@@ -122,6 +122,11 @@ public abstract class Resource
         return mDescription;
     }
 
+    /** For NGW resources when description is filled after a lazy full-resource fetch. */
+    public void setDescription(String description) {
+        mDescription = description;
+    }
+
     @Override
     public String getKey() {
         return mKeyName;

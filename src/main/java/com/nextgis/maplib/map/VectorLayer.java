@@ -224,6 +224,8 @@ public class VectorLayer
     protected LinkedHashMap<String, Field> mFields;
 
     protected boolean mCacheLoaded, mIsCacheRebuilding;
+    /** When true, bulk inserts skip insert broadcast and notifyInsert skips save/cache refresh (NGW/GeoJSON import). */
+    protected boolean mBulkImportMode;
     protected int     mGeometryType;
     protected long    mUniqId;
     protected boolean mIsLocked;
@@ -280,6 +282,25 @@ public class VectorLayer
         mLayerType = LAYERTYPE_LOCAL_VECTOR;
 
         mUniqId = Constants.NOT_FOUND;
+    }
+
+
+    /**
+     * Start bulk feature import: suppress per-row notifications and defer writing R-tree in {@link #toJSON()}
+     * until {@link #endBulkImport()} and a final {@link #save()}.
+     */
+    public void beginBulkImport()
+    {
+        mBulkImportMode = true;
+        mIsCacheRebuilding = true;
+    }
+
+
+    /** End bulk import; call before final {@link #save()} so extents and R-tree are persisted. */
+    public void endBulkImport()
+    {
+        mBulkImportMode = false;
+        mIsCacheRebuilding = false;
     }
 
 
@@ -790,10 +811,18 @@ public class VectorLayer
         jsonStore.fromJSON(jsonObject);
 
         if (mRenderer instanceof RuleFeatureRenderer) {
-            IStyleRule rule = getStyleRule();
-            if (null != rule) {
-                RuleFeatureRenderer renderer = (RuleFeatureRenderer) mRenderer;
-                renderer.setStyleRule(rule);
+            IStyleRule rule = null;
+            if (jsonObject.has(JSON_STYLE_RULE_KEY)) {
+                JSONObject ruleJson = jsonObject.getJSONObject(JSON_STYLE_RULE_KEY);
+                FieldStyleRule fieldRule = new FieldStyleRule(this);
+                fieldRule.fromJSON(ruleJson);
+                rule = fieldRule;
+            }
+            if (rule == null) {
+                rule = getStyleRule();
+            }
+            if (rule != null) {
+                ((RuleFeatureRenderer) mRenderer).setStyleRule(rule);
             }
         }
     }
@@ -1353,7 +1382,7 @@ public class VectorLayer
         SQLiteDatabase db = map.getDatabase(false);
         long rowId = db.insert(mPath.getName(), null, contentValues);
 
-        if (rowId != Constants.NOT_FOUND) {
+        if (rowId != Constants.NOT_FOUND && !mBulkImportMode) {
             Intent notify = new Intent(Constants.NOTIFY_INSERT);
             notify.putExtra(FIELD_ID, rowId);
             notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
@@ -2413,6 +2442,9 @@ public class VectorLayer
     @Override
     public void notifyInsert(long rowId)
     {
+        if (mBulkImportMode) {
+            return;
+        }
 
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "notifyInsert id: " + rowId);
@@ -2642,6 +2674,29 @@ public class VectorLayer
         for (IGeometryCacheItem item : items)
             result.add(item.getFeatureId());
 
+        return result;
+    }
+
+
+    /**
+     * All {@link #FIELD_ID} values in this layer's SQLite table.
+     * Prefer this over {@link #query(GeoEnvelope)} with {@code null} for sync and bulk operations:
+     * the spatial cache may omit or stale-list features relative to the table.
+     */
+    public List<Long> queryAllFeatureIdsFromDb() {
+        List<Long> result = new ArrayList<>();
+        Cursor cursor = query(new String[] { FIELD_ID }, null, null, FIELD_ID, null);
+        if (cursor == null) {
+            return result;
+        }
+        try {
+            int col = cursor.getColumnIndexOrThrow(FIELD_ID);
+            while (cursor.moveToNext()) {
+                result.add(cursor.getLong(col));
+            }
+        } finally {
+            cursor.close();
+        }
         return result;
     }
 
@@ -3280,7 +3335,7 @@ public class VectorLayer
     public void deleteAllFeatures(IProgressor progressor)
     {
         String layerPathName = mPath.getName();
-        List<Long> ids = query(null);
+        List<Long> ids = queryAllFeatureIdsFromDb();
         if (progressor != null)
             progressor.setMax(ids.size());
         int c = 0;
@@ -3562,7 +3617,7 @@ public class VectorLayer
                 NGWVectorLayer layer = (NGWVectorLayer) MapDrawable.getInstance().getLayerByPathName(getPath().getName());
                 FeatureChanges.initialize(layer.getChangeTableName());
                 FeatureAttachments.initialize(layer.getAttachmentsTableName());
-                List<Long> ids = query(null);
+                List<Long> ids = queryAllFeatureIdsFromDb();
                 Collections.sort(ids);
                 for (Long id : ids) {
                     Feature feature = getFeatureWithAttaches(id);

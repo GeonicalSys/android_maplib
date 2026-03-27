@@ -27,8 +27,6 @@ android {
     defaultConfig {
         minSdkVersion 26
         compileSdk 36
-        targetSdkVersion 36
-        versionName '3.0.0'
         buildConfigField "String", "VERSION_NAME", "\"$versionName\""
     }
     productFlavors {
@@ -36,12 +34,12 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             minifyEnabled false
             shrinkResources false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     dataBinding {
@@ -60,6 +58,12 @@ android {
         targetCompatibility JavaVersion.VERSION_21
     }
     namespace 'com.nextgis.maplib'
+    lint {
+        targetSdk 36
+    }
+    testOptions {
+        targetSdk 36
+    }
 }
 
 dependencies {

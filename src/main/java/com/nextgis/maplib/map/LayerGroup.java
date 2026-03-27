@@ -180,6 +180,34 @@ public class LayerGroup
         }
     }
 
+    /**
+     * Depth-first search for a non-group layer whose display name matches (trimmed equals).
+     */
+    public static ILayer findLayerByDisplayNameRecursive(LayerGroup layerGroup, String name) {
+        if (layerGroup == null || name == null) {
+            return null;
+        }
+        final String want = name.trim();
+        if (want.isEmpty()) {
+            return null;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                ILayer found = findLayerByDisplayNameRecursive((LayerGroup) layer, name);
+                if (found != null) {
+                    return found;
+                }
+            } else {
+                String n = layer.getName();
+                if (n != null && want.equals(n.trim())) {
+                    return layer;
+                }
+            }
+        }
+        return null;
+    }
+
     public static ILayer getVectorLayersById(
             LayerGroup layerGroup,
             int id){

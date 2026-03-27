@@ -53,8 +53,6 @@ import static com.nextgis.maplib.util.Constants.JSON_BBOX_MINX_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_BBOX_MINY_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LEVELS_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LEVEL_KEY;
-import static com.nextgis.maplib.util.Constants.JSON_MAXLEVEL_KEY;
-import static com.nextgis.maplib.util.Constants.JSON_MINLEVEL_KEY;
 import static com.nextgis.maplib.util.Constants.LAYERTYPE_LOCAL_TMS;
 
 
@@ -119,8 +117,6 @@ public class LocalTMSLayer
         if(null != mLimits) {
             JSONArray jsonArray = new JSONArray();
             rootConfig.put(JSON_LEVELS_KEY, jsonArray);
-            int nMaxLevel = 0;
-            int nMinLevel = 512;
             for (Map.Entry<Integer, TileCacheLevelDescItem> entry : mLimits.entrySet()) {
                 int nLevelZ = entry.getKey();
                 TileCacheLevelDescItem item = entry.getValue();
@@ -132,17 +128,7 @@ public class LocalTMSLayer
                 oJSONLevel.put(JSON_BBOX_MINY_KEY, item.getMinY());
 
                 jsonArray.put(oJSONLevel);
-
-                if (nMaxLevel < nLevelZ) {
-                    nMaxLevel = nLevelZ;
-                }
-                if (nMinLevel > nLevelZ) {
-                    nMinLevel = nLevelZ;
-                }
             }
-
-            rootConfig.put(JSON_MAXLEVEL_KEY, nMaxLevel);
-            rootConfig.put(JSON_MINLEVEL_KEY, nMinLevel);
         }
         return rootConfig;
     }

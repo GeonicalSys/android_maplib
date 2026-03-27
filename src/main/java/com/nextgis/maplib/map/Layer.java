@@ -139,7 +139,7 @@ public class Layer extends Table
             mMinZoom = GeoConstants.DEFAULT_MIN_ZOOM;
         }
 
-        mIsVisible = jsonObject.getBoolean(JSON_VISIBILITY_KEY);
+        mIsVisible = jsonObject.optBoolean(JSON_VISIBILITY_KEY, true);
 
         if(Constants.DEBUG_MODE){
             Log.d(Constants.TAG, "Layer " + getName() + " is visible " + mIsVisible);

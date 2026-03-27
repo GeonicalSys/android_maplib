@@ -51,6 +51,8 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.net.URL;
 import java.security.cert.CertificateException;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ import io.tus.java.client.TusClient;
 import io.tus.java.client.TusUpload;
 import io.tus.java.client.TusUploader;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -138,8 +141,40 @@ public class NetworkUtil
         userAgentPostfix = pref;
     }
 
-    public final static int TIMEOUT_CONNECTION = 10000;
-    public final static int TIMEOUT_SOCKET = 240000; // 180 sec
+    /** NGW / slow links: allow long TLS and routing (e.g. Wi‑Fi to mobile handoff). */
+    public final static int TIMEOUT_CONNECTION = 45000;
+    /** Large single-request GeoJSON feature downloads from NGW. */
+    public final static int TIMEOUT_SOCKET = 900000; // 15 min
+
+    /**
+     * Whether a failed request is worth retrying (timeouts, disconnects, DNS blips during handover).
+     */
+    public static boolean isTransientNetworkFailure(Throwable t) {
+        while (t != null) {
+            if (t instanceof SocketTimeoutException
+                    || t instanceof UnknownHostException
+                    || t instanceof SSLException
+                    || t instanceof SocketException) {
+                return true;
+            }
+            if (t instanceof IOException) {
+                String m = t.getMessage();
+                if (m != null) {
+                    String u = m.toLowerCase();
+                    if (u.contains("connection reset")
+                            || u.contains("timed out")
+                            || u.contains("broken pipe")
+                            || u.contains("econnreset")
+                            || u.contains("etimedout")
+                            || u.contains("network is unreachable")) {
+                        return true;
+                    }
+                }
+            }
+            t = t.getCause();
+        }
+        return false;
+    }
 
     public final static int ERROR_AUTH                = -401;
     public final static int ERROR_NETWORK_UNAVAILABLE = -1;

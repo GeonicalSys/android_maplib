@@ -31,6 +31,7 @@ import com.nextgis.maplib.location.GpsEventSource;
 import com.nextgis.maplib.map.LayerFactory;
 import com.nextgis.maplib.map.MLP.AuthInterceptorNG;
 import com.nextgis.maplib.map.MapBase;
+import com.nextgis.maplib.map.NGWVectorLayer;
 
 
 /**
@@ -228,6 +229,33 @@ public interface IGISApplication
 
     void startCreateNGWLayerSync(String lpath);
 
+    /**
+     * While true, map UI may skip heavy MapLibre reload on layer-changed events
+     * (e.g. during a multi-layer {@code LayerFillService} queue).
+     */
+    boolean isLayerFillBatchDeferringHeavyMapReload();
 
+    void setLayerFillBatchDeferringHeavyMapReload(boolean defer);
+
+    /**
+     * After a deferred batch finishes, reload map style and all layers (main thread).
+     */
+    void requestMapReloadAfterLayerFillBatch();
+
+    /**
+     * True while {@code LayerFillService} has a non-empty queue or is draining it.
+     * Used to skip {@link com.nextgis.maplib.datasource.ngw.SyncAdapter} work so sync does not
+     * compete with NGW layer import.
+     */
+    boolean isLayerFillServiceBusy();
+
+    void setLayerFillServiceBusy(boolean busy);
+
+    /**
+     * Local NGW vector layer schema no longer matches server metadata during sync.
+     * Implementation should remove the layer and enqueue {@code LayerFillService} refill on the main thread,
+     * unless unsynced local edits exist (then notify user only).
+     */
+    void scheduleNgwLayerRebuildAfterSchemaMismatch(NGWVectorLayer layer);
 
 }

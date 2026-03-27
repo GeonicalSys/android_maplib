@@ -26,6 +26,11 @@ public interface MaplibreMapInteraction {
 
     public  void loadLayersLite();
 
+    /**
+     * Full MapLibre style + layer sources refresh after a deferred layer-fill batch (e.g. collector).
+     */
+    void reloadMapStyleAndLayersAfterLayerFillBatch();
+
     public  boolean getLongLongClickProcesses();
 
     public  void setLongLongClickProcesses(boolean longLongCLickPrecesses);

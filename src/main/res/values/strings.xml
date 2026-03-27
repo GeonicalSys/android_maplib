@@ -96,6 +96,9 @@
     <string name="error_404">Resource not found</string>
     <string name="error_500">Internal server error</string>
     <string name="sync_error_io">Unexpected error</string>
+
+    <string name="ngw_schema_mismatch_title">Layer schema changed</string>
+    <string name="ngw_schema_mismatch_has_local_changes">The layer structure on the server no longer matches this map. You have unsynced edits on the device. Sync or remove your local changes, then remove the layer and add it again from NextGIS Web.</string>
     <string name="self_intersection">Self intersection detected</string>
     <string name="ring_outside">One of the holes outside of the outer ring</string>
     <string name="rings_intersection">Holes intersection</string>

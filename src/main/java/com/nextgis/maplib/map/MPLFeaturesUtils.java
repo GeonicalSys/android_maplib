@@ -126,6 +126,7 @@ public class MPLFeaturesUtils {
     static final public String layer_namepart = "layer-";
     static final public String source_namepart = "source-";
     static final public String outline_namepart = "_outline";
+    static final public String dash_namepart = "_dash";
     static final public String track_namepart = "track-";
     static final public String track_flags_namepart = "track-flags-";
 
@@ -650,8 +651,7 @@ public class MPLFeaturesUtils {
                 feature.addNumberProperty(
                         prop_thinkness,
                         getMPLThinkness(style.getWidth()));
-                if (style instanceof SimpleLineStyle &&
-                        ((SimpleLineStyle) style).getType() == 2) {
+                if (style instanceof SimpleLineStyle) {
                     feature.addNumberProperty(
                             prop_type,
                             ((SimpleLineStyle) style).getType());
@@ -976,6 +976,7 @@ public class MPLFeaturesUtils {
                                                final Style style,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap2,
+                                               @Nullable Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMapLineDash,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> symbolsLayerHashMap,
                                                @Nullable com.nextgis.maplib.display.Style layerStyle,
                                                boolean changeLayer,
@@ -983,6 +984,9 @@ public class MPLFeaturesUtils {
                                                String layerPath,
                                                org.maplibre.android.style.layers.Layer firstToolLayer,
                                                org.maplibre.android.style.layers.Layer signaturesRootLayer){ // layers below signaturesRootLayer
+        if (style == null) {
+            return;
+        }
         // signatures between firstToolLayer and signaturesRootLayer
         float minZoom = -1;
         float maxZoom = -1;
@@ -1040,6 +1044,7 @@ public class MPLFeaturesUtils {
         org.maplibre.android.style.layers.Layer simbolLayer = null;
         org.maplibre.android.style.layers.Layer newLayer = null;
         org.maplibre.android.style.layers.Layer newLayer2 = null;
+        LineLayer newLayerDash = null;
 
         String currentNamePrefixSymbol = "symbol-" +  namePrefix;
 
@@ -1091,10 +1096,13 @@ public class MPLFeaturesUtils {
         boolean isPolygon = layerType == GTPolygon || layerType == GTMultiPolygon;
 
         if (layerType == GeoConstants.GTPoint || layerType == GeoConstants.GTMultiPoint) {
-            if (changeLayer)
-                newLayer = style.getLayer(currentNamePrefix + layer_namepart + layerId);
-            if (newLayer == null)
-                newLayer = new CircleLayer(currentNamePrefix + layer_namepart + layerId, layerPath);
+            String pointMainId = currentNamePrefix + layer_namepart + layerId;
+            if (changeLayer || style.getLayer(pointMainId) != null) {
+                newLayer = style.getLayer(pointMainId);
+            }
+            if (newLayer == null) {
+                newLayer = new CircleLayer(pointMainId, layerPath);
+            }
 
             newLayer.setProperties(
                         PropertyFactory.circleRadius(Expression.coalesce(
@@ -1115,51 +1123,130 @@ public class MPLFeaturesUtils {
                         PropertyFactory.circleStrokeOpacity(1f));
 
         } else if (layerType == GeoConstants.GTLineString || layerType == GeoConstants.GTMultiLineString) {
+            String lineMainId = currentNamePrefix + layer_namepart + layerId;
+            String lineDashId = currentNamePrefix + layer_namepart + layerId + dash_namepart;
+            String lineOutlineId = currentNamePrefix + layer_namepart + layerId + outline_namepart;
             if (changeLayer) {
-                newLayer = style.getLayer(currentNamePrefix + layer_namepart + layerId);
-                newLayer2 = style.getLayer(currentNamePrefix + layer_namepart + layerId + outline_namepart);
+                newLayer = style.getLayer(lineMainId);
+                if (layersHashMapLineDash != null) {
+                    newLayerDash = (LineLayer) style.getLayer(lineDashId);
+                }
+                newLayer2 = style.getLayer(lineOutlineId);
+            } else {
+                if (style.getLayer(lineMainId) != null) {
+                    newLayer = style.getLayer(lineMainId);
+                }
+                if (layersHashMapLineDash != null && style.getLayer(lineDashId) != null) {
+                    newLayerDash = (LineLayer) style.getLayer(lineDashId);
+                }
+                if (style.getLayer(lineOutlineId) != null) {
+                    newLayer2 = style.getLayer(lineOutlineId);
+                }
             }
-            if (newLayer == null )
-                newLayer = new LineLayer(currentNamePrefix + layer_namepart + layerId,layerPath);
+            if (newLayer == null) {
+                newLayer = new LineLayer(lineMainId, layerPath);
+            }
 
-            if (newLayer2 == null)
-                newLayer2 = new LineLayer(currentNamePrefix + layer_namepart + layerId + outline_namepart, layerPath);
+            if (layersHashMapLineDash != null && newLayerDash == null) {
+                newLayerDash = new LineLayer(lineDashId, layerPath);
+            }
 
-            newLayer.setProperties(
-                    PropertyFactory.lineColor(Expression.coalesce(
-                            Expression.get(prop_color_fill), // rule
-                            Expression.literal(getColorName(fistFillColor)))),
+            if (newLayer2 == null) {
+                newLayer2 = new LineLayer(lineOutlineId, layerPath);
+            }
 
-                    PropertyFactory.lineWidth(Expression.coalesce(
-                            Expression.get(prop_thinkness), // rule
-                            Expression.literal(getMPLThinkness(thinkness)))),
+            Expression lineTypeEffective = Expression.toNumber(Expression.coalesce(
+                    Expression.get(prop_type),
+                    Expression.literal((double) type)));
 
-                    PropertyFactory.lineDasharray(type == 2 ?  new Float[]{2f, 2f} : null));
+            // Base line width (main + dash layers). Outline layer must be wider or it is fully covered (rules always set thinkness).
+            Expression lineWidthInner = Expression.coalesce(
+                    Expression.get(prop_thinkness),
+                    Expression.literal((double) getMPLThinkness(thinkness)));
+            // Match SimpleLineStyle.drawSolidEdgingLine: outer stroke is 3x inner width
+            Expression lineWidthOutline = Expression.product(
+                    lineWidthInner,
+                    Expression.literal(3.0));
 
-            // outline -  visible (alpha 1) if line  style set to outline (3)
-            newLayer2.setProperties(
-                    PropertyFactory.lineColor(Expression.coalesce(
-                            Expression.get(prop_color_fill), // rule
-                            Expression.literal(getColorName(outlineColor)))),
+            if (layersHashMapLineDash != null) {
+                Expression filterSolid = Expression.neq(lineTypeEffective, Expression.literal(2.0));
+                Expression filterDash = Expression.eq(lineTypeEffective, Expression.literal(2.0));
 
-                    PropertyFactory.lineWidth(Expression.coalesce(
-                            Expression.get(prop_thinkness), // rule
-                            Expression.literal(getMPLThinkness(thinkness) * 1.5))),
+                ((LineLayer) newLayer).setFilter(filterSolid);
+                newLayerDash.setFilter(filterDash);
 
-                    PropertyFactory.lineOpacity(type == 3? 1.0f:0.0f)
-            );
+                newLayer.setProperties(
+                        PropertyFactory.lineColor(Expression.coalesce(
+                                Expression.get(prop_color_fill), // rule
+                                Expression.literal(getColorName(fistFillColor)))),
 
+                        PropertyFactory.lineWidth(lineWidthInner));
+
+                newLayerDash.setProperties(
+                        PropertyFactory.lineColor(Expression.coalesce(
+                                Expression.get(prop_color_fill), // rule
+                                Expression.literal(getColorName(fistFillColor)))),
+
+                        PropertyFactory.lineWidth(lineWidthInner),
+
+                        PropertyFactory.lineDasharray(new Float[]{2f, 2f}));
+            } else {
+                newLayer.setProperties(
+                        PropertyFactory.lineColor(Expression.coalesce(
+                                Expression.get(prop_color_fill), // rule
+                                Expression.literal(getColorName(fistFillColor)))),
+
+                        PropertyFactory.lineWidth(lineWidthInner),
+
+                        PropertyFactory.lineDasharray(type == 2 ? new Float[]{2f, 2f} : null));
+            }
+
+            // outline - visible (alpha 1) if line style is edging solid (3); stroke color in textcolor for rules
+            if (layersHashMapLineDash != null) {
+                newLayer2.setProperties(
+                        PropertyFactory.lineColor(Expression.coalesce(
+                                Expression.get(prop_text_color), // rule: line outColor
+                                Expression.literal(getColorName(outlineColor)))),
+
+                        PropertyFactory.lineWidth(lineWidthOutline),
+
+                        PropertyFactory.lineOpacity(
+                                Expression.switchCase(
+                                        Expression.eq(lineTypeEffective, Expression.literal(3.0)),
+                                        Expression.literal(1.0),
+                                        Expression.literal(0.0))));
+            } else {
+                newLayer2.setProperties(
+                        PropertyFactory.lineColor(Expression.coalesce(
+                                Expression.get(prop_text_color), // rule: line outColor
+                                Expression.literal(getColorName(outlineColor)))),
+
+                        PropertyFactory.lineWidth(lineWidthOutline),
+
+                        PropertyFactory.lineOpacity(type == 3 ? 1.0f : 0.0f));
+            }
 
         } else if (layerType == GTPolygon || layerType == GeoConstants.GTMultiPolygon) {
+            String polyMainId = currentNamePrefix + layer_namepart + layerId;
+            String polyOutlineId = currentNamePrefix + layer_namepart + layerId + outline_namepart;
             if (changeLayer) {
-                newLayer = style.getLayer(currentNamePrefix + layer_namepart + layerId);
-                newLayer2 = style.getLayer(currentNamePrefix + layer_namepart + layerId + outline_namepart);
+                newLayer = style.getLayer(polyMainId);
+                newLayer2 = style.getLayer(polyOutlineId);
+            } else {
+                if (style.getLayer(polyMainId) != null) {
+                    newLayer = style.getLayer(polyMainId);
+                }
+                if (style.getLayer(polyOutlineId) != null) {
+                    newLayer2 = style.getLayer(polyOutlineId);
+                }
             }
-            if (newLayer == null)
-                newLayer = new FillLayer(currentNamePrefix + layer_namepart + layerId,layerPath);
+            if (newLayer == null) {
+                newLayer = new FillLayer(polyMainId, layerPath);
+            }
 
-            if (newLayer2 == null)
-                newLayer2 = new LineLayer(currentNamePrefix + layer_namepart + layerId + outline_namepart, layerPath);
+            if (newLayer2 == null) {
+                newLayer2 = new LineLayer(polyOutlineId, layerPath);
+            }
 
             newLayer.setProperties(
                             PropertyFactory.fillColor(Expression.coalesce(
@@ -1213,16 +1300,20 @@ public class MPLFeaturesUtils {
             } else {
                 if (needSignatures) {
                     if (simbolLayer == null) {
-                        Log.d("Mbgl", "create layer name : " + currentNamePrefixSymbol + layer_namepart + layerId);
-                        Log.d("Mbgl", "create layer source : " + (layerPath + (isPolygon ? source_polygon_text : "")));
-                        simbolLayer = new SymbolLayer(currentNamePrefixSymbol + layer_namepart + layerId,
-                                layerPath + (isPolygon ? source_polygon_text : ""));
+                        String symbolLayerId = currentNamePrefixSymbol + layer_namepart + layerId;
+                        simbolLayer = style.getLayer(symbolLayerId);
+                        if (simbolLayer == null) {
+                            Log.d("Mbgl", "create layer name : " + symbolLayerId);
+                            Log.d("Mbgl", "create layer source : " + (layerPath + (isPolygon ? source_polygon_text : "")));
+                            simbolLayer = new SymbolLayer(symbolLayerId,
+                                    layerPath + (isPolygon ? source_polygon_text : ""));
 
-                        if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ){
-                            style.addLayerAbove(simbolLayer, signaturesRootLayer.getId());
-                        }
-                        else {
-                            style.addLayer(simbolLayer);
+                            if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ){
+                                style.addLayerAbove(simbolLayer, signaturesRootLayer.getId());
+                            }
+                            else {
+                                style.addLayer(simbolLayer);
+                            }
                         }
                         symbolsLayerHashMap.put(layerId, simbolLayer);
                     }
@@ -1278,11 +1369,13 @@ public class MPLFeaturesUtils {
 
         if (newLayer != null) {
             if (!changeLayer) {
-                if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ) {
-                    style.addLayerBelow(newLayer, signaturesRootLayer.getId());
-                }
-                else {
-                    style.addLayer(newLayer);
+                if (style.getLayer(newLayer.getId()) == null) {
+                    if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ) {
+                        style.addLayerBelow(newLayer, signaturesRootLayer.getId());
+                    }
+                    else {
+                        style.addLayer(newLayer);
+                    }
                 }
                 layersHashMap.put(layerId, newLayer);
             }
@@ -1290,16 +1383,32 @@ public class MPLFeaturesUtils {
 
         if (newLayer2 != null) {
             if (!changeLayer) {
-                if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null  && newLayer != null){
-                    if (layerType == GeoConstants.GTLineString || layerType == GeoConstants.GTMultiLineString)
-                        style.addLayerBelow (newLayer2, newLayer.getId());
-                    else
-                        style.addLayerBelow (newLayer2, signaturesRootLayer.getId());
-                }
-                else {
-                    style.addLayer(newLayer2);
+                if (style.getLayer(newLayer2.getId()) == null) {
+                    if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null  && newLayer != null){
+                        if (layerType == GeoConstants.GTLineString || layerType == GeoConstants.GTMultiLineString)
+                            style.addLayerBelow (newLayer2, newLayer.getId());
+                        else
+                            style.addLayerBelow (newLayer2, signaturesRootLayer.getId());
+                    }
+                    else {
+                        style.addLayer(newLayer2);
+                    }
                 }
                 layersHashMap2.put(layerId, newLayer2);
+            }
+        }
+
+        if (newLayerDash != null && layersHashMapLineDash != null) {
+            if (!changeLayer) {
+                if (style.getLayer(newLayerDash.getId()) == null) {
+                    if (newLayer != null)
+                        style.addLayerAbove(newLayerDash, newLayer.getId());
+                    else if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null)
+                        style.addLayerBelow(newLayerDash, signaturesRootLayer.getId());
+                    else
+                        style.addLayer(newLayerDash);
+                }
+                layersHashMapLineDash.put(layerId, newLayerDash);
             }
         }
 
@@ -1308,6 +1417,8 @@ public class MPLFeaturesUtils {
         if (minZoom!= -1){
             if (newLayer != null)
                 newLayer.setMinZoom(minZoom);
+            if (newLayerDash != null)
+                newLayerDash.setMinZoom(minZoom);
             if (newLayer2 != null)
                 newLayer2.setMinZoom(minZoom);
             if (simbolLayer != null)
@@ -1317,6 +1428,8 @@ public class MPLFeaturesUtils {
         if (maxZoom!= -1){
             if (newLayer != null)
                 newLayer.setMaxZoom(maxZoom);
+            if (newLayerDash != null)
+                newLayerDash.setMaxZoom(maxZoom);
             if (newLayer2 != null)
                 newLayer2.setMaxZoom(maxZoom);
             if (simbolLayer != null)

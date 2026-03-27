@@ -131,10 +131,16 @@ public class SyncAdapter
     {
 
 //        Log.e("RRFRSH", "SyncAdapter ngw - onPerformSync for " + account.name);
-        ((IGISApplication)getContext().getApplicationContext()).setError(
-                null,null,0);
+        IGISApplication gisApp = (IGISApplication) getContext().getApplicationContext();
+        gisApp.setError(null, null, 0);
 
-        ((IGISApplication)getContext().getApplicationContext()).stopHandler();
+        if (gisApp.isLayerFillServiceBusy()) {
+            HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync skipped (layer fill in progress) for " + account.name);
+            Log.d(TAG, "onPerformSync skipped: LayerFillService busy");
+            return;
+        }
+
+        gisApp.stopHandler();
         HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync for" + account.name + " ngw part start");
         Log.d(TAG, "onPerformSync");
 
