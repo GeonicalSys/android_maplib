@@ -1474,20 +1474,31 @@ public class NGWVectorLayer
                     try {
                         String descriptionRaw = LayerConfigUtil.extractNgwResourceDescriptionJson(resourceMeta);
                         if (descriptionRaw != null && !descriptionRaw.trim().isEmpty()) {
-                            JSONObject serverCfg = LayerConfigUtil.parseLayerConfigObject(descriptionRaw);
-                            LayerConfigDiff configDiff = LayerConfigDiff.compare(serverCfg, this);
-                            if (configDiff.isHard()) {
+                            String descHash = LayerConfigUtil.md5(descriptionRaw.trim());
+                            String lastHash = getPreferences().getString(
+                                    SettingsConstants.KEY_PREF_LAST_CONFIG_HASH, "");
+                            if (descHash.equals(lastHash)) {
                                 HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
-                                        + " config hard mismatch: " + configDiff.getHardReason()
-                                        + " — scheduling rebuild");
-                                ((IGISApplication) mContext.getApplicationContext())
-                                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
-                                return true;
-                            }
-                            if (configDiff.isSoftOnly()) {
-                                HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
-                                        + " applying soft config update: " + configDiff);
-                                applySoftConfigUpdate(configDiff);
+                                        + " config description unchanged (hash match), skipping");
+                            } else {
+                                JSONObject serverCfg = LayerConfigUtil.parseLayerConfigObject(descriptionRaw);
+                                LayerConfigDiff configDiff = LayerConfigDiff.compare(serverCfg, this);
+                                if (configDiff.isHard()) {
+                                    HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                                            + " config hard mismatch: " + configDiff.getHardReason()
+                                            + " — scheduling rebuild");
+                                    ((IGISApplication) mContext.getApplicationContext())
+                                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                                    return true;
+                                }
+                                if (configDiff.isSoftOnly()) {
+                                    HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                                            + " applying soft config update: " + configDiff);
+                                    applySoftConfigUpdate(configDiff);
+                                }
+                                getPreferences().edit()
+                                        .putString(SettingsConstants.KEY_PREF_LAST_CONFIG_HASH, descHash)
+                                        .apply();
                             }
                         }
                     } catch (JSONException cfgEx) {

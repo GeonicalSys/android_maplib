@@ -30,6 +30,8 @@ public interface SettingsConstants
     String KEY_PREF_LAST_SYNC_TIMESTAMP     = "last_sync_timestamp";
     /** Bumped when layer feature data changes; invalidates on-disk MapLibre render cache. */
     String KEY_PREF_RENDER_CACHE_GENERATION = "render_cache_generation";
+    /** MD5 hash of last applied config description text; avoids false-positive config reloads. */
+    String KEY_PREF_LAST_CONFIG_HASH        = "last_config_hash";
     String KEY_PREF_LOCATION_SOURCE         = "location_source";
     String KEY_PREF_LOCATION_MIN_TIME       = "location_min_time";
     String KEY_PREF_LOCATION_MIN_DISTANCE   = "location_min_distance";

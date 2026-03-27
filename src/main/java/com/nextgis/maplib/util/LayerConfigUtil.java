@@ -11,6 +11,9 @@ import java.util.Iterator;
 
 import com.nextgis.maplib.util.GeoConstants;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 /**
  * Utilities for parsing NGW resource description JSON that contains mobile layer config.
  * Extracted from LayerFillService so the same logic can be used from NGWVectorLayer during sync.
@@ -193,5 +196,23 @@ public final class LayerConfigUtil {
             }
         }
         return s.substring(start);
+    }
+
+    /**
+     * Simple MD5 hex digest for comparing description text identity across syncs.
+     */
+    public static String md5(String input) {
+        if (input == null) return "";
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b & 0xff));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            return String.valueOf(input.hashCode());
+        }
     }
 }
