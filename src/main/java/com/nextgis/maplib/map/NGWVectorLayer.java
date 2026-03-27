@@ -1482,6 +1482,12 @@ public class NGWVectorLayer
                             if (descHash.equals(lastHash)) {
                                 HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
                                         + " config description unchanged (hash match), skipping");
+                            } else if (lastHash.isEmpty()) {
+                                HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                                        + " no previous config hash stored, saving current hash (skip comparison)");
+                                getPreferences().edit()
+                                        .putString(SettingsConstants.KEY_PREF_LAST_CONFIG_HASH, descHash)
+                                        .apply();
                             } else {
                                 JSONObject serverCfg = LayerConfigUtil.parseLayerConfigObject(descriptionRaw);
                                 LayerConfigDiff configDiff = LayerConfigDiff.compare(serverCfg, this);
