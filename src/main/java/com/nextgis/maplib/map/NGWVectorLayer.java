@@ -61,6 +61,8 @@ import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.HttpResponse;
 import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NGWUtil;
+import com.nextgis.maplib.util.LayerConfigDiff;
+import com.nextgis.maplib.util.LayerConfigUtil;
 import com.nextgis.maplib.util.NGWLayerSchemaCompat;
 import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.ProgressBufferedInputStream;
@@ -544,6 +546,35 @@ public class NGWVectorLayer
         }
     }
 
+
+    @Override
+    public boolean applySoftConfigUpdate(com.nextgis.maplib.util.LayerConfigDiff diff) {
+        boolean changed = super.applySoftConfigUpdate(diff);
+        if (diff == null || diff.isMatch() || diff.isHard()) {
+            return changed;
+        }
+        JSONObject cfg = diff.getServerConfig();
+        if (diff.isSyncSettingsChanged()) {
+            if (cfg.has(JSON_SYNC_TYPE_KEY)) {
+                mSyncType = cfg.optInt(JSON_SYNC_TYPE_KEY, mSyncType);
+                changed = true;
+            }
+            if (cfg.has(JSON_SYNC_DIRECTION_KEY)) {
+                mSyncDirection = cfg.optInt(JSON_SYNC_DIRECTION_KEY, mSyncDirection);
+                changed = true;
+            }
+            if (cfg.has(JSON_TRACKED_KEY)) {
+                mTracked = cfg.optBoolean(JSON_TRACKED_KEY, mTracked);
+                changed = true;
+            }
+            if (cfg.has(JSON_SERVERWHERE_KEY)) {
+                mServerWhere = cfg.optString(JSON_SERVERWHERE_KEY, mServerWhere);
+                changed = true;
+            }
+            if (changed) save();
+        }
+        return changed;
+    }
 
     @Override
     public void create(
@@ -1437,6 +1468,32 @@ public class NGWVectorLayer
                     ((IGISApplication) mContext.getApplicationContext())
                             .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
                     return true;
+                }
+
+                if (resourceMeta != null) {
+                    try {
+                        String descriptionRaw = LayerConfigUtil.extractNgwResourceDescriptionJson(resourceMeta);
+                        if (descriptionRaw != null && !descriptionRaw.trim().isEmpty()) {
+                            JSONObject serverCfg = LayerConfigUtil.parseLayerConfigObject(descriptionRaw);
+                            LayerConfigDiff configDiff = LayerConfigDiff.compare(serverCfg, this);
+                            if (configDiff.isHard()) {
+                                HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                                        + " config hard mismatch: " + configDiff.getHardReason()
+                                        + " — scheduling rebuild");
+                                ((IGISApplication) mContext.getApplicationContext())
+                                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                                return true;
+                            }
+                            if (configDiff.isSoftOnly()) {
+                                HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                                        + " applying soft config update: " + configDiff);
+                                applySoftConfigUpdate(configDiff);
+                            }
+                        }
+                    } catch (JSONException cfgEx) {
+                        HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                                + " config parse failed (ignored): " + cfgEx.getMessage());
+                    }
                 }
             }
         } catch (IllegalStateException ignored) {

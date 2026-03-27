@@ -2300,6 +2300,98 @@ public class VectorLayer
      * @return list of field names present in mFields but missing from the SQLite table;
      *         empty list means the schema is consistent.
      */
+    /**
+     * Apply "soft" config updates from server description without re-downloading data.
+     * Handles: new fields (ALTER TABLE), alias changes, renderer, visibility, zoom, name,
+     * sync settings, editable flag.
+     * Does NOT touch geometry_type or field type changes (those require rebuild).
+     *
+     * @param diff result from {@link com.nextgis.maplib.util.LayerConfigDiff#compare}
+     * @return true if any changes were applied
+     */
+    public boolean applySoftConfigUpdate(com.nextgis.maplib.util.LayerConfigDiff diff) {
+        if (diff == null || diff.isMatch() || diff.isHard()) {
+            return false;
+        }
+        boolean changed = false;
+        JSONObject cfg = diff.getServerConfig();
+
+        for (Field newField : diff.getAddedFields()) {
+            try {
+                String sqlType = fieldTypeToSql(newField.getType());
+                MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+                if (map != null) {
+                    SQLiteDatabase db = map.getDatabase(false);
+                    db.execSQL("ALTER TABLE '" + mPath.getName() + "' ADD COLUMN '"
+                            + newField.getName() + "' " + sqlType);
+                    if (mFields == null) mFields = new LinkedHashMap<>();
+                    mFields.put(newField.getName(), newField);
+                    changed = true;
+                    Log.i(TAG, "applySoftConfigUpdate: added column " + newField.getName());
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "applySoftConfigUpdate: ALTER TABLE failed for " + newField.getName(), e);
+            }
+        }
+
+        for (Map.Entry<String, String> e : diff.getAliasChanges().entrySet()) {
+            Field f = mFields != null ? mFields.get(e.getKey()) : null;
+            if (f != null) {
+                f.setAlias(e.getValue());
+                changed = true;
+            }
+        }
+
+        if (diff.isRendererChanged() && cfg.has(Constants.JSON_RENDERERPROPS_KEY)) {
+            try {
+                setRenderer(cfg.getJSONObject(Constants.JSON_RENDERERPROPS_KEY));
+                changed = true;
+                Log.i(TAG, "applySoftConfigUpdate: renderer updated");
+            } catch (JSONException e) {
+                Log.w(TAG, "applySoftConfigUpdate: renderer update failed", e);
+            }
+        }
+
+        if (diff.isVisibilityChanged() && cfg.has(Constants.JSON_VISIBILITY_KEY)) {
+            setVisible(cfg.optBoolean(Constants.JSON_VISIBILITY_KEY, isVisible()));
+            changed = true;
+        }
+
+        if (diff.isZoomChanged()) {
+            if (cfg.has(Constants.JSON_MAXLEVEL_KEY))
+                setMaxZoom((float) cfg.optDouble(Constants.JSON_MAXLEVEL_KEY, getMaxZoom()));
+            if (cfg.has(Constants.JSON_MINLEVEL_KEY))
+                setMinZoom((float) cfg.optDouble(Constants.JSON_MINLEVEL_KEY, getMinZoom()));
+            changed = true;
+        }
+
+        if (diff.isNameChanged() && cfg.has(Constants.JSON_NAME_KEY)) {
+            String newName = cfg.optString(Constants.JSON_NAME_KEY, "");
+            if (!newName.isEmpty()) {
+                setName(newName);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            save();
+        }
+        return changed;
+    }
+
+    private static String fieldTypeToSql(int type) {
+        switch (type) {
+            case GeoConstants.FTString:  return "TEXT";
+            case GeoConstants.FTInteger:
+            case GeoConstants.FTLong:    return "INTEGER";
+            case GeoConstants.FTReal:    return "REAL";
+            case GeoConstants.FTDateTime:
+            case GeoConstants.FTDate:
+            case GeoConstants.FTTime:    return "TIMESTAMP";
+            default:                     return "TEXT";
+        }
+    }
+
     public List<String> validateSqliteSchemaAgainstFields() {
         List<String> missing = new ArrayList<>();
         if (mFields == null || mFields.isEmpty()) {
