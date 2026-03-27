@@ -129,8 +129,6 @@ public class SyncAdapter
             ContentProviderClient contentProviderClient,
             SyncResult syncResult)
     {
-
-//        Log.e("RRFRSH", "SyncAdapter ngw - onPerformSync for " + account.name);
         IGISApplication gisApp = (IGISApplication) getContext().getApplicationContext();
         gisApp.setError(null, null, 0);
 
@@ -215,6 +213,8 @@ public class SyncAdapter
                 mError += "\r\n";
             mError += getContext().getString(R.string.sync_error_oom);
         }
+        Log.d("SSYNC", "onPerformSync END account - " + account.name);
+        Log.d("SSYNC", "onPerformSync END error - " + mError);
 
         Intent finish = new Intent(SYNC_FINISH);
         if (!TextUtils.isEmpty(mError))
@@ -270,8 +270,7 @@ public class SyncAdapter
             SyncResult syncResult,
             Bundle bundle)
     {
-
-//        Log.e("RRFRSH", "sync() ngw ");
+        Log.d("SSYNC", "sync syncAdapter account - " + account.name);
 
         HyperLog.v(Constants.TAG, "SyncAdapter: StartSynchronization");
         HyperLog.v(Constants.TAG, "SyncAdapter: total layers for sync in " + layerGroup + " is " + layerGroup.getLayerCount());
@@ -348,6 +347,7 @@ public class SyncAdapter
             }
             HyperLog.v(Constants.TAG, "SyncAdapter: Sync Ended for " + layer.getName() + " layer");
         }
+        Log.d("SSYNC", "END sync syncAdapter account - " + account.name);
     }
 
     @SuppressLint("MissingPermission")
@@ -360,9 +360,10 @@ public class SyncAdapter
         final AccountManager accountManager = AccountManager.get(context);
         Log.d(TAG, "SyncAdapter: AccountManager.get(" + context + ")");
 
-        for (Account account : accountManager.getAccountsByType(application.getAccountsType())) {
-            ContentResolver.addPeriodicSync(account, application.getAuthority(), extras, pollFrequency);
-        }
+//      for (Account account : accountManager.getAccountsByType(application.getAccountsType())) {
+//          ContentResolver.addPeriodicSync(account, application.getAuthority(), extras, pollFrequency);
+//      }
+
     }
 
     public boolean isCanceled()

@@ -362,6 +362,8 @@ public class MPLFeaturesUtils {
             Long id = entry.getKey();
             com.nextgis.maplib.datasource.Feature feature = entry.getValue();
             GeoPoint geoPointGeometry = (GeoPoint) feature.getGeometry();
+            if (geoPointGeometry == null)
+                continue;
             double[] lonLat = convert3857To4326(geoPointGeometry.getX(), geoPointGeometry.getY());
             Point point = Point.fromLngLat(lonLat[0], lonLat[1]);
             Feature pointFeature = org.maplibre.geojson.Feature.fromGeometry(point);

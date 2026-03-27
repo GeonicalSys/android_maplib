@@ -217,6 +217,8 @@ public class Connection
                 return NGWResourceTypeWMSClient;
             case "lookup_table":
                 return NGWResourceTypeLookupTable;
+            case "demo_project":
+                return NGWResourceTypeResourceGroup;
             case "collector_project":
                 return NGWResourceTypeCollector;
             default:
