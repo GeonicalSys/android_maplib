@@ -852,7 +852,8 @@ public class MPLFeaturesUtils {
                                             Map<Integer, String> rasterLayersURL,
                                             Map<Integer, Integer> rasterLayersTmsTypeMap,
                                             String layerPath,
-                                            boolean forceCreate) {
+                                            boolean forceCreate,
+                                            java.net.URI fileUri) {
         if (layerType == GT_TRACK_WA){
             return;
         }
@@ -889,11 +890,19 @@ public class MPLFeaturesUtils {
 
         GeoJsonSource vectorSource = (GeoJsonSource) style.getSource(layerPath);
         if (vectorSource == null) {
-            vectorSource = new GeoJsonSource(layerPath, FeatureCollection.fromFeatures(layerFeatures));
+            if (fileUri != null) {
+                vectorSource = new GeoJsonSource(layerPath, fileUri);
+            } else {
+                vectorSource = new GeoJsonSource(layerPath, FeatureCollection.fromFeatures(layerFeatures));
+            }
             style.addSource(vectorSource);
+        } else {
+            if (fileUri != null) {
+                vectorSource.setUri(fileUri);
+            } else {
+                vectorSource.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
+            }
         }
-        else
-            vectorSource.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
 
         sourceHashMap.put(layerPath, vectorSource);
 

@@ -216,6 +216,8 @@ public class MapDrawable
 
     // map  layerID : list of added features for layer
     LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourceFeaturesHashMap = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
+    // map  layerID : file URI for layers loaded from disk cache (bypasses Java JSON parsing)
+    final Map<Integer, java.net.URI> sourceFileUriMap = new HashMap<>();
 
     LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourcesOrder = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
 
@@ -295,6 +297,10 @@ public class MapDrawable
 
     /** Monotonic id so only the latest {@link #loadLayersToMaplibreMap} style callback applies UI teardown. */
     private final AtomicInteger mLoadLayersStyleRequestId = new AtomicInteger(0);
+
+    /** Prevents re-entrant layer loading: invalidation during load is deferred. */
+    private volatile boolean mLayerLoadInProgress = false;
+    private volatile boolean mPendingReload = false;
 
     @Nullable
     private MapView.OnDidFinishLoadingStyleListener mLoadLayersStyleListener;
@@ -440,7 +446,7 @@ public class MapDrawable
                     new ArrayList<>(),
                     style, sourceHashMap,
                     rasterLayersURL, rasterLayersTmsTypeMap,
-                    iLayer.getPath().toString(), true);
+                    iLayer.getPath().toString(), true, null);
         });
     }
 
@@ -622,7 +628,7 @@ public class MapDrawable
                                 signaturesRootLayer);
                         createSourceForLayer(iLayer.getId(), finalGeoType, vectorPolygonFeatures, mainStyle, sourceHashMap,
                                 rasterLayersURLMap, rasterLayersTmsTypeMap,
-                                iLayer.getPath().toString(), false);
+                                iLayer.getPath().toString(), false, null);
 
                         checkLayerVisibility(iLayer.getId());
                     });
@@ -811,13 +817,23 @@ public class MapDrawable
             return;
         }
 
+        if (mLayerLoadInProgress) {
+            mPendingReload = true;
+            Log.d(TAG, "loadLayersToMaplibreMap: already in progress, deferring");
+            return;
+        }
+        mLayerLoadInProgress = true;
+        mPendingReload = false;
+        sourceFileUriMap.clear();
+
         mapFrag.changeProgress(true);
 
         mapViewRef.setOnTouchListener(this);
         mapRef.addOnMapClickListener(this);
         mapRef.addOnMapLongClickListener(this);
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        final int poolSize = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors()));
+        ExecutorService executor = Executors.newFixedThreadPool(poolSize);
         Handler mainHandler = new Handler(Looper.getMainLooper());
 
         final Map<Integer, Integer> layersType = new HashMap<>();
@@ -854,26 +870,25 @@ public class MapDrawable
                         if (skipInvisibleLayers && !layer.isVisible())
                             continue;
 
-                        List<org.maplibre.geojson.Feature> vectorFeatures = VectorLayerRenderCache.tryLoad(layer);
-                        if (vectorFeatures == null) {
+                        java.net.URI cachedUri = VectorLayerRenderCache.tryLoadAsUri(layer);
+                        List<org.maplibre.geojson.Feature> vectorFeatures;
+                        if (cachedUri != null) {
+                            vectorFeatures = new ArrayList<>();
+                            sourceFileUriMap.put(layer.getId(), cachedUri);
+                            Log.d(TAG, "loadLayersToMaplibreMap FILE-URI layer=" + layer.getName());
+                        } else {
                             Intent msg = new Intent(MESSAGE_INTENT_STYLING);
                             String loadHint = getContext().getString(R.string.process_layer_hint);
                             msg.putExtra("msg", loadHint + layer.getName());
                             msg.setPackage(getContext().getPackageName());
                             getContext().sendBroadcast(msg);
 
-                            long tDbStart = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
+                            long tDbStart = System.nanoTime();
                             vectorFeatures = createFeatureListFromLayer(layer);
-                            if (Constants.DEBUG_MODE) {
-                                Log.d(TAG, "loadLayersToMaplibreMap DB build layer=" + layer.getName()
-                                        + " features=" + vectorFeatures.size()
-                                        + " ns=" + (System.nanoTime() - tDbStart));
-                            }
-                            VectorLayerRenderCache.save(layer, vectorFeatures);
-                        } else if (Constants.DEBUG_MODE) {
-                            Log.d(TAG, "loadLayersToMaplibreMap CACHE layer=" + layer.getName()
+                            Log.d(TAG, "loadLayersToMaplibreMap DB build layer=" + layer.getName()
                                     + " features=" + vectorFeatures.size()
-                                    + " parseNs=" + VectorLayerRenderCache.getLastLoadNanos());
+                                    + " ms=" + ((System.nanoTime() - tDbStart) / 1_000_000));
+                            VectorLayerRenderCache.save(layer, vectorFeatures);
                         }
                         com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
                         layersType.put(layer.getId(), layer.getGeometryType());
@@ -1216,7 +1231,8 @@ public class MapDrawable
                                         sourceHashMap,
                                         rasterLayersURLMap,
                                         rasterLayersTmsTypeMap,
-                                        pathForLayer, false);
+                                        pathForLayer, false,
+                                        sourceFileUriMap.get(entry.getKey()));
 
                             createFillLayerForLayer(entry.getKey(),
                                     geoType,
@@ -1236,8 +1252,17 @@ public class MapDrawable
                         } catch (Throwable t) {
                             Log.e(TAG, "loadLayersToMaplibreMap: onDidFinishLoadingStyle", t);
                         } finally {
+                            mLayerLoadInProgress = false;
                             if (styleRequestId == mLoadLayersStyleRequestId.get()) {
                                 dismissStylingProgress();
+                            }
+                            if (mPendingReload) {
+                                mPendingReload = false;
+                                Log.d(TAG, "loadLayersToMaplibreMap: executing deferred reload");
+                                MaplibreMapInteraction mf = mapFragment.get();
+                                if (mf != null) {
+                                    mf.reloadMapStyleAndLayersAfterLayerFillBatch();
+                                }
                             }
                         }
                     }
