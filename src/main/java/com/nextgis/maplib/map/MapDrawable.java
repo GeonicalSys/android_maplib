@@ -551,19 +551,17 @@ public class MapDrawable
                         mainHandler.post(()-> {
                                     mapFragment.get().changeProgress(true); });
                         try {
-                            List<org.maplibre.geojson.Feature> fromCache = VectorLayerRenderCache.tryLoad(layer);
-                            if (fromCache == null) {
+                            java.net.URI cachedUri = VectorLayerRenderCache.tryLoadAsUri(layer);
+                            if (cachedUri != null) {
+                                sourceFileUriMap.put(layer.getId(), cachedUri);
+                            } else {
                                 Intent msg = new Intent(MESSAGE_INTENT_STYLING);
-
                                 String loadHint = getContext().getString(R.string.process_layer_hint);
-
                                 msg.putExtra("msg", loadHint + ((VectorLayer) iLayer).getName());
                                 msg.setPackage(getContext().getPackageName());
                                 getContext().sendBroadcast(msg);
                                 vectorPolygonFeatures.addAll(createFeatureListFromLayer(layer));
                                 VectorLayerRenderCache.save(layer, vectorPolygonFeatures);
-                            } else {
-                                vectorPolygonFeatures.addAll(fromCache);
                             }
                             sourceFeaturesHashMap.put(layer.getId(), vectorPolygonFeatures);
                             sourcesOrder.put(layer.getId(), new ArrayList<>());
