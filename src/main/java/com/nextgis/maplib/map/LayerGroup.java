@@ -410,12 +410,15 @@ public class LayerGroup
             mDisplay = display;
         }
 
-        if (mLayers.size() == 0) {
-            return;
+        List<ILayer> layersCopy;
+        synchronized (this) {
+            if (mLayers.size() == 0) {
+                return;
+            }
+            layersCopy = new ArrayList<>(mLayers.values());
         }
 
-        //synchronized (this) {
-            for (ILayer layer : mLayers.values()) {
+            for (ILayer layer : layersCopy) {
                 if (Thread.currentThread().isInterrupted()) {
                     break;
                 }
@@ -441,7 +444,6 @@ public class LayerGroup
                     }
                 }
             }
-        //}
     }
 
 
@@ -841,10 +843,13 @@ public class LayerGroup
     }
 
     public static Integer removeLayer(LinkedHashMap<Integer, ILayer> map, ILayer layer) {
-        for (Map.Entry<Integer, ILayer> e : map.entrySet()) {
+        Iterator<Map.Entry<Integer, ILayer>> it = map.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, ILayer> e = it.next();
             if (e.getValue() == layer) {
-                map.remove(e.getKey());
-                return e.getKey();
+                Integer key = e.getKey();
+                it.remove();
+                return key;
             }
         }
         return null;

@@ -335,8 +335,11 @@ public class MapDrawable
 
     public void clearMaplLibreMap(){
 
-        final Style style = maplibreMap.get().getStyle();
-        for (final Layer layer :maplibreMap.get().getStyle().getLayers()){
+        MapLibreMap map = maplibreMap.get();
+        if (map == null) return;
+        final Style style = map.getStyle();
+        if (style == null) return;
+        for (final Layer layer : style.getLayers()){
 //            Log.e("ZXZY", "delete layer" + layer.getId());
             if (!layer.getId().equals("background"))
                 style.removeLayer(layer);
@@ -394,6 +397,7 @@ public class MapDrawable
 
         String oldFeatureIdString = String.valueOf(oldFeatureId);
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerId);
+        if (layerFeatures == null) return;
         for (org.maplibre.geojson.Feature feature : layerFeatures){
             if (feature.getStringProperty(prop_featureid).equals(oldFeatureIdString)) {
                 feature.addStringProperty(prop_featureid, String.valueOf(newFeatureId));
@@ -2469,7 +2473,9 @@ public class MapDrawable
         double[] lonLatCenter = convert3857To4326(center.getX(),center.getY());
         LatLng lngCenter = new LatLng(lonLatCenter[1], lonLatCenter[0]);
 
-        maplibreMap.get().moveCamera(CameraUpdateFactory.newLatLng(lngCenter));
+        MapLibreMap map = maplibreMap.get();
+        if (map == null) return;
+        map.moveCamera(CameraUpdateFactory.newLatLng(lngCenter));
     }
 
     public void zoomToExtent(GeoEnvelope envelope, float maxZoom, boolean startSecondMaplibre) {
@@ -3158,52 +3164,57 @@ public class MapDrawable
         mCursor = context.getContentResolver()
                 .query(mContentUriTracks, mProjection, mSelection, null, null);
 
-
-        if (mCursor == null || mCursor.getCount() == 0 || !mCursor.moveToFirst()) {
+        if (mCursor == null) {
             return result;
         }
 
-        String id = mCursor.getString(0);
-        String[] proj = new String[] {TrackLayer.FIELD_LON, TrackLayer.FIELD_LAT};
-
-        Cursor track = null;
         try {
-            track = context.getContentResolver()
-                    .query(Uri.withAppendedPath(mContentUriTracks, id), proj, null, null, null);
-        }catch (Exception ex){
-            Log.e(TAG, ex.getMessage());
+            if (mCursor.getCount() == 0 || !mCursor.moveToFirst()) {
+                return result;
+            }
+
+            String id = mCursor.getString(0);
+            String[] proj = new String[] {TrackLayer.FIELD_LON, TrackLayer.FIELD_LAT};
+
+            Cursor track = null;
+            try {
+                track = context.getContentResolver()
+                        .query(Uri.withAppendedPath(mContentUriTracks, id), proj, null, null, null);
+            } catch (Exception ex) {
+                Log.e(TAG, ex.getMessage());
+                return result;
+            }
+
+            if (track == null || track.getCount() == 0 || !track.moveToFirst()) {
+                if (track != null)
+                    track.close();
+                return result;
+            }
+
+            try {
+                int lonInx = track.getColumnIndex(TrackLayer.FIELD_LON);
+                int latInx = track.getColumnIndex(TrackLayer.FIELD_LAT);
+                int i = 0;
+                do {
+                    i++;
+                    float x1 = track.getFloat(lonInx);
+                    float y1 = track.getFloat(latInx);
+                    double[] lonLat = convert3857To4326(x1, y1);
+                    Point point1 = Point.fromLngLat(lonLat[0], lonLat[1]);
+                    pointsList.add(point1);
+                } while (track.moveToNext());
+            } finally {
+                track.close();
+            }
+
+            LineString lineString = LineString.fromLngLats(pointsList);
+            org.maplibre.geojson.Feature lineFeature = org.maplibre.geojson.Feature.fromGeometry(lineString);
+            result.add(lineFeature);
+
             return result;
+        } finally {
+            mCursor.close();
         }
-
-        if (track == null || track.getCount() == 0 || !track.moveToFirst())
-            return result;
-
-        int lonInx = track.getColumnIndex(TrackLayer.FIELD_LON);
-        int latInx = track.getColumnIndex(TrackLayer.FIELD_LAT);
-        int i = 0;
-        do {
-            i++;
-            float x1 = track.getFloat(lonInx);
-            float y1 = track.getFloat(latInx);
-            double[] lonLat = convert3857To4326(x1, y1);
-            Point point1 = Point.fromLngLat(lonLat[0], lonLat[1]);
-            pointsList.add(point1);
-//                org.maplibre.geojson.Feature pointFeature1 = org.maplibre.geojson.Feature.fromGeometry(point1);
-//                result.add(pointFeature1);
-
-//                Log.e("TTRR", "point" + i + ": " + lonLat[0] + " : " +lonLat[1]);
-
-
-        } while (track.moveToNext());
-        track.close();
-
-
-        LineString lineString = LineString.fromLngLats(pointsList);
-        org.maplibre.geojson.Feature lineFeature = org.maplibre.geojson.Feature.fromGeometry(lineString);
-        result.add(lineFeature);
-
-
-        return result;
     }
 
     public void reloadTrackListToMap(){

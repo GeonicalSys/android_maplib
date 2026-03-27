@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.nextgis.maplib.util.Constants.TAG;
 
@@ -83,7 +84,7 @@ public class MapEventSource
             LayerFactory layerFactory)
     {
         super(context, mapPath, layerFactory);
-        mListeners = new ArrayList<>();
+        mListeners = new CopyOnWriteArrayList<>();
         mFreeze = false;
         mLastMessages = new HashMap<>();
 

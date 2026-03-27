@@ -76,6 +76,7 @@ import com.nextgis.maplib.display.SimpleMarkerStyle;
 import com.nextgis.maplib.display.SimplePolygonStyle;
 import com.nextgis.maplib.display.Style;
 import com.nextgis.maplib.util.AttachItem;
+import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
@@ -2759,6 +2760,9 @@ public class VectorLayer
 
         Cursor cursor = db.query(mPath.getName(), columns, selection, null, null, null, null);
 
+        if (cursor != null) {
+            cursor.close();
+        }
 
         return null;
 
@@ -2989,46 +2993,49 @@ public class VectorLayer
         String columns[] = {FIELD_ID, FIELD_GEOM};
         Cursor cursor = query(columns, null, null, null, null);
         if (null != cursor) {
-            if (cursor.moveToFirst()) {
-                if (null != progressor) {
-                    progressor.setMax(cursor.getCount());
-                }
-
-                mIsCacheRebuilding = true;
-                mCache = createNewCache();
-                int counter = 0;
-                do {
-                    GeoGeometry geometry = null;
-                    try {
-                        geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(1));
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    if (null != geometry) {
-                        long rowId = cursor.getLong(0);
-                        try { // fail on debugapp
-//                            Log.e("CCACHH","mCache.addItem: geometry.getEnvelope" );
-                            mCache.addItem(rowId, geometry.getEnvelope());
-                        } catch ( Exception ex){
-                            Log.e("rebuild cache envelope fail", ex != null ? ex.getMessage() : "null message");
-                        }
-                    }
-
+            try {
+                if (cursor.moveToFirst()) {
                     if (null != progressor) {
-                        if (progressor.isCanceled()) {
-                            break;
-                        }
-                        progressor.setValue(++counter);
-                        progressor.setMessage(
-                                mContext.getString(R.string.process_features) + ": " + counter);
+                        progressor.setMax(cursor.getCount());
                     }
 
-                } while (cursor.moveToNext());
+                    mIsCacheRebuilding = true;
+                    mCache = createNewCache();
+                    int counter = 0;
+                    do {
+                        GeoGeometry geometry = null;
+                        try {
+                            geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(1));
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
 
-                mIsCacheRebuilding = false;
+                        if (null != geometry) {
+                            long rowId = cursor.getLong(0);
+                            try { // fail on debugapp
+//                            Log.e("CCACHH","mCache.addItem: geometry.getEnvelope" );
+                                mCache.addItem(rowId, geometry.getEnvelope());
+                            } catch ( Exception ex){
+                                Log.e("rebuild cache envelope fail", ex != null ? ex.getMessage() : "null message");
+                            }
+                        }
+
+                        if (null != progressor) {
+                            if (progressor.isCanceled()) {
+                                break;
+                            }
+                            progressor.setValue(++counter);
+                            progressor.setMessage(
+                                    mContext.getString(R.string.process_features) + ": " + counter);
+                        }
+
+                    } while (cursor.moveToNext());
+
+                    mIsCacheRebuilding = false;
+                }
+            } finally {
+                cursor.close();
             }
-            cursor.close();
             save();
         }
     }
@@ -3820,7 +3827,9 @@ public class VectorLayer
                 ((MapDrawable)map).loadMarkersTopPart();
                 map.load();
                 new Sync().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-            } catch (IOException | JSONException ignored) { }
+            } catch (IOException | JSONException ignored) {
+                HyperLog.w(Constants.TAG, "VectorLayer.toNGWLayer: " + ignored.getMessage(), ignored);
+            }
         }
     }
 
@@ -3837,7 +3846,9 @@ public class VectorLayer
                 MapBase map = MapDrawable.getInstance();
                 map.load();
                 //new Sync().execute();
-            } catch (IOException | JSONException ignored) { }
+            } catch (IOException | JSONException ignored) {
+                HyperLog.w(Constants.TAG, "VectorLayer.toVectorLayer: " + ignored.getMessage(), ignored);
+            }
         }
     }
 

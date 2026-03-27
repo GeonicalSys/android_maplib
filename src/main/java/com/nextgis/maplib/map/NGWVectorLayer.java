@@ -382,7 +382,9 @@ public class NGWVectorLayer
         Pair<Integer, Integer> ver = null;
         try {
             ver = NGWUtil.getNgwVersion(accountData.url, accountData.login, accountData.password);
-        } catch (IOException | JSONException | NumberFormatException ignored) { }
+        } catch (IOException | JSONException | NumberFormatException ignored) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer.createFromNGW: " + ignored.getMessage(), ignored);
+        }
 
         if (null != ver) {
             mNgwVersionMajor = ver.first;
