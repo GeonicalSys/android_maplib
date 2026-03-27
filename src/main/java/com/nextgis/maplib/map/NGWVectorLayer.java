@@ -485,7 +485,7 @@ public class NGWVectorLayer
                             if (feature.getGeometry() == null || !feature.getGeometry().isValid())
                                 continue;
 
-                            createFeatureBatch(feature, dbTx);
+                            createFeatureBatch(feature, dbTx, false);
                         } catch (OutOfMemoryError | IllegalStateException | IOException | NumberFormatException |
                                  NGException e) {
                             e.printStackTrace();
