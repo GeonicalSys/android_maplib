@@ -107,6 +107,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -2289,6 +2290,45 @@ public class VectorLayer
     public Field getFieldByName(String name)
     {
         return mFields.get(name);
+    }
+
+    /**
+     * Verify that the SQLite table actually contains columns for every field in {@link #mFields}.
+     * Detects cases where the table was created with a stale/incomplete schema (e.g. interrupted
+     * initial fill or server-side field additions that didn't make it into CREATE TABLE).
+     *
+     * @return list of field names present in mFields but missing from the SQLite table;
+     *         empty list means the schema is consistent.
+     */
+    public List<String> validateSqliteSchemaAgainstFields() {
+        List<String> missing = new ArrayList<>();
+        if (mFields == null || mFields.isEmpty()) {
+            return missing;
+        }
+        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        if (map == null) {
+            return missing;
+        }
+        SQLiteDatabase db = map.getDatabase(true);
+        Set<String> sqliteColumns = new HashSet<>();
+        try (Cursor c = db.rawQuery("PRAGMA table_info('" + mPath.getName() + "')", null)) {
+            int nameIdx = c.getColumnIndex("name");
+            while (c.moveToNext()) {
+                sqliteColumns.add(c.getString(nameIdx).toLowerCase(java.util.Locale.ROOT));
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "validateSqliteSchemaAgainstFields: PRAGMA failed", e);
+            return missing;
+        }
+        if (sqliteColumns.isEmpty()) {
+            return missing;
+        }
+        for (Field f : mFields.values()) {
+            if (!sqliteColumns.contains(f.getName().toLowerCase(java.util.Locale.ROOT))) {
+                missing.add(f.getName());
+            }
+        }
+        return missing;
     }
 
 

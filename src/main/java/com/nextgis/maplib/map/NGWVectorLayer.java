@@ -531,6 +531,14 @@ public class NGWVectorLayer
                 Log.d(Constants.TAG, "feature count: " + featureCount);
                 Log.d(Constants.TAG, "createFromNGW fill wall ms: " + (SystemClock.elapsedRealtime() - fillStartMs));
             }
+
+            List<String> missingCols = validateSqliteSchemaAgainstFields();
+            if (!missingCols.isEmpty()) {
+                String msg = "createFromNGW: SQLite table missing columns: " + missingCols
+                        + " for layer \"" + getName() + "\"";
+                HyperLog.w(Constants.TAG, msg);
+                throw new NGException(msg);
+            }
         } finally {
             urlConnection.disconnect();
         }
@@ -1536,8 +1544,20 @@ public class NGWVectorLayer
                             countChanges = compareFeature(cursor, authority, remoteFeature, changeTableName);
                         }
                     } catch (Exception e) {
-                        HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer Exception error " + e.getMessage());
-                        //Log.d(TAG, e.getLocalizedMessage());
+                        String innerMsg = e.getMessage();
+                        HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer Exception error " + innerMsg);
+                        if (e instanceof SQLiteException && innerMsg != null && innerMsg.contains("has no column")) {
+                            HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                                    + " — column missing in SQLite table, scheduling rebuild");
+                            try {
+                                ((IGISApplication) mContext.getApplicationContext())
+                                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                            } catch (Exception rebuildEx) {
+                                HyperLog.w(Constants.TAG, "rebuild scheduling failed", rebuildEx);
+                            }
+                            if (null != cursor) cursor.close();
+                            return true;
+                        }
                     } finally {
                         if (null != cursor) {
                             cursor.close();
@@ -1636,12 +1656,24 @@ public class NGWVectorLayer
                 }
             }
         } catch (SQLiteException | ConcurrentModificationException e) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer Exception " + e.getMessage());
+            String errMsg = e.getMessage();
+            HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer Exception " + errMsg);
             syncResult.stats.numConflictDetectedExceptions++;
             if (Constants.DEBUG_MODE) {
                 Log.d(Constants.TAG, "proceed getChangesFromServer() failed");
             }
             e.printStackTrace();
+
+            if (e instanceof SQLiteException && errMsg != null && errMsg.contains("has no column")) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                        + " — schema mismatch (missing column), scheduling rebuild");
+                try {
+                    ((IGISApplication) mContext.getApplicationContext())
+                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                } catch (Exception rebuildEx) {
+                    HyperLog.w(Constants.TAG, "NGWVectorLayer: rebuild scheduling failed", rebuildEx);
+                }
+            }
             return true;
         }
 
