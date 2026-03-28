@@ -108,7 +108,6 @@ import static com.nextgis.maplib.map.MPLFeaturesUtils.colorRED;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.convert3857To4326;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.convert4326To3857;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.convertToPointFeatures;
-import static com.nextgis.maplib.map.MPLFeaturesUtils.createFeatureListFlagsFromTrackLayer;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.createFeatureListFromLayer;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.createFeatureListFromTrackLayer;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.createFillLayerForLayer;
@@ -243,7 +242,6 @@ public class MapDrawable
     GeoJsonSource signaturesRootLayerSource = null; // choosed source of polygon  //
 
     GeoJsonSource tracksLineSource = null; // constant tracks
-    GeoJsonSource tracksFlagsSource = null; // flags ( start/stop ) tracks
     GeoJsonSource trackInProgressSource = null; // flags ( start/stop ) tracks
 
     CircleLayer selectedDotCircleLayer = null;
@@ -916,7 +914,6 @@ public class MapDrawable
         final Map<Integer, Integer> rasterLayersTmsTypeMap = new HashMap<>();
 
         final List<org.maplibre.geojson.Feature> tracksFeatures = new ArrayList<>();
-        final List<org.maplibre.geojson.Feature> tracksFlagsFeatures = new ArrayList<>();
 
         executor.execute(() -> {
             if (maplibreMap.get() == null || maplibreMapView.get() == null) {
@@ -1015,9 +1012,6 @@ public class MapDrawable
 
                         tracksFeatures.clear();
                         tracksFeatures.addAll(createFeatureListFromTrackLayer(layer));
-
-                        tracksFlagsFeatures.clear();
-                        tracksFlagsFeatures.addAll(createFeatureListFlagsFromTrackLayer(layer));
 
                         //List<org.maplibre.geojson.Feature> tracksFeatures = createFeatureListFromTrackLayer(layer);
                         //sourceFeaturesHashMap.put(layer.getId(), tracksFeatures);
@@ -1159,9 +1153,6 @@ public class MapDrawable
 
                             tracksFeatures.clear();
                             tracksFeatures.addAll(createFeatureListFromTrackLayer(layer));
-
-                            tracksFlagsFeatures.clear();
-                            tracksFlagsFeatures.addAll(createFeatureListFlagsFromTrackLayer(layer));
                         } else if (iLayer instanceof NGWRasterLayer) {
                             Connection found = null;
                             for (int i = 0; i < connections.getChildrenCount(); i++) {
@@ -1412,37 +1403,6 @@ public class MapDrawable
                         style.addLayer(trackInProgressLayer);
 
 
-                        // tracks start stop flags
-                        if (createSource) {
-                            tracksFlagsSource = new GeoJsonSource("track-flag-source", FeatureCollection.fromFeatures(tracksFlagsFeatures));
-                            style.addSource(tracksFlagsSource);
-                        }
-
-                        final Drawable drawableGreenFlag = getContext().getResources().getDrawable( R.drawable.ic_track_flag);
-                        final Bitmap bitmapFlagStart = drawableToBitmap(drawableGreenFlag);
-                        Bitmap greenMarker = recolorBitmap(bitmapFlagStart, Color.GREEN);
-                        String iconFlagStart = "user-marker-flag-start";
-                        style.addImage(iconFlagStart, greenMarker);
-
-                        final Drawable drawableRedFlag = getContext().getResources().getDrawable( R.drawable.ic_track_flag);
-                        final Bitmap bitmapFlagEnd = drawableToBitmap(drawableRedFlag);
-                        Bitmap redBitmap = recolorBitmap(bitmapFlagEnd, Color.RED);
-                        String iconFlagEnd = "user-marker-flag-end";
-                        style.addImage(iconFlagEnd, redBitmap);
-
-                        SymbolLayer trackFlagsLayer = new SymbolLayer("track-flags-layer", "track-flag-source")
-                                .withProperties(
-                                        PropertyFactory.iconImage(
-                                                Expression.switchCase(
-                                                        Expression.eq(Expression.get("type"), Expression.literal(true)), Expression.literal("user-marker-flag-start"),
-                                                        Expression.eq(Expression.get("type"), Expression.literal(false)), Expression.literal("user-marker-flag-end"),
-                                                        Expression.literal("user-marker-flag-start"))),
-                                        PropertyFactory.iconSize(1.0f),
-                                        PropertyFactory.iconAllowOverlap(true),
-                                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM_LEFT));
-                        style.addLayer(trackFlagsLayer);
-
-
                         // marker
                         final Drawable drawable = getContext().getResources().getDrawable( R.drawable.ic_action_anchor_2);
                         final Bitmap bitmap = drawableToBitmap(drawable);
@@ -1638,19 +1598,6 @@ public class MapDrawable
                         PropertyFactory.lineWidth(getMPLThinkness(5)));
         style.addLayer(trackInProgressLayer);
 
-        // tracks start stop flags
-        SymbolLayer trackFlagsLayer = new SymbolLayer("track-flags-layer", "track-flag-source")
-                .withProperties(
-                        PropertyFactory.iconImage(
-                                Expression.switchCase(
-                                        Expression.eq(Expression.get("type"), Expression.literal(true)), Expression.literal("user-marker-flag-start"),
-                                        Expression.eq(Expression.get("type"), Expression.literal(false)), Expression.literal("user-marker-flag-end"),
-                                        Expression.literal("user-marker-flag-start"))),
-                        PropertyFactory.iconSize(1.0f),
-                        PropertyFactory.iconAllowOverlap(true),
-                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM_LEFT));
-        style.addLayer(trackFlagsLayer);
-
         // marker
         final Drawable drawable = getContext().getResources().getDrawable( R.drawable.ic_action_anchor_2);
         final Bitmap bitmap = drawableToBitmap(drawable);
@@ -1673,7 +1620,6 @@ public class MapDrawable
             final Map<Integer, Integer> rasterLayersTmsTypeMap = new HashMap<>();
 
             final List<org.maplibre.geojson.Feature> tracksFeatures = new ArrayList<>();
-            final List<org.maplibre.geojson.Feature> tracksFlagsFeatures = new ArrayList<>();
 
             final AccountManager accountManager = AccountManager.get(getContext());
             final Connections connections = fillConnections(getContext(), accountManager);
@@ -1700,9 +1646,6 @@ public class MapDrawable
                     layersType.put(layer.getId(), GT_TRACK_WA);
                     tracksFeatures.clear();
                     tracksFeatures.addAll(createFeatureListFromTrackLayer(layer));
-
-                    tracksFlagsFeatures.clear();
-                    tracksFlagsFeatures.addAll(createFeatureListFlagsFromTrackLayer(layer));
                 } else if (iLayer instanceof NGWRasterLayer) {
                     // need add auth
                     Connection found = null;
@@ -3362,11 +3305,6 @@ public class MapDrawable
             if (trackLayer!= null)
                 trackLayer.setProperties(visibility(isVisible ? VISIBLE:NONE));
 
-
-            Layer trackLayerFlags = maplibreMap.get().getStyle().getLayer("track-flags-layer");
-            if (trackLayerFlags!= null)
-                trackLayerFlags.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
             Layer trackLayerInProgress = maplibreMap.get().getStyle().getLayer("track-inprogress-layer");
             if (trackLayerInProgress!= null)
                 trackLayerInProgress.setProperties(visibility(isVisible ? VISIBLE:NONE));
@@ -3527,16 +3465,10 @@ public class MapDrawable
 
                 TrackLayer trackLayer = (TrackLayer) (tracks.get(0));
                 List<org.maplibre.geojson.Feature> tracksFeatures = createFeatureListFromTrackLayer(trackLayer);
-                List<org.maplibre.geojson.Feature> tracksFeaturesFlags = createFeatureListFlagsFromTrackLayer(trackLayer);
-
 
                 GeoJsonSource tracksLineSource = (GeoJsonSource)style.getSource("track-line-source");
                 if (tracksLineSource!=null)
                     tracksLineSource.setGeoJson(FeatureCollection.fromFeatures(tracksFeatures));
-
-                GeoJsonSource tracksLineFlagsSource = (GeoJsonSource)style.getSource("track-flag-source");
-                if (tracksLineFlagsSource!=null)
-                    tracksLineFlagsSource.setGeoJson(FeatureCollection.fromFeatures(tracksFeaturesFlags));
             }
         }
     }
@@ -3697,7 +3629,7 @@ public class MapDrawable
             int  colorRes = 0; // black
             String KEY_PREF_MAP_BG = "map_bg"; // copy of
             String namepart = "neutral_";
-            switch (mSharedPreferences.getString(KEY_PREF_MAP_BG, KEY_PREF_NEUTRAL)) {
+            switch (mSharedPreferences.getString(KEY_PREF_MAP_BG, KEY_PREF_LIGHT)) {
                     case KEY_PREF_LIGHT:
                         colorRes = R.drawable.bk_tile_light;
                         namepart = "light_";

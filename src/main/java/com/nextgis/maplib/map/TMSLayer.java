@@ -35,6 +35,7 @@ import com.nextgis.maplib.datasource.TileItem;
 import com.nextgis.maplib.display.TMSRenderer;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.FileUtil;
+import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NetworkUtil;
 
@@ -275,9 +276,17 @@ public abstract class TMSLayer
         save();
     }
 
+    /** Extra zoom levels beyond tile min/max so the layer stays visible when slightly over-zoomed. */
+    private static final float NGRC_VISIBILITY_ZOOM_PADDING = 2f;
+
     public void fillFromNgrc(Uri uri, IProgressor progressor) throws IOException, NumberFormatException, SecurityException, NGException {
         fillFromZipInt(uri, progressor);
         load();
+        float minZ = getMinZoom();
+        float maxZ = getMaxZoom();
+        setMinZoom(Math.max(GeoConstants.DEFAULT_MIN_ZOOM, minZ - NGRC_VISIBILITY_ZOOM_PADDING));
+        setMaxZoom(Math.min(GeoConstants.DEFAULT_MAX_ZOOM, maxZ + NGRC_VISIBILITY_ZOOM_PADDING));
+        save();
     }
 
 }

@@ -195,30 +195,10 @@ public class MPLFeaturesUtils {
         return lineFeatures;
     }
 
+    /** Start/end flag markers disabled — track line only. Kept for API compatibility. */
+    @SuppressWarnings("unused")
     static public List<org.maplibre.geojson.Feature> createFeatureListFlagsFromTrackLayer(final TrackLayer layer) {
-        Map<Integer, GeoLineString> tracks = layer.getTracks();
-        List<org.maplibre.geojson.Feature> pointsFeatures = new ArrayList<>();
-
-        for (Map.Entry<Integer, GeoLineString> entry : tracks.entrySet()) {
-
-            GeoPoint p1 = entry.getValue().getPoints().get(0);
-            GeoPoint p2 = entry.getValue().getPoints().get(entry.getValue().getPoints().size() -1);
-
-            double[] lonLat = convert3857To4326(p1.getX(), p1.getY());
-            Point point1 = Point.fromLngLat(lonLat[0], lonLat[1]);
-            Feature pointFeature1 = org.maplibre.geojson.Feature.fromGeometry(point1);
-            pointFeature1.addBooleanProperty(prop_start_flag, true);
-
-            double[] lonLat2 = convert3857To4326(p2.getX(), p2.getY());
-            Point point2 = Point.fromLngLat(lonLat2[0], lonLat2[1]);
-            Feature pointFeature2 = org.maplibre.geojson.Feature.fromGeometry(point2);
-            pointFeature2.addBooleanProperty(prop_start_flag, false);
-
-            pointsFeatures.add(pointFeature1);
-            pointsFeatures.add(pointFeature2);
-        }
-
-        return pointsFeatures;
+        return new ArrayList<>();
     }
 
     static public List<org.maplibre.geojson.Feature> createFeatureListFromLayer(final VectorLayer layer) {
