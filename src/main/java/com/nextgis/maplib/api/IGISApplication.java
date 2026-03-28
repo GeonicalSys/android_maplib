@@ -31,6 +31,7 @@ import com.nextgis.maplib.location.GpsEventSource;
 import com.nextgis.maplib.map.LayerFactory;
 import com.nextgis.maplib.map.MLP.AuthInterceptorNG;
 import com.nextgis.maplib.map.MapBase;
+import com.nextgis.maplib.map.MaplibreMapInteraction;
 import com.nextgis.maplib.map.NGWVectorLayer;
 
 
@@ -243,6 +244,12 @@ public interface IGISApplication
     void requestMapReloadAfterLayerFillBatch();
 
     /**
+     * If {@link #requestMapReloadAfterLayerFillBatch} could not run (e.g. fragment not ready), call from
+     * {@code MapFragment} when the map UI is attached again.
+     */
+    void flushPendingMapReloadAfterLayerFillIfNeeded(MaplibreMapInteraction mapFragment);
+
+    /**
      * True while {@code LayerFillService} has a non-empty queue or is draining it.
      * Used to skip {@link com.nextgis.maplib.datasource.ngw.SyncAdapter} work so sync does not
      * compete with NGW layer import.
@@ -250,6 +257,41 @@ public interface IGISApplication
     boolean isLayerFillServiceBusy();
 
     void setLayerFillServiceBusy(boolean busy);
+
+    /**
+     * Register expected NGW vector layers for a collector import (layers being downloaded this run).
+     * Clears any previous batch state.
+     *
+     * @param fullCollectorProjectRemoteIds remote ids of <em>all</em> vector layers in the collector project,
+     *        in project list order (as returned by the collector resource). Used to insert new or repaired
+     *        layers next to already-present siblings when the map stacks new layers at the top.
+     * @param formIds server form id per layer, or 0 when the layer has no form (plain NGW fill)
+     */
+    void registerCollectorImportBatch(
+            int groupId,
+            String accountName,
+            long[] remoteIds,
+            String[] names,
+            String[] configJsons,
+            long[] formIds,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Called when a collector import task finishes ({@code success} false = unzip/NGW fill failed or cancelled mid-task).
+     * {@code remoteId} is the collector resource id (stable tracking id on the fill intent).
+     */
+    void notifyCollectorLayerFillResult(long remoteId, boolean success);
+
+    /**
+     * After the import queue drains, compare the map to the registered batch; remove broken layers and re-enqueue fill.
+     * No-op if no batch was registered. Safe to call on the main thread only.
+     */
+    void finalizeCollectorImportVerifyAndRepairIfNeeded();
+
+    /**
+     * Drop an in-progress collector import batch without verification (e.g. user cancelled fill).
+     */
+    void clearCollectorImportBatch();
 
     /**
      * Local NGW vector layer schema no longer matches server metadata during sync.

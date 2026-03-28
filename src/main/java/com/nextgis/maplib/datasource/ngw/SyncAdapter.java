@@ -163,13 +163,6 @@ public class SyncAdapter
             return;
         }
 
-        final String accountNameHash = "_" + account.name.hashCode();
-        SharedPreferences settings = getContext().getSharedPreferences(Constants.PREFERENCES, MODE_MULTI_PROCESS);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP + accountNameHash, System.currentTimeMillis());
-        editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP, System.currentTimeMillis());
-        editor.apply();
-
         mError = "";
         if (syncResult.stats.numIoExceptions > 0)
             mError += getContext().getString(R.string.sync_error_io);
@@ -213,6 +206,17 @@ public class SyncAdapter
                 mError += "\r\n";
             mError += getContext().getString(R.string.sync_error_oom);
         }
+
+        if (mapContentProviderHelper != null && TextUtils.isEmpty(mError) && !syncResult.hasError()) {
+            final String accountNameHash = "_" + account.name.hashCode();
+            SharedPreferences settings = getContext().getSharedPreferences(Constants.PREFERENCES, MODE_MULTI_PROCESS);
+            SharedPreferences.Editor editor = settings.edit();
+            long now = System.currentTimeMillis();
+            editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP + accountNameHash, now);
+            editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP, now);
+            editor.apply();
+        }
+
         Log.d("SSYNC", "onPerformSync END account - " + account.name);
         Log.d("SSYNC", "onPerformSync END error - " + mError);
 

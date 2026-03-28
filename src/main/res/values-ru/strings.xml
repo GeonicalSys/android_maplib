@@ -84,6 +84,7 @@
     <string name="sync_finished">Синхронизация завершена</string>
     <string name="text">Подпись</string>
     <string name="error_connect_failed">Соединение не установлено</string>
+    <string name="error_ngw_feature_count_mismatch">Данные слоя неполные: локально %1$d объектов, на сервере указано %2$d. Попробуйте загрузить слой снова.</string>
     <string name="error_403">Не хватает прав</string>
     <string name="error_404">Ресурс не найден</string>
     <string name="error_500">Ошибка сервера</string>
@@ -110,6 +111,8 @@
     <string name="error_select_obj">Ошибка при выборе обьекта</string>
     <string name="outofmemory">Нехватка памяти при загрузке слоя: </string>
     <string name="process_layer_hint">Загрузка данных для слоя: </string>
+    <string name="map_loading_preparing">Подготовка карты…</string>
+    <string name="map_loading_cache_hit">Чтение кэша: </string>
     <string name="ngw_schema_mismatch_title">Изменилась схема слоя</string>
     <string name="ngw_schema_mismatch_has_local_changes">Структура слоя на сервере больше не совпадает с картой. На устройстве есть несинхронизированные правки. Синхронизируйте или удалите локальные изменения, затем удалите слой и добавьте его снова из NextGIS Web.</string>
 </resources>

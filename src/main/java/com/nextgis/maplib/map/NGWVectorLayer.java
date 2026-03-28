@@ -90,6 +90,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -403,6 +404,8 @@ public class NGWVectorLayer
         //fill field list
         JSONObject featureLayerJSONObject = geoJSONObject.getJSONObject("feature_layer");
         JSONArray fieldsJSONArray = featureLayerJSONObject.getJSONArray(NGWUtil.NGWKEY_FIELDS);
+        final int serverExpectedFeatureCount =
+                featureLayerJSONObject.optInt(NGWUtil.NGWKEY_FEATURE_COUNT, -1);
         List<Field> fields = NGWUtil.getFieldsFromJson(fieldsJSONArray);
 
         //fill SRS
@@ -435,13 +438,13 @@ public class NGWVectorLayer
 
         HttpURLConnection urlConnection = NetworkUtil.getHttpConnection("GET", sURL, accountData.login, accountData.password);
         if (null == urlConnection) {
-            if (Constants.DEBUG_MODE)
+            if (Constants.DEBUG_MODE) {
                 Log.d(TAG, "Error get connection object: " + sURL);
-
-            if (null != progressor)
+            }
+            if (null != progressor) {
                 progressor.setMessage(getContext().getString(R.string.error_connect_failed));
-
-            return;
+            }
+            throw new NGException(getContext().getString(R.string.error_connect_failed));
         }
 
         try {
@@ -449,9 +452,10 @@ public class NGWVectorLayer
                 sURL = sURL.replace("http", "https");
                 urlConnection = NetworkUtil.getHttpConnection("GET", sURL, accountData.login, accountData.password);
                 if (null == urlConnection) {
-                    if (null != progressor)
+                    if (null != progressor) {
                         progressor.setMessage(getContext().getString(R.string.error_connect_failed));
-                    return;
+                    }
+                    throw new NGException(getContext().getString(R.string.error_connect_failed));
                 }
             }
 
@@ -543,9 +547,32 @@ public class NGWVectorLayer
                 HyperLog.w(Constants.TAG, msg);
                 throw new NGException(msg);
             }
+
+            boolean fillCanceled = progressor != null && progressor.isCanceled();
+            if (!hasLocalDataTable()) {
+                throw new NGException(getContext().getString(R.string.error_download_data));
+            }
+            if (!jsonTruncated && !fillCanceled && serverExpectedFeatureCount >= 0) {
+                int rows = getSqliteTableRowCount();
+                if (rows >= 0 && rows != serverExpectedFeatureCount) {
+                    String msg = getContext().getString(R.string.error_ngw_feature_count_mismatch,
+                            rows, serverExpectedFeatureCount);
+                    HyperLog.w(Constants.TAG, "createFromNGW: " + msg + " layer=\"" + getName() + "\"");
+                    throw new NGException(msg);
+                }
+            }
         } finally {
             urlConnection.disconnect();
         }
+    }
+
+    /** Missing column or missing layer table — local storage must be refilled from the server. */
+    private static boolean sqliteMessageNeedsLayerRefillFromServer(String msg) {
+        if (msg == null) {
+            return false;
+        }
+        String m = msg.toLowerCase(Locale.ROOT);
+        return m.contains("has no column") || m.contains("no such table");
     }
 
 
@@ -1452,6 +1479,18 @@ public class NGWVectorLayer
             Log.d(Constants.TAG, "The network is available. Get changes from server");
         }
 
+        if (!hasLocalDataTable()) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                    + " — SQLite data table missing, scheduling full refill from server");
+            try {
+                ((IGISApplication) mContext.getApplicationContext())
+                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+            } catch (Exception rebuildEx) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: refill scheduling failed", rebuildEx);
+            }
+            return true;
+        }
+
         try {
             AccountUtil.AccountData accountDataForSchema = AccountUtil.getAccountData(mContext, mAccountName);
             if (accountDataForSchema.url != null) {
@@ -1622,9 +1661,9 @@ public class NGWVectorLayer
                     } catch (Exception e) {
                         String innerMsg = e.getMessage();
                         HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer Exception error " + innerMsg);
-                        if (e instanceof SQLiteException && innerMsg != null && innerMsg.contains("has no column")) {
+                        if (e instanceof SQLiteException && sqliteMessageNeedsLayerRefillFromServer(innerMsg)) {
                             HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
-                                    + " — column missing in SQLite table, scheduling rebuild");
+                                    + " — SQLite storage error (" + innerMsg + "), scheduling rebuild");
                             try {
                                 ((IGISApplication) mContext.getApplicationContext())
                                         .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
@@ -1740,9 +1779,9 @@ public class NGWVectorLayer
             }
             e.printStackTrace();
 
-            if (e instanceof SQLiteException && errMsg != null && errMsg.contains("has no column")) {
+            if (e instanceof SQLiteException && sqliteMessageNeedsLayerRefillFromServer(errMsg)) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
-                        + " — schema mismatch (missing column), scheduling rebuild");
+                        + " — SQLite storage error, scheduling rebuild: " + errMsg);
                 try {
                     ((IGISApplication) mContext.getApplicationContext())
                             .scheduleNgwLayerRebuildAfterSchemaMismatch(this);

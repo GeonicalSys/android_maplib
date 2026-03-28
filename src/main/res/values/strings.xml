@@ -91,6 +91,7 @@
     <string name="sync_error_conflict">Conflicts found</string>
     <string name="text">Text</string>
     <string name="error_connect_failed">Connect failed</string>
+    <string name="error_ngw_feature_count_mismatch">Layer data incomplete: %1$d features stored locally, %2$d reported by server. Try downloading the layer again.</string>
     <string name="error_401">Authorization required</string>
     <string name="error_403">Forbidden</string>
     <string name="error_404">Resource not found</string>
@@ -115,4 +116,6 @@
     <string name="error_select_obj">Error on object select</string>
     <string name="outofmemory">Out of Memory layer: </string>
     <string name="process_layer_hint">Load data on layer: </string>
+    <string name="map_loading_preparing">Preparing map…</string>
+    <string name="map_loading_cache_hit">Reading cache: </string>
 </resources>

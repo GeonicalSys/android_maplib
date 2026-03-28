@@ -46,6 +46,7 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -206,6 +207,76 @@ public class LayerGroup
             }
         }
         return null;
+    }
+
+    /**
+     * Depth-first search for an NGW vector layer with the given server resource id and account name.
+     */
+    public static NGWVectorLayer findNgwVectorLayerByRemoteIdRecursive(
+            LayerGroup layerGroup,
+            long remoteId,
+            String accountName) {
+        if (layerGroup == null || accountName == null) {
+            return null;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                NGWVectorLayer found = findNgwVectorLayerByRemoteIdRecursive(
+                        (LayerGroup) layer, remoteId, accountName);
+                if (found != null) {
+                    return found;
+                }
+            } else if (layer instanceof NGWVectorLayer) {
+                NGWVectorLayer nv = (NGWVectorLayer) layer;
+                if (nv.getRemoteId() == remoteId && accountName.equals(nv.getAccountName())) {
+                    return nv;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Insert index for a collector NGW layer among siblings (same account, remote id listed in
+     * {@code collectorRemoteIdsInProjectOrder}). Ranks are inverted so visual list order matches the
+     * collector project: internal layer index 0 is the bottom row in the UI drawer, the last internal index
+     * is the top row (adapter uses reversed indexing).
+     */
+    public static int computeCollectorOrderedInsertIndex(
+            LayerGroup group,
+            String accountName,
+            long[] collectorRemoteIdsInProjectOrder,
+            int targetIndexInProjectOrder) {
+        if (group == null || accountName == null || collectorRemoteIdsInProjectOrder == null
+                || targetIndexInProjectOrder < 0) {
+            return group != null ? group.getLayerCount() : 0;
+        }
+        final int L = collectorRemoteIdsInProjectOrder.length;
+        Map<Long, Integer> internalRank = new HashMap<>();
+        for (int i = 0; i < L; i++) {
+            internalRank.put(collectorRemoteIdsInProjectOrder[i], L - 1 - i);
+        }
+        int targetRank = L - 1 - targetIndexInProjectOrder;
+        int count = group.getLayerCount();
+        for (int gi = 0; gi < count; gi++) {
+            ILayer child = group.getLayer(gi);
+            if (!(child instanceof NGWVectorLayer)) {
+                continue;
+            }
+            NGWVectorLayer nv = (NGWVectorLayer) child;
+            if (!accountName.equals(nv.getAccountName())) {
+                continue;
+            }
+            Integer rank = internalRank.get(nv.getRemoteId());
+            if (rank == null) {
+                continue;
+            }
+            if (rank >= targetRank) {
+                return gi;
+            }
+        }
+        return count;
     }
 
     public static ILayer getVectorLayersById(

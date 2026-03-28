@@ -90,10 +90,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.nextgis.maplib.map.MLP.MultiLineEditClass.getNewLinePoints;
@@ -216,8 +219,6 @@ public class MapDrawable
 
     // map  layerID : list of added features for layer
     LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourceFeaturesHashMap = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
-    // map  layerID : file URI for layers loaded from disk cache (bypasses Java JSON parsing)
-    final Map<Integer, java.net.URI> sourceFileUriMap = new HashMap<>();
 
     LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourcesOrder = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
 
@@ -301,6 +302,8 @@ public class MapDrawable
     /** Prevents re-entrant layer loading: invalidation during load is deferred. */
     private volatile boolean mLayerLoadInProgress = false;
     private volatile boolean mPendingReload = false;
+    /** At most one deferred full reload per started {@link #loadLayersToMaplibreMap} run. */
+    private volatile boolean mDeferReloadOnceAllowed = true;
 
     @Nullable
     private MapView.OnDidFinishLoadingStyleListener mLoadLayersStyleListener;
@@ -551,9 +554,10 @@ public class MapDrawable
                         mainHandler.post(()-> {
                                     mapFragment.get().changeProgress(true); });
                         try {
-                            java.net.URI cachedUri = VectorLayerRenderCache.tryLoadAsUri(layer);
-                            if (cachedUri != null) {
-                                sourceFileUriMap.put(layer.getId(), cachedUri);
+                            List<org.maplibre.geojson.Feature> fromCache =
+                                    VectorLayerRenderCache.tryLoadFeatures(layer);
+                            if (fromCache != null) {
+                                vectorPolygonFeatures.addAll(fromCache);
                             } else {
                                 Intent msg = new Intent(MESSAGE_INTENT_STYLING);
                                 String loadHint = getContext().getString(R.string.process_layer_hint);
@@ -617,6 +621,9 @@ public class MapDrawable
                         if (mainStyle == null) {
                             return;
                         }
+                        createSourceForLayer(iLayer.getId(), finalGeoType, vectorPolygonFeatures, mainStyle, sourceHashMap,
+                                rasterLayersURLMap, rasterLayersTmsTypeMap,
+                                iLayer.getPath().toString(), false, null);
                         createFillLayerForLayer(iLayer.getId(), finalGeoType, mainStyle, layersHashMap, layersHashMap2,
                                 layersHashMapLineDash,
                                 symbolsLayerHashMap,
@@ -624,9 +631,6 @@ public class MapDrawable
                                 iLayer.getPath().toString(),
                                 selectedDotCircleLayer,
                                 signaturesRootLayer);
-                        createSourceForLayer(iLayer.getId(), finalGeoType, vectorPolygonFeatures, mainStyle, sourceHashMap,
-                                rasterLayersURLMap, rasterLayersTmsTypeMap,
-                                iLayer.getPath().toString(), false, null);
 
                         checkLayerVisibility(iLayer.getId());
                     });
@@ -803,6 +807,72 @@ public class MapDrawable
         }
     }
 
+    /** Used only from {@link #loadLayersToMaplibreMap} parallel path when {@link Constants#MAP_STARTUP_OPTIMIZATIONS_ENABLED}. */
+    private void sendStylingBroadcast(Handler mainHandler, String message) {
+        mainHandler.post(() -> {
+            try {
+                Intent msg = new Intent(MESSAGE_INTENT_STYLING);
+                msg.putExtra("msg", message);
+                msg.setPackage(getContext().getPackageName());
+                getContext().sendBroadcast(msg);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private static final class VectorLayerPrepResult {
+        final VectorLayer layer;
+        final List<org.maplibre.geojson.Feature> features;
+        final int geometryType;
+        final com.nextgis.maplib.display.Style ngStyle;
+        final boolean fromCache;
+
+        VectorLayerPrepResult(VectorLayer layer,
+                List<org.maplibre.geojson.Feature> features,
+                int geometryType,
+                com.nextgis.maplib.display.Style ngStyle,
+                boolean fromCache) {
+            this.layer = layer;
+            this.features = features;
+            this.geometryType = geometryType;
+            this.ngStyle = ngStyle;
+            this.fromCache = fromCache;
+        }
+    }
+
+    /**
+     * Parallel vector prep for {@link #loadLayersToMaplibreMap}; inactive unless
+     * {@link Constants#MAP_STARTUP_OPTIMIZATIONS_ENABLED}.
+     */
+    private VectorLayerPrepResult prepareVectorLayerForMaplibre(VectorLayer layer, Handler mainHandler) {
+        try {
+            List<org.maplibre.geojson.Feature> vectorFeatures = VectorLayerRenderCache.tryLoadFeatures(layer);
+            boolean fromCache = vectorFeatures != null;
+            if (!fromCache) {
+                sendStylingBroadcast(mainHandler,
+                        getContext().getString(R.string.process_layer_hint) + layer.getName());
+                long tDbStart = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
+                vectorFeatures = createFeatureListFromLayer(layer);
+                if (Constants.DEBUG_MODE) {
+                    Log.d(TAG, "loadLayersToMaplibreMap DB build layer=" + layer.getName()
+                            + " features=" + vectorFeatures.size()
+                            + " ms=" + ((System.nanoTime() - tDbStart) / 1_000_000));
+                }
+                VectorLayerRenderCache.save(layer, vectorFeatures);
+            }
+            com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
+            return new VectorLayerPrepResult(layer, vectorFeatures, layer.getGeometryType(), ngStyle, fromCache);
+        } catch (OutOfMemoryError outOfMemoryError) {
+            mainHandler.post(() -> Toast.makeText(mContext,
+                    mContext.getString(R.string.outofmemory) + layer.getName(),
+                    Toast.LENGTH_LONG).show());
+            return null;
+        } catch (Throwable t) {
+            Log.e(TAG, "prepareVectorLayerForMaplibre: " + layer.getName(), t);
+            return null;
+        }
+    }
+
     public void loadLayersToMaplibreMap(final String styleJson,
                                         final  List<ILayer> allLayers,
                                         final boolean createSource,
@@ -816,13 +886,18 @@ public class MapDrawable
         }
 
         if (mLayerLoadInProgress) {
-            mPendingReload = true;
-            Log.d(TAG, "loadLayersToMaplibreMap: already in progress, deferring");
+            if (mDeferReloadOnceAllowed) {
+                mPendingReload = true;
+                mDeferReloadOnceAllowed = false;
+                Log.d(TAG, "loadLayersToMaplibreMap: already in progress, deferring once");
+            } else {
+                Log.d(TAG, "loadLayersToMaplibreMap: already in progress, extra request ignored");
+            }
             return;
         }
         mLayerLoadInProgress = true;
         mPendingReload = false;
-        sourceFileUriMap.clear();
+        mDeferReloadOnceAllowed = true;
 
         mapFrag.changeProgress(true);
 
@@ -845,9 +920,16 @@ public class MapDrawable
 
         executor.execute(() -> {
             if (maplibreMap.get() == null || maplibreMapView.get() == null) {
-                mainHandler.post(this::dismissStylingProgress);
+                mainHandler.post(() -> {
+                    mLayerLoadInProgress = false;
+                    dismissStylingProgress();
+                });
                 return;
             }
+            // Always notify app for MapViewOverlays (skip heavy per-layer MapLibre reload while we rebuild style).
+            // Needed for collector batch + loadLayersToMaplibreMap; not tied to MAP_STARTUP_OPTIMIZATIONS_ENABLED.
+            ((IGISApplication) getContext().getApplicationContext()).setGetingStyleInProgress(true);
+            try {
             // Load layers
 
             final AccountManager accountManager = AccountManager.get(getContext());
@@ -857,43 +939,75 @@ public class MapDrawable
             //sourceHashMap.clear();
             sourcesOrder.clear();
 
+            if (Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED) {
+            final long tWorkerWallStart = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
+
+            List<VectorLayer> vectorLoadOrder = new ArrayList<>();
+            for (ILayer iLayer : allLayers) {
+                if (iLayer instanceof VectorLayer) {
+                    VectorLayer vl = (VectorLayer) iLayer;
+                    if (skipInvisibleLayers && !vl.isVisible()) {
+                        continue;
+                    }
+                    vectorLoadOrder.add(vl);
+                }
+            }
+
+            ExecutorService parallelPool = Executors.newFixedThreadPool(poolSize);
+            try {
+                final long tVecPhaseStart = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
+                List<Future<VectorLayerPrepResult>> vecFutures = new ArrayList<>(vectorLoadOrder.size());
+                for (VectorLayer vl : vectorLoadOrder) {
+                    vecFutures.add(parallelPool.submit(() -> prepareVectorLayerForMaplibre(vl, mainHandler)));
+                }
+                for (Future<VectorLayerPrepResult> vf : vecFutures) {
+                    VectorLayerPrepResult r;
+                    try {
+                        r = vf.get();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        Log.e(TAG, "loadLayersToMaplibreMap: vector prep interrupted", e);
+                        break;
+                    } catch (ExecutionException e) {
+                        Log.e(TAG, "loadLayersToMaplibreMap: vector prep failed", e.getCause());
+                        continue;
+                    }
+                    if (r == null || r.features == null) {
+                        continue;
+                    }
+                    if (r.fromCache) {
+                        sendStylingBroadcast(mainHandler,
+                                getContext().getString(R.string.map_loading_cache_hit) + r.layer.getName());
+                    }
+
+                    layersType.put(r.layer.getId(), r.geometryType);
+                    layersPath.put(r.layer.getId(), r.layer.getPath().toString());
+                    layersStyle.put(r.layer.getId(), r.ngStyle);
+                    sourceFeaturesHashMap.put(r.layer.getId(), r.features);
+                    sourcesOrder.put(r.layer.getId(), new ArrayList<>());
+                }
+                if (Constants.DEBUG_MODE) {
+                    Log.d(Constants.TAG, "MapDrawable loadLayers vector phase wall ms="
+                            + ((System.nanoTime() - tVecPhaseStart) / 1_000_000));
+                }
+            } finally {
+                parallelPool.shutdown();
+                try {
+                    if (!parallelPool.awaitTermination(30, TimeUnit.MINUTES)) {
+                        parallelPool.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    parallelPool.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+            }
+
             for (ILayer iLayer : allLayers) {
 //                Log.e("MPLREM",  "iterate layer " + iLayer.getName());
 
                 try {
                     if (iLayer instanceof VectorLayer) {
-
-                        VectorLayer layer = (VectorLayer) iLayer;
-
-                        if (skipInvisibleLayers && !layer.isVisible())
-                            continue;
-
-                        java.net.URI cachedUri = VectorLayerRenderCache.tryLoadAsUri(layer);
-                        List<org.maplibre.geojson.Feature> vectorFeatures;
-                        if (cachedUri != null) {
-                            vectorFeatures = new ArrayList<>();
-                            sourceFileUriMap.put(layer.getId(), cachedUri);
-                            Log.d(TAG, "loadLayersToMaplibreMap FILE-URI layer=" + layer.getName());
-                        } else {
-                            Intent msg = new Intent(MESSAGE_INTENT_STYLING);
-                            String loadHint = getContext().getString(R.string.process_layer_hint);
-                            msg.putExtra("msg", loadHint + layer.getName());
-                            msg.setPackage(getContext().getPackageName());
-                            getContext().sendBroadcast(msg);
-
-                            long tDbStart = System.nanoTime();
-                            vectorFeatures = createFeatureListFromLayer(layer);
-                            Log.d(TAG, "loadLayersToMaplibreMap DB build layer=" + layer.getName()
-                                    + " features=" + vectorFeatures.size()
-                                    + " ms=" + ((System.nanoTime() - tDbStart) / 1_000_000));
-                            VectorLayerRenderCache.save(layer, vectorFeatures);
-                        }
-                        com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
-                        layersType.put(layer.getId(), layer.getGeometryType());
-                        layersPath.put(layer.getId(), layer.getPath().toString());
-                        layersStyle.put(layer.getId(), ngStyle);
-                        sourceFeaturesHashMap.put(layer.getId(), vectorFeatures);
-                        sourcesOrder.put(layer.getId(), new ArrayList<>());
+                        continue;
                     } else if (iLayer instanceof TrackLayer) {
                         TrackLayer layer = (TrackLayer) iLayer;
                         layersType.put(layer.getId(), GT_TRACK_WA);
@@ -1007,11 +1121,153 @@ public class MapDrawable
                 }
             }
 
+                if (Constants.DEBUG_MODE) {
+                    Log.d(Constants.TAG, "MapDrawable loadLayers worker pre-setStyle ms="
+                            + ((System.nanoTime() - tWorkerWallStart) / 1_000_000));
+                }
+
+            } else {
+                // --- MAP_STARTUP_OPTIMIZATIONS: sequential vector + track/raster (see Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED) ---
+                for (ILayer iLayer : allLayers) {
+                    try {
+                        if (iLayer instanceof VectorLayer) {
+                            VectorLayer layer = (VectorLayer) iLayer;
+                            if (skipInvisibleLayers && !layer.isVisible()) {
+                                continue;
+                            }
+                            List<org.maplibre.geojson.Feature> vectorFeatures =
+                                    VectorLayerRenderCache.tryLoadFeatures(layer);
+                            if (vectorFeatures == null) {
+                                Intent msg = new Intent(MESSAGE_INTENT_STYLING);
+                                String loadHint = getContext().getString(R.string.process_layer_hint);
+                                msg.putExtra("msg", loadHint + layer.getName());
+                                msg.setPackage(getContext().getPackageName());
+                                getContext().sendBroadcast(msg);
+                                vectorFeatures = createFeatureListFromLayer(layer);
+                                VectorLayerRenderCache.save(layer, vectorFeatures);
+                            }
+                            com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
+                            layersType.put(layer.getId(), layer.getGeometryType());
+                            layersPath.put(layer.getId(), layer.getPath().toString());
+                            layersStyle.put(layer.getId(), ngStyle);
+                            sourceFeaturesHashMap.put(layer.getId(), vectorFeatures);
+                            sourcesOrder.put(layer.getId(), new ArrayList<>());
+                        } else if (iLayer instanceof TrackLayer) {
+                            TrackLayer layer = (TrackLayer) iLayer;
+                            layersType.put(layer.getId(), GT_TRACK_WA);
+                            layersPath.put(layer.getId(), layer.getPath().toString());
+
+                            tracksFeatures.clear();
+                            tracksFeatures.addAll(createFeatureListFromTrackLayer(layer));
+
+                            tracksFlagsFeatures.clear();
+                            tracksFlagsFeatures.addAll(createFeatureListFlagsFromTrackLayer(layer));
+                        } else if (iLayer instanceof NGWRasterLayer) {
+                            Connection found = null;
+                            for (int i = 0; i < connections.getChildrenCount(); i++) {
+                                if (connections.getChild(i).getName().equals((((NGWRasterLayer) iLayer).getAccountName()))) {
+                                    found = (Connection) connections.getChild(i);
+                                    String basicAuth = getHTTPBaseAuth(found.getLogin(), found.getPassword());
+                                    if (null != basicAuth) {
+                                        final String url = ((NGWRasterLayer) iLayer).getURL();
+                                        final String getBaseUrl = getBaseUrlpart(url);
+                                        final String resPart = "resource=" + extractResourceValue(url);
+                                        final String[] authPart = new String[4];
+                                        authPart[0] = getBaseUrl;
+                                        authPart[1] = resPart;
+                                        authPart[2] = basicAuth;
+                                        authPart[3] = iLayer.getPath().toString();
+                                        ((IGISApplication) getContext().getApplicationContext()).updateAuthPair(authPart);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            TMSLayer layer = (TMSLayer) iLayer;
+                            layersType.put(layer.getId(), GT_RASTER_WA);
+                            layersPath.put(layer.getId(), layer.getPath().toString());
+
+                            rasterLayersURLMap.put(layer.getId(), ((NGWRasterLayer) layer).getURL());
+                            sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
+                            sourcesOrder.put(layer.getId(), new ArrayList<>());
+                        } else if (iLayer instanceof RemoteTMSLayer) {
+                            final String url = ((RemoteTMSLayer) iLayer).getURL();
+                            final String getBaseUrl = getBaseUrlpart(url);
+                            final String resPart = "resource=" + extractResourceValue(url);
+                            final String[] authPart = new String[4];
+                            authPart[0] = getBaseUrl;
+                            authPart[1] = resPart;
+                            authPart[2] = "no";
+                            authPart[3] = iLayer.getPath().toString();
+                            ((IGISApplication) getContext().getApplicationContext()).updateAuthPair(authPart);
+
+                            TMSLayer layer = (TMSLayer) iLayer;
+                            layersType.put(layer.getId(), GT_RASTER_WA);
+                            layersPath.put(layer.getId(), layer.getPath().toString());
+
+                            if (((RemoteTMSLayer) layer).mIsOfflineLayer) {
+                                rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                                rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
+                            } else {
+                                rasterLayersURLMap.put(layer.getId(), ((RemoteTMSLayer) layer).getURLSubdomain());
+                                rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
+                            }
+                            sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
+                            sourcesOrder.put(layer.getId(), new ArrayList<>());
+                        } else if (iLayer instanceof LocalTMSLayer) {
+                            TMSLayer layer = (TMSLayer) iLayer;
+                            layersType.put(layer.getId(), GT_RASTER_WA);
+                            layersPath.put(layer.getId(), layer.getPath().toString());
+
+                            rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                            rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
+                            sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
+                            sourcesOrder.put(layer.getId(), new ArrayList<>());
+                        }
+                    } catch (OutOfMemoryError outOfMemoryError) {
+                        mainHandler.post(() -> {
+                            Toast.makeText(mContext, mContext.getString(R.string.outofmemory) + iLayer.getName(), Toast.LENGTH_LONG).show();
+                            Intent clear = new Intent(MESSAGE_INTENT_STYLING);
+                            clear.putExtra("msg", "");
+                            clear.setPackage(mContext.getPackageName());
+                            mContext.sendBroadcast(clear);
+                        });
+                        if (iLayer instanceof VectorLayer) {
+                            int vid = ((VectorLayer) iLayer).getId();
+                            layersType.remove(vid);
+                            layersPath.remove(vid);
+                            layersStyle.remove(vid);
+                            sourceFeaturesHashMap.remove(vid);
+                            sourcesOrder.remove(vid);
+                        }
+                    } catch (Exception ex) {
+                        Log.e(TAG, "loadLayersToMaplibreMap: layer " + iLayer.getName(), ex);
+                        mainHandler.post(() -> {
+                            Intent clear = new Intent(MESSAGE_INTENT_STYLING);
+                            clear.putExtra("msg", "");
+                            clear.setPackage(getContext().getPackageName());
+                            getContext().sendBroadcast(clear);
+                        });
+                        if (iLayer instanceof VectorLayer) {
+                            int vid = ((VectorLayer) iLayer).getId();
+                            layersType.remove(vid);
+                            layersPath.remove(vid);
+                            layersStyle.remove(vid);
+                            sourceFeaturesHashMap.remove(vid);
+                            sourcesOrder.remove(vid);
+                        }
+                    }
+                }
+            }
+
+            final long[] tSetStyleCallNs = (Constants.DEBUG_MODE && Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED)
+                    ? new long[1] : null;
             mainHandler.post(() -> {
                 final int styleRequestId = mLoadLayersStyleRequestId.incrementAndGet();
                 MapView mapViewForStyle = maplibreMapView.get();
                 MapLibreMap mapForStyle = maplibreMap.get();
                 if (mapViewForStyle == null || mapForStyle == null) {
+                    mLayerLoadInProgress = false;
                     dismissStylingProgress();
                     return;
                 }
@@ -1030,6 +1286,13 @@ public class MapDrawable
                         if (styleRequestId != mLoadLayersStyleRequestId.get()) {
                             return;
                         }
+                        if (Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED && Constants.DEBUG_MODE
+                                && tSetStyleCallNs != null && tSetStyleCallNs[0] != 0) {
+                            Log.d(Constants.TAG, "MapDrawable loadLayers mbgl style load wait ms="
+                                    + ((System.nanoTime() - tSetStyleCallNs[0]) / 1_000_000));
+                        }
+                        final long tStyleBodyStart = (Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED && Constants.DEBUG_MODE)
+                                ? System.nanoTime() : 0L;
                         try {
                         Style style = maplibreMap.get().getStyle();
                         updateMapBackground();
@@ -1230,7 +1493,7 @@ public class MapDrawable
                                         rasterLayersURLMap,
                                         rasterLayersTmsTypeMap,
                                         pathForLayer, false,
-                                        sourceFileUriMap.get(entry.getKey()));
+                                        null);
 
                             createFillLayerForLayer(entry.getKey(),
                                     geoType,
@@ -1245,6 +1508,11 @@ public class MapDrawable
                                     signaturesRootLayer);
 
                             checkLayerVisibility(entry.getKey());
+                        }
+
+                        if (Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED && Constants.DEBUG_MODE) {
+                            Log.d(Constants.TAG, "MapDrawable loadLayers style apply body ms="
+                                    + ((System.nanoTime() - tStyleBodyStart) / 1_000_000));
                         }
 
                         } catch (Throwable t) {
@@ -1266,9 +1534,18 @@ public class MapDrawable
                     }
                 };
                 mapViewForStyle.addOnDidFinishLoadingStyleListener(mLoadLayersStyleListener);
-                ((IGISApplication) getContext().getApplicationContext()).setGetingStyleInProgress(true);
+                if (Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED && Constants.DEBUG_MODE && tSetStyleCallNs != null) {
+                    tSetStyleCallNs[0] = System.nanoTime();
+                }
                 mapForStyle.setStyle(new Style.Builder().fromJson(styleJson));
             });
+            } catch (Throwable t) {
+                Log.e(TAG, "loadLayersToMaplibreMap: worker", t);
+                mainHandler.post(() -> {
+                    mLayerLoadInProgress = false;
+                    dismissStylingProgress();
+                });
+            }
         });
         executor.shutdown();
     }

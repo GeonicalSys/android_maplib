@@ -41,6 +41,7 @@ import com.nextgis.maplib.datasource.GeoGeometryFactory;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
 import com.nextgis.maplib.map.VectorLayer;
+import com.nextgis.maplib.map.VectorLayerRenderCache;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -228,6 +229,7 @@ public class GeoJSONUtil {
         }
 
         layer.save();
+        VectorLayerRenderCache.invalidateOnDataChange(layer);
         layer.notifyLayerChanged();
     }
 
@@ -308,6 +310,7 @@ public class GeoJSONUtil {
         }
 
         layer.save();
+        VectorLayerRenderCache.invalidateOnDataChange(layer);
         layer.notifyLayerChanged();
     }
 

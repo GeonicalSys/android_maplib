@@ -36,6 +36,16 @@ public interface Constants
     int     NOT_FOUND          = -1;
     boolean DEBUG_MODE         = BuildConfig.DEBUG;
 
+    /**
+     * Optional cold-start extras: disk render cache ({@code VectorLayerRenderCache}), parallel vector prep
+     * and timing logs in {@code MapDrawable.loadLayersToMaplibreMap}, default progress caption in
+     * {@code MapFragment}, and placeholder {@code HyperLog.setURL} in app/GISApplication.
+     * <p>{@code getGetingStyleInProgress} during {@code loadLayersToMaplibreMap} and {@code MapViewOverlays}
+     * deferral stay <b>always</b> on so collector batch reload and full style rebuild do not race.</p>
+     * <p><b>Currently off.</b> To resume extras: set to {@code true}, rebuild, and regression-test.</p>
+     */
+    boolean MAP_STARTUP_OPTIMIZATIONS_ENABLED = false;
+
     int NGW_v3 = 3;
 
     /**

@@ -78,6 +78,7 @@ import com.nextgis.maplib.display.Style;
 import com.nextgis.maplib.util.AttachItem;
 import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.DatabaseContext;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
 import com.nextgis.maplib.util.FileUtil;
@@ -2424,6 +2425,51 @@ public class VectorLayer
         return missing;
     }
 
+    /**
+     * True if a SQLite user table named like this layer's storage folder exists.
+     */
+    public boolean hasLocalDataTable() {
+        try {
+            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+            if (map == null) {
+                return false;
+            }
+            DatabaseContext.getDbForLayer(this);
+            SQLiteDatabase db = map.getDatabase(true);
+            try (Cursor c = db.rawQuery(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+                    new String[] { mPath.getName() })) {
+                return c.moveToFirst();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "hasLocalDataTable: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Number of rows in the layer data table, or -1 if the table is missing or the query fails.
+     */
+    public int getSqliteTableRowCount() {
+        if (!hasLocalDataTable()) {
+            return -1;
+        }
+        try {
+            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+            if (map == null) {
+                return -1;
+            }
+            DatabaseContext.getDbForLayer(this);
+            SQLiteDatabase db = map.getDatabase(true);
+            try (Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + mPath.getName(), null)) {
+                return c.moveToFirst() ? c.getInt(0) : 0;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "getSqliteTableRowCount: " + e.getMessage());
+            return -1;
+        }
+    }
+
 
     public int getCount()
     {
@@ -2576,6 +2622,13 @@ public class VectorLayer
         saveAttach(featureId, attaches);
     }
 
+    /** NGW layers bump cache generation from sync/import paths; avoid double-invalidate per feature. */
+    private void invalidateLocalRenderCache() {
+        if (!(this instanceof NGWVectorLayer)) {
+            VectorLayerRenderCache.invalidateOnDataChange(this);
+        }
+    }
+
 
     @Override
     public void notifyDelete(long rowId)
@@ -2586,6 +2639,7 @@ public class VectorLayer
         if (mCache.removeItem(rowId) != null) {
 //            Log.e("CCACHH","mCache.removeItem");
             save();
+            invalidateLocalRenderCache();
             notifyLayerChanged();
         }
 //        Log.e("CCACHH","mCache.save");
@@ -2666,6 +2720,7 @@ public class VectorLayer
 
         mCache.clear();
         save();
+        invalidateLocalRenderCache();
         notifyLayerChanged();
     }
 
@@ -2685,6 +2740,7 @@ public class VectorLayer
         if (null != geom) {
             cacheGeometryEnvelope(rowId, geom);
             save();
+            invalidateLocalRenderCache();
             notifyLayerChanged();
         }
     }
@@ -2736,6 +2792,10 @@ public class VectorLayer
             save();
         }
 
+        if (!mBulkImportMode) {
+            invalidateLocalRenderCache();
+        }
+
         notifyLayerChanged();
 
         if (rowId != -1 && oldRowId != -1 )
@@ -2747,6 +2807,7 @@ public class VectorLayer
     public void notifyUpdateAll()
     {
         reloadCache();
+        invalidateLocalRenderCache();
         notifyLayerChanged();
     }
 
