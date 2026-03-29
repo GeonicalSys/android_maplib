@@ -902,6 +902,11 @@ public class LayerGroup
         return -1;
     }
 
+    /** Iteration index of a direct child in {@link #getLayer(int)} order (0 = first / bottom of stack). */
+    public int getChildLayerIndex(ILayer layer) {
+        return indexOfLayer(mLayers, layer);
+    }
+
     public static ILayer getLayerByindex(LinkedHashMap<Integer, ILayer> map, int index) {
         int indextmp = 0;
         for (ILayer value : map.values()) {
