@@ -26,6 +26,7 @@ package com.nextgis.maplib.api;
 import android.accounts.Account;
 import android.accounts.AccountManagerFuture;
 import android.app.Activity;
+import android.os.Bundle;
 
 import com.nextgis.maplib.location.GpsEventSource;
 import com.nextgis.maplib.map.LayerFactory;
@@ -287,6 +288,20 @@ public interface IGISApplication
      * No-op if no batch was registered. Safe to call on the main thread only.
      */
     void finalizeCollectorImportVerifyAndRepairIfNeeded();
+
+    /**
+     * After a successful standalone vector/NGW fill (not a collector batch), register extras for post-drain verification.
+     * The bundle must contain layer group id and the same extras used to enqueue the fill task (for re-queue on repair).
+     * Local GeoJSON fills should also include the map layer id under key {@code standalone_verify_layer_id}.
+     */
+    void registerStandaloneLayerFillVerifyAfterSuccess(Bundle fillTaskIntentExtrasCopy);
+
+    /**
+     * After the import queue drains, verify standalone fills: missing layer or missing SQLite table → delete and re-enqueue
+     * (same idea as {@link #finalizeCollectorImportVerifyAndRepairIfNeeded()}, limited repair waves).
+     * Safe to call on the main thread only.
+     */
+    void finalizeStandaloneLayerFillVerifyIfNeeded();
 
     /**
      * Drop an in-progress collector import batch without verification (e.g. user cancelled fill).

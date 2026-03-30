@@ -62,6 +62,10 @@ import static com.nextgis.maplib.util.GeoConstants.FTTime;
  */
 public class GeoJSONUtil {
 
+    private static final int GEOJSON_FILL_PROGRESS_FEATURE_STEP = 50;
+    private static final long GEOJSON_FILL_PROGRESS_MIN_INTERVAL_MS = 250L;
+    private static final int GEOJSON_FILL_SQL_TX_BATCH = 250;
+
     /**
      * Check if provided name support and throw NGWException if not. Now support EPSG 3857 and 4326 only.
      * @param crsName Spatial reference name
@@ -185,6 +189,8 @@ public class GeoJSONUtil {
                     layer.beginBulkImport();
                     dbTx.beginTransaction();
                     try {
+                        long lastProgressElapsedMs = 0L;
+                        int sqlTxFeatureCount = 0;
                         while (reader.hasNext()) {
                             Feature feature = readGeoJSONFeature(reader, layer, isWGS84);
                             if (null != feature) {
@@ -197,12 +203,29 @@ public class GeoJSONUtil {
 
                                 if(feature.getGeometry() != null) {
                                     layer.createFeatureBatch(feature, db, true);
+                                    sqlTxFeatureCount++;
+                                    if (sqlTxFeatureCount >= GEOJSON_FILL_SQL_TX_BATCH) {
+                                        dbTx.setTransactionSuccessful();
+                                        dbTx.endTransaction();
+                                        dbTx.beginTransaction();
+                                        sqlTxFeatureCount = 0;
+                                    }
                                     if(null != progressor){
                                         if (progressor.isCanceled()) {
                                             break;
                                         }
-                                        progressor.setValue(streamSize - in.available());
-                                        progressor.setMessage(layer.getContext().getString(R.string.process_features) + ": " + counter++);
+                                        final long elapsed = SystemClock.elapsedRealtime();
+                                        final boolean reportProgress =
+                                                (counter % GEOJSON_FILL_PROGRESS_FEATURE_STEP == 0)
+                                                        || (elapsed - lastProgressElapsedMs
+                                                        >= GEOJSON_FILL_PROGRESS_MIN_INTERVAL_MS);
+                                        if (reportProgress) {
+                                            lastProgressElapsedMs = elapsed;
+                                            progressor.setValue(streamSize - in.available());
+                                            progressor.setMessage(layer.getContext().getString(R.string.process_features)
+                                                    + ": " + counter);
+                                        }
+                                        counter++;
                                     }
                                 }
                             }
@@ -267,6 +290,8 @@ public class GeoJSONUtil {
                     layer.beginBulkImport();
                     dbTx.beginTransaction();
                     try {
+                        long lastProgressElapsedMs = 0L;
+                        int sqlTxFeatureCount = 0;
                         while (reader.hasNext()) {
                             Feature feature = readGeoJSONFeature(reader, layer, isWGS84);
                             if (null != feature) {
@@ -279,12 +304,29 @@ public class GeoJSONUtil {
 
                                 if (feature.getGeometry() != null) {
                                     layer.createFeatureBatch(feature, db, true);
+                                    sqlTxFeatureCount++;
+                                    if (sqlTxFeatureCount >= GEOJSON_FILL_SQL_TX_BATCH) {
+                                        dbTx.setTransactionSuccessful();
+                                        dbTx.endTransaction();
+                                        dbTx.beginTransaction();
+                                        sqlTxFeatureCount = 0;
+                                    }
                                     if(null != progressor){
                                         if (progressor.isCanceled()) {
                                             break;
                                         }
-                                        progressor.setValue(streamSize - in.available());
-                                        progressor.setMessage(layer.getContext().getString(R.string.process_features) + ": " + counter++);
+                                        final long elapsed = SystemClock.elapsedRealtime();
+                                        final boolean reportProgress =
+                                                (counter % GEOJSON_FILL_PROGRESS_FEATURE_STEP == 0)
+                                                        || (elapsed - lastProgressElapsedMs
+                                                        >= GEOJSON_FILL_PROGRESS_MIN_INTERVAL_MS);
+                                        if (reportProgress) {
+                                            lastProgressElapsedMs = elapsed;
+                                            progressor.setValue(streamSize - in.available());
+                                            progressor.setMessage(layer.getContext().getString(R.string.process_features)
+                                                    + ": " + counter);
+                                        }
+                                        counter++;
                                     }
                                 }
                             }

@@ -136,6 +136,15 @@ public class NGWVectorLayer
     protected static final int TYPE_CHANGES_ATTACH    = 127;
     protected static final int TYPE_CHANGES_ATTACH_ID = 128;
 
+    /** Limits progressor calls during bulk fill (every N features or after min interval). */
+    private static final int NGW_FILL_PROGRESS_FEATURE_STEP = 50;
+    private static final long NGW_FILL_PROGRESS_MIN_INTERVAL_MS = 250L;
+    /**
+     * Commit SQLite writes every N features so other threads (map/UI) can read the DB instead of
+     * blocking on one multi‑minute transaction while streaming NGW JSON into {@link #createFeatureBatch}.
+     */
+    private static final int NGW_FILL_SQL_TX_BATCH = 250;
+
     protected static final int DIRECTION_TO = 1;
     protected static final int DIRECTION_FROM = 2;
     protected static final int DIRECTION_BOTH = 3;
@@ -487,6 +496,7 @@ public class NGWVectorLayer
                 beginBulkImport();
                 dbTx.beginTransaction();
                 try {
+                    long lastProgressElapsedMs = 0L;
                     while (reader.hasNext()) {
                         try {
                             final Feature feature = NGWUtil.readNGWFeature(reader, fields, mCRS);
@@ -510,11 +520,24 @@ public class NGWVectorLayer
                             if (progressor.isCanceled()) {
                                 break;
                             }
-                            progressor.setValue(streamSize - in.available());
-                            progressor.setMessage(getContext().getString(R.string.process_features) + ": " + featureCount);
+                            final long elapsed = SystemClock.elapsedRealtime();
+                            final boolean reportProgress =
+                                    (featureCount % NGW_FILL_PROGRESS_FEATURE_STEP == 0)
+                                            || (elapsed - lastProgressElapsedMs >= NGW_FILL_PROGRESS_MIN_INTERVAL_MS);
+                            if (reportProgress) {
+                                lastProgressElapsedMs = elapsed;
+                                progressor.setValue(streamSize - in.available());
+                                progressor.setMessage(
+                                        getContext().getString(R.string.process_features) + ": " + featureCount);
+                            }
                         }
 
                         ++featureCount;
+                        if (featureCount % NGW_FILL_SQL_TX_BATCH == 0) {
+                            dbTx.setTransactionSuccessful();
+                            dbTx.endTransaction();
+                            dbTx.beginTransaction();
+                        }
                     }
                     if (!jsonTruncated) {
                         reader.endArray();
