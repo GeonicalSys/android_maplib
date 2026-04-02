@@ -28,6 +28,8 @@ import android.accounts.AccountManagerFuture;
 import android.app.Activity;
 import android.os.Bundle;
 
+import java.util.ArrayList;
+
 import com.nextgis.maplib.location.GpsEventSource;
 import com.nextgis.maplib.map.LayerFactory;
 import com.nextgis.maplib.map.MLP.AuthInterceptorNG;
@@ -290,6 +292,17 @@ public interface IGISApplication
     void finalizeCollectorImportVerifyAndRepairIfNeeded();
 
     /**
+     * If {@code LayerFillService} is already running (e.g. drain worker is blocked in finalize), enqueue repair
+     * bundles on that instance synchronously so the queue is non-empty before the worker resumes — avoids
+     * {@code startForegroundService} racing with {@code stopSelf}. Call from the main thread only.
+     *
+     * @param repairBundles same shape as {@code LayerFillService.KEY_REPAIR_BATCH_EXTRAS}
+     * @param deferMapReload when true, {@link #setLayerFillBatchDeferringHeavyMapReload(boolean)} with true
+     * @return true if at least one task was enqueued on the active service (caller should skip {@code startForegroundService})
+     */
+    boolean tryEnqueueLayerFillRepairBatch(ArrayList<Bundle> repairBundles, boolean deferMapReload);
+
+    /**
      * After a successful standalone vector/NGW fill (not a collector batch), register extras for post-drain verification.
      * The bundle must contain layer group id and the same extras used to enqueue the fill task (for re-queue on repair).
      * Local GeoJSON fills should also include the map layer id under key {@code standalone_verify_layer_id}.
@@ -307,6 +320,12 @@ public interface IGISApplication
      * Drop an in-progress collector import batch without verification (e.g. user cancelled fill).
      */
     void clearCollectorImportBatch();
+
+    /**
+     * True while a collector import batch is registered ({@link #registerCollectorImportBatch}) and not yet cleared.
+     * Used with {@link #isLayerFillBatchDeferringHeavyMapReload()} to keep blocking progress UI until verify/repair finishes.
+     */
+    boolean hasCollectorImportBatchRegistered();
 
     /**
      * Local NGW vector layer schema no longer matches server metadata during sync.
