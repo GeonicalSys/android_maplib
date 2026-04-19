@@ -2993,6 +2993,17 @@ public class MapDrawable
         return true;
     }
 
+    /**
+     * For multipolygon edit, false when internal selection indices are inconsistent (would no-op / crash on delete vertex).
+     * Other geometry types rely on existing menu rules.
+     */
+    public boolean canDeleteCurrentPointSafe() {
+        if (editingObject instanceof MultiPolygonEditClass) {
+            return ((MultiPolygonEditClass) editingObject).canDeleteCurrentPoint();
+        }
+        return true;
+    }
+
     public boolean deleteCurrentLine(){
         if (editingObject != null && editingObject instanceof MultiLineEditClass) {
             ((MultiLineEditClass)editingObject).deleteCurrentLine();

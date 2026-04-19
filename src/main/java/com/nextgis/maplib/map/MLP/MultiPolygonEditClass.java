@@ -1,5 +1,7 @@
 package com.nextgis.maplib.map.MLP;
 
+import android.util.Log;
+
 import com.nextgis.maplib.map.MPLFeaturesUtils;
 import org.maplibre.android.geometry.LatLng;
 import org.maplibre.android.maps.Projection;
@@ -15,6 +17,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class MultiPolygonEditClass extends MLGeometryEditClass {
+
+    private static final String TAG = "MultiPolygonEdit";
 
     // Flat list of all vertices for all rings of all polygons
     protected List<Point> editingVertices = new ArrayList<>(); // Inherited
@@ -405,9 +409,63 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
 
 
 
+    /**
+     * True when {@link #deleteCurrentPoint()} can run without throwing and will change geometry
+     * (same index guards as in delete, plus minimum points per ring).
+     */
+    public boolean canDeleteCurrentPoint() {
+        if (selectedVertexIndex == -1 || editingVertices.isEmpty()) {
+            return false;
+        }
+        if (!areSelectionIndicesConsistentForDelete()) {
+            return false;
+        }
+        int pIdx = selectedPolygonIndex;
+        int rIdxInP = selectedRingIndexInPolygon;
+        int startRingMarkerForSelectedPolygon = (pIdx == 0) ? 0 : multiPolygonRingEndIndicesMarker.get(pIdx - 1);
+        int currentRingAbsoluteIndexInPRI = startRingMarkerForSelectedPolygon + rIdxInP;
+        int ringStartGlobal = (currentRingAbsoluteIndexInPRI == 0) ? 0 : polygonRingEndIndices.get(currentRingAbsoluteIndexInPRI - 1);
+        int ringEndGlobal = polygonRingEndIndices.get(currentRingAbsoluteIndexInPRI);
+        int pointsInCurrentRing = ringEndGlobal - ringStartGlobal;
+        return pointsInCurrentRing >= 4;
+    }
+
+    /**
+     * Validates polygon / ring indices before any {@code List#get} used in {@link #deleteCurrentPoint()}.
+     */
+    private boolean areSelectionIndicesConsistentForDelete() {
+        if (selectedPolygonIndex < 0 || selectedRingIndexInPolygon < 0) {
+            return false;
+        }
+        final int pIdx = selectedPolygonIndex;
+        if (multiPolygonRingEndIndicesMarker.isEmpty() || pIdx >= multiPolygonRingEndIndicesMarker.size()) {
+            return false;
+        }
+        if (pIdx > 0 && (pIdx - 1) >= multiPolygonRingEndIndicesMarker.size()) {
+            return false;
+        }
+        int startRingMarkerForSelectedPolygon = (pIdx == 0) ? 0 : multiPolygonRingEndIndicesMarker.get(pIdx - 1);
+        int currentRingAbsoluteIndexInPRI = startRingMarkerForSelectedPolygon + selectedRingIndexInPolygon;
+        if (currentRingAbsoluteIndexInPRI < 0 || currentRingAbsoluteIndexInPRI >= polygonRingEndIndices.size()) {
+            return false;
+        }
+        if (currentRingAbsoluteIndexInPRI > 0 && (currentRingAbsoluteIndexInPRI - 1) >= polygonRingEndIndices.size()) {
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public void deleteCurrentPoint() {
         if (selectedVertexIndex == -1 || editingVertices.isEmpty()) return;
+
+        if (!areSelectionIndicesConsistentForDelete()) {
+            Log.w(TAG, "deleteCurrentPoint skipped: inconsistent selection (vertex=" + selectedVertexIndex
+                    + ", poly=" + selectedPolygonIndex + ", ringInPoly=" + selectedRingIndexInPolygon
+                    + ", markers=" + multiPolygonRingEndIndicesMarker.size()
+                    + ", ringEnds=" + polygonRingEndIndices.size() + ")");
+            return;
+        }
 
         int pIdx = selectedPolygonIndex;
         int rIdxInP = selectedRingIndexInPolygon;

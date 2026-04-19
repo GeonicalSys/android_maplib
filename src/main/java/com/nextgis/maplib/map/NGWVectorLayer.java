@@ -2485,8 +2485,8 @@ public class NGWVectorLayer
 
         if (0 != (mSyncType & Constants.SYNC_GEOMETRY)) {
             //may be found geometry in cache by id is faster
-            GeoGeometry geometry = GeoGeometryFactory.fromBlob(
-                    cursor.getBlob(cursor.getColumnIndex(Constants.FIELD_GEOM)));
+            int geomCol = cursor.getColumnIndexOrThrow(Constants.FIELD_GEOM);
+            GeoGeometry geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(geomCol));
 
             geometry.setCRS(GeoConstants.CRS_WEB_MERCATOR);
             if (mCRS != GeoConstants.CRS_WEB_MERCATOR)
