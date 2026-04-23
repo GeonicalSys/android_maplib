@@ -83,7 +83,6 @@ import java.net.SocketException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.HashMap;
@@ -780,6 +779,9 @@ public class NGWVectorLayer
         Log.d("SSYNC", "sync of " + getName());
         syncResult.clear();
         if (0 != (mSyncType & Constants.SYNC_NONE) || mFields == null) {
+            if (0 != (mSyncType & Constants.SYNC_NONE) && mFields != null) {
+                tryRefreshServerResourceMetaAndConfig();
+            }
             if (Constants.DEBUG_MODE) {
                 Log.d(Constants.TAG,
                         "Layer " + getName() + " is not checked to sync or not inited");
@@ -1484,19 +1486,20 @@ public class NGWVectorLayer
         return;
     }
 
-    public boolean getChangesFromServer(
-            String authority,
-            SyncResult syncResult)
-    {
-        Log.d("SSYNC", "getChangesFromServer " + getName());
+    private enum ConfigRefreshOutcome {
+        CONTINUE_TO_FEATURES,
+        FINISH_LAYERSYNC_OK,
+    }
 
-        int countChanges = 0;
-        int createNewFeatureCount = 0;
-        mLoggedCreateInsertSqlError = false;
-        HyperLog.v(Constants.TAG, "NGWVectorLayer: getChangesFromServer " + getName());
+    /**
+     * Fetches NGW resource metadata and reconciles server description (style/config) with local
+     * state. Used from full data sync and from SYNC_NONE paths so server-side description updates
+     * are always applied.
+     */
+    private ConfigRefreshOutcome tryRefreshServerResourceMetaAndConfig() {
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " network is unavailable -stop getChangesFromServer");
-            return true;
+            return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
         }
 
         if (Constants.DEBUG_MODE) {
@@ -1512,7 +1515,7 @@ public class NGWVectorLayer
             } catch (Exception rebuildEx) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: refill scheduling failed", rebuildEx);
             }
-            return true;
+            return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
         }
 
         try {
@@ -1532,7 +1535,7 @@ public class NGWVectorLayer
                             + " server schema mismatch — scheduling layer rebuild");
                     ((IGISApplication) mContext.getApplicationContext())
                             .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
-                    return true;
+                    return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
                 }
 
                 if (resourceMeta != null) {
@@ -1560,7 +1563,7 @@ public class NGWVectorLayer
                                             + " — scheduling rebuild");
                                     ((IGISApplication) mContext.getApplicationContext())
                                             .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
-                                    return true;
+                                    return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
                                 }
                                 if (configDiff.isSoftOnly()) {
                                     HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
@@ -1580,6 +1583,36 @@ public class NGWVectorLayer
             }
         } catch (IllegalStateException ignored) {
             // account missing; getFeatures will report auth if needed
+        }
+
+        return ConfigRefreshOutcome.CONTINUE_TO_FEATURES;
+    }
+
+    /**
+     * Reconciles NGW resource meta and description when vector data sync is off ({@code SYNC_NONE}).
+     * Invoked from {@link com.nextgis.maplib.datasource.ngw.SyncAdapter} for layers excluded
+     * from the main sync list.
+     *
+     * @param authority content resolver authority (for parity with {@link #sync})
+     * @param syncResult  sync result object (unchanged; reserved for error reporting)
+     */
+    @SuppressWarnings("unused")
+    public void syncNgwResourceConfigOnly(String authority, SyncResult syncResult) {
+        tryRefreshServerResourceMetaAndConfig();
+    }
+
+    public boolean getChangesFromServer(
+            String authority,
+            SyncResult syncResult)
+    {
+        Log.d("SSYNC", "getChangesFromServer " + getName());
+
+        int countChanges = 0;
+        int createNewFeatureCount = 0;
+        mLoggedCreateInsertSqlError = false;
+        HyperLog.v(Constants.TAG, "NGWVectorLayer: getChangesFromServer " + getName());
+        if (tryRefreshServerResourceMetaAndConfig() == ConfigRefreshOutcome.FINISH_LAYERSYNC_OK) {
+            return true;
         }
 
         List<Feature> features, added = new ArrayList<>(), deleted =  new ArrayList<>(), changed =  new ArrayList<>();

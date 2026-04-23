@@ -253,6 +253,12 @@ public interface IGISApplication
     void flushPendingMapReloadAfterLayerFillIfNeeded(MaplibreMapInteraction mapFragment);
 
     /**
+     * Clears the internal &quot;pending map reload after layer fill&quot; flag after a successful reload
+     * (e.g. from {@link com.nextgis.maplib.map.MaplibreMapInteraction#reloadMapStyleAndLayersAfterLayerFillBatch()} scheduled retries).
+     */
+    void clearMapReloadAfterLayerFillPending();
+
+    /**
      * True while {@code LayerFillService} has a non-empty queue or is draining it.
      * Used to skip {@link com.nextgis.maplib.datasource.ngw.SyncAdapter} work so sync does not
      * compete with NGW layer import.

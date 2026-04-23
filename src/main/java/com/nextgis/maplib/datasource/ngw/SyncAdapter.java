@@ -48,6 +48,7 @@ import com.nextgis.maplib.api.INGWLayer;
 import com.nextgis.maplib.map.LayerGroup;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
+import com.nextgis.maplib.map.NGWVectorLayer;
 import com.nextgis.maplib.map.TrackLayer;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.NGWUtil;
@@ -156,6 +157,11 @@ public class SyncAdapter
             Log.d("SSYNC", "mapContentProviderHelper!=null start sync" );
 
             sync(account, mapContentProviderHelper, authority, syncResult, bundle);
+            if (!isCanceled()
+                    && (bundle == null || bundle.getString(ACTION_LPATH) == null)) {
+                syncNgwConfigForSyncDisabledLayers(
+                        account, mapContentProviderHelper, authority, syncResult);
+            }
         } else
             Log.d("SSYNC", "mapContentProviderHelper=null" );
 
@@ -235,6 +241,27 @@ public class SyncAdapter
 }
 
 
+    /**
+     * @return true if the map contains an {@link NGWVectorLayer} for this account (any sync type);
+     *         used so onPerformSync can run to reconcile NGW description/config from the server
+     *         when data sync is disabled for all such layers.
+     */
+    private static boolean hasNgwVectorLayerForAccount(LayerGroup group, String accountName) {
+        for (int i = 0; i < group.getLayerCount(); i++) {
+            ILayer layer = group.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                if (hasNgwVectorLayerForAccount((LayerGroup) layer, accountName)) {
+                    return true;
+                }
+            } else if (layer instanceof NGWVectorLayer) {
+                if (accountName.equals(((INGWLayer) layer).getAccountName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public boolean isSomeToSync(Account account){
         Log.d("SSYNC", "isSomeToSync start for " + account.name);
 
@@ -243,6 +270,10 @@ public class SyncAdapter
         boolean trackSync = mSharedPreferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, false);
 
         MapContentProviderHelper layerGroup =(MapContentProviderHelper) MapBase.getInstance();
+        if (hasNgwVectorLayerForAccount(layerGroup, account.name)) {
+            Log.d("SSYNC", "isSomeToSync result  true (has NGW vector for account)");
+            return true;
+        }
         List<ILayer> layersToSync = new ArrayList<>();
         for (int i = 0; i < layerGroup.getLayerCount(); i++){
             ILayer layer = layerGroup.getLayer(i);
@@ -377,6 +408,31 @@ public class SyncAdapter
             HyperLog.v(Constants.TAG, "SyncAdapter: Sync Ended for " + layer.getName() + " layer");
         }
         Log.d("SSYNC", "END sync syncAdapter account - " + account.name);
+    }
+
+    private void syncNgwConfigForSyncDisabledLayers(
+            Account account,
+            LayerGroup layerGroup,
+            String authority,
+            SyncResult syncResult) {
+        if (isCanceled()) {
+            return;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            if (isCanceled()) {
+                return;
+            }
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                syncNgwConfigForSyncDisabledLayers(
+                        account, (LayerGroup) layer, authority, syncResult);
+            } else if (layer instanceof NGWVectorLayer) {
+                INGWLayer ngw = (INGWLayer) layer;
+                if (account.name.equals(ngw.getAccountName()) && ngw.getSyncType() == SYNC_NONE) {
+                    ((NGWVectorLayer) layer).syncNgwResourceConfigOnly(authority, syncResult);
+                }
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")

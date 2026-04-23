@@ -28,8 +28,10 @@ public interface MaplibreMapInteraction {
 
     /**
      * Full MapLibre style + layer sources refresh after a deferred layer-fill batch (e.g. collector).
+     *
+     * @return true if a full reload was applied; false if the map was not ready yet (caller may keep a pending flag)
      */
-    void reloadMapStyleAndLayersAfterLayerFillBatch();
+    boolean reloadMapStyleAndLayersAfterLayerFillBatch();
 
     public  boolean getLongLongClickProcesses();
 
