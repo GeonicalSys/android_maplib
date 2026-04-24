@@ -963,6 +963,236 @@ public class MPLFeaturesUtils {
         return rasterLayer;
     }
 
+    /**
+     * MapLibre id of an existing style layer for {@code logical}, used as anchor when inserting a
+     * new raster so it sits under the first drawable sibling above in {@link LayerGroup} order
+     * (same as after a full {@code loadLayersToMaplibreMap} pass). Returns null if nothing exists yet.
+     */
+    @Nullable
+    private static String primaryExistingMbglLayerIdForUserLayer(ILayer logical, Style style) {
+        if (logical instanceof TrackLayer) {
+            String id = "track-line-layer";
+            return style.getLayer(id) != null ? id : null;
+        }
+        if (logical instanceof VectorLayer) {
+            String base = namePrefix + layer_namepart + logical.getId();
+            if (style.getLayer(base) != null) {
+                return base;
+            }
+            String sym = "symbol-" + namePrefix + layer_namepart + logical.getId();
+            if (style.getLayer(sym) != null) {
+                return sym;
+            }
+            return null;
+        }
+        if (logical instanceof TMSLayer) {
+            String rid = namePrefix + layer_namepart + logical.getId();
+            return style.getLayer(rid) != null ? rid : null;
+        }
+        return null;
+    }
+
+    /**
+     * Hot-add placement for a new TMS raster: either insert below an anchor (draw under sibling above)
+     * or above an anchor (draw on top of sibling below). Bulk {@code loadLayersToMaplibreMap} passes
+     * {@code null} and uses the signatures anchor path.
+     */
+    public static final class RasterSiblingAnchor {
+        /** {@code true} → {@link Style#addLayerBelow}; {@code false} → {@link Style#addLayerAbove}. */
+        public final boolean insertRasterBelowAnchor;
+        public final String anchorLayerId;
+
+        public RasterSiblingAnchor(boolean insertRasterBelowAnchor, String anchorLayerId) {
+            this.insertRasterBelowAnchor = insertRasterBelowAnchor;
+            this.anchorLayerId = anchorLayerId;
+        }
+    }
+
+    @Nullable
+    private static String topmostExistingMbglLayerIdForUserLayer(ILayer logical, Style style) {
+        if (logical instanceof TrackLayer) {
+            String id = "track-line-layer";
+            return style.getLayer(id) != null ? id : null;
+        }
+        if (logical instanceof VectorLayer) {
+            int lid = logical.getId();
+            String base = namePrefix + layer_namepart + lid;
+            String sym = "symbol-" + namePrefix + layer_namepart + lid;
+            String dash = base + dash_namepart;
+            String outline = base + outline_namepart;
+            String last = null;
+            for (org.maplibre.android.style.layers.Layer l : style.getLayers()) {
+                String id = l.getId();
+                if (id.equals(sym) || id.equals(base) || id.equals(dash) || id.equals(outline)) {
+                    last = id;
+                }
+            }
+            return last;
+        }
+        if (logical instanceof TMSLayer) {
+            String rid = namePrefix + layer_namepart + logical.getId();
+            return style.getLayer(rid) != null ? rid : null;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String bottommostMbglInSubtree(LayerGroup root, Style style) {
+        for (int i = 0; i < root.getLayerCount(); i++) {
+            ILayer ch = root.getLayer(i);
+            if (ch instanceof LayerGroup) {
+                String id = bottommostMbglInSubtree((LayerGroup) ch, style);
+                if (id != null) {
+                    return id;
+                }
+            } else {
+                String id = primaryExistingMbglLayerIdForUserLayer(ch, style);
+                if (id != null) {
+                    return id;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String topmostMbglInSubtree(LayerGroup root, Style style) {
+        for (int i = root.getLayerCount() - 1; i >= 0; i--) {
+            ILayer ch = root.getLayer(i);
+            if (ch instanceof LayerGroup) {
+                String id = topmostMbglInSubtree((LayerGroup) ch, style);
+                if (id != null) {
+                    return id;
+                }
+            } else {
+                String id = topmostExistingMbglLayerIdForUserLayer(ch, style);
+                if (id != null) {
+                    return id;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String mbglBottomAnchorForSiblingAbove(ILayer sibling, Style style) {
+        if (sibling instanceof LayerGroup) {
+            return bottommostMbglInSubtree((LayerGroup) sibling, style);
+        }
+        return primaryExistingMbglLayerIdForUserLayer(sibling, style);
+    }
+
+    @Nullable
+    private static String mbglTopAnchorForSiblingBelow(ILayer sibling, Style style) {
+        if (sibling instanceof LayerGroup) {
+            return topmostMbglInSubtree((LayerGroup) sibling, style);
+        }
+        return topmostExistingMbglLayerIdForUserLayer(sibling, style);
+    }
+
+    private static boolean isOsmBasemapTmsLayer(ILayer layer) {
+        if (!(layer instanceof TMSLayer)) {
+            return false;
+        }
+        TMSLayer t = (TMSLayer) layer;
+        if (t.getTMSType() == TMSTYPE_OSM) {
+            return true;
+        }
+        try {
+            if (t.getPath() != null && "osm".equalsIgnoreCase(t.getPath().getName())) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    @Nullable
+    private static ILayer findFirstOsmTmsInTree(LayerGroup root) {
+        for (int i = 0; i < root.getLayerCount(); i++) {
+            ILayer ch = root.getLayer(i);
+            if (ch instanceof LayerGroup) {
+                ILayer found = findFirstOsmTmsInTree((LayerGroup) ch);
+                if (found != null) {
+                    return found;
+                }
+            } else if (isOsmBasemapTmsLayer(ch)) {
+                return ch;
+            }
+        }
+        return null;
+    }
+
+    private static LayerGroup rootLayerGroupContaining(LayerGroup group) {
+        LayerGroup root = group;
+        ILayer p = root.getParent();
+        while (p instanceof LayerGroup) {
+            root = (LayerGroup) p;
+            p = root.getParent();
+        }
+        return root;
+    }
+
+    /**
+     * For hot-add only: MapLibre placement relative to siblings in {@link LayerGroup} order (index 0 =
+     * bottom). Prefers a sibling <em>above</em> (higher index): raster is inserted <em>below</em> that
+     * sibling's bottom MapLibre layer so the whole sibling draws on top. If none, prefers the nearest
+     * OSM basemap <em>below</em> (same intent as {@code LayerFillService} NGRc insert above OSM), then
+     * any other sibling below. If still unknown, uses OSM anywhere in the map tree (covers wrong list
+     * index after {@code addLayer} or missing parent index). Avoids {@code signaturesRootLayer} when OSM
+     * exists in the style.
+     */
+    @Nullable
+    public static RasterSiblingAnchor resolveRasterSiblingAnchorOrNull(ILayer tmsLayer, Style style) {
+        if (tmsLayer == null || style == null) {
+            return null;
+        }
+        ILayer parent = tmsLayer.getParent();
+        if (!(parent instanceof LayerGroup)) {
+            return null;
+        }
+        LayerGroup group = (LayerGroup) parent;
+        int idx = group.getChildLayerIndex(tmsLayer);
+        if (idx < 0) {
+            return null;
+        }
+        for (int j = idx + 1; j < group.getLayerCount(); j++) {
+            ILayer above = group.getLayer(j);
+            String mbglId = mbglBottomAnchorForSiblingAbove(above, style);
+            if (mbglId != null) {
+                return new RasterSiblingAnchor(true, mbglId);
+            }
+        }
+        for (int j = idx - 1; j >= 0; j--) {
+            ILayer below = group.getLayer(j);
+            if (!isOsmBasemapTmsLayer(below)) {
+                continue;
+            }
+            String mbglId = mbglTopAnchorForSiblingBelow(below, style);
+            if (mbglId != null) {
+                return new RasterSiblingAnchor(false, mbglId);
+            }
+        }
+        for (int j = idx - 1; j >= 0; j--) {
+            ILayer below = group.getLayer(j);
+            if (isOsmBasemapTmsLayer(below)) {
+                continue;
+            }
+            String mbglId = mbglTopAnchorForSiblingBelow(below, style);
+            if (mbglId != null) {
+                return new RasterSiblingAnchor(false, mbglId);
+            }
+        }
+        ILayer osmFromTree = findFirstOsmTmsInTree(rootLayerGroupContaining(group));
+        if (osmFromTree != null && osmFromTree != tmsLayer) {
+            String mbglId = mbglTopAnchorForSiblingBelow(osmFromTree, style);
+            if (mbglId != null) {
+                return new RasterSiblingAnchor(false, mbglId);
+            }
+        }
+        return null;
+    }
+
     static public void createFillLayerForLayer(int layerId, int layerType,
                                                final Style style,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap,
@@ -975,6 +1205,24 @@ public class MPLFeaturesUtils {
                                                String layerPath,
                                                org.maplibre.android.style.layers.Layer firstToolLayer,
                                                org.maplibre.android.style.layers.Layer signaturesRootLayer){ // layers below signaturesRootLayer
+        createFillLayerForLayer(layerId, layerType, style, layersHashMap, layersHashMap2,
+                layersHashMapLineDash, symbolsLayerHashMap, layerStyle, changeLayer, iLayer, layerPath,
+                firstToolLayer, signaturesRootLayer, null);
+    }
+
+    static public void createFillLayerForLayer(int layerId, int layerType,
+                                               final Style style,
+                                               Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap,
+                                               Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap2,
+                                               @Nullable Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMapLineDash,
+                                               Map<Integer,org.maplibre.android.style.layers.Layer> symbolsLayerHashMap,
+                                               @Nullable com.nextgis.maplib.display.Style layerStyle,
+                                               boolean changeLayer,
+                                               ILayer iLayer,
+                                               String layerPath,
+                                               org.maplibre.android.style.layers.Layer firstToolLayer,
+                                               org.maplibre.android.style.layers.Layer signaturesRootLayer,
+                                               @Nullable RasterSiblingAnchor rasterSiblingAnchor) {
         if (style == null) {
             return;
         }
@@ -998,10 +1246,17 @@ public class MPLFeaturesUtils {
             if (rasterLayer == null){
                 rasterLayer = new RasterLayer(currentNamePrefix + layer_namepart + layerId, layerPath);
 
-                if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ) {
+                if (rasterSiblingAnchor != null
+                        && rasterSiblingAnchor.anchorLayerId != null
+                        && style.getLayer(rasterSiblingAnchor.anchorLayerId) != null) {
+                    if (rasterSiblingAnchor.insertRasterBelowAnchor) {
+                        style.addLayerBelow(rasterLayer, rasterSiblingAnchor.anchorLayerId);
+                    } else {
+                        style.addLayerAbove(rasterLayer, rasterSiblingAnchor.anchorLayerId);
+                    }
+                } else if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null) {
                     style.addLayerBelow(rasterLayer, signaturesRootLayer.getId());
-                }
-                else {
+                } else {
                     style.addLayer(rasterLayer);
                 }
             }

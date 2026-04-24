@@ -622,15 +622,29 @@ public class MapDrawable
                         createSourceForLayer(iLayer.getId(), finalGeoType, vectorPolygonFeatures, mainStyle, sourceHashMap,
                                 rasterLayersURLMap, rasterLayersTmsTypeMap,
                                 iLayer.getPath().toString(), false, null);
+                        MPLFeaturesUtils.RasterSiblingAnchor rasterSiblingAnchor = null;
+                        if (finalGeoType == GT_RASTER_WA && iLayer instanceof TMSLayer) {
+                            rasterSiblingAnchor = MPLFeaturesUtils.resolveRasterSiblingAnchorOrNull(
+                                    iLayer, mainStyle);
+                        }
                         createFillLayerForLayer(iLayer.getId(), finalGeoType, mainStyle, layersHashMap, layersHashMap2,
                                 layersHashMapLineDash,
                                 symbolsLayerHashMap,
                                 finalStyle, false, iLayer,
                                 iLayer.getPath().toString(),
                                 selectedDotCircleLayer,
-                                signaturesRootLayer);
+                                signaturesRootLayer,
+                                rasterSiblingAnchor);
 
                         checkLayerVisibility(iLayer.getId());
+                        /* Same as tapping the layer list (ReorderedLayerView ACTION_UP → loadLayersLite):
+                         * hot-added raster was under signaturesRootLayer until full reorder from sourcesOrder. */
+                        if (finalGeoType == GT_RASTER_WA) {
+                            MaplibreMapInteraction host = mapFragment.get();
+                            if (host != null) {
+                                host.loadLayersLite();
+                            }
+                        }
                     });
                 }
             } catch (OutOfMemoryError outOfMemoryError) {
