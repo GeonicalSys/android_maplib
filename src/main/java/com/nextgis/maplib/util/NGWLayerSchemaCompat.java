@@ -99,10 +99,23 @@ public final class NGWLayerSchemaCompat {
                 localTypeByNorm.put(key, f.getType());
             }
 
+            Map<String, Integer> remoteTypeByNorm = new HashMap<>();
             for (Field rf : remoteFields) {
                 String key = LayerUtil.normalizeFieldName(unwrapQuotation(rf.getName()));
-                Integer lt = localTypeByNorm.get(key);
-                if (lt == null || lt != rf.getType()) {
+                remoteTypeByNorm.put(key, rf.getType());
+            }
+
+            /* Bi-directional match: server-only field (added on Web GIS) or local-only (removed on server)
+             * both require a refill/rebuild — previously only server→local was checked. */
+            for (Map.Entry<String, Integer> e : remoteTypeByNorm.entrySet()) {
+                Integer lt = localTypeByNorm.get(e.getKey());
+                if (lt == null || !lt.equals(e.getValue())) {
+                    return false;
+                }
+            }
+            for (Map.Entry<String, Integer> e : localTypeByNorm.entrySet()) {
+                Integer rt = remoteTypeByNorm.get(e.getKey());
+                if (rt == null || !rt.equals(e.getValue())) {
                     return false;
                 }
             }

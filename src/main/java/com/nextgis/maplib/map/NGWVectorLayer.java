@@ -65,6 +65,7 @@ import com.nextgis.maplib.util.LayerConfigDiff;
 import com.nextgis.maplib.util.LayerConfigUtil;
 import com.nextgis.maplib.util.NGWLayerSchemaCompat;
 import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.ProgressBufferedInputStream;
 import com.nextgis.maplib.util.SettingsConstants;
 
@@ -406,6 +407,8 @@ public class NGWVectorLayer
         HttpResponse response = NetworkUtil.get(getResourceMetaUrl(accountData), accountData.login,
                 accountData.password, false);
         if (!response.isOk()) {
+            HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure("resourceMeta", getName(), mRemoteId, -1, -1,
+                    response));
             throw new NGException(NetworkUtil.getError(mContext, response.getResponseCode()));
         }
         geoJSONObject = new JSONObject(response.getResponseBody());
@@ -809,6 +812,10 @@ public class NGWVectorLayer
                 if (Constants.DEBUG_MODE) {
                     Log.d(Constants.TAG, "Get remote changes failed");
                 }
+                HyperLog.w(Constants.TAG, "NGWVectorLayer pull aborted layer=\""
+                        + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
+                        + " " + ProdLogUtil.formatSyncResultStats(syncResult));
+
                 HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer return null - EXIT" );
 
                 return; // layer not exist - exits
@@ -1030,6 +1037,12 @@ public class NGWVectorLayer
             e.printStackTrace();
         }
 
+        if (isError) {
+            HyperLog.w(Constants.TAG, "NGW sendLocalChanges incomplete layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
+                    + " pendingChanges=" + FeatureChanges.getChangeCount(changeTableName));
+        }
+
         return !isError;
     }
 
@@ -1060,11 +1073,7 @@ public class NGWVectorLayer
             HttpResponse response = changeAttachOnServer(featureId, attachId, putData.toString());
 
             if (!response.isOk()) {
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachOnServer !response.isOk()");
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: response code: " + response.getResponseCode());
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: response message: " + response.getResponseMessage());
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: response body: " + response.getResponseBody());
-                log(syncResult, response.getResponseCode() + "");
+                reportSyncHttpFailure("changeAttach", featureId, attachId, syncResult, response);
                 return false;
             }
 
@@ -1110,8 +1119,7 @@ public class NGWVectorLayer
             HttpResponse response = deleteAttachOnServer(featureId, attachId);
 
             if (!response.isOk()) {
-                syncResult.stats.numIoExceptions++;
-                syncResult.stats.numEntries++;
+                reportSyncHttpFailure("deleteAttach", featureId, attachId, syncResult, response);
                 return false;
             }
 
@@ -1162,9 +1170,7 @@ public class NGWVectorLayer
 
                 response = sendAttachOnServerViaTus(featureId, attach);
                 if (!response.isOk()) {
-                    HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer FAILED with code" + response.getResponseCode());
-                    HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer FAILED with " + response.getResponseBody());
-                    log(syncResult, response.getResponseCode() + "");
+                    reportSyncHttpFailure("sendAttachTus", featureId, attachId, syncResult, response);
                     return false;
                 }
                 fisrtSendPhase = false;
@@ -1178,9 +1184,7 @@ public class NGWVectorLayer
                 response = sendAttachOnServerOldStyle(featureId, attach);
 
                 if (!response.isOk()) {
-                    HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer FAILED with code" + response.getResponseCode());
-                    HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer FAILED with " + response.getResponseBody());
-                    log(syncResult, response.getResponseCode() + "");
+                    reportSyncHttpFailure("sendAttachOld", featureId, attachId, syncResult, response);
                     return false;
                 }
                 result = new JSONObject(response.getResponseBody());
@@ -1194,21 +1198,20 @@ public class NGWVectorLayer
 
             response = sendFeatureAttachOnServer(result, featureId, attach);
             if (!response.isOk()) {
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer FAILED with code" + response.getResponseCode());
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: sendFeatureAttachOnServer  FAILED with " + response.getResponseBody());
-
-                log(syncResult, response.getResponseCode() + "");
+                reportSyncHttpFailure("sendFeatureAttach", featureId, attachId, syncResult, response);
                 return false;
             }
 
             // set new local id for attach
             result = new JSONObject(response.getResponseBody());
-            if (!result.has(Constants.JSON_ID_KEY)) {
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: set new local id for attach  FAILED - no Constants.JSON_ID_KEY, result json =  " + result.toString());
+                if (!result.has(Constants.JSON_ID_KEY)) {
+                    HyperLog.w(Constants.TAG, "sendAttach missing id in response layer=\""
+                            + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
+                            + " json=\"" + ProdLogUtil.truncateForLog(result.toString(), 500) + "\"");
 
-                if (Constants.DEBUG_MODE) {
-                    Log.d(Constants.TAG, "Problem sendAttachOnServer(), result has not ID key, result: " + result.toString());
-                }
+                    if (Constants.DEBUG_MODE) {
+                        Log.d(Constants.TAG, "Problem sendAttachOnServer(), result has not ID key, result: " + result.toString());
+                    }
                 syncResult.stats.numParseExceptions++;
                 return false;
             }
@@ -1372,8 +1375,34 @@ public class NGWVectorLayer
         return NetworkUtil.postFileOld(url, fileName, filePath, fileMime, accountData.login, accountData.password, false);
     }
 
+    /**
+     * Classifies HTTP failure into {@link SyncResult} counters and writes one bounded diagnostic line.
+     */
+    protected void reportSyncHttpFailure(
+            String operation,
+            long featureId,
+            long attachId,
+            SyncResult syncResult,
+            HttpResponse response) {
+        if (response != null) {
+            log(syncResult, String.valueOf(response.getResponseCode()));
+        }
+        HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure(operation, getName(), mRemoteId, featureId, attachId,
+                response));
+    }
+
     protected void log(SyncResult syncResult, String code) {
-        int responseCode = Integer.parseInt(code);
+        int responseCode;
+        try {
+            responseCode = Integer.parseInt(code);
+        } catch (NumberFormatException e) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer bad HTTP token layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
+                    + " token=\"" + ProdLogUtil.truncateForLog(code, 48) + "\"");
+            syncResult.stats.numIoExceptions++;
+            syncResult.stats.numEntries++;
+            return;
+        }
         switch (responseCode) {
             case HttpURLConnection.HTTP_UNAUTHORIZED:
             case HttpURLConnection.HTTP_FORBIDDEN:
@@ -1395,6 +1424,8 @@ public class NGWVectorLayer
 
     protected void log(Exception e, String tag) {
         e.printStackTrace();
+        HyperLog.w(Constants.TAG, tag + ": " + e.getClass().getSimpleName()
+                + (e.getMessage() != null ? " " + ProdLogUtil.truncateForLog(e.getMessage(), 360) : ""));
         if (Constants.DEBUG_MODE) {
             String error = e.getLocalizedMessage() == null ? tag + ": Exception" : e.getLocalizedMessage();
             Log.d(Constants.TAG, error);
@@ -2117,6 +2148,16 @@ public class NGWVectorLayer
                 Log.d("SSYNC", "url: " + urlConnection.getURL().toString());
 
             int code = urlConnection.getResponseCode();
+            if (code < 200 || code >= 300) {
+                String urlStr = "";
+                try {
+                    if (urlConnection.getURL() != null) {
+                        urlStr = urlConnection.getURL().toString();
+                    }
+                } catch (Exception ignored) {
+                }
+                HyperLog.w(Constants.TAG, ProdLogUtil.ngwPullHttpStatus(getName(), mRemoteId, code, urlStr));
+            }
             if (code == 404){
                 Log.d("SSYNC", "url: " + urlConnection.getURL().toString() + " = FAIL 404");
                 return new ExistFeatureResult(null, false, 404);
@@ -2178,6 +2219,8 @@ public class NGWVectorLayer
             syncResult.stats.numParseExceptions++;
             return new ExistFeatureResult(null, false, 0);
         } catch (OutOfMemoryError e) {
+            HyperLog.w(Constants.TAG, "NGW pull OOM layer=\"" + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId);
             e.printStackTrace();
             syncResult.stats.numIoExceptions++;
             syncResult.stats.numSkippedEntries++;
@@ -2253,10 +2296,7 @@ public class NGWVectorLayer
                                 getContext().getResources().getString(R.string.error_no_access_403),
                                 403);
                     }
-                    HyperLog.v(Constants.TAG, "addFeatureOnServer response not OK, body: " + response.getResponseBody());
-                    HyperLog.v(Constants.TAG, "addFeatureOnServer response not OK, code: " + response.getResponseCode());
-                    HyperLog.v(Constants.TAG, "addFeatureOnServer response not OK, message: " + response.getResponseMessage());
-                    log(syncResult, response.getResponseCode() + "");
+                    reportSyncHttpFailure("addFeature", featureId, -1, syncResult, response);
                     return false;
                 }
 
@@ -2323,13 +2363,7 @@ public class NGWVectorLayer
         try {
             HttpResponse response = deleteFeatureOnServer(featureId);
             if (!response.isOk()) {
-                HyperLog.v(Constants.TAG, "deleteFeatureOnServer !response.isOk()");
-                HyperLog.v(Constants.TAG, "deleteFeatureOnServer response code: " + response.getResponseCode());
-                HyperLog.v(Constants.TAG, "deleteFeatureOnServer response message: " + response.getResponseMessage());
-                HyperLog.v(Constants.TAG, "deleteFeatureOnServer response body: " + response.getResponseBody());
-
-                syncResult.stats.numIoExceptions++;
-                syncResult.stats.numEntries++;
+                reportSyncHttpFailure("deleteFeature", featureId, -1, syncResult, response);
                 return false;
             }
             return true;
@@ -2391,12 +2425,7 @@ public class NGWVectorLayer
                 HttpResponse response = changeFeatureOnServer(featureId, payload, accountData);
 
                 if (!response.isOk()) {
-                    HyperLog.v(Constants.TAG, "changeFeatureOnServer !response.isOk()");
-                    HyperLog.v(Constants.TAG, "changeFeatureOnServer response not OK, body: " + response.getResponseBody());
-                    HyperLog.v(Constants.TAG, "changeFeatureOnServer response not OK, code: " + response.getResponseCode());
-                    HyperLog.v(Constants.TAG, "changeFeatureOnServer response not OK, message: " + response.getResponseMessage());
-
-                    log(syncResult, response.getResponseCode() + "");
+                    reportSyncHttpFailure("changeFeature", featureId, -1, syncResult, response);
                     return false;
                 }
 

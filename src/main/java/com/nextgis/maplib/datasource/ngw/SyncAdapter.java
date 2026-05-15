@@ -51,6 +51,7 @@ import com.nextgis.maplib.map.MapContentProviderHelper;
 import com.nextgis.maplib.map.NGWVectorLayer;
 import com.nextgis.maplib.map.TrackLayer;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.SettingsConstants;
 
@@ -215,6 +216,13 @@ public class SyncAdapter
             if (mError.length() > 0)
                 mError += "\r\n";
             mError += getContext().getString(R.string.sync_error_oom);
+        }
+
+        if (!TextUtils.isEmpty(mError) || syncResult.hasError()) {
+            HyperLog.w(Constants.TAG, "SyncAdapter finish account=\""
+                    + ProdLogUtil.truncateForLog(account.name, 96) + "\" userMsg=\""
+                    + ProdLogUtil.truncateForLog(mError, 640) + "\" "
+                    + ProdLogUtil.formatSyncResultStats(syncResult));
         }
 
         if (mapContentProviderHelper != null && TextUtils.isEmpty(mError) && !syncResult.hasError()) {

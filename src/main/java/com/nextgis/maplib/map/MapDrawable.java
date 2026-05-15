@@ -1802,6 +1802,22 @@ public class MapDrawable
             }
         }
 
+        syncUserLocationSourceFromStyle(style);
+    }
+
+    /**
+     * After {@link #loadLayersToMaplibreMapLite} the style keeps {@code user-location-source} but the
+     * cached {@link #locationSource} can point at a detached GeoJsonSource; GPS updates then no-op until
+     * a full style reload (e.g. app resume). Always resolve from the live {@link Style}.
+     */
+    private void syncUserLocationSourceFromStyle(@Nullable Style style) {
+        if (style == null) {
+            return;
+        }
+        Source src = style.getSource("user-location-source");
+        if (src instanceof GeoJsonSource) {
+            locationSource = (GeoJsonSource) src;
+        }
     }
 
     @Override
@@ -3428,7 +3444,10 @@ public class MapDrawable
             return;
 
         ILayer targetlayer = getVectorLayersById(this,  id);
-        boolean isVisible = ((com.nextgis.maplib.map.Layer)targetlayer).isVisible();
+        if (targetlayer == null || !(targetlayer instanceof com.nextgis.maplib.map.Layer)) {
+            return;
+        }
+        boolean isVisible = ((com.nextgis.maplib.map.Layer) targetlayer).isVisible();
 
         Layer layer = layersHashMap.get(id);
         if (layer != null)
@@ -3516,16 +3535,23 @@ public class MapDrawable
 
 
 
-    public void updateLocation(Point point, boolean isStanding, float bearing){
-        if(locationSource!= null) {
-            org.maplibre.geojson.Feature pointFeature = org.maplibre.geojson.Feature.fromGeometry(point);
-            pointFeature.addStringProperty("type", String.valueOf(isStanding?"stand" : "go"));
-            if (isStanding)
-                bearing = 0.0f;
-            pointFeature.addNumberProperty("bearing", bearing);
-
-            locationSource.setGeoJson(pointFeature);
+    public void updateLocation(Point point, boolean isStanding, float bearing) {
+        MapLibreMap map = maplibreMap.get();
+        if (map == null) {
+            return;
         }
+        syncUserLocationSourceFromStyle(map.getStyle());
+        if (locationSource == null) {
+            return;
+        }
+        org.maplibre.geojson.Feature pointFeature = org.maplibre.geojson.Feature.fromGeometry(point);
+        pointFeature.addStringProperty("type", String.valueOf(isStanding ? "stand" : "go"));
+        if (isStanding) {
+            bearing = 0.0f;
+        }
+        pointFeature.addNumberProperty("bearing", bearing);
+
+        locationSource.setGeoJson(pointFeature);
     }
 
     public void addPointByWalk(LatLng latLng) {
