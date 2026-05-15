@@ -24,18 +24,23 @@
 package com.nextgis.maplib.api;
 
 import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.accounts.AccountManagerFuture;
 import android.app.Activity;
 import android.os.Bundle;
 
-import java.util.ArrayList;
-
+import com.nextgis.maplib.datasource.ngw.Connection;
 import com.nextgis.maplib.location.GpsEventSource;
 import com.nextgis.maplib.map.LayerFactory;
+import com.nextgis.maplib.map.LayerGroup;
 import com.nextgis.maplib.map.MLP.AuthInterceptorNG;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MaplibreMapInteraction;
 import com.nextgis.maplib.map.NGWVectorLayer;
+import com.nextgis.maplib.util.Constants;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -232,6 +237,14 @@ public interface IGISApplication
 
 
     void startCreateNGWLayerSync(String lpath);
+
+    /* Upstream: refresh offline raster layers after tile download completes. */
+    void setLayerToRefresh(int id);
+    void removeLayerToRefresh(int id);
+    List<Integer> getlayersToRefresh();
+
+    /* Upstream: ensure the default tracks layer exists. */
+    void checkTracksLayerExist();
 
     /**
      * While true, map UI may skip heavy MapLibre reload on layer-changed events

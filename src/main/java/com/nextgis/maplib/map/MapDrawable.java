@@ -184,7 +184,6 @@ import org.maplibre.android.style.layers.Layer;
 import org.maplibre.android.style.layers.LineLayer;
 import org.maplibre.android.style.layers.Property;
 import org.maplibre.android.style.layers.PropertyFactory;
-import org.maplibre.android.style.layers.RasterLayer;
 import org.maplibre.android.style.layers.SymbolLayer;
 import org.maplibre.android.style.sources.GeoJsonSource;
 import org.maplibre.android.style.sources.Source;
@@ -195,8 +194,6 @@ import org.maplibre.geojson.MultiPoint;
 import org.maplibre.geojson.MultiPolygon;
 import org.maplibre.geojson.Point;
 import org.maplibre.geojson.Polygon;
-
-import kotlin.Unit;
 
 
 public class MapDrawable
@@ -274,7 +271,7 @@ public class MapDrawable
     public boolean isMeasurmentChangeVertex = false;
     private org.maplibre.geojson.Feature  editingFeature = null;    // current edit
     private org.maplibre.geojson.Feature  editingFeatureOriginal = null;
-    private org.maplibre.geojson.Feature  viewedFeature = null;   // who looking
+    public org.maplibre.geojson.Feature  viewedFeature = null;   // who looking
     private boolean hasEditeometry = false; // was edit
 
     private boolean isDragging = false;
@@ -289,7 +286,7 @@ public class MapDrawable
     protected int  mLimitsType;
     protected RunnableFuture<Void> mDrawThreadTask;
 
-    public WeakReference<MaplibreMapInteraction> mapFragment = new WeakReference(null);
+    public WeakReference<MaplibreMapInteraction> mapContext = new WeakReference(null);
 
     WeakReference<MapLibreMap> maplibreMap = new WeakReference(null);
     WeakReference<org.maplibre.android.maps.MapView> maplibreMapView = new WeakReference(null);
@@ -306,6 +303,10 @@ public class MapDrawable
     @Nullable
     private MapView.OnDidFinishLoadingStyleListener mLoadLayersStyleListener;
 
+    /* Upstream: state for restoring an active walk-by-geometry edit after process kill. */
+    VectorLayer layerForWalkRestore = null;
+    Feature featureToRestore = null;
+
     public MapDrawable(
             Bitmap backgroundTile,
             Context context,
@@ -318,8 +319,8 @@ public class MapDrawable
         mLimitsType = MAP_LIMITS_Y;
     }
 
-    public void setMapFragment(final MaplibreMapInteraction mapFragment){
-        this.mapFragment = new WeakReference<>(mapFragment);
+    public void setMapContext(final MaplibreMapInteraction mapContext){
+        this.mapContext = new WeakReference<>(mapContext);
     }
 
     public void setMaplibreMap(final MapLibreMap maplibreMap){
@@ -550,7 +551,9 @@ public class MapDrawable
                         ((IGISApplication) getContext().getApplicationContext()).setGetingStyleInProgress(true);
 
                         mainHandler.post(()-> {
-                                    mapFragment.get().changeProgress(true); });
+                                    if (mapContext.get()!= null)
+                                        mapContext.get().changeProgress(true);
+                        });
                         try {
                             List<org.maplibre.geojson.Feature> fromCache =
                                     VectorLayerRenderCache.tryLoadFeatures(layer);
@@ -581,7 +584,7 @@ public class MapDrawable
 
                             ((IGISApplication) getContext().getApplicationContext()).setGetingStyleInProgress(false);
                             mainHandler.post(()-> {
-                                mapFragment.get().changeProgress(false);
+                                mapContext.get().changeProgress(false);
                             });
                         }
                     } else if (iLayer instanceof NGWRasterLayer) {
@@ -640,7 +643,7 @@ public class MapDrawable
                         /* Same as tapping the layer list (ReorderedLayerView ACTION_UP → loadLayersLite):
                          * hot-added raster was under signaturesRootLayer until full reorder from sourcesOrder. */
                         if (finalGeoType == GT_RASTER_WA) {
-                            MaplibreMapInteraction host = mapFragment.get();
+                            MaplibreMapInteraction host = mapContext.get();
                             if (host != null) {
                                 host.loadLayersLite();
                             }
@@ -648,11 +651,11 @@ public class MapDrawable
                     });
                 }
             } catch (OutOfMemoryError outOfMemoryError) {
-                if (mapFragment.get() != null) {
+                if (mapContext.get() != null) {
                     String layerName = (crashLayer == null ? "null" : crashLayer.getName());
-                    AlertDialog builder = new AlertDialog.Builder(((Fragment) mapFragment.get()).getActivity())
+                    AlertDialog builder = new AlertDialog.Builder(((Fragment) mapContext.get()).getActivity())
                             .setTitle("MemoryError")
-                            .setMessage(((Fragment) mapFragment.get()).getActivity().getString(R.string.outofmemory) + layerName)
+                            .setMessage(((Fragment) mapContext.get()).getActivity().getString(R.string.outofmemory) + layerName)
                             .setPositiveButton(android.R.string.ok, null)
                             .show();
                 }
@@ -662,7 +665,7 @@ public class MapDrawable
     }
 
     public void reloadFillLayerStyleToMaplibre(final  int  id) {
-        if (mapFragment.get() != null && (!(mapFragment.get().getMode() == 0)))
+        if (mapContext.get() != null && (!(mapContext.get().getMode() == 0)))
             return;
 
         List<ILayer> vectorss = new ArrayList<>();
@@ -740,7 +743,7 @@ public class MapDrawable
 
                 ((IGISApplication)getContext().getApplicationContext()).setGetingStyleInProgress(true);
                 mainHandler.post(() -> {
-                    mapFragment.get().changeProgress(true);
+                    mapContext.get().changeProgress(true);
                 });
 
                 String loadHint = getContext().getString(R.string.process_layer_hint);
@@ -786,8 +789,8 @@ public class MapDrawable
                 } finally {
                     ((IGISApplication) getContext().getApplicationContext()).setGetingStyleInProgress(false);
                     mainHandler.post(() -> {
-                        if (mapFragment.get() != null)
-                            mapFragment.get().changeProgress(false);
+                        if (mapContext.get() != null)
+                            mapContext.get().changeProgress(false);
                     });
                     Intent clear = new Intent(MESSAGE_INTENT_STYLING);
                     clear.putExtra("msg", "");
@@ -807,7 +810,7 @@ public class MapDrawable
     private void dismissStylingProgress() {
         try {
             ((IGISApplication) getContext().getApplicationContext()).setGetingStyleInProgress(false);
-            MaplibreMapInteraction frag = mapFragment.get();
+            MaplibreMapInteraction frag = mapContext.get();
             if (frag != null) {
                 frag.changeProgress(false);
             }
@@ -890,7 +893,7 @@ public class MapDrawable
                                         final boolean createSource,
                                         final boolean skipInvisibleLayers) {
 
-        MaplibreMapInteraction mapFrag = mapFragment.get();
+        MaplibreMapInteraction mapFrag = mapContext.get();
         MapView mapViewRef = maplibreMapView.get();
         MapLibreMap mapRef = maplibreMap.get();
         if (mapFrag == null || mapViewRef == null || mapRef == null) {
@@ -930,6 +933,7 @@ public class MapDrawable
         final List<org.maplibre.geojson.Feature> tracksFeatures = new ArrayList<>();
 
         executor.execute(() -> {
+            TrackLayer trackLayerNGW = null;
             if (maplibreMap.get() == null || maplibreMapView.get() == null) {
                 mainHandler.post(() -> {
                     mLayerLoadInProgress = false;
@@ -1015,17 +1019,16 @@ public class MapDrawable
 
             for (ILayer iLayer : allLayers) {
 //                Log.e("MPLREM",  "iterate layer " + iLayer.getName());
-
                 try {
                     if (iLayer instanceof VectorLayer) {
                         continue;
                     } else if (iLayer instanceof TrackLayer) {
-                        TrackLayer layer = (TrackLayer) iLayer;
-                        layersType.put(layer.getId(), GT_TRACK_WA);
-                        layersPath.put(layer.getId(), layer.getPath().toString());
+                        trackLayerNGW = (TrackLayer) iLayer;
+                        layersType.put(trackLayerNGW.getId(), GT_TRACK_WA);
+                        layersPath.put(trackLayerNGW.getId(), trackLayerNGW.getPath().toString());
 
                         tracksFeatures.clear();
-                        tracksFeatures.addAll(createFeatureListFromTrackLayer(layer));
+                        tracksFeatures.addAll(createFeatureListFromTrackLayer(trackLayerNGW));
 
                         //List<org.maplibre.geojson.Feature> tracksFeatures = createFeatureListFromTrackLayer(layer);
                         //sourceFeaturesHashMap.put(layer.getId(), tracksFeatures);
@@ -1267,6 +1270,7 @@ public class MapDrawable
 
             final long[] tSetStyleCallNs = (Constants.DEBUG_MODE && Constants.MAP_STARTUP_OPTIMIZATIONS_ENABLED)
                     ? new long[1] : null;
+            final TrackLayer trackLayerFinal = trackLayerNGW;
             mainHandler.post(() -> {
                 final int styleRequestId = mLoadLayersStyleRequestId.incrementAndGet();
                 MapView mapViewForStyle = maplibreMapView.get();
@@ -1416,6 +1420,13 @@ public class MapDrawable
                                         PropertyFactory.lineWidth(getMPLThinkness(5)));
                         style.addLayer(trackInProgressLayer);
 
+                        /* Upstream adds track start/end flag icons here; per CUSTOMIZATIONS §14
+                           «Tracks: no start/end flag icons» we intentionally skip flag source/layer
+                           and the bitmap registration. checkLayerVisibility kept so track layer
+                           visibility still applies (track is not in sourcesOrder loop below). */
+                        if (trackLayerFinal != null) {
+                            checkLayerVisibility(trackLayerFinal.getId());
+                        }
 
                         // marker
                         final Drawable drawable = getContext().getResources().getDrawable( R.drawable.ic_action_anchor_2);
@@ -1489,6 +1500,45 @@ public class MapDrawable
                                     + ((System.nanoTime() - tStyleBodyStart) / 1_000_000));
                         }
 
+                        /* Upstream: restore active walk-by-geometry edit after process kill / map reload. */
+                        if (layerForWalkRestore != null && featureToRestore != null) {
+                            try {
+                                editingObject = null;
+                                editingFeature = null;
+
+                                startFeatureSelectionForEdit(layerForWalkRestore,
+                                        layerForWalkRestore.getGeometryType(),
+                                        featureToRestore,
+                                        true,
+                                        layerForWalkRestore.getDefaultStyleNoExcept(),
+                                        true);
+
+                                editingFeature = MPLFeaturesUtils.getFeatureFromNGFeature(featureToRestore.getGeometry());
+                                if (editingObject != null) {
+                                    editingObject.editingFeature = editingFeature;
+                                    editingObject.extractVertices(editingFeature, false);
+                                    editingObject.hideVertext();
+                                    editingObject.selectLastPoint();
+                                }
+                            } catch (Throwable wt) {
+                                Log.e(TAG, "loadLayersToMaplibreMap: walk-restore", wt);
+                            } finally {
+                                layerForWalkRestore = null;
+                                featureToRestore = null;
+                            }
+                        }
+
+                        /* Upstream: collector hooks — must run after layers are applied. */
+                        MaplibreMapInteraction loadedFrag = mapContext.get();
+                        if (loadedFrag != null) {
+                            try {
+                                loadedFrag.setMapLayersLoaded();
+                                loadedFrag.checkCreateIfNeed();
+                            } catch (Throwable th) {
+                                Log.e(TAG, "loadLayersToMaplibreMap: post-load hooks", th);
+                            }
+                        }
+
                         } catch (Throwable t) {
                             Log.e(TAG, "loadLayersToMaplibreMap: onDidFinishLoadingStyle", t);
                         } finally {
@@ -1499,7 +1549,7 @@ public class MapDrawable
                             if (mPendingReload) {
                                 mPendingReload = false;
                                 Log.d(TAG, "loadLayersToMaplibreMap: executing deferred reload");
-                                MaplibreMapInteraction mf = mapFragment.get();
+                                MaplibreMapInteraction mf = mapContext.get();
                                 if (mf != null) {
                                     mf.reloadMapStyleAndLayersAfterLayerFillBatch();
                                 }
@@ -1522,6 +1572,14 @@ public class MapDrawable
             }
         });
         executor.shutdown();
+    }
+
+    public void updateWalkingFeature(Feature featureToUpate){
+        editingFeature = MPLFeaturesUtils.getFeatureFromNGFeature(featureToUpate.getGeometry());
+        editingObject.editingFeature = editingFeature;
+        editingObject.extractVertices(editingFeature,  false);
+        editingObject.hideVertext();
+        editingObject.selectLastPoint();
     }
 
     public void loadLayersToMaplibreMapLite(final  List<ILayer> allLayers, boolean skipUserLayers){
@@ -1751,13 +1809,13 @@ public class MapDrawable
         android.graphics.PointF screenPoint = new android.graphics.PointF(event.getX(), event.getY());
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN: {
-                if (mapFragment.get()!= null)
-                    mapFragment.get().setLongLongClickProcesses(false);
+                if (mapContext.get()!= null)
+                    mapContext.get().setLongLongClickProcesses(false);
                 clickPoint = new PointF(event.getX(), event.getY());
                 android.graphics.RectF rect = new android.graphics.RectF(event.getX() - 20,event.getY() - 20,event.getX() + 20,event.getY() + 20);
                 List<org.maplibre.geojson.Feature> featuresMarker = maplibreMap.get().queryRenderedFeatures(rect, "marker-layer");
 
-                if (mapFragment.get().getMode() == MODE_EDIT_BY_TOUCH ){
+                if (mapContext.get().getMode() == MODE_EDIT_BY_TOUCH ){
                     isDraggingByTouchGPS = true;
                     startEvent = event;
 
@@ -1793,7 +1851,7 @@ public class MapDrawable
                             editingObject.updateSelectionMiddlePoint(features.get(0));
                             //editingObject.updateSelectionVerticeIndex(index);
                             editingObject.updateEditingPolygonAndVertex();
-                            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+                            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
 
                         }
                         Point point = ((Point)clickedFeature.geometry());
@@ -1814,7 +1872,7 @@ public class MapDrawable
                             editingObject.updateSelectionVerticeIndex(index);
                             editingObject.updateEditingPolygonAndVertex();
                             editingObject.displayMiddlePoints(false, true);
-                            mapFragment.get().updateActions(editingObject);
+                            mapContext.get().updateActions(editingObject);
                         }
                         Point point = ((Point)clickedFeature.geometry());
                         setMarker(new LatLng(point.latitude(), point.longitude()));
@@ -1832,10 +1890,10 @@ public class MapDrawable
                     selectedVertexIndex = editingObject.getSelectedVertexIndex();
 
                 if (isDraggingByTouchGPS && editingObject!= null){
-                    if (mapFragment.get().getMode() == MODE_EDIT_BY_TOUCH){
+                    if (mapContext.get().getMode() == MODE_EDIT_BY_TOUCH){
                         PointF  newPoint = new PointF(screenPoint.x,screenPoint.y);
                         LatLng latLng = maplibreMap.get().getProjection().fromScreenLocation(newPoint);
-                        editingObject.addNewFlowPoint(latLng);
+                        editingObject.addNewFlowPoint(latLng, false);
                         editingObject.updateEditingPolygonAndVertex();
                         return true;
                     }
@@ -1877,8 +1935,8 @@ public class MapDrawable
             }
 
             case MotionEvent.ACTION_UP: {
-                if (mapFragment.get()!=null && mapFragment.get().getLongLongClickProcesses()){
-                    mapFragment.get().setLongLongClickProcesses(false);
+                if (mapContext.get()!=null && mapContext.get().getLongLongClickProcesses()){
+                    mapContext.get().setLongLongClickProcesses(false);
                     return false;
                 }
 
@@ -1887,12 +1945,7 @@ public class MapDrawable
                 float distance = (float) Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
                 if (isDraggingByTouchGPS){
-
-                    mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
-
-//                    if (editingObject != null)
-//                        editingObject.showVertext();
-
+                    mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
                     isDraggingByTouchGPS = false;
                     isDragging = false;
                     isDraggingByTouchGPS = false;
@@ -1909,7 +1962,7 @@ public class MapDrawable
                                 if (!isMeasurmentChangeVertex) {
                                     android.graphics.PointF touchscreenPoint = new android.graphics.PointF(event.getX(), event.getY());
                                     LatLng latLng = maplibreMap.get().getProjection().fromScreenLocation(touchscreenPoint); // todo add tolerance and rect
-                                    editingObject.addNewFlowPoint(latLng);
+                                    editingObject.addNewFlowPoint(latLng, false);
                                     setMarker(latLng);
                                     editingObject.updateEditingPolygonAndVertex();
                                     updateMeasurmentCaptions(editingObject);
@@ -1919,13 +1972,13 @@ public class MapDrawable
                                 return false;
 
                             } else
-                                mapFragment.get().processMapClick(screenPoint.x, screenPoint.y);
+                                mapContext.get().processMapClick(screenPoint.x, screenPoint.y);
                         }
                     clickPoint = null;
 
                     if (isDragging || isSwitchVertex) {
                         if (editingObject != null) {
-                            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+                            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
                             editingObject.regenerateVertexFeatures();
                             editingObject.displayMiddlePoints(false, true);
                             LatLng pointReleased = editingObject.getSelectedPoint();
@@ -1952,9 +2005,9 @@ public class MapDrawable
 
 
     public void updateHistoryByWalkEnd() {
-        if (editingObject == null || mapFragment.get() == null)
+        if (editingObject == null || mapContext.get() == null)
             return;
-        mapFragment.get().updateGeometryFromMaplibre(
+        mapContext.get().updateGeometryFromMaplibre(
                 editingObject.editingFeature, originalSelectedFeature, editingObject);
     }
 
@@ -1965,6 +2018,10 @@ public class MapDrawable
     }
 
     public void setMarker(LatLng latLng){
+        if (latLng == null) {
+            Log.e(TAG, "set marker on null point");
+            return;
+        }
         org.maplibre.geojson.Feature feature = org.maplibre.geojson.Feature.fromGeometry(Point.fromLngLat(latLng.getLongitude(), latLng.getLatitude()));
         markerFeatureCollection = FeatureCollection.fromFeature(feature);
         markerSource.setGeoJson(markerFeatureCollection);
@@ -1972,7 +2029,8 @@ public class MapDrawable
 
     public void hideMarker(){
         markerFeatureCollection = FeatureCollection.fromFeatures(emptyList());
-        markerSource.setGeoJson(markerFeatureCollection);
+        if (markerSource != null)
+            markerSource.setGeoJson(markerFeatureCollection);
     }
 
     private static Bitmap drawableToBitmap(Drawable drawable) {
@@ -2001,9 +2059,9 @@ public class MapDrawable
         PointF clickPoint = maplibreMap.get().getProjection().toScreenLocation(latLng);
         GeoEnvelope clickeEnelope = getClickEnelope(clickPoint);
 
-        boolean result = mapFragment.get().processMapLongClick(clickeEnelope, clickPoint);
-        if (result && mapFragment.get()!= null)
-            mapFragment.get().setLongLongClickProcesses(true);
+        boolean result = mapContext.get().processMapLongClick(clickeEnelope, clickPoint);
+        if (result && mapContext.get()!= null)
+            mapContext.get().setLongLongClickProcesses(true);
         return false;
     }
 
@@ -2058,10 +2116,12 @@ public class MapDrawable
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerd.getId());
 
         for (org.maplibre.geojson.Feature item : layerFeatures){
-            long id = item.getNumberProperty(prop_featureid).longValue();
-            if (id == selectedFeatureId) {
-                viewedFeature = item;
-                break;
+            if (item!= null && item.hasProperty(prop_featureid)) {
+                long id = item.getNumberProperty(prop_featureid).longValue();
+                if (id == selectedFeatureId) {
+                    viewedFeature = item;
+                    break;
+                }
             }
         }
 
@@ -2086,19 +2146,30 @@ public class MapDrawable
     }
 
 
-    public void startFeatureSelectionForEdit(final ILayer  ilayerd, Integer layerGeoType,
+    public void startFeatureSelectionForEdit(final ILayer  ilayer, Integer layerGeoType,
                                              Feature originalSelectedFeature, boolean createNew,
-                                             com.nextgis.maplib.display.Style ngstyle){
+                                             com.nextgis.maplib.display.Style ngstyle,
+                                             boolean isFillByWalking){
 
         Long selectedFeatureId = originalSelectedFeature.getId();
 
         // clear prev edit state
         if (editingObject != null) {
             if (editingFeature != null) {
-                Integer lID = Integer.valueOf(editingFeature.getStringProperty(prop_layerid));
-                Long fID = Long.valueOf(editingFeature.getStringProperty(prop_featureid));
+                Integer lID = null;
+                if (editingFeature.hasProperty(prop_layerid))
+                    lID = Integer.valueOf(editingFeature.getStringProperty(prop_layerid));
+                else
+                    lID = ilayer.getId();
 
-                if (ilayerd.getId() != lID || !selectedFeatureId.equals(fID)) {
+
+                Long fID = null;
+                if (editingFeature.hasProperty(prop_featureid))
+                    fID = Long.valueOf(editingFeature.getStringProperty(prop_featureid));
+                else
+                    fID = originalSelectedFeature.getId();
+
+                if (ilayer.getId() != lID || !selectedFeatureId.equals(fID)) {
                     // need clear previous edited obj
                     unselectFeatureFromEdit(false, false);
                 } else {
@@ -2114,20 +2185,22 @@ public class MapDrawable
         vertexSource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
 
 
-        List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(ilayerd.getId());
+        List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(ilayer.getId());
         org.maplibre.geojson.Feature  editingFeatureTmp = null;
         if (layerFeatures != null)
             for (org.maplibre.geojson.Feature item:layerFeatures){
-                long id = item.getNumberProperty(prop_featureid).longValue();
-                if (id == selectedFeatureId) {
-                    editingFeatureTmp = item;
-                    break;
+                if (item.hasProperty(prop_featureid)) {
+                    long id = item.getNumberProperty(prop_featureid).longValue();
+                    if (id == selectedFeatureId) {
+                        editingFeatureTmp = item;
+                        break;
+                    }
                 }
             }
 
         if (createNew) {
             org.maplibre.geojson.Feature feature = null;
-            int type = ((VectorLayer)ilayerd).getGeometryType();
+            int type = ((VectorLayer)ilayer).getGeometryType();
 
             LatLng center = null;
             if (originalSelectedFeature != null && originalSelectedFeature.getGeometry() != null
@@ -2140,50 +2213,84 @@ public class MapDrawable
             Projection projection = maplibreMap.get().getProjection();
             Point point = Point.fromLngLat(center.getLongitude(), center.getLatitude());
 
-            switch (type){
-                case GTPoint :
-                    feature = org.maplibre.geojson.Feature.fromGeometry(point);
-                    break;
+            if (!isFillByWalking)
+                switch (type){
+                    case GTPoint :
+                        feature = org.maplibre.geojson.Feature.fromGeometry(point);
+                        break;
 
-                case GTMultiPoint:
-                    MultiPoint mpoint = MultiPoint.fromLngLats(Arrays.asList(point));
-                    feature = org.maplibre.geojson.Feature.fromGeometry(mpoint);
-                    break;
+                    case GTMultiPoint:
+                        MultiPoint mpoint = MultiPoint.fromLngLats(Arrays.asList(point));
+                        feature = org.maplibre.geojson.Feature.fromGeometry(mpoint);
+                        break;
 
-                case GeoConstants.GTPolygon:
-                    List<List<org.maplibre.geojson.Point>> polyList = new ArrayList<>();
-                    polyList.add(createPointsForRing(center, maplibreMap.get().getProjection(),  true));
-                    Polygon polygon = Polygon.fromLngLats(polyList);
-                    feature = org.maplibre.geojson.Feature.fromGeometry(polygon);
-                    break;
+                    case GeoConstants.GTPolygon:
+                        List<List<org.maplibre.geojson.Point>> polyList = new ArrayList<>();
+                        polyList.add(createPointsForRing(center, maplibreMap.get().getProjection(),  true));
+                        Polygon polygon = Polygon.fromLngLats(polyList);
+                        feature = org.maplibre.geojson.Feature.fromGeometry(polygon);
+                        break;
 
-                case GTMultiPolygon:
-                    List<List<org.maplibre.geojson.Point>> polyListMP = new ArrayList<>();
-                    polyListMP.add(createPointsForRing(center, maplibreMap.get().getProjection(),  true));
-                    MultiPolygon polygonMP = MultiPolygon.fromLngLats(Arrays.asList(polyListMP));
-                    feature = org.maplibre.geojson.Feature.fromGeometry(polygonMP);
-                    break;
+                    case GTMultiPolygon:
+                        List<List<org.maplibre.geojson.Point>> polyListMP = new ArrayList<>();
+                        polyListMP.add(createPointsForRing(center, maplibreMap.get().getProjection(),  true));
+                        MultiPolygon polygonMP = MultiPolygon.fromLngLats(Arrays.asList(polyListMP));
+                        feature = org.maplibre.geojson.Feature.fromGeometry(polygonMP);
+                        break;
 
-                case GTLineString:
-                    List<org.maplibre.geojson.Point> lineList = getNewLinePoints(center, projection);
-                    LineString line = LineString.fromLngLats(lineList);
-                    feature = org.maplibre.geojson.Feature.fromGeometry(line);
-                    break;
+                    case GTLineString:
+                        List<org.maplibre.geojson.Point> lineList = getNewLinePoints(center, projection);
+                        LineString line = LineString.fromLngLats(lineList);
+                        feature = org.maplibre.geojson.Feature.fromGeometry(line);
+                        break;
 
-                case GTMultiLineString:
-                    List<org.maplibre.geojson.Point> lineList2 = getNewLinePoints(center, projection);
-                    List<List<org.maplibre.geojson.Point>> multiline = new ArrayList<>();
-                    multiline.add(lineList2);
-                    MultiLineString multiLineString = MultiLineString.fromLngLats(multiline);
-                    feature = org.maplibre.geojson.Feature.fromGeometry(multiLineString);
-                    break;
+                    case GTMultiLineString:
+                        List<org.maplibre.geojson.Point> lineList2 = getNewLinePoints(center, projection);
+                        List<List<org.maplibre.geojson.Point>> multiline = new ArrayList<>();
+                        multiline.add(lineList2);
+                        MultiLineString multiLineString = MultiLineString.fromLngLats(multiline);
+                        feature = org.maplibre.geojson.Feature.fromGeometry(multiLineString);
+                        break;
+                }else {
+                // need create with 0 point - first point will be from gps on walking
+                    switch (type){
+                        case GTPoint :
+                            feature = org.maplibre.geojson.Feature.fromGeometry(point);
+                            break;
+
+                        case GTMultiPoint:
+                            MultiPoint mpoint = MultiPoint.fromLngLats(emptyList());
+                            feature = org.maplibre.geojson.Feature.fromGeometry(mpoint);
+                            break;
+
+                        case GeoConstants.GTPolygon:
+                            Polygon polygon = Polygon.fromLngLats(emptyList());
+                            feature = org.maplibre.geojson.Feature.fromGeometry(polygon);
+                            break;
+
+                        case GTMultiPolygon:
+                            MultiPolygon polygonMP = MultiPolygon.fromLngLats(emptyList());
+                            feature = org.maplibre.geojson.Feature.fromGeometry(polygonMP);
+                            break;
+
+                        case GTLineString:
+                            //List<org.maplibre.geojson.Point> lineList = getNewLinePoints(center, projection);
+                            LineString line = LineString.fromLngLats(emptyList());
+                            feature = org.maplibre.geojson.Feature.fromGeometry(line);
+                            break;
+
+                        case GTMultiLineString:
+                            MultiLineString multiLineString = MultiLineString.fromLngLats(emptyList());
+                            feature = org.maplibre.geojson.Feature.fromGeometry(multiLineString);
+                            break;
+                }
             }
 
-            feature.addStringProperty(prop_layerid, String.valueOf(ilayerd.getId()));
+            feature.addStringProperty(prop_layerid, String.valueOf(ilayer.getId()));
 
             if (ngstyle != null){
                 String styleField = ((ITextStyle)ngstyle).getField();
-                String styleText = ((ITextStyle)ngstyle).getText();
+                String styleText = ((ITextStyle) ngstyle).getText();
 
                 if (styleField != null || styleText != null ) {
                     String signature = null;
@@ -2203,17 +2310,18 @@ public class MapDrawable
             }
 
 
-            int size = sourceFeaturesHashMap.get(ilayerd.getId()).size();
+            sourceFeaturesHashMap.computeIfAbsent(ilayer.getId(), k -> new ArrayList<>());
+            int size = sourceFeaturesHashMap.get(ilayer.getId()).size();
             feature.addStringProperty(prop_order, String.valueOf(size+1));
             feature.addStringProperty(prop_featureid, String.valueOf(originalSelectedFeature.getId()));
             editingFeatureTmp = copyFeature(feature);
         }
 
         if (editingFeatureTmp != null) {
-            selectedEditedSource = sourceHashMap.get(ilayerd.getPath().toString());
+            selectedEditedSource = sourceHashMap.get(ilayer.getPath().toString());
             editingFeature = editingFeatureTmp;
 
-            int type = ((VectorLayer)ilayerd).getGeometryType();
+            int type = ((VectorLayer)ilayer).getGeometryType();
             GeoJsonSource choosed = null;
             if  (type == GTPoint || type == GTMultiPoint) {
                 selectedDotSource.setGeoJson(FeatureCollection.fromFeature(editingFeature));
@@ -2233,7 +2341,7 @@ public class MapDrawable
 
             editingFeatureOriginal = copyFeature(editingFeatureTmp);
 
-            polygonFeatures = sourceFeaturesHashMap.get(ilayerd.getId());
+            polygonFeatures = sourceFeaturesHashMap.get(ilayer.getId());
             this.originalSelectedFeature = originalSelectedFeature;
 
             // choose layer
@@ -2244,7 +2352,7 @@ public class MapDrawable
                     choosed,
                     vertexSource,
                     markerSource,
-                    ilayerd.getPath().toString());
+                    ilayer.getPath().toString());
 
             Layer layer = maplibreMap.get().getStyle().getLayer("selected-polygon-fill");
             if (layerGeoType ==GeoConstants.GTPolygon ||
@@ -2269,10 +2377,12 @@ public class MapDrawable
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerdID);
         org.maplibre.geojson.Feature  editingFeatureTmp = null;
         for (org.maplibre.geojson.Feature item: layerFeatures){
-            long id = item.getNumberProperty(prop_featureid).longValue();
-            if (id == selectedFeatureId) {
-                editingFeatureTmp = item;
-                break;
+            if (item.hasProperty(prop_featureid)) {
+                long id = item.getNumberProperty(prop_featureid).longValue();
+                if (id == selectedFeatureId) {
+                    editingFeatureTmp = item;
+                    break;
+                }
             }
         }
 
@@ -2469,7 +2579,7 @@ public class MapDrawable
 
 
         if (originalSelectedFeature!= null && originalSelectedFeature.getId() != -1)
-            startFeatureSelectionForView(mapFragment.get().getSelectedLayer(), originalSelectedFeature );
+            startFeatureSelectionForView(mapContext.get().getSelectedLayer(), originalSelectedFeature );
     }
 
     public void unselectFeatureFromView(){
@@ -2486,6 +2596,12 @@ public class MapDrawable
     public void hideVertex(){
         if (editingObject != null)
             editingObject.hideVertext();
+    }
+
+
+    public void hideSelectedDotSource(){
+        if (selectedDotSource != null)
+            selectedDotSource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
     }
 
     public void showVertex(){
@@ -2564,10 +2680,10 @@ public class MapDrawable
                 }
 
                 // clear edited objects
+                hideVertex();
                 editingObject = null;
                 editingFeatureOriginal = null;
                 editingFeature = null;
-                //originalSelectedFeature = null;
             }
         }
     }
@@ -2684,7 +2800,8 @@ public class MapDrawable
     @Override
     public void setZoomAndCenter(
             float zoom,
-            GeoPoint center, boolean startSecondMaplibre)
+            GeoPoint center, boolean startSecondMaplibre,
+            int delay)
     {
         if (mDisplay != null) {
             float newZoom = zoom;
@@ -2703,7 +2820,9 @@ public class MapDrawable
 
         if (!startSecondMaplibre)
             if (maplibreMap.get()!= null)
-                maplibreMap.get().easeCamera(CameraUpdateFactory.newLatLngZoom(latLngPointFromGeoPoint(center), zoom), 800);
+                maplibreMap.get().moveCamera(CameraUpdateFactory.
+                        newLatLngZoom(latLngPointFromGeoPoint(center), zoom)
+                );
     }
 
 
@@ -2745,7 +2864,7 @@ public class MapDrawable
             if (zoom > maxZoom)
                 zoom = maxZoom;
 
-            setZoomAndCenter((float) zoom, envelope.getCenter(), startSecondMaplibre);
+            setZoomAndCenter((float) zoom, envelope.getCenter(), startSecondMaplibre, 800);
             if (!startSecondMaplibre)
                 return;
 
@@ -2759,7 +2878,8 @@ public class MapDrawable
                     .include(sw)
                     .include(ne)
                     .build();
-            maplibreMap.get().easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 50), 800);
+            if (maplibreMap != null &&  maplibreMap.get() != null)
+                maplibreMap.get().easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 50), 800);
         }
     }
 
@@ -3002,7 +3122,7 @@ public class MapDrawable
     public boolean deleteCurrentPoint(){
         if (editingObject != null) {
             editingObject.deleteCurrentPoint();
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
@@ -3021,7 +3141,7 @@ public class MapDrawable
     public boolean deleteCurrentLine(){
         if (editingObject != null && editingObject instanceof MultiLineEditClass) {
             ((MultiLineEditClass)editingObject).deleteCurrentLine();
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
@@ -3029,7 +3149,7 @@ public class MapDrawable
     public boolean addNewPoint(LatLng center){
         if (editingObject != null && editingObject instanceof MultiPointEditClass) {
             ((MultiPointEditClass)editingObject).addNewPoint(center);
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
@@ -3037,7 +3157,7 @@ public class MapDrawable
     public boolean addNewLine(LatLng center, Projection projection){
         if (editingObject != null && editingObject instanceof MultiLineEditClass) {
             ((MultiLineEditClass)editingObject).addNewLine(center, projection);
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
 
         }
         return true;
@@ -3046,12 +3166,12 @@ public class MapDrawable
     public boolean deleteCurrentHole(){
         if (editingObject != null && editingObject instanceof PolygonEditClass) {
             ((PolygonEditClass)editingObject).deleteCurrentHole();
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
 
         if (editingObject != null && editingObject instanceof MultiPolygonEditClass) {
             ((MultiPolygonEditClass)editingObject).deleteSelectedPolygon();
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
@@ -3059,11 +3179,11 @@ public class MapDrawable
     public boolean addHole(LatLng center, Projection projection){
         if (editingObject != null && editingObject instanceof PolygonEditClass) {
             ((PolygonEditClass)editingObject).addHole(center, projection);
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         if (editingObject != null && editingObject instanceof MultiPolygonEditClass) {
             ((MultiPolygonEditClass)editingObject).addHole(center, projection);
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
@@ -3071,7 +3191,7 @@ public class MapDrawable
     public boolean deleteCurrentPolygon(){
         if (editingObject != null && editingObject instanceof MultiPolygonEditClass) {
             ((MultiPolygonEditClass)editingObject).deleteSelectedPolygon();
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
@@ -3079,7 +3199,7 @@ public class MapDrawable
     public boolean addNewPolygon(LatLng center, Projection projection){
         if (editingObject != null && editingObject instanceof MultiPolygonEditClass) {
             ((MultiPolygonEditClass)editingObject).addNewPolygonAt(center,projection);
-            mapFragment.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
@@ -3278,7 +3398,32 @@ public class MapDrawable
 //        cancelFeatureEdit(false);
     }
 
-    public void checkLayerVisibility(int id){
+    public boolean getLayerVisible(int id){
+        ILayer targetlayer = getVectorLayersById(this,  id);
+        if (targetlayer != null)
+            return ((com.nextgis.maplib.map.Layer)targetlayer).isVisible();
+        else
+            return false;
+    }
+
+    public void refreshLayerVisibility(int id, boolean visible){
+        if (maplibreMap.get() == null || maplibreMap.get().getStyle() == null)
+            return;
+
+        ILayer targetlayer = getVectorLayersById(this,  id);
+
+        if (targetlayer instanceof NGWRasterLayer || targetlayer instanceof  RemoteTMSLayer ||
+                targetlayer instanceof  LocalTMSLayer){
+            Layer layerRaster = getRasterLayer(id,  maplibreMap.get().getStyle());
+            if (layerRaster != null){
+                layerRaster.setProperties(visibility(visible ? VISIBLE:NONE));
+            }
+        }
+    }
+
+
+
+        public void checkLayerVisibility(int id){
         if (maplibreMap.get() == null || maplibreMap.get().getStyle() == null)
             return;
 
@@ -3385,7 +3530,7 @@ public class MapDrawable
 
     public void addPointByWalk(LatLng latLng) {
         if (editingObject != null) {
-            editingObject.addNewFlowPoint(latLng);
+            editingObject.addNewFlowPoint(latLng, true);
             editingObject.updateEditingPolygonAndVertex();
         }
     }
@@ -3398,11 +3543,11 @@ public class MapDrawable
 
             List<org.maplibre.geojson.Feature> tracksFeatures = createFeatureListFromCurrentTrack(getContext());
 
-            if (tracksFeatures .size() > 0){
+            //if (tracksFeatures .size() > 0){
                 GeoJsonSource tracksLineSource = (GeoJsonSource)style.getSource("track-inprogress-source");
                 if (tracksLineSource!=null)
                     tracksLineSource.setGeoJson(FeatureCollection.fromFeatures(tracksFeatures));
-            }
+            //}
         }
     }
 
@@ -3494,7 +3639,13 @@ public class MapDrawable
                 GeoJsonSource tracksLineSource = (GeoJsonSource)style.getSource("track-line-source");
                 if (tracksLineSource!=null)
                     tracksLineSource.setGeoJson(FeatureCollection.fromFeatures(tracksFeatures));
+
+                /* Upstream updates track-flag-source here; per CUSTOMIZATIONS §14 «Tracks: no start/end
+                   flag icons» we skip flag source update (it does not exist in our style). */
+                checkLayerVisibility(trackLayer.getId());
             }
+
+
         }
     }
 
@@ -3629,21 +3780,21 @@ public class MapDrawable
     }
 
     public void updateMeasurmentCaptions(MLGeometryEditClass editingObject) {
-        if (mapFragment.get() != null) {
-            GeoGeometry geometry = mapFragment.get().getGeometryFromMaplibreGeometry(editingObject.editingFeature);
+        if (mapContext.get() != null) {
+            GeoGeometry geometry = mapContext.get().getGeometryFromMaplibreGeometry(editingObject.editingFeature);
 
             if (geometry != null && geometry instanceof GeoLineString) {
                 double length = ((GeoLineString) (geometry)).getLength();
-                mapFragment.get().onLengthChanged(length);
+                mapContext.get().onLengthChanged(length);
             }
 
             Polygon polygon = Polygon.fromLngLats(((MeasurmentLine)editingObject).getPoints());
             org.maplibre.geojson.Feature featurePoly =  org.maplibre.geojson.Feature.fromGeometry(polygon);
-            GeoGeometry geometryPoly = mapFragment.get().getGeometryFromMaplibreGeometry(featurePoly);
+            GeoGeometry geometryPoly = mapContext.get().getGeometryFromMaplibreGeometry(featurePoly);
 
             if (geometryPoly instanceof GeoPolygon){
                 double area = ((GeoPolygon) (geometryPoly)).getArea();
-                mapFragment.get().onAreaChanged(area);
+                mapContext.get().onAreaChanged(area);
             }
         }
     }
@@ -3694,6 +3845,44 @@ public class MapDrawable
             selectedDotSource.setGeoJson(FeatureCollection.fromFeature(viewedFeature));
         }
     }
+
+    // call when mapFragment restored from destroy and WalkEditService running
+    // - get Feature from service, re-create editFeature, fill with data  and continue record by walking
+    public void startEditByWalkFromRestore(
+            final VectorLayer  vectorLayer,
+                Feature originalSelectedFeature){
+        Log.e("WWALK", "MapDrawable startEditByWalkFromRestore featureid = "
+                +  (originalSelectedFeature ==null ? "null" : originalSelectedFeature.getId()) );
+        featureToRestore = originalSelectedFeature;
+        layerForWalkRestore = vectorLayer;
+    }
+
+    // use from collector
+    public void loadViewFeature(long selectedFeatureId, int layerid){
+        List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerid);
+
+        for (org.maplibre.geojson.Feature item : layerFeatures){
+            if (item!= null && item.hasProperty(prop_featureid)) {
+                long id = item.getNumberProperty(prop_featureid).longValue();
+                if (id == selectedFeatureId) {
+                    viewedFeature = item;
+                    break;
+                }
+            }
+        }
+    }
+
+    // use from collector
+    public void updateEditedId(long newId){
+        if (originalSelectedFeature != null && originalSelectedFeature.getId() == -1)
+            originalSelectedFeature.setId(newId);
+
+        if (editingObject!= null && editingObject.editingFeature!= null && editingObject.editingFeature.hasProperty(prop_featureid)
+        && editingObject.editingFeature.getStringProperty(prop_featureid).equals("-1"))
+            editingObject.editingFeature.addStringProperty(prop_featureid, "" + newId);
+    }
+
+
 
     // future update raster prop
 //    public void updateRasterLayerProperties(Integer layerid, int alpha, float contrast,

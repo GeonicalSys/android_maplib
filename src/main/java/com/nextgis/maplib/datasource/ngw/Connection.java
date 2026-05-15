@@ -307,10 +307,10 @@ public class Connection
     }
 
 
-    public void loadChildren()
+    public void loadChildren(boolean skipSubLoad)
     {
         if (null != mRootResource) {
-            mRootResource.loadChildren();
+            mRootResource.loadChildren(skipSubLoad);
         }
     }
 

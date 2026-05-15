@@ -35,6 +35,7 @@ import androidx.annotation.Nullable;
 import com.google.gson.JsonArray;
 import com.nextgis.maplib.api.ILayer;
 import com.nextgis.maplib.api.ITextStyle;
+import com.nextgis.maplib.datasource.GeoGeometry;
 import com.nextgis.maplib.datasource.GeoGeometryCollection;
 import com.nextgis.maplib.datasource.GeoLineString;
 import com.nextgis.maplib.datasource.GeoLinearRing;
@@ -467,7 +468,7 @@ public class MPLFeaturesUtils {
             ArrayList<Polygon> polygons = new ArrayList<>();
             for (int j = 0; j < geoGeometryCollection.size(); j++) {
                 GeoPolygon polygonNG = (GeoPolygon) geoGeometryCollection.getGeometry(j);
-                Polygon polygonML = getPolygonFromNGFeaturePolygon(polygonNG);
+                Polygon polygonML = getPolygonSeparFromNGFeaturePolygon(polygonNG);
                 polygons.add(polygonML);
             }
             MultiPolygon multiPolygon = MultiPolygon.fromPolygons(polygons);
@@ -752,7 +753,7 @@ public class MPLFeaturesUtils {
         ArrayList<Polygon> polygons = new ArrayList<>();
         for (int j = 0; j < geoPolygonGeometry.size(); j++) {
             GeoPolygon polygonNG = (GeoPolygon) geoPolygonGeometry.getGeometry(j);
-            Polygon polygonML = getPolygonFromNGFeaturePolygon(polygonNG);
+            Polygon polygonML = getPolygonSeparFromNGFeaturePolygon(polygonNG);
             polygons.add(polygonML);
         }
         MultiPolygon multiPolygon = MultiPolygon.fromPolygons(polygons);
@@ -777,7 +778,26 @@ public class MPLFeaturesUtils {
         return org.maplibre.geojson.Feature.fromGeometry(multiPoint);
     }
 
-    public static org.maplibre.geojson.Polygon getPolygonFromNGFeaturePolygon(GeoPolygon geoPolygonGeometry) {
+    public static org.maplibre.geojson.Feature getPolygonFromNGFeaturePolygon(GeoPolygon geoPolygonGeometry) {
+        List<List<Point>> points = new ArrayList<>();
+        List<Point> outerRing = new ArrayList<>();
+        for (GeoPoint item : geoPolygonGeometry.getOuterRing().getPoints()) {
+            double[] lonLat = convert3857To4326(item.getX(), item.getY());
+            outerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
+        }
+        points.add(outerRing);
+        for (GeoLinearRing innerRing : geoPolygonGeometry.getInnerRings()) {
+            List<Point> newInnerRing = new ArrayList<>();
+            for (GeoPoint itemPoint : innerRing.getPoints()) {
+                double[] lonLat = convert3857To4326(itemPoint.getX(), itemPoint.getY());
+                newInnerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
+            }
+            points.add(newInnerRing);
+        }
+        return org.maplibre.geojson.Feature.fromGeometry(org.maplibre.geojson.Polygon.fromLngLats(points));
+    }
+
+    public static org.maplibre.geojson.Polygon getPolygonSeparFromNGFeaturePolygon(GeoPolygon geoPolygonGeometry) {
         List<List<Point>> points = new ArrayList<>();
         List<Point> outerRing = new ArrayList<>();
         for (GeoPoint item : geoPolygonGeometry.getOuterRing().getPoints()) {
@@ -795,6 +815,20 @@ public class MPLFeaturesUtils {
         }
         return org.maplibre.geojson.Polygon.fromLngLats(points);
     }
+
+    public static org.maplibre.geojson.Feature getFeatureFromNGFeature(GeoGeometry ngGeometry) {
+        switch (ngGeometry.getType()){
+            case GTPoint: return getFeatureFromNGFeaturePoint((GeoPoint) ngGeometry);
+            case GTMultiPoint: return getFeatureFromNGFeatureMultiPoint((GeoMultiPoint) ngGeometry);
+            case GTLineString: return getFeatureFromNGFeatureLine((GeoLineString) ngGeometry);
+            case GTMultiLineString: return getFeatureFromNGFeatureMultiLine((GeoMultiLineString) ngGeometry);
+            case GTPolygon: return getPolygonFromNGFeaturePolygon((GeoPolygon) ngGeometry);
+            case GTMultiPolygon: return getFeatureFromNGFeatureMultiPolygon((GeoMultiPolygon) ngGeometry);
+            default: return null;
+
+        }
+    }
+
 
     static public double[] convert3857To4326(double x, double y) {
         double lon = x * 180 / 20037508.34;
@@ -845,10 +879,19 @@ public class MPLFeaturesUtils {
                     rasterSource = null;
                 }
                 if (rasterSource == null || forceCreate) {
+
+                    String url = rasterLayersURL.get(layerId);
+                    if (url.contains("{q}")){
+                        // replace for zxy scheme
+                        url = url.replace("{q}", "quadtiles{z}/{x}/{y}");
+                    }
+
                     TileSet tileSet = new TileSet(
                             "tileset",
-                            rasterLayersURL.get(layerId));
+                            url);
+
                     Integer tileTmsType =rasterLayersTmsTypeMap.get(layerId);
+
                     if ( tileTmsType != null && tileTmsType != -1){
                         if (tileTmsType == TMSTYPE_NORMAL) {
                             tileSet.setScheme( "tms");
@@ -857,6 +900,7 @@ public class MPLFeaturesUtils {
                             tileSet.setScheme("xyz");
                         }
                     }
+
                     rasterSource = new RasterSource(layerPath,tileSet, 256 );
                     style.addSource(rasterSource);
                 }
