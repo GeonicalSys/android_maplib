@@ -236,7 +236,7 @@ public class LocationUtil
         String preferenceKey = isTracks ? tracks : location;
         String preferences = context.getPackageName() + "_preferences";
         SharedPreferences sharedPreferences = context.getSharedPreferences(preferences, MODE_MULTI_PROCESS);
-        String defaultSource = isTracks ? "1" : "3";
+        String defaultSource = "3";
         String value = sharedPreferences.getString(preferenceKey, defaultSource);
         int providers = value != null ? Integer.parseInt(value) : Integer.parseInt(defaultSource);
         return 0 != (providers & currentProvider);

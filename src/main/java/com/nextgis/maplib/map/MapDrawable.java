@@ -38,6 +38,7 @@ import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
+import android.location.Location;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -3562,12 +3563,16 @@ public class MapDrawable
     }
 
     public void reloadCurrentTrackToMap(){
+        reloadCurrentTrackToMap(null);
+    }
+
+    public void reloadCurrentTrackToMap(@Nullable Location leadLocation){
         if (maplibreMap.get() == null)
             return;
         Style style = maplibreMap.get().getStyle();
         if (style != null) {
 
-            List<org.maplibre.geojson.Feature> tracksFeatures = createFeatureListFromCurrentTrack(getContext());
+            List<org.maplibre.geojson.Feature> tracksFeatures = createFeatureListFromCurrentTrack(getContext(), leadLocation);
 
             //if (tracksFeatures .size() > 0){
                 GeoJsonSource tracksLineSource = (GeoJsonSource)style.getSource("track-inprogress-source");
@@ -3578,6 +3583,12 @@ public class MapDrawable
     }
 
     static public List<org.maplibre.geojson.Feature> createFeatureListFromCurrentTrack(Context context) {
+        return createFeatureListFromCurrentTrack(context, null);
+    }
+
+    static public List<org.maplibre.geojson.Feature> createFeatureListFromCurrentTrack(
+            Context context,
+            @Nullable Location leadLocation) {
 
         List<org.maplibre.geojson.Feature> result = new ArrayList<>();
 
@@ -3641,6 +3652,7 @@ public class MapDrawable
                 track.close();
             }
 
+            appendCurrentTrackLeadPoint(pointsList, leadLocation);
             LineString lineString = LineString.fromLngLats(pointsList);
             org.maplibre.geojson.Feature lineFeature = org.maplibre.geojson.Feature.fromGeometry(lineString);
             result.add(lineFeature);
@@ -3649,6 +3661,19 @@ public class MapDrawable
         } finally {
             mCursor.close();
         }
+    }
+
+    private static void appendCurrentTrackLeadPoint(List<Point> pointsList, @Nullable Location leadLocation) {
+        if (leadLocation == null || pointsList.isEmpty()) {
+            return;
+        }
+        Point lead = Point.fromLngLat(leadLocation.getLongitude(), leadLocation.getLatitude());
+        Point last = pointsList.get(pointsList.size() - 1);
+        if (Math.abs(last.longitude() - lead.longitude()) < 1e-9
+                && Math.abs(last.latitude() - lead.latitude()) < 1e-9) {
+            return;
+        }
+        pointsList.add(lead);
     }
 
     public void reloadTrackListToMap(){

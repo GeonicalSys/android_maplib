@@ -12,6 +12,8 @@ import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
 
+import com.hypertrack.hyperlog.HyperLog;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -311,6 +313,7 @@ public final class LocationTrackFilter {
     }
 
     private void debugDrop(String reason) {
+        HyperLog.d(Constants.TAG, "LocationTrackFilter: " + reason);
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "LocationTrackFilter: " + reason);
         }
