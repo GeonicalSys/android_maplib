@@ -102,6 +102,7 @@
     <string name="ngw_schema_mismatch_has_local_changes">The layer structure on the server no longer matches this map. You have unsynced edits on the device. Sync or remove your local changes, then remove the layer and add it again from NextGIS Web.</string>
     <string name="self_intersection">Self intersection detected</string>
     <string name="ring_outside">One of the holes outside of the outer ring</string>
+    <string name="error_geojson_invalid_geometry">Invalid geometry in GeoJSON feature</string>
     <string name="rings_intersection">Holes intersection</string>
     <string name="unit_mile">ml</string>
     <string name="unit_foot">ft</string>

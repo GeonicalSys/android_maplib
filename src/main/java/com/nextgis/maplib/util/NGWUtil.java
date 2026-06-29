@@ -421,12 +421,10 @@ public class NGWUtil
             long remoteId,
             String where)
     {
-        if (TextUtils.isEmpty(where))
+        if (TextUtils.isEmpty(where)) {
             return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment";
-        //return getFeaturesUrl(server, remoteId) + "?" + where + "&dt_format=iso&?extensions=";
-
-        return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment";
-        //  keeps attachment after sync  - but delete attach manualy  not work  on sync changes to  server - tryes to delete all
+        }
+        return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment&" + where;
     }
 
 

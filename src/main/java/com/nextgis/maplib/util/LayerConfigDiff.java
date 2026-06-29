@@ -31,6 +31,8 @@ public final class LayerConfigDiff {
     private boolean mVisibilityChanged;
     private boolean mZoomChanged;
     private boolean mNameChanged;
+    private boolean mLayerOpacityChanged;
+    private boolean mEditableChanged;
     private boolean mSyncSettingsChanged;
 
     private final JSONObject mServerConfig;
@@ -51,6 +53,8 @@ public final class LayerConfigDiff {
     public boolean isVisibilityChanged() { return mVisibilityChanged; }
     public boolean isZoomChanged() { return mZoomChanged; }
     public boolean isNameChanged() { return mNameChanged; }
+    public boolean isLayerOpacityChanged() { return mLayerOpacityChanged; }
+    public boolean isEditableChanged() { return mEditableChanged; }
     public boolean isSyncSettingsChanged() { return mSyncSettingsChanged; }
     public JSONObject getServerConfig() { return mServerConfig; }
 
@@ -68,6 +72,8 @@ public final class LayerConfigDiff {
         }
 
         try {
+            NgwLayerConfigAdapter.adaptLayerConfig(serverConfig);
+
             diff.compareGeometryType(serverConfig, local);
             if (diff.isHard()) return diff;
 
@@ -75,6 +81,8 @@ public final class LayerConfigDiff {
             if (diff.isHard()) return diff;
 
             diff.compareRenderer(serverConfig, local);
+            diff.compareLayerOpacity(serverConfig, local);
+            diff.compareEditable(serverConfig, local);
             diff.compareVisibility(serverConfig, local);
             diff.compareZoom(serverConfig, local);
             diff.compareName(serverConfig, local);
@@ -152,6 +160,28 @@ public final class LayerConfigDiff {
         }
     }
 
+    private void compareLayerOpacity(JSONObject cfg, VectorLayer local) {
+        if (!cfg.has(Constants.JSON_LAYER_OPACITY_KEY)) {
+            return;
+        }
+        int serverOpacity = cfg.optInt(Constants.JSON_LAYER_OPACITY_KEY, 255);
+        if (serverOpacity != local.getLayerOpacity()) {
+            mLayerOpacityChanged = true;
+            markSoft();
+        }
+    }
+
+    private void compareEditable(JSONObject cfg, VectorLayer local) {
+        if (!cfg.has("is_editable")) {
+            return;
+        }
+        boolean serverEditable = cfg.optBoolean("is_editable", true);
+        if (serverEditable != local.isEditable()) {
+            mEditableChanged = true;
+            markSoft();
+        }
+    }
+
     private void compareVisibility(JSONObject cfg, VectorLayer local) {
         if (!cfg.has(Constants.JSON_VISIBILITY_KEY)) return;
         boolean serverVis = cfg.optBoolean(Constants.JSON_VISIBILITY_KEY, true);
@@ -188,7 +218,7 @@ public final class LayerConfigDiff {
     }
 
     private void compareSyncSettings(JSONObject cfg, VectorLayer local) {
-        final String[] keys = {"sync_type", "sync_direction", "tracked", "server_where", "is_editable"};
+        final String[] keys = {"sync_type", "sync_direction", "tracked", "server_where"};
         try {
             JSONObject localCfg = local.toJSON();
             for (String k : keys) {
@@ -261,6 +291,8 @@ public final class LayerConfigDiff {
         if (mVisibilityChanged) sb.append(" visibility");
         if (mZoomChanged) sb.append(" zoom");
         if (mNameChanged) sb.append(" name");
+        if (mLayerOpacityChanged) sb.append(" layerOpacity");
+        if (mEditableChanged) sb.append(" editable");
         if (mSyncSettingsChanged) sb.append(" syncSettings");
         sb.append("]");
         return sb.toString();

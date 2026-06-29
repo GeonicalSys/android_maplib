@@ -45,11 +45,23 @@ import com.nextgis.maplib.datasource.GeoMultiPolygon;
 import com.nextgis.maplib.datasource.GeoPoint;
 import com.nextgis.maplib.datasource.GeoPolygon;
 import com.nextgis.maplib.display.FieldStyleRule;
+import com.nextgis.maplib.display.LabelAttributes;
+import com.nextgis.maplib.display.LabelTemplate;
+import com.nextgis.maplib.display.MarkerIconRegistry;
+import com.nextgis.maplib.display.MplStyleMapper;
+import com.nextgis.maplib.display.PolygonPatternRegistry;
+import com.nextgis.maplib.map.mpl.LineLayerFactory;
+import com.nextgis.maplib.map.mpl.MplLayerBuildContext;
+import com.nextgis.maplib.map.mpl.MplLayerBuildResult;
+import com.nextgis.maplib.map.mpl.MplLayerStyleVars;
+import com.nextgis.maplib.map.mpl.PointLayerFactory;
+import com.nextgis.maplib.map.mpl.PolygonLayerFactory;
 import com.nextgis.maplib.display.RuleFeatureRenderer;
 import com.nextgis.maplib.display.SimpleLineStyle;
 import com.nextgis.maplib.display.SimpleMarkerStyle;
 import com.nextgis.maplib.display.SimplePolygonStyle;
 import com.nextgis.maplib.display.TMSRenderer;
+import com.nextgis.maplib.display.TextStyleUtil;
 import com.nextgis.maplib.map.MLP.LineEditClass;
 import com.nextgis.maplib.map.MLP.MLGeometryEditClass;
 import com.nextgis.maplib.map.MLP.MeasurmentLine;
@@ -74,6 +86,7 @@ import org.maplibre.android.style.layers.RasterLayer;
 import org.maplibre.android.style.layers.SymbolLayer;
 import org.maplibre.android.style.sources.GeoJsonSource;
 import org.maplibre.android.style.sources.RasterSource;
+import org.maplibre.android.style.sources.Source;
 import org.maplibre.android.style.sources.TileSet;
 import org.maplibre.geojson.Feature;
 import org.maplibre.geojson.FeatureCollection;
@@ -90,7 +103,26 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-//loader for features from NG to maplibre geojson features
+// Loader: NG SQLite features → MapLibre GeoJSON with per-feature style properties.
+//
+// GeoJSON property contract (used in MapLibre data-driven paint via Expression.get):
+//   signature      — label text (SymbolLayer text-field)
+//   colorfill      — point fill / line color
+//   fillcolor      — polygon fill (rule-style alias: prop_color_fill_rule)
+//   colorstroke    — stroke / outline color
+//   textcolor      — label color; line edging color for rules
+//   size           — point radius (CircleLayer)
+//   thinkness      — stroke width (points, lines, polygon outline)
+//   opacity        — fill / line body opacity
+//   strokeopacity  — stroke / outline opacity
+//   fillpattern    — polygon fill pattern id (0 solid, 1 hatch, 2 cross, 3 dots, 4 brick, 5 forest, 6 marsh)
+//   filltype       — line style: 1 solid, 2 dash, 3 solid+outline, 4 dash+outline; point marker type
+//   textsize       — label size
+//   textanchor     — MapLibre text-anchor
+//   textoffset     — [x, y] label offset
+//   texthalo_color, texthalo_width, texthalo_blur — label halo (rule-style)
+//   textopacity    — label opacity 0–1 (rule-style)
+//   featureid, layerid, order — selection / ordering
 public class MPLFeaturesUtils {
 
     static public Number pointRaduis = 8;
@@ -100,34 +132,42 @@ public class MPLFeaturesUtils {
     static public String colorBlue = "#0000FF";
     static public String colorRED = "#FF0000";
 
-    static public String prop_color_fill_rule = "fillcolor";
-    static public String prop_text_color = "textcolor";
-    static public String prop_text_textsize = "textsize";
-    static public String prop_text_textanchor = "textanchor";
-    static public String prop_text_textoffsets = "textoffset";
+    static public String prop_color_fill_rule = MplFeatureStyleProps.COLOR_FILL_RULE;
+    static public String prop_text_color = MplFeatureStyleProps.TEXT_COLOR;
+    static public String prop_text_textsize = MplFeatureStyleProps.TEXT_SIZE;
+    static public String prop_text_textanchor = MplFeatureStyleProps.TEXT_ANCHOR;
+    static public String prop_text_textoffsets = MplFeatureStyleProps.TEXT_OFFSETS;
+    static public String prop_texthalo_color = MplFeatureStyleProps.TEXT_HALO_COLOR;
+    static public String prop_texthalo_width = MplFeatureStyleProps.TEXT_HALO_WIDTH;
+    static public String prop_texthalo_blur = MplFeatureStyleProps.TEXT_HALO_BLUR;
+    static public String prop_text_opacity = MplFeatureStyleProps.TEXT_OPACITY;
 
-    // common properties
-    static public String prop_color_fill = "colorfill";  // fill color
-    static public String prop_color_stroke = "colorstroke"; // color outline for dot and polygone
-    static public String prop_size = "size"; // size for dot
-    static public String prop_thinkness = "thinkness";   // thinkness for dot / line
-    static public String prop_opacity = "opacity";   // thinkness for dot / line
+    // common properties — aliases of {@link MplFeatureStyleProps}
+    static public String prop_color_fill = MplFeatureStyleProps.COLOR_FILL;
+    static public String prop_color_stroke = MplFeatureStyleProps.COLOR_STROKE;
+    static public String prop_size = MplFeatureStyleProps.SIZE;
+    static public String prop_thinkness = MplFeatureStyleProps.THICKNESS;
+    static public String prop_opacity = MplFeatureStyleProps.OPACITY;
+    static public String prop_stroke_opacity = MplFeatureStyleProps.STROKE_OPACITY;
 
-    static public String prop_type = "filltype"; // dot (circle square ...) .  // line - dashed
-    static public String prop_type2 = "filltype2"; // dot (circle square ...) .  // line - dashed
+    static public String prop_type = MplFeatureStyleProps.FILL_TYPE;
+    static public String prop_type2 = MplFeatureStyleProps.FILL_TYPE2;
+    static public String prop_dash_preset = MplFeatureStyleProps.DASH_PRESET;
+    static public String prop_fill_pattern = MplFeatureStyleProps.FILL_PATTERN;
 
-    static public String prop_featureid = "featureid";
-    static public String prop_layerid = "layerid";
-    static public String prop_order = "order";
+    static public String prop_featureid = MplFeatureStyleProps.FEATURE_ID;
+    static public String prop_layerid = MplFeatureStyleProps.LAYER_ID;
+    static public String prop_order = MplFeatureStyleProps.ORDER;
     static public String namePrefix = "nglayer-";
-    static public String prop_color = "color";
-    static public String prop_signature_text = "signature";
-    static public String prop_start_flag = "type";
+    static public String prop_color = MplFeatureStyleProps.COLOR;
+    static public String prop_signature_text = MplFeatureStyleProps.SIGNATURE;
+    static public String prop_start_flag = MplFeatureStyleProps.START_FLAG;
 
     static final public String layer_namepart = "layer-";
     static final public String source_namepart = "source-";
     static final public String outline_namepart = "_outline";
     static final public String dash_namepart = "_dash";
+    static final public String pattern_namepart = "_pattern";
     static final public String track_namepart = "track-";
     static final public String track_flags_namepart = "track-flags-";
 
@@ -209,10 +249,12 @@ public class MPLFeaturesUtils {
         com.nextgis.maplib.display.Style layerStyle = layer.getDefaultStyleNoExcept();
         String styleField = ((ITextStyle) layerStyle).getField();
         String commonText = ((ITextStyle) layerStyle).getText();
+        LabelAttributes labelAttributes = LabelAttributes.fromStyle(layerStyle);
 
         boolean needSignatures = false;
         if (layer.getRenderer() instanceof RuleFeatureRenderer ||
-                !TextUtils.isEmpty(styleField) || !TextUtils.isEmpty(commonText)) {
+                !TextUtils.isEmpty(styleField) || !TextUtils.isEmpty(commonText)
+                || LabelTemplate.hasTemplate(labelAttributes.getLabelTemplate())) {
             needSignatures = true;
         }
 
@@ -515,20 +557,178 @@ public class MPLFeaturesUtils {
             return;
         }
 
-        if (needSignatures) {
-            if (signatureField != null) {
-                String text = "_id".equals(signatureField)
-                        ? String.valueOf(ngFeature.getId())
-                        : getNullableValue(ngFeature, signatureField);
-                feature.addStringProperty(
-                        prop_signature_text,
-                        getSpaceCorrectedText(text));
-            } else if (!TextUtils.isEmpty(commonText)) {
-                feature.addStringProperty(
-                        prop_signature_text,
-                        getSpaceCorrectedText(commonText));
+        if (geoType == GTPolygon || geoType == GTMultiPolygon) {
+            com.nextgis.maplib.display.Style defaultStyle = layer.getDefaultStyleNoExcept();
+            if (defaultStyle != null) {
+                MplFeatureStyleProps.apply(defaultStyle, feature, geoType);
             }
         }
+
+        if (needSignatures) {
+            // Layer SymbolLayer owns text size/color; drop stale per-feature props from cache.
+            MplFeatureStyleProps.clearTextProps(feature);
+            String signatureText = resolveSignatureText(
+                    ngFeature,
+                    signatureField,
+                    commonText,
+                    LabelAttributes.fromStyle(layer.getDefaultStyleNoExcept()));
+            if (!TextUtils.isEmpty(signatureText)) {
+                feature.addStringProperty(prop_signature_text, signatureText);
+            }
+        }
+    }
+
+    /**
+     * Whether a style-only reload must refresh GeoJSON feature properties (not just MapLibre layers).
+     */
+    public static boolean needsSourceStyleRefresh(VectorLayer layer) {
+        if (layer.getRenderer() instanceof RuleFeatureRenderer) {
+            return true;
+        }
+        com.nextgis.maplib.display.Style layerStyle = layer.getDefaultStyleNoExcept();
+        if (layerStyle == null) {
+            return false;
+        }
+        String styleField = ((ITextStyle) layerStyle).getField();
+        String commonText = ((ITextStyle) layerStyle).getText();
+        LabelAttributes labelAttributes = LabelAttributes.fromStyle(layerStyle);
+        return !TextUtils.isEmpty(styleField)
+                || !TextUtils.isEmpty(commonText)
+                || LabelTemplate.hasTemplate(labelAttributes.getLabelTemplate());
+    }
+
+    /**
+     * Strip MapLibre style/signature props, keeping geometry and stable ids for geometry cache.
+     */
+    public static List<Feature> toGeometryShells(List<Feature> features, int geoType) {
+        List<Feature> shells = new ArrayList<>(features.size());
+        for (Feature feature : features) {
+            if (feature == null || feature.geometry() == null) {
+                continue;
+            }
+            Feature shell = Feature.fromGeometry(feature.geometry());
+            copyStableFeatureIds(feature, shell);
+            shells.add(shell);
+        }
+        return shells;
+    }
+
+    private static void copyStableFeatureIds(Feature from, Feature to) {
+        String layerId = from.getStringProperty(prop_layerid);
+        if (layerId != null) {
+            to.addStringProperty(prop_layerid, layerId);
+        }
+        String order = from.getStringProperty(prop_order);
+        if (order != null) {
+            to.addStringProperty(prop_order, order);
+        }
+        String featureId = from.getStringProperty(prop_featureid);
+        if (featureId != null) {
+            to.addStringProperty(prop_featureid, featureId);
+        }
+    }
+
+    /**
+     * Re-apply rule/signature props onto features that already carry geometry (no SQLite geom scan).
+     */
+    public static void refreshMaplibreStyleOnFeatures(VectorLayer layer, List<Feature> features) {
+        if (layer == null || features == null || features.isEmpty()) {
+            return;
+        }
+        int geoType = layer.getGeometryType();
+        String signatureField = getLayerSignatureField(layer);
+        com.nextgis.maplib.display.Style layerStyle = layer.getDefaultStyleNoExcept();
+        String styleField = layerStyle != null ? ((ITextStyle) layerStyle).getField() : null;
+        String commonText = layerStyle != null ? ((ITextStyle) layerStyle).getText() : null;
+        LabelAttributes labelAttributes = LabelAttributes.fromStyle(layerStyle);
+        boolean ruleStyle = layer.getRenderer() instanceof RuleFeatureRenderer;
+        boolean needSignatures = ruleStyle
+                || !TextUtils.isEmpty(styleField)
+                || !TextUtils.isEmpty(commonText)
+                || LabelTemplate.hasTemplate(labelAttributes.getLabelTemplate());
+        String effectiveSignatureField = !TextUtils.isEmpty(styleField) ? styleField : signatureField;
+
+        for (Feature feature : features) {
+            if (feature == null) {
+                continue;
+            }
+            String featureId = feature.getStringProperty(prop_featureid);
+            if (TextUtils.isEmpty(featureId)) {
+                continue;
+            }
+            com.nextgis.maplib.datasource.Feature ngFeature;
+            try {
+                ngFeature = layer.getFeature(Long.parseLong(featureId));
+            } catch (NumberFormatException ignored) {
+                continue;
+            }
+            if (ngFeature == null) {
+                continue;
+            }
+            feature.removeProperty(prop_signature_text);
+            MplFeatureStyleProps.clear(feature, geoType);
+            applyTextAndStyle(
+                    layer,
+                    ngFeature,
+                    feature,
+                    geoType,
+                    ruleStyle,
+                    needSignatures,
+                    effectiveSignatureField,
+                    commonText);
+        }
+    }
+
+    @Nullable
+    private static String resolveSignatureText(
+            com.nextgis.maplib.datasource.Feature ngFeature,
+            @Nullable String field,
+            @Nullable String commonText,
+            LabelAttributes labelAttributes) {
+        if (labelAttributes != null && LabelTemplate.hasTemplate(labelAttributes.getLabelTemplate())) {
+            return getSpaceCorrectedText(
+                    LabelTemplate.resolve(labelAttributes.getLabelTemplate(), ngFeature));
+        }
+        if (!TextUtils.isEmpty(field)) {
+            String text = "_id".equals(field)
+                    ? String.valueOf(ngFeature.getId())
+                    : getNullableValue(ngFeature, field);
+            return getSpaceCorrectedText(text);
+        }
+        if (!TextUtils.isEmpty(commonText)) {
+            return getSpaceCorrectedText(commonText);
+        }
+        return null;
+    }
+
+
+    /**
+     * MapLibre text-size for the layer symbol. For simple renderer the size comes only from layer
+     * style; for rule renderer per-feature {@link #prop_text_textsize} may override the default.
+     * Zoom scaling must wrap the size expression (not sit inside coalesce) so ["zoom"] is evaluated.
+     */
+    private static Expression buildTextSizeExpression(
+            float textSizeNg,
+            LabelAttributes labelAttributes,
+            boolean ruleStyle) {
+        float baseSize = (textSizeNg + 3) * 3;
+        Expression sizeExpr = ruleStyle
+                ? Expression.coalesce(
+                Expression.get(prop_text_textsize),
+                Expression.literal(baseSize))
+                : Expression.literal(baseSize);
+
+        if (labelAttributes != null && labelAttributes.isTextScaleWithZoom()) {
+            return Expression.interpolate(
+                    Expression.linear(),
+                    Expression.zoom(),
+                    Expression.stop(6, Expression.product(sizeExpr, Expression.literal(0.35))),
+                    Expression.stop(10, Expression.product(sizeExpr, Expression.literal(0.65))),
+                    Expression.stop(14, sizeExpr),
+                    Expression.stop(18, Expression.product(sizeExpr, Expression.literal(1.5))),
+                    Expression.stop(22, Expression.product(sizeExpr, Expression.literal(2.2))));
+        }
+        return sizeExpr;
     }
 
     private static void applyRuleStyleInternal(
@@ -545,15 +745,17 @@ public class MPLFeaturesUtils {
         boolean isIdKey = "_id".equals(key);
 
         String keyValue = isIdKey   ? String.valueOf(ngFeature.getId()): getNullableValue(ngFeature, key);
-        com.nextgis.maplib.display.Style style = fsr.getStyleRules().get(keyValue);
+        com.nextgis.maplib.display.Style style = fsr.getStyle(keyValue);
 
         if (style != null) {
             String ruleCommonText = style.getText();
             applyText(style, ngFeature, feature, ruleCommonText != null? ruleCommonText : commonText);
-            applyGeometrySpecificStyle(style, feature, geoType);
+            MplFeatureStyleProps.apply(style, feature, geoType);
         } else {
-            applyCommonStyleText(rfr, ngFeature, feature, commonText);
-            clearGeometrySpecificStyle(feature,geoType);
+            com.nextgis.maplib.display.Style otherStyle = fsr.resolveOtherStyle(rfr.getStyle());
+            String otherText = otherStyle.getText();
+            applyText(otherStyle, ngFeature, feature, otherText != null ? otherText : commonText);
+            MplFeatureStyleProps.apply(otherStyle, feature, geoType);
         }
     }
 
@@ -563,134 +765,13 @@ public class MPLFeaturesUtils {
             Feature feature,
             String commonText){
         String field = ((ITextStyle) style).getField();
-        if (!TextUtils.isEmpty(field)) {
-            String text = "_id".equals(field)? String.valueOf(ngFeature.getId()): getNullableValue(ngFeature, field);
-            feature.addStringProperty(prop_signature_text,getSpaceCorrectedText(text));
-
-        } else if (!TextUtils.isEmpty(commonText)){
-            feature.addStringProperty(prop_signature_text,getSpaceCorrectedText(commonText));
-        }
-    }
-
-
-    private static void applyCommonStyleText(
-            RuleFeatureRenderer rfr,
-            com.nextgis.maplib.datasource.Feature ngFeature,
-            Feature feature,
-            String commonText  ) {
-        String styleField = rfr.getStyle().getField();
-
-        if (!TextUtils.isEmpty(styleField)) {
-            String text = "_id".equals(styleField)
-                    ? String.valueOf(ngFeature.getId())
-                    : getNullableValue(ngFeature, styleField);
-
-            feature.addStringProperty(
-                    prop_signature_text,
-                    getSpaceCorrectedText(text) );
-        } else if (!TextUtils.isEmpty(commonText)) {
-            feature.addStringProperty(
-                    prop_signature_text,
-                    getSpaceCorrectedText(commonText));
-        }
-    }
-
-    private static void applyGeometrySpecificStyle(
-            com.nextgis.maplib.display.Style style,
-            Feature feature,
-            int geoType ) {
-        switch (geoType) {
-
-            case GTPoint:
-            case GTMultiPoint:
-                SimpleMarkerStyle ms = (SimpleMarkerStyle) style;
-
-                feature.addStringProperty(prop_text_color, getColorName(ms.getTextColor()) );
-
-                float textSize = (ms.getTextSize() + 3) * 3;
-                feature.addNumberProperty( prop_text_textsize,textSize );
-
-                int align = ms.getTextAlignment();
-                feature.addStringProperty(prop_text_textanchor,getTextAnchor(align));
-
-                Float[] offsets = getTextAnchorOffsets(align, textSize);
-                JsonArray arr = new JsonArray();
-                arr.add(offsets[0]);
-                arr.add(offsets[1]);
-                feature.addProperty(prop_text_textoffsets, arr);
-
-                feature.addStringProperty(prop_color_fill, getColorName(style.getColor()));
-                feature.addStringProperty(prop_color_stroke, getColorName(style.getOutColor()));
-                feature.addNumberProperty(prop_size, getMPLThinkness(ms.getSize()));
-                break;
-            case GTLineString:
-            case GTMultiLineString:
-                feature.addStringProperty(
-                        prop_color_fill,
-                        getColorName(style.getColor()));
-                feature.addStringProperty(
-                        prop_text_color,
-                        getColorName(style.getOutColor()));
-                feature.addNumberProperty(
-                        prop_thinkness,
-                        getMPLThinkness(style.getWidth()));
-                if (style instanceof SimpleLineStyle) {
-                    feature.addNumberProperty(
-                            prop_type,
-                            ((SimpleLineStyle) style).getType());
-                }
-                break;
-
-            case GTPolygon:
-            case GTMultiPolygon:
-                feature.addStringProperty(
-                        prop_color_fill_rule,
-                        getColorName(style.getColor()));
-                feature.addStringProperty(
-                        prop_color_stroke,
-                        getColorName(style.getOutColor()));
-                feature.addNumberProperty(
-                        prop_thinkness,
-                        getMPLThinkness(style.getWidth()));
-
-                if (style instanceof SimplePolygonStyle) {
-                    feature.addNumberProperty(
-                            prop_opacity,
-                            ((SimplePolygonStyle) style).isFill() ? 0.5f : 0f);
-                }
-                break;
-        }
-    }
-
-
-    private static void clearGeometrySpecificStyle(Feature feature,int geoType ) {
-        switch (geoType) {
-
-            case GTPoint:
-            case GTMultiPoint:
-                feature.removeProperty(prop_text_color);
-                feature.removeProperty( prop_text_textsize);
-                feature.removeProperty(prop_text_textanchor);
-                feature.removeProperty(prop_text_textoffsets);
-                feature.removeProperty(prop_color_fill);
-                feature.removeProperty(prop_color_stroke);
-                feature.removeProperty(prop_size);
-                break;
-            case GTLineString:
-            case GTMultiLineString:
-                feature.removeProperty(prop_color_fill);
-                feature.removeProperty(prop_text_color);
-                feature.removeProperty(prop_thinkness);
-                feature.removeProperty(prop_type);
-                break;
-
-            case GTPolygon:
-            case GTMultiPolygon:
-                feature.removeProperty(prop_color_fill_rule);
-                feature.removeProperty(prop_color_stroke);
-                feature.removeProperty(prop_thinkness);
-                feature.removeProperty(prop_opacity);
-                break;
+        String signatureText = resolveSignatureText(
+                ngFeature,
+                field,
+                commonText,
+                LabelAttributes.fromStyle(style));
+        if (!TextUtils.isEmpty(signatureText)) {
+            feature.addStringProperty(prop_signature_text, signatureText);
         }
     }
 
@@ -873,7 +954,13 @@ public class MPLFeaturesUtils {
         }
 
         if (layerType == GT_RASTER_WA){
-                RasterSource rasterSource = (RasterSource) style.getSource(layerPath);
+                Source rasterExisting = style.getSource(layerPath);
+                RasterSource rasterSource = (rasterExisting instanceof RasterSource)
+                        ? (RasterSource) rasterExisting : null;
+                if (rasterExisting != null && rasterSource == null) {
+                    // Wrong-kind source left from a previous layer type; drop so the cast is safe.
+                    style.removeSource(layerPath);
+                }
                 if (rasterSource != null && rasterSource.getUrl()!= null &&  !rasterSource.getUrl().equals(rasterLayersURL.get(layerId))){
                     style.removeSource(layerPath);
                     rasterSource = null;
@@ -881,6 +968,11 @@ public class MPLFeaturesUtils {
                 if (rasterSource == null || forceCreate) {
 
                     String url = rasterLayersURL.get(layerId);
+                    if (url == null) {
+                        Log.w("Mbgl", "createSourceForLayer: missing raster URL layer id=" + layerId
+                                + " path=" + layerPath);
+                        return;
+                    }
                     if (url.contains("{q}")){
                         // replace for zxy scheme
                         url = url.replace("{q}", "quadtiles{z}/{x}/{y}");
@@ -912,17 +1004,39 @@ public class MPLFeaturesUtils {
             addPolyTextSource = true;
         }
 
-        GeoJsonSource vectorSource = (GeoJsonSource) style.getSource(layerPath);
+        Source vectorExisting = style.getSource(layerPath);
+        if (vectorExisting != null && !(vectorExisting instanceof GeoJsonSource)) {
+            // Wrong-kind source left from a previous layer type; drop so the cast is safe.
+            style.removeSource(layerPath);
+            vectorExisting = null;
+        }
+        GeoJsonSource vectorSource = (GeoJsonSource) vectorExisting;
+        boolean useNativeUri = fileUri != null
+                && layerFeatures != null
+                && !layerFeatures.isEmpty();
         if (vectorSource == null) {
-            if (fileUri != null) {
-                vectorSource = new GeoJsonSource(layerPath, fileUri);
+            if (useNativeUri) {
+                try {
+                    vectorSource = new GeoJsonSource(layerPath, fileUri);
+                } catch (Exception uriEx) {
+                    Log.w("Mbgl", "createSourceForLayer: native URI failed, fallback to GeoJson "
+                            + layerPath + " " + uriEx.getMessage());
+                    vectorSource = new GeoJsonSource(layerPath,
+                            FeatureCollection.fromFeatures(layerFeatures));
+                }
             } else {
                 vectorSource = new GeoJsonSource(layerPath, FeatureCollection.fromFeatures(layerFeatures));
             }
             style.addSource(vectorSource);
         } else {
-            if (fileUri != null) {
-                vectorSource.setUri(fileUri);
+            if (useNativeUri) {
+                try {
+                    vectorSource.setUri(fileUri);
+                } catch (Exception uriEx) {
+                    Log.w("Mbgl", "createSourceForLayer: setUri failed, fallback to GeoJson "
+                            + layerPath + " " + uriEx.getMessage());
+                    vectorSource.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
+                }
             } else {
                 vectorSource.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
             }
@@ -934,7 +1048,12 @@ public class MPLFeaturesUtils {
 
             List<Feature> points =  convertToPointFeatures(layerFeatures);
 
-            GeoJsonSource vectorTextSource = (GeoJsonSource) style.getSource(layerPath + source_polygon_text);
+            Source vectorTextExisting = style.getSource(layerPath + source_polygon_text);
+            if (vectorTextExisting != null && !(vectorTextExisting instanceof GeoJsonSource)) {
+                style.removeSource(layerPath + source_polygon_text);
+                vectorTextExisting = null;
+            }
+            GeoJsonSource vectorTextSource = (GeoJsonSource) vectorTextExisting;
             if (vectorTextSource == null) {
                 vectorTextSource = new GeoJsonSource(layerPath + source_polygon_text, FeatureCollection.fromFeatures(points));
                 Log.d("Mbgl", "create source for: " + layerPath + source_polygon_text);
@@ -1062,12 +1181,13 @@ public class MPLFeaturesUtils {
             int lid = logical.getId();
             String base = namePrefix + layer_namepart + lid;
             String sym = "symbol-" + namePrefix + layer_namepart + lid;
-            String dash = base + dash_namepart;
             String outline = base + outline_namepart;
             String last = null;
             for (org.maplibre.android.style.layers.Layer l : style.getLayers()) {
                 String id = l.getId();
-                if (id.equals(sym) || id.equals(base) || id.equals(dash) || id.equals(outline)) {
+                if (id.equals(sym) || id.equals(base) || id.equals(outline)
+                        || id.startsWith(base + dash_namepart)
+                        || id.equals(base + pattern_namepart)) {
                     last = id;
                 }
             }
@@ -1241,7 +1361,7 @@ public class MPLFeaturesUtils {
                                                final Style style,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap2,
-                                               @Nullable Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMapLineDash,
+                                               @Nullable Map<Integer, List<org.maplibre.android.style.layers.Layer>> layersHashMapLineDash,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> symbolsLayerHashMap,
                                                @Nullable com.nextgis.maplib.display.Style layerStyle,
                                                boolean changeLayer,
@@ -1258,7 +1378,7 @@ public class MPLFeaturesUtils {
                                                final Style style,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMap2,
-                                               @Nullable Map<Integer,org.maplibre.android.style.layers.Layer> layersHashMapLineDash,
+                                               @Nullable Map<Integer, List<org.maplibre.android.style.layers.Layer>> layersHashMapLineDash,
                                                Map<Integer,org.maplibre.android.style.layers.Layer> symbolsLayerHashMap,
                                                @Nullable com.nextgis.maplib.display.Style layerStyle,
                                                boolean changeLayer,
@@ -1276,6 +1396,12 @@ public class MPLFeaturesUtils {
         if (iLayer!= null){
             minZoom =((com.nextgis.maplib.map.Layer)iLayer).getMinZoom();
             maxZoom =((com.nextgis.maplib.map.Layer)iLayer).getMaxZoom();
+        }
+
+        float layerOpacityFactor = 1f;
+        if (iLayer instanceof com.nextgis.maplib.map.Layer) {
+            layerOpacityFactor = MplStyleMapper.alphaToOpacity(
+                    ((com.nextgis.maplib.map.Layer) iLayer).getLayerOpacity());
         }
 
         String currentNamePrefix = namePrefix;
@@ -1309,6 +1435,10 @@ public class MPLFeaturesUtils {
                 if (maxZoom!= -1)
                     rasterLayer.setMaxZoom(maxZoom + 1);
 
+                if (layerOpacityFactor < 0.999f) {
+                    rasterLayer.setProperties(PropertyFactory.rasterOpacity(layerOpacityFactor));
+                }
+
                 if (iLayer != null && iLayer instanceof  TMSLayer) {
 //                    TMSRenderer tmsRenderer = (TMSRenderer) ((TMSLayer) iLayer).getRenderer();
 //                    float alpha = tmsRenderer.getAlpha() / 255.0f; // stored value 0 - 255 // need for maplibre 0 - 1
@@ -1334,50 +1464,16 @@ public class MPLFeaturesUtils {
         org.maplibre.android.style.layers.Layer simbolLayer = null;
         org.maplibre.android.style.layers.Layer newLayer = null;
         org.maplibre.android.style.layers.Layer newLayer2 = null;
-        LineLayer newLayerDash = null;
+        List<LineLayer> dashLayers = new ArrayList<>();
+        FillLayer patternFillLayer = null;
 
-        String currentNamePrefixSymbol = "symbol-" +  namePrefix;
+        String currentNamePrefixSymbol = "symbol-" + namePrefix;
 
-        int fistFillColor = 0;
-        int outlineColor = 0;
-        float alpha  = 0.5f;
-        float thinkness = 3; // outline
+        MplLayerStyleVars styleVars = MplLayerStyleVars.from(layerStyle, layerType);
+        LabelAttributes layerLabelAttributes = LabelAttributes.fromStyle(layerStyle);
 
-        // dot
-        float rasuis = 6; // dot
-        int type = 0; // circle quadro triangle . // dash dot
-
-        // poly
-        boolean isFilled; // polygon - is filled
-
-        int textAlignment = ALIGN_TOP;
-        float textSize = 3;
-        int textColor = 0;
-
-        if (layerStyle!= null){
-            fistFillColor = layerStyle.getColor();
-            outlineColor = layerStyle.getOutColor();
-            alpha = layerStyle.getAlpha() / 256.0f;
-            thinkness = layerStyle.getWidth();
-
-            if (layerStyle instanceof SimpleMarkerStyle){ // dots
-                rasuis = ((SimpleMarkerStyle)layerStyle).getSize();
-                type = ((SimpleMarkerStyle)layerStyle).getType();
-                textAlignment = ((SimpleMarkerStyle) layerStyle).getTextAlignment();
-                textSize = ((SimpleMarkerStyle) layerStyle).getTextSize();
-                textColor = ((SimpleMarkerStyle) layerStyle).getTextColor();
-            }
-            if (layerStyle instanceof SimpleLineStyle){ //line
-                type = ((SimpleLineStyle)layerStyle).getType();
-                textColor = ( layerStyle).getOutColor();
-            }
-            if (layerStyle instanceof SimplePolygonStyle){ //line
-                isFilled = ((SimplePolygonStyle)layerStyle ).isFill();
-                if (!isFilled)
-                    alpha = 0.0f;
-            }
-        }
-
+        boolean ruleStyling = iLayer instanceof VectorLayer
+                && ((VectorLayer) iLayer).getRenderer() instanceof RuleFeatureRenderer;
 
         // polygon makes signature other way: - create points for polygones
         // - differ source for points () (layerPath + source_text)
@@ -1385,179 +1481,38 @@ public class MPLFeaturesUtils {
         // SymbolLayer for (layerPath + source_text) source
         boolean isPolygon = layerType == GTPolygon || layerType == GTMultiPolygon;
 
+        int textAlignment = styleVars.textAlignment;
+        float textSize = styleVars.textSize;
+        int textColor = styleVars.textColor;
+
+        MplLayerBuildContext buildContext = new MplLayerBuildContext(
+                layerId,
+                layerType,
+                style,
+                changeLayer,
+                layerPath,
+                currentNamePrefix,
+                layerOpacityFactor,
+                styleVars,
+                ruleStyling,
+                iLayer,
+                layersHashMap,
+                layersHashMap2,
+                layersHashMapLineDash);
+        MplLayerBuildResult buildResult = new MplLayerBuildResult();
+
         if (layerType == GeoConstants.GTPoint || layerType == GeoConstants.GTMultiPoint) {
-            String pointMainId = currentNamePrefix + layer_namepart + layerId;
-            if (changeLayer || style.getLayer(pointMainId) != null) {
-                newLayer = style.getLayer(pointMainId);
-            }
-            if (newLayer == null) {
-                newLayer = new CircleLayer(pointMainId, layerPath);
-            }
-
-            newLayer.setProperties(
-                        PropertyFactory.circleRadius(Expression.coalesce(
-                                Expression.get(prop_size), // rule
-                                Expression.literal(getMPLThinkness(rasuis)))),
-
-                        PropertyFactory.circleColor(Expression.coalesce(
-                        Expression.get(prop_color_fill), // rule
-                        Expression.literal(getColorName(fistFillColor)))),
-
-                        PropertyFactory.circleStrokeColor(Expression.coalesce(
-                                Expression.get(prop_color_stroke), // rule
-                                Expression.literal(getColorName(outlineColor)))),
-
-                        PropertyFactory.circleStrokeWidth(Expression.coalesce(
-                                Expression.get(prop_thinkness), // rule
-                                Expression.literal(getMPLThinkness(thinkness)))),
-                        PropertyFactory.circleStrokeOpacity(1f));
-
+            PointLayerFactory.build(buildContext, buildResult);
         } else if (layerType == GeoConstants.GTLineString || layerType == GeoConstants.GTMultiLineString) {
-            String lineMainId = currentNamePrefix + layer_namepart + layerId;
-            String lineDashId = currentNamePrefix + layer_namepart + layerId + dash_namepart;
-            String lineOutlineId = currentNamePrefix + layer_namepart + layerId + outline_namepart;
-            if (changeLayer) {
-                newLayer = style.getLayer(lineMainId);
-                if (layersHashMapLineDash != null) {
-                    newLayerDash = (LineLayer) style.getLayer(lineDashId);
-                }
-                newLayer2 = style.getLayer(lineOutlineId);
-            } else {
-                if (style.getLayer(lineMainId) != null) {
-                    newLayer = style.getLayer(lineMainId);
-                }
-                if (layersHashMapLineDash != null && style.getLayer(lineDashId) != null) {
-                    newLayerDash = (LineLayer) style.getLayer(lineDashId);
-                }
-                if (style.getLayer(lineOutlineId) != null) {
-                    newLayer2 = style.getLayer(lineOutlineId);
-                }
-            }
-            if (newLayer == null) {
-                newLayer = new LineLayer(lineMainId, layerPath);
-            }
-
-            if (layersHashMapLineDash != null && newLayerDash == null) {
-                newLayerDash = new LineLayer(lineDashId, layerPath);
-            }
-
-            if (newLayer2 == null) {
-                newLayer2 = new LineLayer(lineOutlineId, layerPath);
-            }
-
-            Expression lineTypeEffective = Expression.toNumber(Expression.coalesce(
-                    Expression.get(prop_type),
-                    Expression.literal((double) type)));
-
-            // Base line width (main + dash layers). Outline layer must be wider or it is fully covered (rules always set thinkness).
-            Expression lineWidthInner = Expression.coalesce(
-                    Expression.get(prop_thinkness),
-                    Expression.literal((double) getMPLThinkness(thinkness)));
-            // Match SimpleLineStyle.drawSolidEdgingLine: outer stroke is 3x inner width
-            Expression lineWidthOutline = Expression.product(
-                    lineWidthInner,
-                    Expression.literal(3.0));
-
-            if (layersHashMapLineDash != null) {
-                Expression filterSolid = Expression.neq(lineTypeEffective, Expression.literal(2.0));
-                Expression filterDash = Expression.eq(lineTypeEffective, Expression.literal(2.0));
-
-                ((LineLayer) newLayer).setFilter(filterSolid);
-                newLayerDash.setFilter(filterDash);
-
-                newLayer.setProperties(
-                        PropertyFactory.lineColor(Expression.coalesce(
-                                Expression.get(prop_color_fill), // rule
-                                Expression.literal(getColorName(fistFillColor)))),
-
-                        PropertyFactory.lineWidth(lineWidthInner));
-
-                newLayerDash.setProperties(
-                        PropertyFactory.lineColor(Expression.coalesce(
-                                Expression.get(prop_color_fill), // rule
-                                Expression.literal(getColorName(fistFillColor)))),
-
-                        PropertyFactory.lineWidth(lineWidthInner),
-
-                        PropertyFactory.lineDasharray(new Float[]{2f, 2f}));
-            } else {
-                newLayer.setProperties(
-                        PropertyFactory.lineColor(Expression.coalesce(
-                                Expression.get(prop_color_fill), // rule
-                                Expression.literal(getColorName(fistFillColor)))),
-
-                        PropertyFactory.lineWidth(lineWidthInner),
-
-                        PropertyFactory.lineDasharray(type == 2 ? new Float[]{2f, 2f} : null));
-            }
-
-            // outline - visible (alpha 1) if line style is edging solid (3); stroke color in textcolor for rules
-            if (layersHashMapLineDash != null) {
-                newLayer2.setProperties(
-                        PropertyFactory.lineColor(Expression.coalesce(
-                                Expression.get(prop_text_color), // rule: line outColor
-                                Expression.literal(getColorName(outlineColor)))),
-
-                        PropertyFactory.lineWidth(lineWidthOutline),
-
-                        PropertyFactory.lineOpacity(
-                                Expression.switchCase(
-                                        Expression.eq(lineTypeEffective, Expression.literal(3.0)),
-                                        Expression.literal(1.0),
-                                        Expression.literal(0.0))));
-            } else {
-                newLayer2.setProperties(
-                        PropertyFactory.lineColor(Expression.coalesce(
-                                Expression.get(prop_text_color), // rule: line outColor
-                                Expression.literal(getColorName(outlineColor)))),
-
-                        PropertyFactory.lineWidth(lineWidthOutline),
-
-                        PropertyFactory.lineOpacity(type == 3 ? 1.0f : 0.0f));
-            }
-
+            LineLayerFactory.build(buildContext, buildResult);
         } else if (layerType == GTPolygon || layerType == GeoConstants.GTMultiPolygon) {
-            String polyMainId = currentNamePrefix + layer_namepart + layerId;
-            String polyOutlineId = currentNamePrefix + layer_namepart + layerId + outline_namepart;
-            if (changeLayer) {
-                newLayer = style.getLayer(polyMainId);
-                newLayer2 = style.getLayer(polyOutlineId);
-            } else {
-                if (style.getLayer(polyMainId) != null) {
-                    newLayer = style.getLayer(polyMainId);
-                }
-                if (style.getLayer(polyOutlineId) != null) {
-                    newLayer2 = style.getLayer(polyOutlineId);
-                }
-            }
-            if (newLayer == null) {
-                newLayer = new FillLayer(polyMainId, layerPath);
-            }
-
-            if (newLayer2 == null) {
-                newLayer2 = new LineLayer(polyOutlineId, layerPath);
-            }
-
-            newLayer.setProperties(
-                            PropertyFactory.fillColor(Expression.coalesce(
-                                    Expression.get(prop_color_fill_rule), // rule
-                                    Expression.literal(getColorName(fistFillColor)))), // def value
-
-                                PropertyFactory.fillOpacity(Expression.coalesce(
-                                    Expression.get(prop_opacity), // rule
-                                    Expression.literal(alpha))));
-
-            newLayer2.setProperties(
-                                PropertyFactory.lineColor(
-                                        Expression.coalesce(
-                                                Expression.get(prop_color_stroke), // rule
-                                                Expression.literal(getColorName(outlineColor)))),
-
-                                PropertyFactory.lineWidth(Expression.coalesce(
-                                        Expression.get(prop_thinkness), // rule
-                                        Expression.literal(getMPLThinkness(thinkness))
-                                        )));
+            PolygonLayerFactory.build(buildContext, buildResult);
         }
+
+        newLayer = buildResult.mainLayer;
+        newLayer2 = buildResult.outlineLayer;
+        dashLayers = buildResult.dashLayers;
+        patternFillLayer = buildResult.patternFillLayer;
 
         // signatures turn on
         if (layerStyle!= null) {
@@ -1568,15 +1523,14 @@ public class MPLFeaturesUtils {
             // old - if signature always turn on for all layer (vector)
 
             boolean needSignatures = false;
-            boolean ruleSyling = false;
 
             if (iLayer instanceof  VectorLayer){
                 final VectorLayer vectorLayer = (VectorLayer)(iLayer);
-                if (vectorLayer.getRenderer() instanceof RuleFeatureRenderer ||
-                        !TextUtils.isEmpty(styleField) || !TextUtils.isEmpty(styleText)) {
+                LabelAttributes labelAttributes = LabelAttributes.fromStyle(layerStyle);
+                if (ruleStyling ||
+                        !TextUtils.isEmpty(styleField) || !TextUtils.isEmpty(styleText)
+                        || LabelTemplate.hasTemplate(labelAttributes.getLabelTemplate())) {
                 needSignatures = true;
-                if (vectorLayer.getRenderer() instanceof RuleFeatureRenderer)
-                    ruleSyling = true;
                 }
             }
 
@@ -1614,29 +1568,77 @@ public class MPLFeaturesUtils {
                     String[] font = {"Open Sans Regular"};
                     //String[] font = {"Roboto Regular"}; // no offline
 
-                    PropertyValue<String> placementProperty = null;
-                    if (layerType == GeoConstants.GTPoint || layerType == GeoConstants.GTMultiPoint || isPolygon)
+                    PropertyValue<String> placementProperty;
+                    PropertyValue<String> textRotationAlignmentProperty =
+                            PropertyFactory.textRotationAlignment(Property.TEXT_ROTATION_ALIGNMENT_AUTO);
+                    boolean isLineLayer = layerType == GeoConstants.GTLineString
+                            || layerType == GeoConstants.GTMultiLineString;
+                    if (layerType == GeoConstants.GTPoint || layerType == GeoConstants.GTMultiPoint || isPolygon) {
                         placementProperty = PropertyFactory.symbolPlacement(Property.SYMBOL_PLACEMENT_POINT);
-                    else
+                    } else if (isLineLayer) {
+                        if (layerLabelAttributes.isLineLabelRepeat()) {
+                            placementProperty = PropertyFactory.symbolPlacement(Property.SYMBOL_PLACEMENT_LINE);
+                        } else {
+                            placementProperty = PropertyFactory.symbolPlacement(
+                                    Property.SYMBOL_PLACEMENT_LINE_CENTER);
+                        }
+                        textRotationAlignmentProperty = PropertyFactory.textRotationAlignment(
+                                layerLabelAttributes.isLineLabelHorizontal()
+                                        ? Property.TEXT_ROTATION_ALIGNMENT_VIEWPORT
+                                        : Property.TEXT_ROTATION_ALIGNMENT_MAP);
+                    } else {
                         placementProperty = PropertyFactory.symbolPlacement(Property.SYMBOL_PLACEMENT_LINE);
+                    }
 
                     String anchor = getTextAnchor(textAlignment); // def - Property.TEXT_ANCHOR_TOP
                     Float[] offsets =  isPolygon? new Float[]{0.0f, 0f} :  getTextAnchorOffsets(textAlignment, textSize); // {0f, 0f};
 
+                    boolean allowOverlap = layerLabelAttributes.getTextAllowOverlap() != null
+                            ? layerLabelAttributes.getTextAllowOverlap()
+                            : false;
+                    boolean textOptional = layerLabelAttributes.isTextOptional();
+                    float symbolSpacing = layerLabelAttributes.getSymbolSpacing();
+                    float textMaxWidth = layerLabelAttributes.getTextMaxWidth();
+                    String haloColor = getColorName(layerLabelAttributes.getTextHaloColor());
+                    float haloWidth = layerLabelAttributes.getTextHaloWidth();
+                    float haloBlur = layerLabelAttributes.getTextHaloBlur();
+
+                    Expression textSizeExpression = buildTextSizeExpression(
+                            textSize, layerLabelAttributes, ruleStyling);
+                    float defaultTextOpacity = layerLabelAttributes != null
+                            ? layerLabelAttributes.textOpacityFloat()
+                            : 1f;
+                    Expression textOpacityExpression = ruleStyling
+                            ? MplStyleMapper.textOpacityExpression(
+                                    prop_text_opacity, defaultTextOpacity, layerOpacityFactor)
+                            : MplStyleMapper.textOpacityExpression(
+                                    defaultTextOpacity, layerOpacityFactor);
+
                     simbolLayer.setProperties(
                             signatureProperty,
 
-                            PropertyFactory.textSize(Expression.coalesce(
-                                    Expression.get(prop_text_textsize), // rule
-                                    Expression.literal((textSize + 3) * 3)  // def value
-                            )),
+                            PropertyFactory.textSize(textSizeExpression),
 
-                            PropertyFactory.symbolSpacing(15f), // less  = often
+                            PropertyFactory.textOpacity(textOpacityExpression),
+
+                            PropertyFactory.symbolSpacing(symbolSpacing),
 
                             PropertyFactory.textColor(Expression.coalesce(
                                     Expression.get(prop_text_color), // rule
                                     Expression.literal(getColorName(textColor))  // def value
                             )),
+
+                            PropertyFactory.textHaloColor(Expression.coalesce(
+                                    Expression.get(prop_texthalo_color),
+                                    Expression.literal(haloColor))),
+
+                            PropertyFactory.textHaloWidth(Expression.coalesce(
+                                    Expression.get(prop_texthalo_width),
+                                    Expression.literal(haloWidth > 0f ? haloWidth : 0f))),
+
+                            PropertyFactory.textHaloBlur(Expression.coalesce(
+                                    Expression.get(prop_texthalo_blur),
+                                    Expression.literal(haloBlur))),
 
                             PropertyFactory.textAnchor(Expression.coalesce(
                                     Expression.get(prop_text_textanchor), // rule
@@ -1644,86 +1646,122 @@ public class MPLFeaturesUtils {
                             )),
                             placementProperty,
 
+                            textRotationAlignmentProperty,
+
                             PropertyFactory.textOffset(Expression.coalesce(
                                     Expression.get(prop_text_textoffsets), // rule
                                     Expression.literal(offsets)  // def value
                             )),
 
-                            PropertyFactory.textAllowOverlap(true),
-                            PropertyFactory.textIgnorePlacement(true),
+                            PropertyFactory.textAllowOverlap(allowOverlap),
+                            PropertyFactory.textOptional(textOptional),
+                            PropertyFactory.textIgnorePlacement(allowOverlap && !textOptional),
+                            PropertyFactory.symbolSortKey(Expression.toNumber(Expression.get(prop_order))),
                             PropertyFactory.textFont(font),
-                            PropertyFactory.textMaxWidth(0f));
+                            PropertyFactory.textMaxWidth(textMaxWidth > 0f ? textMaxWidth : 0f));
                 }
             }
         }
 
         if (newLayer != null) {
-            if (!changeLayer) {
-                if (style.getLayer(newLayer.getId()) == null) {
-                    if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ) {
-                        style.addLayerBelow(newLayer, signaturesRootLayer.getId());
-                    }
-                    else {
-                        style.addLayer(newLayer);
-                    }
+            if (style.getLayer(newLayer.getId()) == null) {
+                if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ) {
+                    style.addLayerBelow(newLayer, signaturesRootLayer.getId());
                 }
-                layersHashMap.put(layerId, newLayer);
+                else {
+                    style.addLayer(newLayer);
+                }
+            }
+            layersHashMap.put(layerId, newLayer);
+        }
+
+        if (patternFillLayer != null) {
+            if (style.getLayer(patternFillLayer.getId()) == null) {
+                if (newLayer != null) {
+                    style.addLayerAbove(patternFillLayer, newLayer.getId());
+                } else if (signaturesRootLayer != null
+                        && style.getLayer(signaturesRootLayer.getId()) != null) {
+                    style.addLayerBelow(patternFillLayer, signaturesRootLayer.getId());
+                } else {
+                    style.addLayer(patternFillLayer);
+                }
             }
         }
 
         if (newLayer2 != null) {
-            if (!changeLayer) {
-                if (style.getLayer(newLayer2.getId()) == null) {
-                    if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null  && newLayer != null){
-                        if (layerType == GeoConstants.GTLineString || layerType == GeoConstants.GTMultiLineString)
-                            style.addLayerBelow (newLayer2, newLayer.getId());
-                        else
-                            style.addLayerBelow (newLayer2, signaturesRootLayer.getId());
+            if (style.getLayer(newLayer2.getId()) == null) {
+                if (newLayer != null
+                        && (layerType == GeoConstants.GTPoint || layerType == GeoConstants.GTMultiPoint)) {
+                    style.addLayerBelow(newLayer2, newLayer.getId());
+                } else if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null
+                        && newLayer != null) {
+                    if (layerType == GeoConstants.GTLineString || layerType == GeoConstants.GTMultiLineString) {
+                        style.addLayerBelow(newLayer2, newLayer.getId());
+                    } else {
+                        style.addLayerBelow(newLayer2, signaturesRootLayer.getId());
                     }
-                    else {
-                        style.addLayer(newLayer2);
-                    }
+                } else {
+                    style.addLayer(newLayer2);
                 }
-                layersHashMap2.put(layerId, newLayer2);
             }
+            layersHashMap2.put(layerId, newLayer2);
         }
 
-        if (newLayerDash != null && layersHashMapLineDash != null) {
-            if (!changeLayer) {
-                if (style.getLayer(newLayerDash.getId()) == null) {
-                    if (newLayer != null)
-                        style.addLayerAbove(newLayerDash, newLayer.getId());
-                    else if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null)
-                        style.addLayerBelow(newLayerDash, signaturesRootLayer.getId());
-                    else
-                        style.addLayer(newLayerDash);
+        if (!dashLayers.isEmpty() && layersHashMapLineDash != null) {
+            for (LineLayer dashLayer : dashLayers) {
+                if (style.getLayer(dashLayer.getId()) == null) {
+                    if (newLayer != null) {
+                        style.addLayerAbove(dashLayer, newLayer.getId());
+                    } else if (signaturesRootLayer != null
+                            && style.getLayer(signaturesRootLayer.getId()) != null) {
+                        style.addLayerBelow(dashLayer, signaturesRootLayer.getId());
+                    } else {
+                        style.addLayer(dashLayer);
+                    }
                 }
-                layersHashMapLineDash.put(layerId, newLayerDash);
             }
+            layersHashMapLineDash.put(layerId, new ArrayList<>(dashLayers));
         }
 
-        // set zoom for vector layer
-
+        // Layer geometry zoom (fill/line/circle)
         if (minZoom!= -1){
             if (newLayer != null)
                 newLayer.setMinZoom(minZoom);
-            if (newLayerDash != null)
-                newLayerDash.setMinZoom(minZoom);
+            if (patternFillLayer != null)
+                patternFillLayer.setMinZoom(minZoom);
+            for (LineLayer dashLayer : dashLayers) {
+                dashLayer.setMinZoom(minZoom);
+            }
             if (newLayer2 != null)
                 newLayer2.setMinZoom(minZoom);
-            if (simbolLayer != null)
-                simbolLayer.setMinZoom(minZoom);
         }
 
         if (maxZoom!= -1){
             if (newLayer != null)
                 newLayer.setMaxZoom(maxZoom);
-            if (newLayerDash != null)
-                newLayerDash.setMaxZoom(maxZoom);
+            if (patternFillLayer != null)
+                patternFillLayer.setMaxZoom(maxZoom);
+            for (LineLayer dashLayer : dashLayers) {
+                dashLayer.setMaxZoom(maxZoom);
+            }
             if (newLayer2 != null)
                 newLayer2.setMaxZoom(maxZoom);
-            if (simbolLayer != null)
+        }
+
+        // Label zoom can differ from layer geometry zoom
+        if (simbolLayer != null) {
+            float labelMinZoom = layerLabelAttributes.getLabelMinZoom();
+            float labelMaxZoom = layerLabelAttributes.getLabelMaxZoom();
+            if (labelMinZoom >= 0f) {
+                simbolLayer.setMinZoom(labelMinZoom);
+            } else if (minZoom != -1) {
+                simbolLayer.setMinZoom(minZoom);
+            }
+            if (labelMaxZoom >= 0f) {
+                simbolLayer.setMaxZoom(labelMaxZoom);
+            } else if (maxZoom != -1) {
                 simbolLayer.setMaxZoom(maxZoom);
+            }
         }
     }
 

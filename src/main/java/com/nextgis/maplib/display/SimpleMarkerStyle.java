@@ -79,6 +79,16 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
     protected String mText;
     protected int mTextAlignment;
     protected int mTextColor = Color.BLACK;
+    protected float mCircleBlur = MplStyleMapper.DEFAULT_CIRCLE_BLUR;
+    protected LabelAttributes mLabelAttributes = LabelAttributes.defaults();
+
+    public LabelAttributes getLabelAttributes() {
+        return mLabelAttributes;
+    }
+
+    public void setLabelAttributes(LabelAttributes labelAttributes) {
+        mLabelAttributes = labelAttributes != null ? labelAttributes : LabelAttributes.defaults();
+    }
 
     public SimpleMarkerStyle() {
         super();
@@ -104,8 +114,10 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
         obj.mTextSize = mTextSize;
         obj.mTextAlignment = mTextAlignment;
         obj.mTextColor = mTextColor;
+        obj.mCircleBlur = mCircleBlur;
         obj.mText = mText;
         obj.mField = mField;
+        obj.mLabelAttributes = mLabelAttributes.clone();
         return obj;
     }
 
@@ -383,6 +395,14 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
             mText = null;
     }
 
+    public float getCircleBlur() {
+        return mCircleBlur;
+    }
+
+    public void setCircleBlur(float circleBlur) {
+        mCircleBlur = Math.max(0f, circleBlur);
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject rootConfig = super.toJSON();
@@ -399,6 +419,10 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
         if (null != mField) {
             rootConfig.put(JSON_VALUE_KEY, mField);
         }
+        if (mCircleBlur > MplStyleMapper.DEFAULT_CIRCLE_BLUR) {
+            rootConfig.put(JSON_CIRCLE_BLUR_KEY, mCircleBlur);
+        }
+        mLabelAttributes.mergeInto(rootConfig);
 
         return rootConfig;
     }
@@ -418,6 +442,9 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
         if (jsonObject.has(JSON_VALUE_KEY)) {
             mField = jsonObject.getString(JSON_VALUE_KEY);
         }
+        mCircleBlur = (float) jsonObject.optDouble(
+                JSON_CIRCLE_BLUR_KEY, MplStyleMapper.DEFAULT_CIRCLE_BLUR);
+        mLabelAttributes.readFrom(jsonObject);
 
         setPaintsColors();
     }

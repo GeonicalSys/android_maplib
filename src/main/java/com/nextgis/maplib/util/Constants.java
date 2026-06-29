@@ -37,14 +37,29 @@ public interface Constants
     boolean DEBUG_MODE         = BuildConfig.DEBUG;
 
     /**
-     * Optional cold-start extras: disk render cache ({@code VectorLayerRenderCache}), parallel vector prep
-     * and timing logs in {@code MapDrawable.loadLayersToMaplibreMap}, default progress caption in
-     * {@code MapFragment}, and placeholder {@code HyperLog.setURL} in app/GISApplication.
-     * <p>{@code getGetingStyleInProgress} during {@code loadLayersToMaplibreMap} and {@code MapViewOverlays}
-     * deferral stay <b>always</b> on so collector batch reload and full style rebuild do not race.</p>
-     * <p><b>Currently off.</b> To resume extras: set to {@code true}, rebuild, and regression-test.</p>
+     * Disk render cache for vector layers ({@link com.nextgis.maplib.map.VectorLayerRenderCache}).
+     * Enabled on the sequential {@code loadLayersToMaplibreMap} path first; parallel prep is separate.
      */
-    boolean MAP_STARTUP_OPTIMIZATIONS_ENABLED = false;
+    boolean VECTOR_RENDER_DISK_CACHE_ENABLED = false;
+
+    /**
+     * Parallel {@code prepareVectorLayerForMaplibre} in a thread pool during startup.
+     * Keep {@code false} until disk cache passes on-device regression (see CUSTOMIZATIONS.md).
+     */
+    boolean MAP_STARTUP_PARALLEL_VECTOR_PREP = false;
+
+    /**
+     * Cold-start UX extras: timing logs in {@code MapDrawable.loadLayersToMaplibreMap}, default progress
+     * caption in {@code MapFragment}, placeholder {@code HyperLog.setURL} in app/GISApplication.
+     */
+    boolean MAP_STARTUP_UX_EXTRAS_ENABLED = VECTOR_RENDER_DISK_CACHE_ENABLED
+            || MAP_STARTUP_PARALLEL_VECTOR_PREP;
+
+    /**
+     * @deprecated Use {@link #VECTOR_RENDER_DISK_CACHE_ENABLED} and {@link #MAP_STARTUP_PARALLEL_VECTOR_PREP}.
+     */
+    @Deprecated
+    boolean MAP_STARTUP_OPTIMIZATIONS_ENABLED = MAP_STARTUP_UX_EXTRAS_ENABLED;
 
     int NGW_v3 = 3;
 
@@ -152,6 +167,30 @@ public interface Constants
     String JSON_TEXT_SIZE_KEY     = "text_size";
     String JSON_TEXT_ALIGN_KEY    = "text_alignment";
     String JSON_TEXT_COLOR_KEY    = "text_color";
+    String JSON_TEXT_MAX_WIDTH_KEY = "text_max_width";
+    String JSON_LABEL_HALO_COLOR_KEY = "text_halo_color";
+    String JSON_LABEL_HALO_WIDTH_KEY = "text_halo_width";
+    String JSON_LABEL_HALO_BLUR_KEY = "text_halo_blur";
+    String JSON_LABEL_SCALE_WITH_ZOOM_KEY = "text_scale_with_zoom";
+    String JSON_LABEL_ALLOW_OVERLAP_KEY = "text_allow_overlap";
+    String JSON_LABEL_OPTIONAL_KEY = "text_optional";
+    String JSON_LABEL_SPACING_KEY = "symbol_spacing";
+    String JSON_LABEL_TEMPLATE_KEY = "label_template";
+    String JSON_LABEL_MIN_ZOOM_KEY = "label_min_zoom";
+    String JSON_LABEL_MAX_ZOOM_KEY = "label_max_zoom";
+    String JSON_LINE_LABEL_REPEAT_KEY = "line_label_repeat";
+    String JSON_LINE_LABEL_HORIZONTAL_KEY = "line_label_horizontal";
+    String JSON_LINE_CAP_KEY = "line_cap";
+    String JSON_LINE_JOIN_KEY = "line_join";
+    String JSON_LINE_DASH_PRESET_KEY = "dash_preset";
+    String JSON_FILL_PATTERN_KEY = "fill_pattern";
+    String JSON_LAYER_OPACITY_KEY = "layer_opacity";
+    String JSON_LABEL_TEXT_OPACITY_KEY = "text_opacity";
+    String JSON_LINE_MITER_LIMIT_KEY = "line_miter_limit";
+    String JSON_CIRCLE_BLUR_KEY = "circle_blur";
+    String JSON_LINE_BLUR_KEY = "line_blur";
+    String JSON_RULE_KEY_IGNORE_CASE_KEY = "key_ignore_case";
+    String JSON_SCALE_SIZE_WITH_ZOOM_KEY = "scale_size_with_zoom";
     String JSON_DISPLAY_NAME      = "display_name";
     String JSON_RESOURCE_KEY      = "resource";
     String JSON_MESSAGE_KEY       = "message";

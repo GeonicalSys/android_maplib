@@ -55,6 +55,8 @@ import com.nextgis.maplib.util.AttachItem;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.DatabaseContext;
 import com.nextgis.maplib.util.ExistFeatureResult;
+import com.nextgis.maplib.util.NgwPullDecision;
+import com.nextgis.maplib.util.DistrictFilterUtil;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
 import com.nextgis.maplib.util.GeoConstants;
@@ -68,6 +70,7 @@ import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.ProgressBufferedInputStream;
 import com.nextgis.maplib.util.SettingsConstants;
+import com.nextgis.maplib.util.SyncResultUtil;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -170,6 +173,16 @@ public class NGWVectorLayer
     /** Log SQLite error text once per getChangesFromServer when createNewFeature insert fails. */
     private boolean mLoggedCreateInsertSqlError;
 
+    /** True when {@link #mServerWhere} was set from parent {@link LayerGroup} district filter (runtime only). */
+    private transient boolean mDistrictFilterActive;
+
+    /**
+     * District from import {@link LayerGroup} during fill, before the layer is attached to the group.
+     */
+    private transient String mCollectorDistrictOverride;
+
+    public static final String LOG_DISTRICT_FILTER = "DistrictFilter";
+
     public NGWVectorLayer(
             Context context,
             File path)
@@ -255,6 +268,53 @@ public class NGWVectorLayer
         mServerWhere = serverWhere;
     }
 
+    public boolean isDistrictFilterActive() {
+        return mDistrictFilterActive;
+    }
+
+    /**
+     * During collector import fill the layer is not yet in {@link LayerGroup}; pass district explicitly.
+     */
+    public void setCollectorDistrictOverride(String collectorDistrict) {
+        mCollectorDistrictOverride = TextUtils.isEmpty(collectorDistrict)
+                ? null
+                : collectorDistrict.trim();
+    }
+
+    /**
+     * Opt-in PostGIS district filter from parent {@link LayerGroup#getCollectorDistrict()}.
+     *
+     * @return {@code true} if {@code fld_district=} filter is active for this fill/pull
+     */
+    protected boolean applyDistrictFilterFromProjectGroup() {
+        String district = mCollectorDistrictOverride;
+        final String districtSource;
+        if (!TextUtils.isEmpty(district)) {
+            districtSource = "fill override";
+        } else {
+            district = LayerGroup.findCollectorDistrict(this);
+            districtSource = TextUtils.isEmpty(district) ? "none" : "parent group";
+        }
+        HyperLog.d(Constants.TAG, LOG_DISTRICT_FILTER + " layer=\"" + getName() + "\" remoteId=" + mRemoteId
+                + " districtSource=" + districtSource
+                + " district=" + (TextUtils.isEmpty(district) ? "<empty>" : district)
+                + " ngwLayerType=" + mNGWLayerType
+                + " postgisType=" + NGWResourceTypePostgisLayer);
+
+        DistrictFilterUtil.Decision decision = DistrictFilterUtil.resolveDistrictFilter(
+                mNGWLayerType, mFields, district);
+        mCollectorDistrictOverride = null;
+        mDistrictFilterActive = decision.active;
+        if (!decision.active) {
+            HyperLog.d(Constants.TAG, LOG_DISTRICT_FILTER + " OFF: " + decision.inactiveReason);
+            return false;
+        }
+        mServerWhere = decision.serverWhere;
+        mTracked = false;
+        HyperLog.d(Constants.TAG, LOG_DISTRICT_FILTER + " ON serverWhere=" + mServerWhere + " mTracked=false");
+        return true;
+    }
+
 
     public String getChangeTableName()    {
         return mPath.getName() + Constants.CHANGES_NAME_POSTFIX;
@@ -276,7 +336,9 @@ public class NGWVectorLayer
         rootConfig.put(Constants.JSON_ID_KEY, mRemoteId);
         rootConfig.put(JSON_SYNC_TYPE_KEY, mSyncType);
         rootConfig.put(JSON_NGWLAYER_TYPE_KEY, mNGWLayerType);
-        rootConfig.put(JSON_SERVERWHERE_KEY, mServerWhere);
+        if (!mDistrictFilterActive) {
+            rootConfig.put(JSON_SERVERWHERE_KEY, mServerWhere);
+        }
         rootConfig.put(JSON_TRACKED_KEY, mTracked);
         rootConfig.put(GeoConstants.GEOJSON_CRS, mCRS);
         rootConfig.put(JSON_SYNC_DIRECTION_KEY, mSyncDirection);
@@ -443,7 +505,11 @@ public class NGWVectorLayer
 
         create(geomType, fields);
 
+        applyDistrictFilterFromProjectGroup();
+
         String sURL = getFeaturesUrl(accountData);
+        HyperLog.d(Constants.TAG, LOG_DISTRICT_FILTER + " fill featuresUrl="
+                + sURL + (mDistrictFilterActive ? " (filtered)" : " (full pull)"));
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "download features from: " + sURL);
         }
@@ -557,6 +623,9 @@ public class NGWVectorLayer
             }
 
             mTracked = vectorLayerJSONObject.optBoolean(JSON_TRACKED_KEY);
+            if (mDistrictFilterActive) {
+                mTracked = false;
+            }
             save();
             notifyLayerChanged();
             VectorLayerRenderCache.invalidateOnDataChange(this);
@@ -578,7 +647,8 @@ public class NGWVectorLayer
             if (!hasLocalDataTable()) {
                 throw new NGException(getContext().getString(R.string.error_download_data));
             }
-            if (!jsonTruncated && !fillCanceled && serverExpectedFeatureCount >= 0) {
+            if (!jsonTruncated && !fillCanceled && serverExpectedFeatureCount >= 0
+                    && !mDistrictFilterActive) {
                 int rows = getSqliteTableRowCount();
                 if (rows >= 0 && rows != serverExpectedFeatureCount) {
                     String msg = getContext().getString(R.string.error_ngw_feature_count_mismatch,
@@ -759,7 +829,7 @@ public class NGWVectorLayer
             syncResult.stats.numAuthExceptions++;
         } catch (IOException e) {
             log(e, "replaceUuidWithUrl(): IOException: " + e.getMessage());
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
         }
     }
 
@@ -780,7 +850,6 @@ public class NGWVectorLayer
     {
 
         Log.d("SSYNC", "sync of " + getName());
-        syncResult.clear();
         if (0 != (mSyncType & Constants.SYNC_NONE) || mFields == null) {
             if (0 != (mSyncType & Constants.SYNC_NONE) && mFields != null) {
                 tryRefreshServerResourceMetaAndConfig();
@@ -1054,7 +1123,7 @@ public class NGWVectorLayer
     {
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachOnServer !mNet.isNetworkAvailable()");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markNetworkUnavailable(syncResult);
             return false;
         }
 
@@ -1086,7 +1155,7 @@ public class NGWVectorLayer
         } catch (IOException e) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: IOException " + e.getMessage());
             log(e, "changeAttachOnServer IOException");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
             syncResult.stats.numUpdates++;
             return false;
         } catch (IllegalStateException e) {
@@ -1111,7 +1180,7 @@ public class NGWVectorLayer
             SyncResult syncResult)
     {
         if (!mNet.isNetworkAvailable()) {
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markNetworkUnavailable(syncResult);
             return false;
         }
 
@@ -1127,7 +1196,7 @@ public class NGWVectorLayer
         } catch (IOException e) {
             HyperLog.v(Constants.TAG, "deleteAttachOnServer IOException: " + e.getMessage());
             log(e, "deleteAttachOnServer IOException");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
             syncResult.stats.numDeletes++;
             return false;
         } catch (IllegalStateException e) {
@@ -1153,7 +1222,7 @@ public class NGWVectorLayer
             SyncResult syncResult)
     {
         if (!mNet.isNetworkAvailable()) {
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markNetworkUnavailable(syncResult);
             return false;
         }
 
@@ -1232,7 +1301,7 @@ public class NGWVectorLayer
             }
             HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer IOException " + e.getMessage());
             log(e, "sendAttachOnServer IOException");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
             syncResult.stats.numInserts++;
             return false;
         }  catch (JSONException e) {
@@ -1412,9 +1481,14 @@ public class NGWVectorLayer
                 syncResult.stats.numParseExceptions++;
                 break;
             case 0:
-            default:
+                SyncResultUtil.markConnectFailed(syncResult);
+                break;
             case HttpURLConnection.HTTP_NOT_FOUND:
             case HttpURLConnection.HTTP_INTERNAL_ERROR:
+                syncResult.stats.numIoExceptions++;
+                syncResult.stats.numEntries++;
+                break;
+            default:
                 syncResult.stats.numIoExceptions++;
                 syncResult.stats.numEntries++;
                 break;
@@ -1520,6 +1594,8 @@ public class NGWVectorLayer
     private enum ConfigRefreshOutcome {
         CONTINUE_TO_FEATURES,
         FINISH_LAYERSYNC_OK,
+        /** Device has no network; pull cannot run. */
+        NETWORK_UNAVAILABLE,
     }
 
     /**
@@ -1530,7 +1606,7 @@ public class NGWVectorLayer
     private ConfigRefreshOutcome tryRefreshServerResourceMetaAndConfig() {
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " network is unavailable -stop getChangesFromServer");
-            return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
+            return ConfigRefreshOutcome.NETWORK_UNAVAILABLE;
         }
 
         if (Constants.DEBUG_MODE) {
@@ -1596,14 +1672,23 @@ public class NGWVectorLayer
                                             .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
                                     return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
                                 }
+                                boolean softUpdateIncomplete = false;
                                 if (configDiff.isSoftOnly()) {
                                     HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
                                             + " applying soft config update: " + configDiff);
                                     applySoftConfigUpdate(configDiff);
+                                    softUpdateIncomplete = wasLastSoftConfigUpdateIncomplete();
                                 }
-                                getPreferences().edit()
-                                        .putString(SettingsConstants.KEY_PREF_LAST_CONFIG_HASH, descHash)
-                                        .apply();
+                                if (softUpdateIncomplete) {
+                                    // A schema change (e.g. ALTER TABLE) failed; keep the old hash so
+                                    // the update is retried next sync instead of being marked applied.
+                                    HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                                            + " soft config update incomplete - not advancing config hash");
+                                } else {
+                                    getPreferences().edit()
+                                            .putString(SettingsConstants.KEY_PREF_LAST_CONFIG_HASH, descHash)
+                                            .apply();
+                                }
                             }
                         }
                     } catch (JSONException cfgEx) {
@@ -1642,28 +1727,43 @@ public class NGWVectorLayer
         int createNewFeatureCount = 0;
         mLoggedCreateInsertSqlError = false;
         HyperLog.v(Constants.TAG, "NGWVectorLayer: getChangesFromServer " + getName());
-        if (tryRefreshServerResourceMetaAndConfig() == ConfigRefreshOutcome.FINISH_LAYERSYNC_OK) {
+        ConfigRefreshOutcome refreshOutcome = tryRefreshServerResourceMetaAndConfig();
+        if (refreshOutcome == ConfigRefreshOutcome.NETWORK_UNAVAILABLE) {
+            SyncResultUtil.markNetworkUnavailable(syncResult);
             return true;
         }
+        if (refreshOutcome == ConfigRefreshOutcome.FINISH_LAYERSYNC_OK) {
+            return true;
+        }
+
+        applyDistrictFilterFromProjectGroup();
+
+        HyperLog.d(Constants.TAG, LOG_DISTRICT_FILTER + " sync layer=\"" + getName() + "\" remoteId=" + mRemoteId
+                + (mDistrictFilterActive ? " filtered serverWhere=" + mServerWhere : " no district filter"));
 
         List<Feature> features, added = new ArrayList<>(), deleted =  new ArrayList<>(), changed =  new ArrayList<>();
         List<Long> deleteItems = new ArrayList<>();
 
         ExistFeatureResult result =  getFeatures(syncResult, mTracked);
-        if (result == null) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " null from getFeatures - stop getChangesFromServer");
-
-            return false;
+        switch (NgwPullDecision.decide(result)) {
+            case ABORT_404:
+                HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " 404 from getFeatures - stop getChangesFromServer");
+                clearLayerSync(this);
+                return false;
+            case ABORT_FAILED:
+                // Pull failed (result null, or I/O / parse / OOM / connect): getFeatures already bumped
+                // syncResult.stats. Treating this as success would push local changes + advance the
+                // tracked timestamp as if the pull succeeded, permanently skipping server deltas.
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                        + " getFeatures failed (code=" + (result == null ? "null" : result.code)
+                        + ") - abort sync for this layer " + ProdLogUtil.formatSyncResultStats(syncResult));
+                return false;
+            case EMPTY_OK:
+                return true;
+            case PROCEED:
+            default:
+                break;
         }
-
-        if (result.code == 404){
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " 404 from getFeatures - stop getChangesFromServer");
-
-            clearLayerSync(this);
-            return false;
-        }
-        if (result.object == null) // no objects
-            return  true;
         if (! (result.object instanceof  HashMap)){
             return true;
         }
@@ -2212,10 +2312,14 @@ public class NGWVectorLayer
             return new ExistFeatureResult(null, false, 0);
         } catch (FileNotFoundException e) {
             log(e, "getFeatures(): FileNotFoundException");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
             return new ExistFeatureResult(null, false, 0);
-        } catch (IOException | NGException e) {
+        } catch (IOException e) {
             log(e, "getFeatures(): IOException");
+            SyncResultUtil.markConnectFailed(syncResult);
+            return new ExistFeatureResult(null, false, 0);
+        } catch (NGException e) {
+            log(e, "getFeatures(): NGException");
             syncResult.stats.numParseExceptions++;
             return new ExistFeatureResult(null, false, 0);
         } catch (OutOfMemoryError e) {
@@ -2247,6 +2351,19 @@ public class NGWVectorLayer
         reader.endArray();
     }
 
+    /**
+     * A pending change references a feature row that is not present locally, so we currently drop the
+     * change (treat as handled). Returning false instead would keep the change but risks a perpetual
+     * sync error when the row is genuinely orphaned. Logged at WARN with full context for diagnosis.
+     * TODO (further review): distinguish a transient query failure from a truly missing row and decide
+     * whether such changes should be repaired/retried rather than dropped.
+     */
+    private void logBuggyChangeDrop(String op, long featureId) {
+        HyperLog.w(Constants.TAG, op + ": missing local feature row, dropping pending change layer=\""
+                + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
+                + " fid=" + featureId);
+    }
+
     protected boolean addFeatureOnServer(
             long featureId,
             SyncResult syncResult,
@@ -2258,7 +2375,7 @@ public class NGWVectorLayer
 
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer !mNet.isNetworkAvailable() no network!!! ");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markNetworkUnavailable(syncResult);
             return false;
         }
         Uri uri = ContentUris.withAppendedId(getContentUri(), featureId);
@@ -2266,11 +2383,7 @@ public class NGWVectorLayer
 
         Cursor cursor = query(uri, null, null, null, "_id", null);
         if (null == cursor) {
-            if (Constants.DEBUG_MODE) {
-                Log.d(Constants.TAG, "addFeatureOnServer: Get cursor failed");
-            }
-            HyperLog.v(Constants.TAG, "addFeatureOnServer return true - just remove buggy data ");
-
+            logBuggyChangeDrop("addFeatureOnServer (null cursor)", featureId);
             return true; //just remove buggy data
         }
 
@@ -2310,10 +2423,7 @@ public class NGWVectorLayer
 
                 return true;
             } else {
-                if (Constants.DEBUG_MODE)
-                    Log.d(Constants.TAG, "addFeatureOnServer: Get cursor failed");
-                HyperLog.v(Constants.TAG, "addFeatureOnServer Get cursor failed // just remove buggy data") ;
-
+                logBuggyChangeDrop("addFeatureOnServer (empty cursor)", featureId);
                 return true; //just remove buggy data
             }
 
@@ -2325,7 +2435,7 @@ public class NGWVectorLayer
         } catch (IOException e) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer IOException: " + e.getMessage());
             log(e, "addFeatureOnServer IOException");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
             syncResult.stats.numInserts++;
             return false;
         } catch (SQLiteConstraintException e) {
@@ -2356,7 +2466,7 @@ public class NGWVectorLayer
     {
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "deleteFeatureOnServer !mNet.isNetworkAvailable()");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markNetworkUnavailable(syncResult);
             return false;
         }
 
@@ -2370,7 +2480,7 @@ public class NGWVectorLayer
         } catch (IOException e) {
             HyperLog.v(Constants.TAG, "deleteFeatureOnServer  IOException: " + e.getMessage());
             log(e, "deleteFeatureOnServer IOException");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
             syncResult.stats.numDeletes++;
             return false;
         } catch (IllegalStateException e) {
@@ -2396,7 +2506,7 @@ public class NGWVectorLayer
     {
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "changeFeatureOnServer !mNet.isNetworkAvailable()");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markNetworkUnavailable(syncResult);
             return false;
         }
 
@@ -2407,9 +2517,7 @@ public class NGWVectorLayer
         // get it's cursor
         Cursor cursor = query(uri, null, null, null, null, null);
         if (null == cursor) {
-            if (Constants.DEBUG_MODE) {
-                Log.d(Constants.TAG, "empty cursor for uri: " + uri);
-            }
+            logBuggyChangeDrop("changeFeatureOnServer (null cursor)", featureId);
             return true; //just remove buggy data
         }
 
@@ -2431,9 +2539,7 @@ public class NGWVectorLayer
 
                 return true;
             } else {
-                HyperLog.v(Constants.TAG, "changeFeatureOnServer empty cursor for uri: " + uri);
-                if (Constants.DEBUG_MODE)
-                    Log.d(Constants.TAG, "changeFeatureOnServer(), empty cursor for uri: " + uri);
+                logBuggyChangeDrop("changeFeatureOnServer (empty cursor)", featureId);
                 return true; //just remove buggy data
             }
         } catch (IllegalStateException e) {
@@ -2444,7 +2550,7 @@ public class NGWVectorLayer
         } catch (IOException e) {
             HyperLog.v(Constants.TAG, "changeFeatureOnServer IOException: " + e.getMessage());
             log(e, "changeFeatureOnServer IOException");
-            syncResult.stats.numIoExceptions++;
+            SyncResultUtil.markConnectFailed(syncResult);
             syncResult.stats.numUpdates++;
             return false;
         } catch (JSONException e) {

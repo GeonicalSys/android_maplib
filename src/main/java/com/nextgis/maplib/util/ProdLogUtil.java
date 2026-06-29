@@ -7,6 +7,7 @@ package com.nextgis.maplib.util;
 
 import android.content.SyncResult;
 import android.text.TextUtils;
+import android.util.Log;
 
 /**
  * Truncation and one-line diagnostics so release logs stay useful without huge payloads or CPU churn.
@@ -18,7 +19,49 @@ public final class ProdLogUtil {
     /** Max characters from a stack trace when embedded in a single log message (full trace via throwable). */
     public static final int MAX_CRASH_MESSAGE_CHARS = 2000;
 
+    /**
+     * Coarse breadcrumb of the currently running heavy operation (layer load / collector fill / etc.).
+     * Appended to crash headlines so an exported log shows which phase/layer was active at the crash.
+     * Best-effort and volatile; not a precise call stack.
+     */
+    private static volatile String sPhase = "";
+
     private ProdLogUtil() {
+    }
+
+    /** Set the current phase breadcrumb (e.g. "loadLayers layer=Точки"). Pass null/empty to clear. */
+    public static void setPhase(String phase) {
+        sPhase = phase == null ? "" : phase;
+    }
+
+    public static String getPhase() {
+        return sPhase;
+    }
+
+    /**
+     * Builds a single log message with the throwable's full stack trace (incl. cause chain via
+     * {@link Log#getStackTraceString}) embedded, capped to {@link #MAX_CRASH_MESSAGE_CHARS}.
+     * Needed because HyperLog persists only the message text to its DB/export, not the throwable.
+     * Newlines are preserved for readability (unlike {@link #truncateForLog}).
+     */
+    public static String withStack(String message, Throwable t) {
+        String head = message == null ? "" : message;
+        if (t == null) {
+            return head;
+        }
+        String stack = Log.getStackTraceString(t);
+        if (stack.length() > MAX_CRASH_MESSAGE_CHARS) {
+            stack = stack.substring(0, MAX_CRASH_MESSAGE_CHARS) + "…(len=" + stack.length() + ")";
+        }
+        return head.isEmpty() ? stack : head + "\n" + stack;
+    }
+
+    /**
+     * Full crash report for the uncaught-exception handler: headline (class/message/thread/phase)
+     * plus the bounded full stack trace, ready to persist as a single HyperLog message.
+     */
+    public static String crashReport(Thread thread, Throwable t) {
+        return withStack(crashHeadline(thread, t), t);
     }
 
     public static String truncateForLog(CharSequence s) {
@@ -77,6 +120,8 @@ public final class ProdLogUtil {
                 + " del=" + st.numDeletes
                 + " ent=" + st.numEntries
                 + " skip=" + st.numSkippedEntries
+                + " netOff=" + SyncResultUtil.hasNetworkUnavailable(sr)
+                + " connFail=" + SyncResultUtil.hasConnectFailed(sr)
                 + " delayUntil=" + sr.delayUntil;
     }
 
@@ -124,6 +169,11 @@ public final class ProdLogUtil {
         String msg = t.getMessage();
         String oneLine = t.getClass().getSimpleName()
                 + (TextUtils.isEmpty(msg) ? "" : ": " + truncateForLog(msg, 400));
-        return "Uncaught thread=" + (thread != null ? thread.getName() : "?") + " " + oneLine;
+        String headline = "Uncaught thread=" + (thread != null ? thread.getName() : "?") + " " + oneLine;
+        String phase = sPhase;
+        if (!TextUtils.isEmpty(phase)) {
+            headline += " | phase=" + truncateForLog(phase, 200);
+        }
+        return headline;
     }
 }

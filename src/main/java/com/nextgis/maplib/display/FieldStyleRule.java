@@ -31,21 +31,25 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class FieldStyleRule implements IStyleRule, IJSONStore {
     public static final String JSON_RULES_KEY = "rules";
     public static final String JSON_FIELD_KEY = "field";
+    public static final String JSON_OTHER_STYLE_KEY = "other_style";
 
     VectorLayer mLayer;
     Map<String, Style> mStyleRules;
     String mKey;
+    boolean mKeyIgnoreCase;
+    Style mOtherStyle;
 
     public FieldStyleRule(VectorLayer layer) {
         mLayer = layer;
-        mStyleRules = new TreeMap<>();
+        mStyleRules = new LinkedHashMap<>();
     }
 
     public void setKey(String key) {
@@ -56,20 +60,133 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
         return mKey;
     }
 
+    public boolean isKeyIgnoreCase() {
+        return mKeyIgnoreCase;
+    }
+
+    public void setKeyIgnoreCase(boolean keyIgnoreCase) {
+        mKeyIgnoreCase = keyIgnoreCase;
+    }
+
+    /** Trim whitespace; optionally fold case for rule lookup keys. */
+    public String normalizeKey(String rawKey) {
+        if (rawKey == null) {
+            return null;
+        }
+        String key = rawKey.trim();
+        if (mKeyIgnoreCase) {
+            key = key.toLowerCase(Locale.ROOT);
+        }
+        return key;
+    }
+
     public void setStyle(String value, Style style) {
-        mStyleRules.put(value, style);
+        mStyleRules.put(normalizeKey(value), style);
     }
 
     public Style getStyle(String value) {
-        return mStyleRules.get(value);
+        return mStyleRules.get(normalizeKey(value));
     }
 
     public void removeStyle(String value) {
-        mStyleRules.remove(value);
+        mStyleRules.remove(normalizeKey(value));
     }
 
     public Map<String, Style> getStyleRules() {
         return mStyleRules;
+    }
+
+    public Style getOtherStyle() {
+        return mOtherStyle;
+    }
+
+    public void setOtherStyle(Style otherStyle) {
+        mOtherStyle = otherStyle;
+    }
+
+    /** Style for features that do not match any rule category. */
+    public Style resolveOtherStyle(Style rendererFallback) {
+        return mOtherStyle != null ? mOtherStyle : rendererFallback;
+    }
+
+    public void applyStyleForFeatureId(Style target, long featureId, Style rendererFallback) {
+        if (mKey == null) {
+            return;
+        }
+
+        Feature feature = mLayer.getFeature(featureId);
+        String value = mKey.equals(Constants.FIELD_ID)
+                ? feature.getId() + ""
+                : feature.getFieldValueAsString(mKey);
+
+        Style source = null;
+        if (value != null) {
+            source = getStyle(value);
+        }
+        if (source == null) {
+            source = resolveOtherStyle(rendererFallback);
+        }
+        if (source != null) {
+            copyStyleParams(target, source);
+        }
+    }
+
+    public static void copyStyleParams(Style target, Style source) {
+        if (target == null || source == null) {
+            return;
+        }
+        if (target instanceof SimpleMarkerStyle && source instanceof SimpleMarkerStyle) {
+            SimpleMarkerStyle markerStyle = (SimpleMarkerStyle) target;
+            SimpleMarkerStyle ruleStyle = (SimpleMarkerStyle) source;
+            markerStyle.setColor(ruleStyle.getColor());
+            markerStyle.setOutColor(ruleStyle.getOutColor());
+            markerStyle.setType(ruleStyle.getType());
+            markerStyle.setSize(ruleStyle.getSize());
+            markerStyle.setWidth(ruleStyle.getWidth());
+            markerStyle.setText(ruleStyle.getText());
+            markerStyle.setField(ruleStyle.getField());
+            markerStyle.setTextColor(ruleStyle.getTextColor());
+            markerStyle.setAlpha(ruleStyle.getAlpha());
+            markerStyle.setOutAlpha(ruleStyle.getOutAlpha());
+            markerStyle.setScaleSizeWithZoom(ruleStyle.isScaleSizeWithZoom());
+            markerStyle.setCircleBlur(ruleStyle.getCircleBlur());
+            markerStyle.setLabelAttributes(ruleStyle.getLabelAttributes());
+        } else if (target instanceof SimpleLineStyle && source instanceof SimpleLineStyle) {
+            SimpleLineStyle lineStyle = (SimpleLineStyle) target;
+            SimpleLineStyle ruleStyle = (SimpleLineStyle) source;
+            lineStyle.setColor(ruleStyle.getColor());
+            lineStyle.setOutColor(ruleStyle.getOutColor());
+            lineStyle.setType(ruleStyle.getType());
+            lineStyle.setWidth(ruleStyle.getWidth());
+            lineStyle.setText(ruleStyle.getText());
+            lineStyle.setField(ruleStyle.getField());
+            lineStyle.setTextSize(ruleStyle.getTextSize());
+            lineStyle.setTextColor(ruleStyle.getTextColor());
+            lineStyle.setLineCap(ruleStyle.getLineCap());
+            lineStyle.setLineJoin(ruleStyle.getLineJoin());
+            lineStyle.setLineMiterLimit(ruleStyle.getLineMiterLimit());
+            lineStyle.setLineBlur(ruleStyle.getLineBlur());
+            lineStyle.setDashPreset(ruleStyle.getDashPreset());
+            lineStyle.setAlpha(ruleStyle.getAlpha());
+            lineStyle.setOutAlpha(ruleStyle.getOutAlpha());
+            lineStyle.setScaleSizeWithZoom(ruleStyle.isScaleSizeWithZoom());
+            lineStyle.setLabelAttributes(ruleStyle.getLabelAttributes());
+        } else if (target instanceof SimplePolygonStyle && source instanceof SimplePolygonStyle) {
+            SimplePolygonStyle polygonStyle = (SimplePolygonStyle) target;
+            SimplePolygonStyle ruleStyle = (SimplePolygonStyle) source;
+            polygonStyle.setColor(ruleStyle.getColor());
+            polygonStyle.setOutColor(ruleStyle.getOutColor());
+            polygonStyle.setWidth(ruleStyle.getWidth());
+            polygonStyle.setFill(ruleStyle.isFill());
+            polygonStyle.setFillPattern(ruleStyle.getFillPattern());
+            polygonStyle.setText(ruleStyle.getText());
+            polygonStyle.setTextSize(ruleStyle.getTextSize());
+            polygonStyle.setTextColor(ruleStyle.getTextColor());
+            polygonStyle.setField(ruleStyle.getField());
+            polygonStyle.setAlpha(ruleStyle.getAlpha());
+            polygonStyle.setOutAlpha(ruleStyle.getOutAlpha());
+            polygonStyle.setLabelAttributes(ruleStyle.getLabelAttributes());
+        }
     }
 
     @Override
@@ -81,40 +198,11 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
         String value = mKey.equals(Constants.FIELD_ID) ? feature.getId() + "" : feature.getFieldValueAsString(mKey);
 
         if (value != null) {
-            Style rule = mStyleRules.get(value);
+            Style rule = getStyle(value);
             if (rule == null)
                 return;
 
-            if (style instanceof SimpleMarkerStyle) {
-                SimpleMarkerStyle markerStyle = (SimpleMarkerStyle) style;
-                SimpleMarkerStyle ruleStyle = (SimpleMarkerStyle) rule;
-                markerStyle.setColor(ruleStyle.getColor());
-                markerStyle.setOutColor(ruleStyle.getOutColor());
-                markerStyle.setType(ruleStyle.getType());
-                markerStyle.setSize(ruleStyle.getSize());
-                markerStyle.setWidth(ruleStyle.getWidth());
-                markerStyle.setText(ruleStyle.getText());
-                markerStyle.setField(ruleStyle.getField());
-            } else if (style instanceof SimpleLineStyle) {
-                SimpleLineStyle lineStyle = (SimpleLineStyle) style;
-                SimpleLineStyle ruleStyle = (SimpleLineStyle) rule;
-                lineStyle.setColor(ruleStyle.getColor());
-                lineStyle.setOutColor(ruleStyle.getOutColor());
-                lineStyle.setType(ruleStyle.getType());
-                lineStyle.setWidth(ruleStyle.getWidth());
-                lineStyle.setText(ruleStyle.getText());
-                lineStyle.setField(ruleStyle.getField());
-            } else if (style instanceof SimplePolygonStyle) {
-                SimplePolygonStyle polygonStyle = (SimplePolygonStyle) style;
-                SimplePolygonStyle ruleStyle = (SimplePolygonStyle) rule;
-                polygonStyle.setColor(ruleStyle.getColor());
-                polygonStyle.setOutColor(ruleStyle.getOutColor());
-                polygonStyle.setWidth(ruleStyle.getWidth());
-                polygonStyle.setFill(ruleStyle.isFill());
-                polygonStyle.setText(ruleStyle.getText());
-                polygonStyle.setTextSize(ruleStyle.getTextSize());
-                polygonStyle.setField(ruleStyle.getField());
-            }
+            copyStyleParams(style, rule);
         }
     }
 
@@ -131,6 +219,12 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
 
         result.put(JSON_FIELD_KEY, mKey);
         result.put(JSON_RULES_KEY, rules);
+        if (mKeyIgnoreCase) {
+            result.put(Constants.JSON_RULE_KEY_IGNORE_CASE_KEY, true);
+        }
+        if (mOtherStyle != null) {
+            result.put(JSON_OTHER_STYLE_KEY, mOtherStyle.toJSON());
+        }
 
         return result;
     }
@@ -139,6 +233,9 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
     public void fromJSON(JSONObject jsonObject) throws JSONException {
         if (jsonObject.has(JSON_FIELD_KEY))
             mKey = jsonObject.getString(JSON_FIELD_KEY);
+
+        mKeyIgnoreCase = jsonObject.optBoolean(Constants.JSON_RULE_KEY_IGNORE_CASE_KEY, false);
+        mStyleRules.clear();
 
         if (jsonObject.has(JSON_RULES_KEY)) {
             JSONArray rules = jsonObject.getJSONArray(JSON_RULES_KEY);
@@ -150,17 +247,36 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
 
                     if (reference.get() != null) {
                         String value = ruleObject.getString(Constants.JSON_VALUE_KEY);
-                        mStyleRules.put(value, reference.get());
+                        setStyle(value, reference.get());
                     }
                 }
             } catch (JSONException e) {
                 e.printStackTrace();
             }
         }
+
+        if (jsonObject.has(JSON_OTHER_STYLE_KEY)) {
+            AtomicReference<Style> otherReference = new AtomicReference<>();
+            JSONObject otherWrapper = new JSONObject();
+            otherWrapper.put(SimpleFeatureRenderer.JSON_STYLE_KEY,
+                    jsonObject.getJSONObject(JSON_OTHER_STYLE_KEY));
+            SimpleFeatureRenderer.fromJSON(otherWrapper, otherReference);
+            mOtherStyle = otherReference.get();
+        } else {
+            mOtherStyle = null;
+        }
     }
 
     public void clearRules() {
         mStyleRules.clear();
+    }
+
+    public void renormalizeRuleKeys() {
+        Map<String, Style> snapshot = new LinkedHashMap<>(mStyleRules);
+        mStyleRules.clear();
+        for (Map.Entry<String, Style> entry : snapshot.entrySet()) {
+            mStyleRules.put(normalizeKey(entry.getKey()), entry.getValue());
+        }
     }
 
     public int size() {

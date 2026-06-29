@@ -289,13 +289,18 @@ public interface IGISApplication
      *        layers next to already-present siblings when the map stacks new layers at the top.
      * @param formIds server form id per layer, or 0 when the layer has no form (plain NGW fill)
      */
-    void registerCollectorImportBatch(
+    /**
+     * @return {@code true} if the batch was registered (verify/repair will run); {@code false} if the
+     *         input failed validation (caller must not import as a verified collector batch).
+     */
+    boolean registerCollectorImportBatch(
             int groupId,
             String accountName,
             long[] remoteIds,
             String[] names,
             String[] configJsons,
             long[] formIds,
+            boolean[] collectorEditables,
             long[] fullCollectorProjectRemoteIds);
 
     /**

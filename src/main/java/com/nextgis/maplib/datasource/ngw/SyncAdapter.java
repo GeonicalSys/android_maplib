@@ -53,7 +53,9 @@ import com.nextgis.maplib.map.TrackLayer;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.NGWUtil;
+import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.SettingsConstants;
+import com.nextgis.maplib.util.SyncResultUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -135,38 +137,148 @@ public class SyncAdapter
         Log.d("SSYNC", "super.onPerformSync for " + account.name);
         gisApp.setError(null, null, 0);
 
-        if (gisApp.isLayerFillServiceBusy()) {
-            HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync skipped (layer fill in progress) for " + account.name);
-            Log.d(TAG, "onPerformSync skipped: LayerFillService busy");
-            return;
-        }
-
-        gisApp.stopHandler();
-        HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync for" + account.name + " ngw part start");
-        Log.d(TAG, "onPerformSync");
-
-        MapContentProviderHelper mapContentProviderHelper =(MapContentProviderHelper) MapBase.getInstance();
-
-        getContext().sendBroadcast(
-                (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
-
-        mVersions = new HashMap<>();
-        HyperLog.v(Constants.TAG, "SyncAdapter: mapContentProviderHelper is " + mapContentProviderHelper);
-        if (null != mapContentProviderHelper) {
-            // FIXME Temporary fix till 3.0
-//            mapContentProviderHelper.load(); // reload map for deleted/added layers
-            Log.d("SSYNC", "mapContentProviderHelper!=null start sync" );
-
-            sync(account, mapContentProviderHelper, authority, syncResult, bundle);
-            if (!isCanceled()
-                    && (bundle == null || bundle.getString(ACTION_LPATH) == null)) {
-                syncNgwConfigForSyncDisabledLayers(
-                        account, mapContentProviderHelper, authority, syncResult);
+        // completePerformSync emits SYNC_FINISH (or SYNC_CANCELED) in the normal/offline-manual paths.
+        // Track that so the finally below can broadcast a safety SYNC_FINISH on any early return or
+        // uncaught failure — otherwise a UI spinner waiting on finish could hang forever.
+        boolean finishBroadcast = false;
+        try {
+            if (gisApp.isLayerFillServiceBusy()) {
+                HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync skipped (layer fill in progress) for " + account.name);
+                Log.d(TAG, "onPerformSync skipped: LayerFillService busy");
+                return;
             }
-        } else
-            Log.d("SSYNC", "mapContentProviderHelper=null" );
 
+            final boolean manualSync = isManualSync(bundle);
+            final NetworkUtil networkUtil = new NetworkUtil(getContext());
+            if (!networkUtil.isNetworkAvailable()) {
+                HyperLog.v(Constants.TAG, "SyncAdapter: aborted — network unavailable, manual=" + manualSync);
+                if (!manualSync) {
+                    return;
+                }
+                SyncResultUtil.beginSync();
+                try {
+                    gisApp.stopHandler();
+                    getContext().sendBroadcast(
+                            (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
+                    SyncResultUtil.markNetworkUnavailable(syncResult);
+                    completePerformSync(account, syncResult, (MapContentProviderHelper) MapBase.getInstance(), true);
+                    finishBroadcast = true;
+                } finally {
+                    SyncResultUtil.endSync();
+                }
+                return;
+            }
 
+            gisApp.stopHandler();
+            HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync for" + account.name + " ngw part start manual=" + manualSync);
+            Log.d(TAG, "onPerformSync");
+
+            SyncResultUtil.beginSync();
+            try {
+                MapContentProviderHelper mapContentProviderHelper = (MapContentProviderHelper) MapBase.getInstance();
+
+                getContext().sendBroadcast(
+                        (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
+
+                mVersions = new HashMap<>();
+                HyperLog.v(Constants.TAG, "SyncAdapter: mapContentProviderHelper is " + mapContentProviderHelper);
+                if (null != mapContentProviderHelper) {
+                    Log.d("SSYNC", "mapContentProviderHelper!=null start sync");
+
+                    sync(account, mapContentProviderHelper, authority, syncResult, bundle);
+                    if (!isCanceled()
+                            && (bundle == null || bundle.getString(ACTION_LPATH) == null)) {
+                        syncNgwConfigForSyncDisabledLayers(
+                                account, mapContentProviderHelper, authority, syncResult);
+                    }
+                } else {
+                    Log.d("SSYNC", "mapContentProviderHelper=null");
+                }
+
+                completePerformSync(account, syncResult, mapContentProviderHelper, manualSync);
+                finishBroadcast = true;
+            } finally {
+                SyncResultUtil.endSync();
+            }
+        } catch (Throwable t) {
+            // Never let a sync crash silently: log with stack and mark an I/O error so the framework
+            // reschedules instead of treating this as a clean success.
+            HyperLog.w(Constants.TAG, "SyncAdapter.onPerformSync uncaught for " + account.name, t);
+            syncResult.stats.numIoExceptions++;
+        } finally {
+            if (!finishBroadcast) {
+                Intent finish = new Intent(SYNC_FINISH).setPackage(getContext().getPackageName());
+                HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH (safety/early-exit) sent");
+                getContext().sendBroadcast(finish);
+            }
+        }
+    }
+
+    protected static boolean isManualSync(Bundle bundle) {
+        return bundle != null && bundle.getBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, false);
+    }
+
+    private void buildSyncErrorMessage(SyncResult syncResult) {
+        mError = "";
+        if (syncResult.stats.numIoExceptions > 0) {
+            mError += SyncResultUtil.ioErrorMessage(getContext(), syncResult);
+        }
+        if (syncResult.stats.numParseExceptions > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_parse);
+        }
+        if (syncResult.stats.numAuthExceptions > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.error_auth_and_forbidden);
+        }
+        if (syncResult.stats.numConflictDetectedExceptions > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_conflict);
+        }
+        if (syncResult.stats.numInserts > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_insert);
+        }
+        if (syncResult.stats.numUpdates > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_change);
+        }
+        if (syncResult.stats.numDeletes > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_delete);
+        }
+        if (syncResult.stats.numEntries > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_server);
+        }
+        if (syncResult.stats.numSkippedEntries > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_oom);
+        }
+    }
+
+    private void completePerformSync(
+            Account account,
+            SyncResult syncResult,
+            MapContentProviderHelper mapContentProviderHelper,
+            boolean manualSync)
+    {
         if (isCanceled()) {
             Log.d(Constants.TAG, "onPerformSync - SYNC_CANCELED is sent");
             HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_CANCELED is sent");
@@ -174,58 +286,24 @@ public class SyncAdapter
             return;
         }
 
-        mError = "";
-        if (syncResult.stats.numIoExceptions > 0)
-            mError += getContext().getString(R.string.sync_error_io);
-        if (syncResult.stats.numParseExceptions > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_parse);
-        }
-        if (syncResult.stats.numAuthExceptions > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.error_auth_and_forbidden);
-        }
-        if (syncResult.stats.numConflictDetectedExceptions > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_conflict);
-        }
-        if (syncResult.stats.numInserts > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_insert);
-        }
-        if (syncResult.stats.numUpdates > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_change);
-        }
-        if (syncResult.stats.numDeletes > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_delete);
-        }
-        if (syncResult.stats.numEntries > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_server);
-        }
-        if (syncResult.stats.numSkippedEntries > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_oom);
+        if (manualSync) {
+            buildSyncErrorMessage(syncResult);
+        } else {
+            mError = "";
+            if (syncResult.hasError()) {
+                HyperLog.v(Constants.TAG, "SyncAdapter: auto sync finished with errors (silent) "
+                        + ProdLogUtil.formatSyncResultStats(syncResult));
+            }
         }
 
         if (!TextUtils.isEmpty(mError) || syncResult.hasError()) {
             HyperLog.w(Constants.TAG, "SyncAdapter finish account=\""
-                    + ProdLogUtil.truncateForLog(account.name, 96) + "\" userMsg=\""
-                    + ProdLogUtil.truncateForLog(mError, 640) + "\" "
+                    + ProdLogUtil.truncateForLog(account.name, 96) + "\" manual=" + manualSync
+                    + " userMsg=\"" + ProdLogUtil.truncateForLog(mError, 640) + "\" "
                     + ProdLogUtil.formatSyncResultStats(syncResult));
         }
 
-        if (mapContentProviderHelper != null && TextUtils.isEmpty(mError) && !syncResult.hasError()) {
+        if (mapContentProviderHelper != null && !syncResult.hasError()) {
             final String accountNameHash = "_" + account.name.hashCode();
             SharedPreferences settings = getContext().getSharedPreferences(Constants.PREFERENCES, MODE_MULTI_PROCESS);
             SharedPreferences.Editor editor = settings.edit();
@@ -239,14 +317,14 @@ public class SyncAdapter
         Log.d("SSYNC", "onPerformSync END error - " + mError);
 
         Intent finish = new Intent(SYNC_FINISH);
-        if (!TextUtils.isEmpty(mError))
+        if (manualSync && !TextUtils.isEmpty(mError)) {
             finish.putExtra(EXCEPTION, mError);
-        HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH is sent / mError is " + (TextUtils.isEmpty(mError) ? null:mError));
+        }
+        HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH is sent / mError is "
+                + (TextUtils.isEmpty(mError) ? null : mError));
         finish.setPackage(getContext().getPackageName());
         getContext().sendBroadcast(finish);
-
-//        Log.e("RRFRSH", "SyncAdapter ngw - onPerformSync end");
-}
+    }
 
 
     /**
@@ -278,6 +356,10 @@ public class SyncAdapter
         boolean trackSync = mSharedPreferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, false);
 
         MapContentProviderHelper layerGroup =(MapContentProviderHelper) MapBase.getInstance();
+        if (layerGroup == null) {
+            Log.d("SSYNC", "isSomeToSync: map is null, nothing to sync");
+            return false;
+        }
         if (hasNgwVectorLayerForAccount(layerGroup, account.name)) {
             Log.d("SSYNC", "isSomeToSync result  true (has NGW vector for account)");
             return true;

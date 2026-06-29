@@ -33,6 +33,7 @@ import static com.nextgis.maplib.util.Constants.JSON_ALPHA_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_COLOR_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_OUTALPHA_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_OUTCOLOR_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_SCALE_SIZE_WITH_ZOOM_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_WIDTH_KEY;
 
 public abstract class Style implements IJSONStore, Cloneable {
@@ -41,6 +42,7 @@ public abstract class Style implements IJSONStore, Cloneable {
     protected int mOutColor;
     protected int mOuterAlpha = 255;
     protected int mInnerAlpha = 255;
+    protected boolean mScaleSizeWithZoom;
 
     public Style() {
         mWidth = 3;
@@ -53,6 +55,7 @@ public abstract class Style implements IJSONStore, Cloneable {
         obj.mOutColor = mOutColor;
         obj.mInnerAlpha = mInnerAlpha;
         obj.mOuterAlpha = mOuterAlpha;
+        obj.mScaleSizeWithZoom = mScaleSizeWithZoom;
         return obj;
     }
 
@@ -102,6 +105,9 @@ public abstract class Style implements IJSONStore, Cloneable {
         rootConfig.put(JSON_OUTCOLOR_KEY, mOutColor);
         rootConfig.put(JSON_ALPHA_KEY, mInnerAlpha);
         rootConfig.put(JSON_OUTALPHA_KEY, mOuterAlpha);
+        if (mScaleSizeWithZoom) {
+            rootConfig.put(JSON_SCALE_SIZE_WITH_ZOOM_KEY, true);
+        }
         return rootConfig;
     }
 
@@ -112,6 +118,7 @@ public abstract class Style implements IJSONStore, Cloneable {
         mOutColor = jsonObject.optInt(JSON_OUTCOLOR_KEY, mColor);
         mInnerAlpha = jsonObject.optInt(JSON_ALPHA_KEY, 255);
         mOuterAlpha = jsonObject.optInt(JSON_OUTALPHA_KEY, 255);
+        mScaleSizeWithZoom = jsonObject.optBoolean(JSON_SCALE_SIZE_WITH_ZOOM_KEY, false);
     }
 
     public int getAlpha() {
@@ -128,5 +135,13 @@ public abstract class Style implements IJSONStore, Cloneable {
 
     public void setOutAlpha(int alpha) {
         mOuterAlpha = alpha;
+    }
+
+    public boolean isScaleSizeWithZoom() {
+        return mScaleSizeWithZoom;
+    }
+
+    public void setScaleSizeWithZoom(boolean scaleSizeWithZoom) {
+        mScaleSizeWithZoom = scaleSizeWithZoom;
     }
 }

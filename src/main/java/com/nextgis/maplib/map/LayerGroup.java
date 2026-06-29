@@ -35,6 +35,7 @@ import com.nextgis.maplib.api.IRenderer;
 import com.nextgis.maplib.datasource.GeoEnvelope;
 import com.nextgis.maplib.datasource.GeoPoint;
 import com.nextgis.maplib.display.GISDisplay;
+import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.FileUtil;
 
@@ -61,16 +62,54 @@ import static com.nextgis.maplib.util.SettingsConstants.KEY_PREF_MAP_PATH;
 public class LayerGroup
         extends Layer
 {
+    protected static final String JSON_COLLECTOR_DISTRICT_KEY = "collector_district";
+
     protected final LinkedHashMap<Integer, ILayer> mLayers = new LinkedHashMap<>();
     protected LayerFactory mLayerFactory;
     protected int          mLayerDrawIndex;
     protected GISDisplay   mDisplay;
     protected OnAllLayersAddedListener mOnAllLayersAddedListener;
+    protected String       mCollectorDistrict;
 
 
     public interface OnAllLayersAddedListener
     {
         void onAllLayersAdded(LinkedHashMap<Integer, ILayer> layers);
+    }
+
+    /**
+     * Collector project district from {@code resmeta.items.district} (stored on import).
+     */
+    public String getCollectorDistrict() {
+        return mCollectorDistrict;
+    }
+
+    public void setCollectorDistrict(String collectorDistrict) {
+        mCollectorDistrict = TextUtils.isEmpty(collectorDistrict) ? null : collectorDistrict.trim();
+        HyperLog.d(Constants.TAG, NGWVectorLayer.LOG_DISTRICT_FILTER + " group=\"" + getName()
+                + "\" setCollectorDistrict="
+                + (mCollectorDistrict != null ? mCollectorDistrict : "<cleared>"));
+    }
+
+    /**
+     * Walks parent {@link LayerGroup} chain for the nearest non-empty {@link #getCollectorDistrict()}.
+     */
+    public static String findCollectorDistrict(ILayer layer) {
+        ILayer current = layer;
+        while (current != null) {
+            if (current instanceof LayerGroup) {
+                String district = ((LayerGroup) current).getCollectorDistrict();
+                if (!TextUtils.isEmpty(district)) {
+                    return district;
+                }
+            }
+            if (current instanceof Table) {
+                current = ((Table) current).getParent();
+            } else {
+                break;
+            }
+        }
+        return null;
     }
 
 
@@ -630,6 +669,9 @@ public class LayerGroup
             layerObject.put(JSON_PATH_KEY, layer.getPath().getName());
             jsonArray.put(layerObject);
         }
+        if (!TextUtils.isEmpty(mCollectorDistrict)) {
+            rootConfig.put(JSON_COLLECTOR_DISTRICT_KEY, mCollectorDistrict);
+        }
         return rootConfig;
     }
 
@@ -650,6 +692,12 @@ public class LayerGroup
             throws JSONException
     {
         super.fromJSON(jsonObject);
+
+        if (jsonObject.has(JSON_COLLECTOR_DISTRICT_KEY) && !jsonObject.isNull(JSON_COLLECTOR_DISTRICT_KEY)) {
+            setCollectorDistrict(jsonObject.optString(JSON_COLLECTOR_DISTRICT_KEY, null));
+        } else {
+            mCollectorDistrict = null;
+        }
 
         clearLayers();
 

@@ -356,7 +356,7 @@ public class GeoJSONUtil {
         layer.notifyLayerChanged();
     }
 
-    private static Feature readGeoJSONFeature(JsonReader reader, VectorLayer layer, boolean isWGS84) throws IOException {
+    private static Feature readGeoJSONFeature(JsonReader reader, VectorLayer layer, boolean isWGS84) throws IOException, NGException {
         Feature feature;
         if(layer.getFields() != null && !layer.getFields().isEmpty())
             feature = new Feature(Constants.NOT_FOUND, layer.getFields());
@@ -372,6 +372,7 @@ public class GeoJSONUtil {
             } else if (name.equals(GeoConstants.GEOJSON_GEOMETRY)) {
                 GeoGeometry geometry = GeoGeometryFactory.fromJsonStream(reader, crs);
                 if (null != geometry) {
+                    validateImportedGeometry(layer, geometry);
                     if (isWGS84) {
                         geometry.setCRS(GeoConstants.CRS_WGS84);
                         geometry.project(GeoConstants.CRS_WEB_MERCATOR);
@@ -385,6 +386,16 @@ public class GeoJSONUtil {
         }
         reader.endObject();
         return feature;
+    }
+
+    private static void validateImportedGeometry(VectorLayer layer, GeoGeometry geometry) throws NGException {
+        Integer error = MapUtil.polygonGeometryValidationError(geometry);
+        if (error != null) {
+            throw new NGException(layer.getContext().getString(error));
+        }
+        if (!geometry.isValid()) {
+            throw new NGException(layer.getContext().getString(R.string.error_geojson_invalid_geometry));
+        }
     }
 
 

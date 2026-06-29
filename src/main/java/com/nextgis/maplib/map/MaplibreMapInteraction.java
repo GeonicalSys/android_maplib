@@ -33,6 +33,11 @@ public interface MaplibreMapInteraction {
      */
     boolean reloadMapStyleAndLayersAfterLayerFillBatch();
 
+    /**
+     * Refresh MapLibre style layers and feature props for one vector layer (after style/settings change).
+     */
+    void reloadLayerStyle(int layerId);
+
     public  boolean getLongLongClickProcesses();
 
     public  void setLongLongClickProcesses(boolean longLongCLickPrecesses);

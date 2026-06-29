@@ -85,6 +85,7 @@ import com.nextgis.maplib.util.FileUtil;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.GeoJSONUtil;
 import com.nextgis.maplib.util.LayerUtil;
+import com.nextgis.maplib.util.NgwLayerConfigAdapter;
 import com.nextgis.maplib.util.MapUtil;
 import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NGWUtil;
@@ -194,7 +195,9 @@ public class VectorLayer
 {
     protected static final String JSON_GEOMETRY_TYPE_KEY = "geometry_type";
     protected static final String JSON_FIELDS_KEY        = "fields";
-    protected static final String JSON_EDITABLE_KEY      = "is_editable";
+    protected static final String JSON_EDITABLE_KEY           = "is_editable";
+    /** Collector project item policy (NGW «Редактируемый»); not the mobile edit-mode toggle. */
+    protected static final String JSON_COLLECTOR_EDITABLE_KEY = "collector_editable";
 
     protected static final String CONTENT_ATTACH_TYPE = "vnd.android.cursor.dir/*";
     protected static final String NO_SYNC             = "no_sync";
@@ -235,6 +238,8 @@ public class VectorLayer
     protected boolean mIsLocked;
 
     protected boolean mIsEditable;
+    /** When false, layer is display-only per collector project (not overridable via {@link #JSON_EDITABLE_KEY}). */
+    protected boolean mCollectorEditable = true;
 
     static final boolean useNewLargeDataload = true;
     /**
@@ -798,6 +803,7 @@ public class VectorLayer
     public void setRenderer(JSONObject jsonObject)
             throws JSONException
     {
+        NgwLayerConfigAdapter.adaptRenderer(jsonObject);
         String renderName = "";
         if (jsonObject.has(JSON_NAME_KEY)) {
             renderName = jsonObject.getString(JSON_NAME_KEY);
@@ -830,6 +836,7 @@ public class VectorLayer
                 ((RuleFeatureRenderer) mRenderer).setStyleRule(rule);
             }
         }
+        VectorLayerRenderCache.invalidateOnStyleChange(this);
     }
 
 
@@ -863,6 +870,7 @@ public class VectorLayer
         JSONObject rootConfig = super.toJSON();
         rootConfig.put(JSON_GEOMETRY_TYPE_KEY, mGeometryType);
         rootConfig.put(JSON_EDITABLE_KEY, mIsEditable);
+        rootConfig.put(JSON_COLLECTOR_EDITABLE_KEY, mCollectorEditable);
 
         if (null != mFields) {
             JSONArray fields = new JSONArray();
@@ -901,9 +909,11 @@ public class VectorLayer
     public void fromJSON(JSONObject jsonObject)
             throws JSONException, SQLiteException
     {
+        NgwLayerConfigAdapter.adaptLayerConfig(jsonObject);
         super.fromJSON(jsonObject);
         mGeometryType = jsonObject.getInt(JSON_GEOMETRY_TYPE_KEY);
         mIsEditable = jsonObject.optBoolean(JSON_EDITABLE_KEY, true);
+        mCollectorEditable = jsonObject.optBoolean(JSON_COLLECTOR_EDITABLE_KEY, true);
 
         if (jsonObject.has(JSON_FIELDS_KEY)) {
             mFields = new LinkedHashMap<>();
@@ -931,7 +941,17 @@ public class VectorLayer
         reloadCache();
 
         if (jsonObject.has(Constants.JSON_RENDERERPROPS_KEY)) {
-            setRenderer(jsonObject.getJSONObject(Constants.JSON_RENDERERPROPS_KEY));
+            try {
+                setRenderer(jsonObject.getJSONObject(Constants.JSON_RENDERERPROPS_KEY));
+            } catch (Throwable rendererEx) {
+                // A malformed / foreign / partially-unsupported renderer or style must not fail the
+                // whole layer load (which would silently drop the layer from the map). Fall back to the
+                // default renderer so old or unexpected configs stay visible, and log which layer failed.
+                HyperLog.w(Constants.TAG, "VectorLayer.fromJSON: renderer parse failed for layer=\""
+                        + getName() + "\" - using default renderer", rendererEx);
+                mRenderer = null;
+                setDefaultRenderer();
+            }
         } else {
             setDefaultRenderer();
         }
@@ -2275,6 +2295,20 @@ public class VectorLayer
         mIsEditable = isEditable;
     }
 
+    /** Collector project «Редактируемый» policy (default true for non-collector layers). */
+    public boolean isCollectorEditable() {
+        return mCollectorEditable;
+    }
+
+    public void setCollectorEditable(boolean collectorEditable) {
+        mCollectorEditable = collectorEditable;
+    }
+
+    /** Whether the user may create or edit features (collector policy; independent of {@link #isEditable()}). */
+    public boolean isEditingAllowed() {
+        return mCollectorEditable;
+    }
+
     public boolean isFieldsInitialized() {
         return mFields != null;
     }
@@ -2311,7 +2345,20 @@ public class VectorLayer
      * @param diff result from {@link com.nextgis.maplib.util.LayerConfigDiff#compare}
      * @return true if any changes were applied
      */
+    /** Set by {@link #applySoftConfigUpdate} when an ALTER TABLE (added column) failed to apply. */
+    private boolean mLastSoftConfigAlterFailed = false;
+
+    /**
+     * @return true if the most recent {@link #applySoftConfigUpdate} left a schema change unapplied
+     *         (e.g. ALTER TABLE failed). Callers should not advance the persisted config hash so the
+     *         update is retried on the next sync.
+     */
+    public boolean wasLastSoftConfigUpdateIncomplete() {
+        return mLastSoftConfigAlterFailed;
+    }
+
     public boolean applySoftConfigUpdate(com.nextgis.maplib.util.LayerConfigDiff diff) {
+        mLastSoftConfigAlterFailed = false;
         if (diff == null || diff.isMatch() || diff.isHard()) {
             return false;
         }
@@ -2332,7 +2379,11 @@ public class VectorLayer
                     Log.i(TAG, "applySoftConfigUpdate: added column " + newField.getName());
                 }
             } catch (Exception e) {
-                Log.w(TAG, "applySoftConfigUpdate: ALTER TABLE failed for " + newField.getName(), e);
+                // Keep schema drift visible in the exported log and signal the caller not to advance
+                // the config hash, so this ALTER is retried on the next sync.
+                mLastSoftConfigAlterFailed = true;
+                HyperLog.w(Constants.TAG, "applySoftConfigUpdate: ALTER TABLE failed for "
+                        + newField.getName() + " layer=\"" + getName() + "\"", e);
             }
         }
 
@@ -2346,12 +2397,26 @@ public class VectorLayer
 
         if (diff.isRendererChanged() && cfg.has(Constants.JSON_RENDERERPROPS_KEY)) {
             try {
-                setRenderer(cfg.getJSONObject(Constants.JSON_RENDERERPROPS_KEY));
+                JSONObject renderer = cfg.getJSONObject(Constants.JSON_RENDERERPROPS_KEY);
+                NgwLayerConfigAdapter.adaptRenderer(renderer);
+                setRenderer(renderer);
                 changed = true;
                 Log.i(TAG, "applySoftConfigUpdate: renderer updated");
             } catch (JSONException e) {
                 Log.w(TAG, "applySoftConfigUpdate: renderer update failed", e);
             }
+        }
+
+        if (diff.isLayerOpacityChanged() && cfg.has(Constants.JSON_LAYER_OPACITY_KEY)) {
+            setLayerOpacity(cfg.optInt(Constants.JSON_LAYER_OPACITY_KEY, 255));
+            changed = true;
+            Log.i(TAG, "applySoftConfigUpdate: layer_opacity updated");
+        }
+
+        if (diff.isEditableChanged() && cfg.has(JSON_EDITABLE_KEY)) {
+            setIsEditable(cfg.optBoolean(JSON_EDITABLE_KEY, true));
+            changed = true;
+            Log.i(TAG, "applySoftConfigUpdate: is_editable updated");
         }
 
         if (diff.isVisibilityChanged() && cfg.has(Constants.JSON_VISIBILITY_KEY)) {
@@ -2377,6 +2442,10 @@ public class VectorLayer
 
         if (changed) {
             save();
+            if (diff.isRendererChanged() || diff.isZoomChanged() || diff.isVisibilityChanged()
+                    || diff.isLayerOpacityChanged() || diff.isEditableChanged()) {
+                notifyLayerChanged();
+            }
         }
         return changed;
     }

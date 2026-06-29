@@ -36,6 +36,8 @@ import com.nextgis.maplib.datasource.GeoEnvelope;
 import com.nextgis.maplib.datasource.GeoGeometry;
 import com.nextgis.maplib.datasource.GeoMultiPolygon;
 import com.nextgis.maplib.datasource.GeoPolygon;
+
+import androidx.annotation.Nullable;
 import com.nextgis.maplib.datasource.TileItem;
 
 import org.json.JSONException;
@@ -292,41 +294,51 @@ public class MapUtil {
 
 
     public static boolean isGeometryIntersects(Context context, GeoGeometry geometry) {
+        Integer error = polygonGeometryValidationError(geometry);
+        if (error != null) {
+            Toast.makeText(context, error, Toast.LENGTH_SHORT).show();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @return string resource id for the first polygon validation error, or null if geometry is ok
+     */
+    @Nullable
+    public static Integer polygonGeometryValidationError(GeoGeometry geometry) {
         if (geometry instanceof GeoPolygon) {
-            if (((GeoPolygon) geometry).intersects()) {
-                Toast.makeText(context, R.string.self_intersection, Toast.LENGTH_SHORT).show();
-                return true;
-            }
-
-            if (!((GeoPolygon) geometry).isHolesInside()) {
-                Toast.makeText(context, R.string.ring_outside, Toast.LENGTH_SHORT).show();
-                return true;
-            }
-
-            if (((GeoPolygon) geometry).isHolesIntersect()) {
-                Toast.makeText(context, R.string.rings_intersection, Toast.LENGTH_SHORT).show();
-                return true;
-            }
+            return polygonPartValidationError((GeoPolygon) geometry);
         }
 
         if (geometry instanceof GeoMultiPolygon) {
-            if (((GeoMultiPolygon) geometry).isSelfIntersects()) {
-                Toast.makeText(context, R.string.self_intersection, Toast.LENGTH_SHORT).show();
-                return true;
-            }
-
-            if (!((GeoMultiPolygon) geometry).isHolesInside()) {
-                Toast.makeText(context, R.string.ring_outside, Toast.LENGTH_SHORT).show();
-                return true;
-            }
-
-            if (((GeoMultiPolygon) geometry).isHolesIntersect()) {
-                Toast.makeText(context, R.string.rings_intersection, Toast.LENGTH_SHORT).show();
-                return true;
+            GeoMultiPolygon multiPolygon = (GeoMultiPolygon) geometry;
+            for (int i = 0; i < multiPolygon.size(); i++) {
+                GeoGeometry part = multiPolygon.get(i);
+                if (part instanceof GeoPolygon) {
+                    Integer error = polygonPartValidationError((GeoPolygon) part);
+                    if (error != null) {
+                        return error;
+                    }
+                }
             }
         }
 
-        return false;
+        return null;
+    }
+
+    @Nullable
+    private static Integer polygonPartValidationError(GeoPolygon polygon) {
+        if (polygon.intersects()) {
+            return R.string.self_intersection;
+        }
+        if (!polygon.isHolesInside()) {
+            return R.string.ring_outside;
+        }
+        if (polygon.isHolesIntersect()) {
+            return R.string.rings_intersection;
+        }
+        return null;
     }
 
     public final static Date convertTime(final Date currentTime, TimeZone sourceTimeZone, TimeZone targetTimeZone) {

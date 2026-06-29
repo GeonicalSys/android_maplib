@@ -22,6 +22,7 @@ package com.nextgis.maplib.datasource.ngw;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.hypertrack.hyperlog.HyperLog;
@@ -29,6 +30,7 @@ import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.HttpResponse;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.NgwResmetaUtil;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -47,10 +49,12 @@ public class CollectorResource extends Resource {
 
     private final List<LayerWithStyles> mLayers = new ArrayList<>();
     private final Set<Long> mResolvedLayerRemoteIds = new HashSet<>();
+    private String mProjectDistrict;
 
     public CollectorResource(JSONObject json, Connection connection) {
         super(json, connection);
         try {
+            applyEnvelopeMetadata(json);
             JSONObject collectorProject = extractCollectorProject(json);
             if (collectorProject != null) {
                 parseCollectorProject(collectorProject);
@@ -107,6 +111,22 @@ public class CollectorResource extends Resource {
         return Collections.unmodifiableList(mLayers);
     }
 
+    /**
+     * Collector project district from NGW {@code resmeta.items.district} (Latin, e.g. {@code vologda}).
+     */
+    public String getProjectDistrict() {
+        return mProjectDistrict;
+    }
+
+    private void applyEnvelopeMetadata(JSONObject envelope) {
+        String district = NgwResmetaUtil.getResmetaItemString(envelope, "district");
+        if (!TextUtils.isEmpty(district)) {
+            mProjectDistrict = district;
+            HyperLog.d(Constants.TAG, "CollectorResource \"" + getName() + "\" resmeta district="
+                    + mProjectDistrict);
+        }
+    }
+
     private static JSONObject extractCollectorProject(JSONObject envelope) {
         JSONObject res = envelope.optJSONObject("resource");
         if (res != null && res.has("collector_project")) {
@@ -125,6 +145,7 @@ public class CollectorResource extends Resource {
                 return;
             }
             JSONObject full = new JSONObject(response.getResponseBody());
+            applyEnvelopeMetadata(full);
             JSONObject cp = extractCollectorProject(full);
             if (cp != null) {
                 parseCollectorProject(cp);
@@ -178,19 +199,62 @@ public class CollectorResource extends Resource {
 
     private void tryConsumeCollectorItem(JSONObject item) {
         try {
+            final boolean collectorEditable = parseCollectorItemEditable(item);
             if (item.has("resource")) {
                 JSONObject wrapped = wrapResourceIfNeeded(item);
-                tryAddLayerFromWrapped(wrapped);
+                tryAddLayerFromWrapped(wrapped, collectorEditable);
                 return;
             }
             long rid = extractLayerResourceId(item);
             if (rid > 0) {
-                tryFetchAndAddLayer(rid);
+                tryFetchAndAddLayer(rid, collectorEditable);
             }
         } catch (JSONException e) {
             Log.e(TAG, "tryConsumeCollectorItem", e);
             HyperLog.exception(Constants.TAG, e);
         }
+    }
+
+    /**
+     * NGW collector item «Редактируемый» — not the vector layer description {@code is_editable}.
+     */
+    private boolean parseCollectorItemEditable(JSONObject item) {
+        final String[] keys = {"editable", "layer_editable", "is_editable"};
+        String resolvedKey = null;
+        boolean value = true;
+        for (String k : keys) {
+            if (item.has(k) && !item.isNull(k)) {
+                value = item.optBoolean(k, true);
+                resolvedKey = k;
+                break;
+            }
+        }
+        long layerRid = extractLayerResourceId(item);
+        if (item.has("resource")) {
+            JSONObject res = item.optJSONObject("resource");
+            if (res != null) {
+                long v = readIdKey(res, "id");
+                if (v > 0) {
+                    layerRid = v;
+                }
+            }
+        }
+        if (Constants.DEBUG_MODE && resolvedKey == null) {
+            java.util.Iterator<String> it = item.keys();
+            StringBuilder keyList = new StringBuilder();
+            while (it.hasNext()) {
+                if (keyList.length() > 0) {
+                    keyList.append(',');
+                }
+                keyList.append(it.next());
+            }
+            HyperLog.d(Constants.TAG, "CollectorResource item editable parse layerRid=" + layerRid
+                    + " no editable key; itemKeys=" + keyList);
+        } else {
+            HyperLog.d(Constants.TAG, "CollectorResource item editable parse layerRid=" + layerRid
+                    + " key=" + resolvedKey + " value=" + value);
+        }
+        return value;
     }
 
     private long extractLayerResourceId(JSONObject item) {
@@ -223,7 +287,7 @@ public class CollectorResource extends Resource {
         }
     }
 
-    private void tryFetchAndAddLayer(long resourceId) {
+    private void tryFetchAndAddLayer(long resourceId, boolean collectorEditable) {
         try {
             if (mResolvedLayerRemoteIds.contains(resourceId)) {
                 return;
@@ -232,7 +296,7 @@ public class CollectorResource extends Resource {
             if (envelope == null) {
                 return;
             }
-            tryAddLayerFromWrapped(envelope);
+            tryAddLayerFromWrapped(envelope, collectorEditable);
         } catch (JSONException | IOException e) {
             Log.e(TAG, "tryFetchAndAddLayer", e);
             HyperLog.exception(Constants.TAG, e);
@@ -262,7 +326,7 @@ public class CollectorResource extends Resource {
         return null;
     }
 
-    private void tryAddLayerFromWrapped(JSONObject envelope) throws JSONException {
+    private void tryAddLayerFromWrapped(JSONObject envelope, boolean collectorEditable) throws JSONException {
         JSONObject wrapped = wrapResourceIfNeeded(envelope);
         LayerWithStyles layer = new LayerWithStyles(wrapped, mConnection);
         int t = layer.getType();
@@ -277,6 +341,7 @@ public class CollectorResource extends Resource {
         if (mResolvedLayerRemoteIds.contains(rid)) {
             return;
         }
+        layer.setCollectorEditable(collectorEditable);
         layer.fillExtent();
         layer.fillStyles();
         ensureDescriptionFromServer(layer);
