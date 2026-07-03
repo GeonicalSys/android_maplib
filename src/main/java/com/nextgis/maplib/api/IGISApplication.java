@@ -288,6 +288,8 @@ public interface IGISApplication
      *        in project list order (as returned by the collector resource). Used to insert new or repaired
      *        layers next to already-present siblings when the map stacks new layers at the top.
      * @param formIds server form id per layer, or 0 when the layer has no form (plain NGW fill)
+     * @param collectorProjectUid persistent project uid stored in each imported layer origin; used by future
+     *        Collector composition/form sync and by repair tasks to preserve project ownership metadata.
      */
     /**
      * @return {@code true} if the batch was registered (verify/repair will run); {@code false} if the
@@ -296,6 +298,7 @@ public interface IGISApplication
     boolean registerCollectorImportBatch(
             int groupId,
             String accountName,
+            String collectorProjectUid,
             long[] remoteIds,
             String[] names,
             String[] configJsons,

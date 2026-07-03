@@ -63,6 +63,7 @@ public class LayerGroup
         extends Layer
 {
     protected static final String JSON_COLLECTOR_DISTRICT_KEY = "collector_district";
+    protected static final String JSON_COLLECTOR_PROJECT_KEY = "collector_project";
 
     protected final LinkedHashMap<Integer, ILayer> mLayers = new LinkedHashMap<>();
     protected LayerFactory mLayerFactory;
@@ -70,6 +71,7 @@ public class LayerGroup
     protected GISDisplay   mDisplay;
     protected OnAllLayersAddedListener mOnAllLayersAddedListener;
     protected String       mCollectorDistrict;
+    protected CollectorProjectMetadata mCollectorProjectMetadata;
 
 
     public interface OnAllLayersAddedListener
@@ -89,6 +91,23 @@ public class LayerGroup
         HyperLog.d(Constants.TAG, NGWVectorLayer.LOG_DISTRICT_FILTER + " group=\"" + getName()
                 + "\" setCollectorDistrict="
                 + (mCollectorDistrict != null ? mCollectorDistrict : "<cleared>"));
+    }
+
+    /**
+     * Persistent identity of the imported Collector project represented by this group.
+     *
+     * Collector architecture foundation: future project-composition sync and project switching
+     * depend on this even though the current runtime only uses the district immediately.
+     */
+    public CollectorProjectMetadata getCollectorProjectMetadata() {
+        return mCollectorProjectMetadata;
+    }
+
+    public void setCollectorProjectMetadata(CollectorProjectMetadata metadata) {
+        mCollectorProjectMetadata = metadata != null && metadata.isValid() ? metadata : null;
+        if (mCollectorProjectMetadata != null) {
+            setCollectorDistrict(mCollectorProjectMetadata.getDistrict());
+        }
     }
 
     /**
@@ -693,6 +712,9 @@ public class LayerGroup
         if (!TextUtils.isEmpty(mCollectorDistrict)) {
             rootConfig.put(JSON_COLLECTOR_DISTRICT_KEY, mCollectorDistrict);
         }
+        if (mCollectorProjectMetadata != null && mCollectorProjectMetadata.isValid()) {
+            rootConfig.put(JSON_COLLECTOR_PROJECT_KEY, mCollectorProjectMetadata.toJSON());
+        }
         return rootConfig;
     }
 
@@ -718,6 +740,11 @@ public class LayerGroup
             setCollectorDistrict(jsonObject.optString(JSON_COLLECTOR_DISTRICT_KEY, null));
         } else {
             mCollectorDistrict = null;
+        }
+        mCollectorProjectMetadata = CollectorProjectMetadata.fromJSON(
+                jsonObject.optJSONObject(JSON_COLLECTOR_PROJECT_KEY));
+        if (mCollectorProjectMetadata != null && TextUtils.isEmpty(mCollectorDistrict)) {
+            setCollectorDistrict(mCollectorProjectMetadata.getDistrict());
         }
 
         clearLayers();

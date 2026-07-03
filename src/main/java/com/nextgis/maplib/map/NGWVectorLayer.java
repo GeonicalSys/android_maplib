@@ -134,6 +134,7 @@ public class NGWVectorLayer
     protected static final String JSON_SERVERWHERE_KEY       = "server_where";
     protected static final String JSON_TRACKED_KEY           = "tracked";
     protected static final String JSON_SYNC_DIRECTION_KEY    = "sync_direction";
+    protected static final String JSON_LAYER_ORIGIN_KEY      = "layer_origin";
 
     protected static final int TYPE_CHANGES_TABLE     = 125;
     protected static final int TYPE_CHANGES_FEATURE   = 126;
@@ -170,6 +171,7 @@ public class NGWVectorLayer
     protected String mServerWhere;
     protected boolean mTracked;
     protected int mSyncDirection = DIRECTION_BOTH; //1 - to server only, 2 - from server only, 3 - both directions
+    protected LayerOriginMetadata mLayerOriginMetadata;
     //check where to sync on GSM/WI-FI for data/attachments
 
     /** Log SQLite error text once per getChangesFromServer when createNewFeature insert fails. */
@@ -270,6 +272,20 @@ public class NGWVectorLayer
         mServerWhere = serverWhere;
     }
 
+    public LayerOriginMetadata getLayerOriginMetadata() {
+        return mLayerOriginMetadata;
+    }
+
+    /**
+     * Collector architecture foundation.
+     *
+     * Persisted layer ownership is consumed by future Collector composition/form/tile sync. Keep
+     * this metadata even when current layer data sync only needs account + remote id.
+     */
+    public void setLayerOriginMetadata(LayerOriginMetadata layerOriginMetadata) {
+        mLayerOriginMetadata = layerOriginMetadata;
+    }
+
     public boolean isDistrictFilterActive() {
         return mDistrictFilterActive;
     }
@@ -344,6 +360,9 @@ public class NGWVectorLayer
         rootConfig.put(JSON_TRACKED_KEY, mTracked);
         rootConfig.put(GeoConstants.GEOJSON_CRS, mCRS);
         rootConfig.put(JSON_SYNC_DIRECTION_KEY, mSyncDirection);
+        if (mLayerOriginMetadata != null) {
+            rootConfig.put(JSON_LAYER_ORIGIN_KEY, mLayerOriginMetadata.toJSON());
+        }
 
         return rootConfig;
     }
@@ -371,6 +390,8 @@ public class NGWVectorLayer
         mNGWLayerType = jsonObject.optInt(JSON_NGWLAYER_TYPE_KEY, Constants.LAYERTYPE_NGW_VECTOR);
         mServerWhere = jsonObject.optString(JSON_SERVERWHERE_KEY);
         mSyncDirection = jsonObject.optInt(JSON_SYNC_DIRECTION_KEY, DIRECTION_BOTH);
+        mLayerOriginMetadata = LayerOriginMetadata.fromJSON(
+                jsonObject.optJSONObject(JSON_LAYER_ORIGIN_KEY));
     }
 
 
