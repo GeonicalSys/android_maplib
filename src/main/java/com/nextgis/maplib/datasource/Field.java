@@ -25,7 +25,6 @@ package com.nextgis.maplib.datasource;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.text.TextUtils;
 
 import com.nextgis.maplib.api.IJSONStore;
 import com.nextgis.maplib.util.Constants;
@@ -48,7 +47,7 @@ public class Field implements IJSONStore, Parcelable {
     public Field(int type, String name, String alias) {
         mType = type;
         mName = name;
-        if (TextUtils.isEmpty(alias)) {
+        if (alias == null || alias.length() == 0) {
             mAlias = mName;
         } else {
             mAlias = alias;

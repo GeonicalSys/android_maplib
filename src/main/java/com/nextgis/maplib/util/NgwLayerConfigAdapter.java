@@ -16,14 +16,19 @@ import org.json.JSONObject;
 
 import java.util.Iterator;
 
+import static com.nextgis.maplib.util.Constants.JSON_ALPHA_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_DISPLAY_NAME;
+import static com.nextgis.maplib.util.Constants.JSON_FILL_PATTERN_IMAGE_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LABEL_FONT_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LABEL_HALO_BLUR_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LABEL_HALO_COLOR_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LABEL_HALO_WIDTH_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LABEL_TEMPLATE_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LABEL_TEXT_OPACITY_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LAYER_OPACITY_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_MARKER_ICON_IMAGE_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_NAME_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_OUTALPHA_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_RENDERERPROPS_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_SCALE_SIZE_WITH_ZOOM_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_STYLE_RULE_KEY;
@@ -134,6 +139,9 @@ public final class NgwLayerConfigAdapter {
         if (style.has("scale_with_zoom") && !style.has(JSON_SCALE_SIZE_WITH_ZOOM_KEY)) {
             style.put(JSON_SCALE_SIZE_WITH_ZOOM_KEY, style.optBoolean("scale_with_zoom"));
         }
+        mapStyleAliases(style);
+        normalizeOpacity0to1(style, JSON_ALPHA_KEY, 255);
+        normalizeOpacity0to1(style, JSON_OUTALPHA_KEY, 255);
         normalizeOpacity0to1(style, JSON_LABEL_TEXT_OPACITY_KEY, 255);
     }
 
@@ -162,6 +170,23 @@ public final class NgwLayerConfigAdapter {
         copyIfMissing(style, "halo_width", JSON_LABEL_HALO_WIDTH_KEY);
         copyIfMissing(style, "halo_blur", JSON_LABEL_HALO_BLUR_KEY);
         copyIfMissing(style, "template", JSON_LABEL_TEMPLATE_KEY);
+    }
+
+    private static void mapStyleAliases(JSONObject style) throws JSONException {
+        copyIfMissing(style, "fill_opacity", JSON_ALPHA_KEY);
+        copyIfMissing(style, "stroke_opacity", JSON_OUTALPHA_KEY);
+        copyIfMissing(style, "outline_opacity", JSON_OUTALPHA_KEY);
+        if (!style.has(JSON_ALPHA_KEY) && style.has("opacity")) {
+            style.put(JSON_ALPHA_KEY, style.get("opacity"));
+        }
+        copyIfMissing(style, "font", JSON_LABEL_FONT_KEY);
+        copyIfMissing(style, "font_family", JSON_LABEL_FONT_KEY);
+        copyIfMissing(style, "label_font", JSON_LABEL_FONT_KEY);
+        copyIfMissing(style, "icon", JSON_MARKER_ICON_IMAGE_KEY);
+        copyIfMissing(style, "icon_image", JSON_MARKER_ICON_IMAGE_KEY);
+        copyIfMissing(style, "marker_icon", JSON_MARKER_ICON_IMAGE_KEY);
+        copyIfMissing(style, "pattern", JSON_FILL_PATTERN_IMAGE_KEY);
+        copyIfMissing(style, "pattern_image", JSON_FILL_PATTERN_IMAGE_KEY);
     }
 
     private static void copyIfMissing(JSONObject style, String from, String to) throws JSONException {

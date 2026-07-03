@@ -29,12 +29,15 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
+import android.util.Log;
+import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.api.IGISApplication;
 import com.nextgis.maplib.map.Layer;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
 import com.nextgis.maplib.map.TrackLayer;
 import com.nextgis.maplib.map.VectorLayer;
+import com.nextgis.maplib.util.Constants;
 
 import java.io.FileNotFoundException;
 
@@ -173,18 +176,38 @@ public class LayerContentProvider
     {
         Layer layer = getLayerByUri(uri);
         if (null == layer) {
+            logInsertFailure("layer not found", uri, null);
             return null;
         }
 
-        if (layer instanceof VectorLayer) {
-            return ((VectorLayer) layer).insert(uri, contentValues);
+        try {
+            if (layer instanceof VectorLayer) {
+                return ((VectorLayer) layer).insert(uri, contentValues);
+            }
+
+            if (layer instanceof TrackLayer) {
+                return ((TrackLayer) layer).insert(uri, contentValues);
+            }
+        } catch (RuntimeException e) {
+            logInsertFailure("insert threw", uri, e);
+            throw e;
         }
 
-        if (layer instanceof TrackLayer) {
-            return ((TrackLayer) layer).insert(uri, contentValues);
-        }
-
+        logInsertFailure("unsupported layer type " + layer.getClass().getSimpleName(), uri, null);
         return null;
+    }
+
+
+    protected void logInsertFailure(String reason, Uri uri, RuntimeException error) {
+        String message = "LayerContentProvider.insert " + reason + " uri=" + uri;
+        if (error == null) {
+            Log.w(Constants.TAG, message);
+            HyperLog.w(Constants.TAG, message);
+        } else {
+            Log.e(Constants.TAG, message, error);
+            HyperLog.w(Constants.TAG, message + " error=" + error.getClass().getSimpleName()
+                    + ": " + error.getMessage(), error);
+        }
     }
 
 

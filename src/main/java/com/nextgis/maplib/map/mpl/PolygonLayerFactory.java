@@ -57,17 +57,25 @@ public final class PolygonLayerFactory {
         Expression fillOpacityExpr = MplStyleMapper.fillOpacityExpression(
                 MplFeatureStyleProps.OPACITY, vars.fillOpacity, ctx.layerOpacityFactor);
         Expression fillSortKeyExpr = Expression.toNumber(Expression.get(MplFeatureStyleProps.ORDER));
+        Expression fillTranslate = Expression.coalesce(
+                Expression.get(MplFeatureStyleProps.FILL_TRANSLATE),
+                Expression.literal(new Float[]{vars.fillTranslateX, vars.fillTranslateY}));
 
         String polyPatternId = polyMainId + pattern_namepart;
         FillLayer patternFillLayer = null;
+        boolean hasCustomPatternImage =
+                vars.fillPatternImage != null && !vars.fillPatternImage.trim().isEmpty();
+        int effectiveDefaultPattern = hasCustomPatternImage
+                ? PolygonPatternRegistry.FILL_PATTERN_HATCH
+                : vars.fillPattern;
         if (ctx.ruleStyling) {
-            fillLayer.setFilter(PolygonPatternRegistry.solidFillFilter(vars.fillPattern));
+            fillLayer.setFilter(clearFilter());
             fillLayer.setProperties(
                     PropertyFactory.fillColor(fillColorExpr),
                     PropertyFactory.fillOpacity(fillOpacityExpr),
                     PropertyFactory.fillAntialias(true),
                     PropertyFactory.fillSortKey(fillSortKeyExpr),
-                    clearFillPattern());
+                    PropertyFactory.fillTranslate(fillTranslate));
 
             Layer existingPattern = ctx.mapStyle.getLayer(polyPatternId);
             if (existingPattern instanceof FillLayer) {
@@ -78,18 +86,21 @@ public final class PolygonLayerFactory {
             if (patternFillLayer == null) {
                 patternFillLayer = new FillLayer(polyPatternId, ctx.layerPath);
             }
-            patternFillLayer.setFilter(PolygonPatternRegistry.patternedFillFilter(vars.fillPattern));
+            patternFillLayer.setFilter(PolygonPatternRegistry.patternedFillFilter(effectiveDefaultPattern));
             patternFillLayer.setProperties(
-                    PropertyFactory.fillColor(fillColorExpr),
                     PropertyFactory.fillOpacity(fillOpacityExpr),
                     PropertyFactory.fillAntialias(true),
                     PropertyFactory.fillSortKey(fillSortKeyExpr),
+                    PropertyFactory.fillTranslate(fillTranslate),
                     PropertyFactory.fillPattern(
-                            PolygonPatternRegistry.patternImageMatchExpression()));
+                            Expression.coalesce(
+                                    Expression.get(MplFeatureStyleProps.FILL_PATTERN_IMAGE),
+                                    PolygonPatternRegistry.patternImageExpression(
+                                            effectiveDefaultPattern,
+                                            hasCustomPatternImage
+                                                    ? vars.fillPatternImage
+                                                    : null))));
         } else {
-            if (ctx.mapStyle.getLayer(polyPatternId) != null) {
-                ctx.mapStyle.removeLayer(ctx.mapStyle.getLayer(polyPatternId));
-            }
             // MapLibre's Layer.setFilter(@NonNull) calls filter.toArray(); passing null crashes with
             // "Expression.toArray() on a null object reference". Use an always-true filter to clear any
             // leftover rule-style filter (e.g. solidFillFilter) instead.
@@ -98,13 +109,34 @@ public final class PolygonLayerFactory {
                     PropertyFactory.fillColor(fillColorExpr),
                     PropertyFactory.fillOpacity(fillOpacityExpr),
                     PropertyFactory.fillAntialias(true),
-                    PropertyFactory.fillSortKey(fillSortKeyExpr));
-            if (PolygonPatternRegistry.useFillPatternExpression(vars.fillPattern, false)) {
-                fillLayer.setProperties(PropertyFactory.fillPattern(
-                        PolygonPatternRegistry.patternImageExpression(vars.fillPattern)));
+                    PropertyFactory.fillSortKey(fillSortKeyExpr),
+                    PropertyFactory.fillTranslate(fillTranslate));
+
+            if (effectiveDefaultPattern > PolygonPatternRegistry.FILL_PATTERN_NONE) {
+                Layer existingPattern = ctx.mapStyle.getLayer(polyPatternId);
+                if (existingPattern instanceof FillLayer) {
+                    patternFillLayer = (FillLayer) existingPattern;
+                } else if (existingPattern != null) {
+                    ctx.mapStyle.removeLayer(existingPattern);
+                }
+                if (patternFillLayer == null) {
+                    patternFillLayer = new FillLayer(polyPatternId, ctx.layerPath);
+                }
+                patternFillLayer.setFilter(PolygonPatternRegistry.patternedFillFilter(effectiveDefaultPattern));
+                patternFillLayer.setProperties(
+                        PropertyFactory.fillOpacity(fillOpacityExpr),
+                        PropertyFactory.fillAntialias(true),
+                        PropertyFactory.fillSortKey(fillSortKeyExpr),
+                        PropertyFactory.fillTranslate(fillTranslate),
+                        PropertyFactory.fillPattern(
+                                PolygonPatternRegistry.patternImageExpression(
+                                        effectiveDefaultPattern,
+                                        vars.fillPatternImage)));
             } else {
-                // MapLibre NPEs on null; "" clears a pattern left from rule-style sublayer.
-                fillLayer.setProperties(clearFillPattern());
+                Layer existingPattern = ctx.mapStyle.getLayer(polyPatternId);
+                if (existingPattern != null) {
+                    ctx.mapStyle.removeLayer(existingPattern);
+                }
             }
         }
 
@@ -113,9 +145,16 @@ public final class PolygonLayerFactory {
                         Expression.coalesce(
                                 Expression.get(MplFeatureStyleProps.COLOR_STROKE),
                                 Expression.literal(getColorName(vars.outlineColor)))),
-                PropertyFactory.lineWidth(Expression.coalesce(
-                        Expression.get(MplFeatureStyleProps.THICKNESS),
-                        Expression.literal(getMPLThinkness(vars.thickness)))),
+                PropertyFactory.lineWidth(MplStyleMapper.zoomScaleExpression(
+                        Expression.coalesce(
+                                Expression.get(MplFeatureStyleProps.THICKNESS),
+                                Expression.literal(getMPLThinkness(vars.thickness))),
+                        ctx.ruleStyling
+                                ? Expression.get(MplFeatureStyleProps.SCALE_SIZE_WITH_ZOOM)
+                                : null,
+                        !ctx.ruleStyling && vars.scaleSizeWithZoom,
+                        vars.sizeZoomScaleStops)),
+                PropertyFactory.lineSortKey(Expression.toNumber(Expression.get(MplFeatureStyleProps.ORDER))),
                 PropertyFactory.lineOpacity(
                         MplStyleMapper.fillOpacityExpression(
                                 MplFeatureStyleProps.STROKE_OPACITY,
@@ -125,11 +164,6 @@ public final class PolygonLayerFactory {
         result.mainLayer = newLayer;
         result.outlineLayer = newLayer2;
         result.patternFillLayer = patternFillLayer;
-    }
-
-    /** MapLibre crashes on {@code fillPattern(null)}; empty string clears a previous pattern. */
-    private static org.maplibre.android.style.layers.PropertyValue<String> clearFillPattern() {
-        return PropertyFactory.fillPattern("");
     }
 
     /** Canonical always-true filter ({@code ["all"]}); clears a previous filter without passing null. */

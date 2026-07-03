@@ -139,6 +139,7 @@ import static com.nextgis.maplib.map.MPLFeaturesUtils.prop_order;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.prop_signature_text;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.source_namepart;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.source_polygon_text;
+import static com.nextgis.maplib.map.mpl.PointLayerFactory.MARKER_ICON_LAYER_SUFFIX;
 import static com.nextgis.maplib.util.Constants.DRAW_FINISH_ID;
 import static com.nextgis.maplib.util.Constants.MAP_LIMITS_Y;
 import static com.nextgis.maplib.util.Constants.MESSAGE_INTENT_STYLING;
@@ -221,6 +222,9 @@ public class MapDrawable
 
     // map  layerID : list of added features for layer
     LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourceFeaturesHashMap = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
+
+    private final ExecutorService mMaplibreVectorReloadExecutor =
+            Executors.newSingleThreadExecutor(r -> new Thread(r, "MaplibreVectorReload"));
 
     LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourcesOrder = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
 
@@ -514,6 +518,8 @@ public class MapDrawable
 
         String vectorLayerIdPattern = namePrefix + layer_namepart + id + pattern_namepart;
 
+        String vectorLayerIdMarkerIcon = namePrefix + layer_namepart + id + MARKER_ICON_LAYER_SUFFIX;
+
         String currentNamePrefixSymbol = "symbol-" +  namePrefix;
         String vectorLayerIdSymbols =currentNamePrefixSymbol + layer_namepart + id;
 
@@ -525,6 +531,9 @@ public class MapDrawable
 
         if (style.getLayer(vectorLayerIdPattern)!= null)
             style.removeLayer(vectorLayerIdPattern);
+
+        if (style.getLayer(vectorLayerIdMarkerIcon)!= null)
+            style.removeLayer(vectorLayerIdMarkerIcon);
 
         if (style.getLayer(vectorLayerIdSymbols)!= null)
             style.removeLayer(vectorLayerIdSymbols);
@@ -896,11 +905,10 @@ public class MapDrawable
     }
 
     public void reloadVectorLayerDataToMaplibre(final  ILayer ilayer) {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
         Handler mainHandler = new Handler(Looper.getMainLooper());
 
         Runnable r = () -> {
-            executor.execute(() -> {
+            mMaplibreVectorReloadExecutor.execute(() -> {
                 if (maplibreMap.get() == null || maplibreMapView.get() == null)
                     return;
                 if (ilayer instanceof  TMSLayer){
@@ -934,6 +942,10 @@ public class MapDrawable
                                 + " features=" + vectorPolygonFeatures.size()
                                 + " ns=" + (System.nanoTime() - tDbStart));
                     }
+                    HyperLog.d(TAG, "reloadVectorLayerDataToMaplibre layer=\""
+                            + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                            + "\" id=" + layer.getId()
+                            + " features=" + vectorPolygonFeatures.size());
                     VectorLayerRenderCache.save(layer, vectorPolygonFeatures);
                     sourceFeaturesHashMap.put(layer.getId(), vectorPolygonFeatures);
                     sourcesOrder.put(layer.getId(), new ArrayList<>());
@@ -960,7 +972,6 @@ public class MapDrawable
                     getContext().sendBroadcast(clear);
                 }
             });
-            executor.shutdown();
         };
         mainHandler.postDelayed(r, 500);
 
@@ -3649,6 +3660,11 @@ public class MapDrawable
                 namePrefix + layer_namepart + id + pattern_namepart);
         if (layerPattern != null)
             layerPattern.setProperties(visibility(isVisible ? VISIBLE : NONE));
+
+        Layer layerMarkerIcon = maplibreMap.get().getStyle().getLayer(
+                namePrefix + layer_namepart + id + MARKER_ICON_LAYER_SUFFIX);
+        if (layerMarkerIcon != null)
+            layerMarkerIcon.setProperties(visibility(isVisible ? VISIBLE : NONE));
 
         List<Layer> layerLineDashList = layersHashMapLineDash.get(id);
         if (layerLineDashList != null) {

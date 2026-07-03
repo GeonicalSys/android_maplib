@@ -36,6 +36,8 @@ import com.nextgis.maplib.location.GpsEventSource;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 import static android.content.Context.MODE_MULTI_PROCESS;
@@ -211,6 +213,39 @@ public class LocationUtil
         exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, longitudeStr);
         exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, lon > 0 ? "E" : "W");
 
+        exif.saveAttributes();
+    }
+
+
+    public static Location locationFromLatLon(double latitude, double longitude) {
+        Location location = new Location("photo_overlay");
+        location.setLatitude(latitude);
+        location.setLongitude(longitude);
+        return location;
+    }
+
+
+    public static void writeDateTimeToExif(
+            File imgFile,
+            long timestampMillis)
+            throws IOException
+    {
+        ExifInterface exif = new ExifInterface(imgFile.getCanonicalPath());
+        String value = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US)
+                .format(new Date(timestampMillis));
+        exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, value);
+        exif.setAttribute(ExifInterface.TAG_DATETIME, value);
+        exif.saveAttributes();
+    }
+
+
+    public static void setExifOrientationNormal(File imgFile)
+            throws IOException
+    {
+        ExifInterface exif = new ExifInterface(imgFile.getCanonicalPath());
+        exif.setAttribute(
+                ExifInterface.TAG_ORIENTATION,
+                String.valueOf(ExifInterface.ORIENTATION_NORMAL));
         exif.saveAttributes();
     }
 

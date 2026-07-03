@@ -15,11 +15,14 @@ import org.maplibre.android.style.expressions.Expression;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public final class PolygonPatternRegistry {
 
     public static final String ICON_PREFIX = "ng-fill-pattern-";
     public static final String PROP_FILL_PATTERN = "fillpattern";
+    public static final String PROP_FILL_PATTERN_IMAGE = "fillpatternimage";
 
     public static final int FILL_PATTERN_NONE = 0;
     public static final int FILL_PATTERN_HATCH = 1;
@@ -42,6 +45,7 @@ public final class PolygonPatternRegistry {
 
     private static final int TILE_PX = 64;
     private static final SparseArray<Bitmap> CUSTOM_PATTERN_BITMAPS = new SparseArray<>();
+    private static final Map<String, Bitmap> CUSTOM_PATTERN_IMAGES = new LinkedHashMap<>();
 
     private PolygonPatternRegistry() {
     }
@@ -59,6 +63,18 @@ public final class PolygonPatternRegistry {
         }
     }
 
+    public static void registerCustomPatternBitmap(String imageName, Bitmap bitmap) {
+        if (imageName == null || imageName.trim().isEmpty()) {
+            return;
+        }
+        String key = imageName.trim();
+        if (bitmap != null) {
+            CUSTOM_PATTERN_IMAGES.put(key, bitmap);
+        } else {
+            CUSTOM_PATTERN_IMAGES.remove(key);
+        }
+    }
+
     /** Load pattern PNG from assets, e.g. {@code fill_patterns/forest.png}. */
     public static void registerPatternFromAssets(
             AssetManager assetManager,
@@ -70,6 +86,19 @@ public final class PolygonPatternRegistry {
                 throw new IOException("Failed to decode pattern bitmap: " + assetPath);
             }
             registerCustomPatternBitmap(pattern, bitmap);
+        }
+    }
+
+    public static void registerPatternFromAssets(
+            AssetManager assetManager,
+            String imageName,
+            String assetPath) throws IOException {
+        try (InputStream stream = assetManager.open(assetPath)) {
+            Bitmap bitmap = BitmapFactory.decodeStream(stream);
+            if (bitmap == null) {
+                throw new IOException("Failed to decode pattern bitmap: " + assetPath);
+            }
+            registerCustomPatternBitmap(imageName, bitmap);
         }
     }
 
@@ -85,12 +114,26 @@ public final class PolygonPatternRegistry {
                 // already registered on this style instance
             }
         }
+        for (Map.Entry<String, Bitmap> entry : CUSTOM_PATTERN_IMAGES.entrySet()) {
+            try {
+                style.addImage(entry.getKey(), entry.getValue(), false);
+            } catch (IllegalArgumentException ignored) {
+                // already registered on this style instance
+            }
+        }
     }
 
     public static Expression patternImageExpression(int defaultPattern) {
+        return patternImageExpression(defaultPattern, null);
+    }
+
+    public static Expression patternImageExpression(int defaultPattern, String customPatternImage) {
         Expression patternExpr = Expression.toNumber(Expression.coalesce(
                 Expression.get(PROP_FILL_PATTERN),
                 Expression.literal((double) defaultPattern)));
+        if (customPatternImage != null && !customPatternImage.trim().isEmpty()) {
+            return Expression.literal(customPatternImage.trim());
+        }
         return Expression.switchCase(
                 Expression.gt(patternExpr, Expression.literal(0.0)),
                 patternImageMatchExpression(patternExpr),

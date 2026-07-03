@@ -12,8 +12,6 @@
 
 package com.nextgis.maplib.util;
 
-import android.text.TextUtils;
-
 import org.json.JSONObject;
 
 /**
@@ -32,7 +30,7 @@ public final class NgwResmetaUtil {
      * @return trimmed non-empty value or {@code null}
      */
     public static String getResmetaItemString(JSONObject envelope, String key) {
-        if (envelope == null || TextUtils.isEmpty(key)) {
+        if (envelope == null || isEmpty(key)) {
             return null;
         }
         JSONObject resmeta = envelope.optJSONObject(NGWUtil.NGWKEY_RESMETA);
@@ -44,9 +42,13 @@ public final class NgwResmetaUtil {
             return null;
         }
         String value = items.optString(key, "");
-        if (TextUtils.isEmpty(value)) {
+        if (isEmpty(value)) {
             return null;
         }
         return value.trim();
+    }
+
+    private static boolean isEmpty(CharSequence value) {
+        return value == null || value.length() == 0;
     }
 }

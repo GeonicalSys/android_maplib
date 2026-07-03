@@ -48,6 +48,9 @@ import static com.nextgis.maplib.util.GeoConstants.GTPolygon;
 public class SimplePolygonStyle extends Style implements ITextStyle {
     protected boolean mFill;
     protected int mFillPattern = PolygonPatternRegistry.FILL_PATTERN_NONE;
+    protected String mFillPatternImage;
+    protected float mFillTranslateX;
+    protected float mFillTranslateY;
     protected String mField;
     protected String mText;
     protected Float mTextSize = 12f;
@@ -81,6 +84,9 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
         SimplePolygonStyle obj = (SimplePolygonStyle) super.clone();
         obj.mFill = mFill;
         obj.mFillPattern = mFillPattern;
+        obj.mFillPatternImage = mFillPatternImage;
+        obj.mFillTranslateX = mFillTranslateX;
+        obj.mFillTranslateY = mFillTranslateY;
         obj.mText = mText;
         obj.mTextSize = mTextSize;
         obj.mTextColor = mTextColor;
@@ -103,6 +109,32 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
 
     public void setFillPattern(int fillPattern) {
         mFillPattern = fillPattern;
+    }
+
+    public String getFillPatternImage() {
+        return mFillPatternImage;
+    }
+
+    public void setFillPatternImage(String fillPatternImage) {
+        mFillPatternImage = fillPatternImage != null && !fillPatternImage.trim().isEmpty()
+                ? fillPatternImage.trim()
+                : null;
+    }
+
+    public float getFillTranslateX() {
+        return mFillTranslateX;
+    }
+
+    public void setFillTranslateX(float fillTranslateX) {
+        mFillTranslateX = fillTranslateX;
+    }
+
+    public float getFillTranslateY() {
+        return mFillTranslateY;
+    }
+
+    public void setFillTranslateY(float fillTranslateY) {
+        mFillTranslateY = fillTranslateY;
     }
 
     @Override
@@ -228,6 +260,15 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
         if (mFillPattern != PolygonPatternRegistry.FILL_PATTERN_NONE) {
             rootConfig.put(JSON_FILL_PATTERN_KEY, mFillPattern);
         }
+        if (mFillPatternImage != null) {
+            rootConfig.put(JSON_FILL_PATTERN_IMAGE_KEY, mFillPatternImage);
+        }
+        if (mFillTranslateX != 0f) {
+            rootConfig.put(JSON_FILL_TRANSLATE_X_KEY, mFillTranslateX);
+        }
+        if (mFillTranslateY != 0f) {
+            rootConfig.put(JSON_FILL_TRANSLATE_Y_KEY, mFillTranslateY);
+        }
         rootConfig.put(JSON_NAME_KEY, "SimplePolygonStyle");
 
         if (null != mText) {
@@ -251,6 +292,9 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
         mFill = jsonObject.optBoolean(JSON_FILL_KEY, true);
         mFillPattern = jsonObject.optInt(
                 JSON_FILL_PATTERN_KEY, PolygonPatternRegistry.FILL_PATTERN_NONE);
+        setFillPatternImage(jsonObject.optString(JSON_FILL_PATTERN_IMAGE_KEY, null));
+        mFillTranslateX = (float) jsonObject.optDouble(JSON_FILL_TRANSLATE_X_KEY, 0);
+        mFillTranslateY = (float) jsonObject.optDouble(JSON_FILL_TRANSLATE_Y_KEY, 0);
 
         if (jsonObject.has(JSON_DISPLAY_NAME)) {
             mText = jsonObject.getString(JSON_DISPLAY_NAME);

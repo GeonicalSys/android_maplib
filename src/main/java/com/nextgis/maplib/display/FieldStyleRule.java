@@ -149,7 +149,16 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
             markerStyle.setAlpha(ruleStyle.getAlpha());
             markerStyle.setOutAlpha(ruleStyle.getOutAlpha());
             markerStyle.setScaleSizeWithZoom(ruleStyle.isScaleSizeWithZoom());
+            markerStyle.setSizeZoomScaleStops(ruleStyle.getSizeZoomScaleStops());
             markerStyle.setCircleBlur(ruleStyle.getCircleBlur());
+            markerStyle.setIconImage(ruleStyle.getIconImage());
+            markerStyle.setIconSize(ruleStyle.getIconSize());
+            markerStyle.setIconRotate(ruleStyle.getIconRotate());
+            markerStyle.setIconOffsetX(ruleStyle.getIconOffsetX());
+            markerStyle.setIconOffsetY(ruleStyle.getIconOffsetY());
+            markerStyle.setIconAnchor(ruleStyle.getIconAnchor());
+            markerStyle.setIconAllowOverlap(ruleStyle.isIconAllowOverlap());
+            markerStyle.setIconIgnorePlacement(ruleStyle.isIconIgnorePlacement());
             markerStyle.setLabelAttributes(ruleStyle.getLabelAttributes());
         } else if (target instanceof SimpleLineStyle && source instanceof SimpleLineStyle) {
             SimpleLineStyle lineStyle = (SimpleLineStyle) target;
@@ -167,9 +176,14 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
             lineStyle.setLineMiterLimit(ruleStyle.getLineMiterLimit());
             lineStyle.setLineBlur(ruleStyle.getLineBlur());
             lineStyle.setDashPreset(ruleStyle.getDashPreset());
+            lineStyle.setDashArray(ruleStyle.getDashArray());
+            lineStyle.setLineOffset(ruleStyle.getLineOffset());
+            lineStyle.setLineGapWidth(ruleStyle.getLineGapWidth());
+            lineStyle.setLineOutlineMultiplier(ruleStyle.getLineOutlineMultiplier());
             lineStyle.setAlpha(ruleStyle.getAlpha());
             lineStyle.setOutAlpha(ruleStyle.getOutAlpha());
             lineStyle.setScaleSizeWithZoom(ruleStyle.isScaleSizeWithZoom());
+            lineStyle.setSizeZoomScaleStops(ruleStyle.getSizeZoomScaleStops());
             lineStyle.setLabelAttributes(ruleStyle.getLabelAttributes());
         } else if (target instanceof SimplePolygonStyle && source instanceof SimplePolygonStyle) {
             SimplePolygonStyle polygonStyle = (SimplePolygonStyle) target;
@@ -185,6 +199,11 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
             polygonStyle.setField(ruleStyle.getField());
             polygonStyle.setAlpha(ruleStyle.getAlpha());
             polygonStyle.setOutAlpha(ruleStyle.getOutAlpha());
+            polygonStyle.setScaleSizeWithZoom(ruleStyle.isScaleSizeWithZoom());
+            polygonStyle.setSizeZoomScaleStops(ruleStyle.getSizeZoomScaleStops());
+            polygonStyle.setFillPatternImage(ruleStyle.getFillPatternImage());
+            polygonStyle.setFillTranslateX(ruleStyle.getFillTranslateX());
+            polygonStyle.setFillTranslateY(ruleStyle.getFillTranslateY());
             polygonStyle.setLabelAttributes(ruleStyle.getLabelAttributes());
         }
     }

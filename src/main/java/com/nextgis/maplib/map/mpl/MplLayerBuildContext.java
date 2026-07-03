@@ -1,5 +1,7 @@
 package com.nextgis.maplib.map.mpl;
 
+import android.content.res.AssetManager;
+
 import com.nextgis.maplib.api.ILayer;
 
 import org.maplibre.android.maps.Style;
@@ -20,6 +22,7 @@ public final class MplLayerBuildContext {
     public final String namePrefix;
     public final float layerOpacityFactor;
     public final MplLayerStyleVars vars;
+    public final AssetManager assetManager;
     public final boolean ruleStyling;
     public final ILayer iLayer;
     public final Map<Integer, Layer> layersHashMap;
@@ -35,6 +38,7 @@ public final class MplLayerBuildContext {
             String namePrefix,
             float layerOpacityFactor,
             MplLayerStyleVars vars,
+            AssetManager assetManager,
             boolean ruleStyling,
             ILayer iLayer,
             Map<Integer, Layer> layersHashMap,
@@ -48,6 +52,7 @@ public final class MplLayerBuildContext {
         this.namePrefix = namePrefix;
         this.layerOpacityFactor = layerOpacityFactor;
         this.vars = vars;
+        this.assetManager = assetManager;
         this.ruleStyling = ruleStyling;
         this.iLayer = iLayer;
         this.layersHashMap = layersHashMap;

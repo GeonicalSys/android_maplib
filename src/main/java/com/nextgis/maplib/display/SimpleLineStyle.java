@@ -41,11 +41,15 @@ import org.json.JSONObject;
 import java.util.List;
 
 import static com.nextgis.maplib.util.Constants.JSON_DISPLAY_NAME;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_DASH_ARRAY_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LINE_BLUR_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LINE_CAP_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LINE_DASH_PRESET_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_GAP_WIDTH_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LINE_JOIN_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_LINE_MITER_LIMIT_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_OFFSET_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_OUTLINE_MULTIPLIER_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_NAME_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_TEXT_COLOR_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_TEXT_SIZE_KEY;
@@ -67,6 +71,10 @@ public class SimpleLineStyle extends Style implements ITextStyle {
     protected float mLineMiterLimit = MplStyleMapper.DEFAULT_LINE_MITER_LIMIT;
     protected float mLineBlur = MplStyleMapper.DEFAULT_LINE_BLUR;
     protected int mDashPreset = MplStyleMapper.DASH_PRESET_SHORT;
+    protected String mDashArray;
+    protected float mLineOffset;
+    protected float mLineGapWidth;
+    protected float mLineOutlineMultiplier = 3f;
     protected String mField;
     protected String mText;
     protected float mTextSize = 3f;
@@ -103,6 +111,10 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         obj.mLineMiterLimit = mLineMiterLimit;
         obj.mLineBlur = mLineBlur;
         obj.mDashPreset = mDashPreset;
+        obj.mDashArray = mDashArray;
+        obj.mLineOffset = mLineOffset;
+        obj.mLineGapWidth = mLineGapWidth;
+        obj.mLineOutlineMultiplier = mLineOutlineMultiplier;
         obj.mText = mText;
         obj.mField = mField;
         obj.mTextSize = mTextSize;
@@ -485,6 +497,40 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         mDashPreset = dashPreset;
     }
 
+    public String getDashArray() {
+        return mDashArray;
+    }
+
+    public void setDashArray(String dashArray) {
+        mDashArray = dashArray != null && !dashArray.trim().isEmpty()
+                ? dashArray.trim()
+                : null;
+    }
+
+    public float getLineOffset() {
+        return mLineOffset;
+    }
+
+    public void setLineOffset(float lineOffset) {
+        mLineOffset = lineOffset;
+    }
+
+    public float getLineGapWidth() {
+        return mLineGapWidth;
+    }
+
+    public void setLineGapWidth(float lineGapWidth) {
+        mLineGapWidth = Math.max(0f, lineGapWidth);
+    }
+
+    public float getLineOutlineMultiplier() {
+        return mLineOutlineMultiplier > 0f ? mLineOutlineMultiplier : 3f;
+    }
+
+    public void setLineOutlineMultiplier(float lineOutlineMultiplier) {
+        mLineOutlineMultiplier = lineOutlineMultiplier > 0f ? lineOutlineMultiplier : 3f;
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject rootConfig = super.toJSON();
@@ -504,6 +550,18 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         }
         if (mDashPreset != MplStyleMapper.DASH_PRESET_SHORT) {
             rootConfig.put(JSON_LINE_DASH_PRESET_KEY, mDashPreset);
+        }
+        if (mDashArray != null) {
+            rootConfig.put(JSON_LINE_DASH_ARRAY_KEY, mDashArray);
+        }
+        if (mLineOffset != 0f) {
+            rootConfig.put(JSON_LINE_OFFSET_KEY, mLineOffset);
+        }
+        if (mLineGapWidth > 0f) {
+            rootConfig.put(JSON_LINE_GAP_WIDTH_KEY, mLineGapWidth);
+        }
+        if (getLineOutlineMultiplier() != 3f) {
+            rootConfig.put(JSON_LINE_OUTLINE_MULTIPLIER_KEY, getLineOutlineMultiplier());
         }
         if (mLineBlur > MplStyleMapper.DEFAULT_LINE_BLUR) {
             rootConfig.put(JSON_LINE_BLUR_KEY, mLineBlur);
@@ -535,6 +593,11 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         mLineMiterLimit = (float) jsonObject.optDouble(
                 JSON_LINE_MITER_LIMIT_KEY, MplStyleMapper.DEFAULT_LINE_MITER_LIMIT);
         mDashPreset = jsonObject.optInt(JSON_LINE_DASH_PRESET_KEY, MplStyleMapper.DASH_PRESET_SHORT);
+        setDashArray(jsonObject.optString(JSON_LINE_DASH_ARRAY_KEY, null));
+        mLineOffset = (float) jsonObject.optDouble(JSON_LINE_OFFSET_KEY, 0);
+        mLineGapWidth = (float) jsonObject.optDouble(JSON_LINE_GAP_WIDTH_KEY, 0);
+        setLineOutlineMultiplier((float) jsonObject.optDouble(
+                JSON_LINE_OUTLINE_MULTIPLIER_KEY, 3f));
         mLineBlur = (float) jsonObject.optDouble(
                 JSON_LINE_BLUR_KEY, MplStyleMapper.DEFAULT_LINE_BLUR);
 

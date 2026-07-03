@@ -421,7 +421,7 @@ public class NGWUtil
             long remoteId,
             String where)
     {
-        if (TextUtils.isEmpty(where)) {
+        if (where == null || where.length() == 0) {
             return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment";
         }
         return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment&" + where;

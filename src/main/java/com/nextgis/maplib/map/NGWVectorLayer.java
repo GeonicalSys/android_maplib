@@ -148,6 +148,8 @@ public class NGWVectorLayer
      * blocking on one multi‑minute transaction while streaming NGW JSON into {@link #createFeatureBatch}.
      */
     private static final int NGW_FILL_SQL_TX_BATCH = 250;
+    private static final int NGW_SYNC_PULL_MAX_ATTEMPTS = 3;
+    private static final long NGW_SYNC_PULL_RETRY_DELAY_MS = 1200L;
 
     protected static final int DIRECTION_TO = 1;
     protected static final int DIRECTION_FROM = 2;
@@ -537,9 +539,54 @@ public class NGWVectorLayer
                 }
             }
 
+            final int responseCode = urlConnection.getResponseCode();
+            final String responseMessage = urlConnection.getResponseMessage();
+            final int contentLength = urlConnection.getContentLength();
+            HyperLog.d(Constants.TAG, "NGW feature pull response layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " http=" + responseCode
+                    + (TextUtils.isEmpty(responseMessage) ? "" : " msg=\""
+                    + ProdLogUtil.truncateForLog(responseMessage, 120) + "\"")
+                    + " contentLength=" + contentLength
+                    + " contentType=" + ProdLogUtil.truncateForLog(urlConnection.getContentType(), 120)
+                    + " expectedFeatures=" + serverExpectedFeatureCount
+                    + " url=" + ProdLogUtil.scrubUrlForLog(sURL));
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                String errorBody = null;
+                try {
+                    errorBody = NetworkUtil.responseToString(urlConnection.getErrorStream());
+                } catch (IOException bodyError) {
+                    HyperLog.w(Constants.TAG, "NGW feature pull error body read failed: "
+                            + bodyError.getMessage(), bodyError);
+                }
+                HttpResponse featureResponse =
+                        new HttpResponse(responseCode, responseMessage, errorBody);
+                String httpFailure = ProdLogUtil.ngwHttpFailure(
+                        "featurePull",
+                        getName(),
+                        mRemoteId,
+                        -1,
+                        -1,
+                        featureResponse)
+                        + " expectedFeatures=" + serverExpectedFeatureCount
+                        + " url=" + ProdLogUtil.scrubUrlForLog(sURL);
+                HyperLog.w(Constants.TAG, httpFailure);
+                if (Constants.DEBUG_MODE) {
+                    Log.w(Constants.TAG, httpFailure);
+                }
+                String error = NetworkUtil.getError(mContext, responseCode);
+                if (NetworkUtil.isTransientNgwHttpError(responseCode, errorBody, responseMessage)) {
+                    throw new IOException("NGW feature pull HTTP " + responseCode
+                            + (TextUtils.isEmpty(responseMessage) ? "" : " " + responseMessage)
+                            + " " + ProdLogUtil.scrubUrlForLog(sURL));
+                }
+                throw new NGException(error);
+            }
+
             final long fillStartMs = SystemClock.elapsedRealtime();
 
-            InputStream in = new ProgressBufferedInputStream(urlConnection.getInputStream(), urlConnection.getContentLength());
+            InputStream in = new ProgressBufferedInputStream(urlConnection.getInputStream(), contentLength);
             JsonReader reader = new JsonReader(new InputStreamReader(in, "UTF-8"));
             reader.beginArray();
 
@@ -1844,7 +1891,7 @@ public class NGWVectorLayer
                                 createNewFeatureCount++;
                             }
                         } else {
-                            countChanges = compareFeature(cursor, authority, remoteFeature, changeTableName);
+                            countChanges += compareFeature(cursor, authority, remoteFeature, changeTableName);
                         }
                     } catch (Exception e) {
                         String innerMsg = e.getMessage();
@@ -1893,9 +1940,6 @@ public class NGWVectorLayer
                 }
                 HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " delete features " + deleteItems.size());
                 deleteFeatures(deleteItems);
-                if (createNewFeatureCount > 0 || !deleteItems.isEmpty()) {
-                    reloadCache();
-                }
             }
 
             if (!mTracked) {
@@ -1980,10 +2024,28 @@ public class NGWVectorLayer
             return true;
         }
 
-        getPreferences().edit().putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP, System.currentTimeMillis()).apply();
+        int trackedAddedCount = added == null ? 0 : added.size();
+        int trackedChangedCount = changed == null ? 0 : changed.size();
+        int trackedDeletedCount = deleted == null ? 0 : deleted.size();
+        HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                + " pull summary updated=" + countChanges
+                + " created=" + createNewFeatureCount
+                + " deleted=" + deleteItems.size()
+                + " trackedAdded=" + trackedAddedCount
+                + " trackedChanged=" + trackedChangedCount
+                + " trackedDeleted=" + trackedDeletedCount);
         HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer END");
         // call reload on maplibre if changes > 0
-        if (countChanges>0 || createNewFeatureCount>0 || deleteItems.size()>0 || added.size()>0 || changed.size() >0 ) {
+        boolean hasRemoteDataChanges = countChanges > 0 || createNewFeatureCount > 0
+                || !deleteItems.isEmpty() || trackedAddedCount > 0 || trackedChangedCount > 0
+                || trackedDeletedCount > 0;
+        if (hasRemoteDataChanges) {
+            try {
+                rebuildCache(null);
+            } catch (RuntimeException e) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                        + " spatial cache rebuild after pull failed: " + e.getMessage(), e);
+            }
             VectorLayerRenderCache.invalidateOnDataChange(this);
             ((IGISApplication)getContext().getApplicationContext()).reloadLayerByID(getId());
         }
@@ -2240,103 +2302,147 @@ public class NGWVectorLayer
             return null;
         }
 
-        HashMap<Integer, List<Feature>> results = new HashMap<>();
+        for (int attempt = 1; attempt <= NGW_SYNC_PULL_MAX_ATTEMPTS; attempt++) {
+            HashMap<Integer, List<Feature>> results = new HashMap<>();
+            HttpURLConnection urlConnection = null;
+            try {
+                urlConnection = getConnection(accountData);
+                if (Constants.DEBUG_MODE)
+                    Log.d("SSYNC", "url: " + urlConnection.getURL().toString());
 
-        try {
-            HttpURLConnection urlConnection = getConnection(accountData);
-            if (Constants.DEBUG_MODE)
-                Log.d("SSYNC", "url: " + urlConnection.getURL().toString());
-
-            int code = urlConnection.getResponseCode();
-            if (code < 200 || code >= 300) {
-                String urlStr = "";
-                try {
-                    if (urlConnection.getURL() != null) {
-                        urlStr = urlConnection.getURL().toString();
+                int code = urlConnection.getResponseCode();
+                if (code < 200 || code >= 300) {
+                    String urlStr = "";
+                    try {
+                        if (urlConnection.getURL() != null) {
+                            urlStr = urlConnection.getURL().toString();
+                        }
+                    } catch (Exception ignored) {
                     }
-                } catch (Exception ignored) {
+                    String responseMessage = urlConnection.getResponseMessage();
+                    String errorBody = null;
+                    try {
+                        errorBody = NetworkUtil.responseToString(urlConnection.getErrorStream());
+                    } catch (IOException bodyError) {
+                        HyperLog.w(Constants.TAG, "NGW sync pull error body read failed: "
+                                + bodyError.getMessage(), bodyError);
+                    }
+                    HttpResponse response = new HttpResponse(code, responseMessage, errorBody);
+                    HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure(
+                            "syncPull", getName(), mRemoteId, -1, -1, response)
+                            + " attempt=" + attempt + "/" + NGW_SYNC_PULL_MAX_ATTEMPTS
+                            + " url=" + ProdLogUtil.scrubUrlForLog(urlStr));
+                    if (code == 404){
+                        Log.d("SSYNC", "url: " + urlConnection.getURL().toString() + " = FAIL 404");
+                        return new ExistFeatureResult(null, false, 404);
+                    }
+                    if (NetworkUtil.isTransientNgwHttpError(code, errorBody, responseMessage)
+                            && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
+                        sleepBeforeNgwSyncPullRetry(attempt, "HTTP " + code);
+                        continue;
+                    }
+                    if (NetworkUtil.isTransientNgwHttpError(code, errorBody, responseMessage)) {
+                        SyncResultUtil.markConnectFailed(syncResult);
+                    } else {
+                        syncResult.stats.numIoExceptions++;
+                    }
+                    return new ExistFeatureResult(null, false, 0);
                 }
-                HyperLog.w(Constants.TAG, ProdLogUtil.ngwPullHttpStatus(getName(), mRemoteId, code, urlStr));
-            }
-            if (code == 404){
-                Log.d("SSYNC", "url: " + urlConnection.getURL().toString() + " = FAIL 404");
-                return new ExistFeatureResult(null, false, 404);
-            }
 
 //            if (code == 403){
 //                return new ExistFeatureResult(null, false, 404);
 //            }
-            if (Constants.DEBUG_MODE)
-                Log.d(TAG, "code: " + code);
+                if (Constants.DEBUG_MODE)
+                    Log.d(TAG, "code: " + code);
 
-            InputStream in = new ProgressBufferedInputStream(urlConnection.getInputStream(),
-                    urlConnection.getContentLength());
-            JsonReader reader = new JsonReader(new InputStreamReader(in, "UTF-8"));
+                InputStream in = new ProgressBufferedInputStream(urlConnection.getInputStream(),
+                        urlConnection.getContentLength());
+                JsonReader reader = new JsonReader(new InputStreamReader(in, "UTF-8"));
 
-            if (tracked) {
-                List<Feature> added = new LinkedList<>(), changed = new LinkedList<>(), deleted = new LinkedList<>();
-                reader.beginObject();
-                while (reader.hasNext()) {
-                    String name = reader.nextName();
-                    switch (name) {
-                        case "deleted":
-                            reader.beginArray();
-                            while (reader.hasNext())
-                                deleted.add(new Feature(reader.nextLong(), getFields()));
-                            reader.endArray();
-                            break;
-                        case "added":
-                            readFeatures(reader, added);
-                            break;
-                        case "changed":
-                            readFeatures(reader, changed);
-                            break;
+                if (tracked) {
+                    List<Feature> added = new LinkedList<>(), changed = new LinkedList<>(), deleted = new LinkedList<>();
+                    reader.beginObject();
+                    while (reader.hasNext()) {
+                        String name = reader.nextName();
+                        switch (name) {
+                            case "deleted":
+                                reader.beginArray();
+                                while (reader.hasNext())
+                                    deleted.add(new Feature(reader.nextLong(), getFields()));
+                                reader.endArray();
+                                break;
+                            case "added":
+                                readFeatures(reader, added);
+                                break;
+                            case "changed":
+                                readFeatures(reader, changed);
+                                break;
+                        }
                     }
+                    reader.endObject();
+
+                    results.put(0, added);
+                    results.put(1, changed);
+                    results.put(2, deleted);
+                } else {
+                    List<Feature> features = new LinkedList<>();
+                    readFeatures(reader, features);
+                    results.put(0, features);
                 }
-                reader.endObject();
+                reader.close();
 
-                results.put(0, added);
-                results.put(1, changed);
-                results.put(2, deleted);
-            } else {
-                List<Feature> features = new LinkedList<>();
-                readFeatures(reader, features);
-                results.put(0, features);
+                //MapUtil.logFeatures(results);
+                return new ExistFeatureResult(results, true, 200);
+            } catch (MalformedURLException e) {
+                log(e, "getFeatures(): MalformedURLException");
+                syncResult.stats.numIoExceptions++;
+                return new ExistFeatureResult(null, false, 0);
+            } catch (FileNotFoundException e) {
+                log(e, "getFeatures(): FileNotFoundException");
+                SyncResultUtil.markConnectFailed(syncResult);
+                return new ExistFeatureResult(null, false, 0);
+            } catch (IOException e) {
+                if (NetworkUtil.isTransientNetworkFailure(e)
+                        && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
+                    sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
+                    continue;
+                }
+                log(e, "getFeatures(): IOException");
+                SyncResultUtil.markConnectFailed(syncResult);
+                return new ExistFeatureResult(null, false, 0);
+            } catch (NGException e) {
+                log(e, "getFeatures(): NGException");
+                syncResult.stats.numParseExceptions++;
+                return new ExistFeatureResult(null, false, 0);
+            } catch (OutOfMemoryError e) {
+                HyperLog.w(Constants.TAG, "NGW pull OOM layer=\"" + ProdLogUtil.truncateForLog(getName(), 100)
+                        + "\" res=" + mRemoteId);
+                e.printStackTrace();
+                syncResult.stats.numIoExceptions++;
+                syncResult.stats.numSkippedEntries++;
+                return new ExistFeatureResult(null, false, 0);
+            } catch (IllegalStateException | NumberFormatException e) {
+                log(e, "getFeatures(): IllegalStateException | NumberFormatException");
+                syncResult.stats.numParseExceptions++;
+                return new ExistFeatureResult(null, false, 0);
+            } finally {
+                if (urlConnection != null) {
+                    urlConnection.disconnect();
+                }
             }
-            reader.close();
-
-            urlConnection.disconnect();
-        } catch (MalformedURLException e) {
-            log(e, "getFeatures(): MalformedURLException");
-            syncResult.stats.numIoExceptions++;
-            return new ExistFeatureResult(null, false, 0);
-        } catch (FileNotFoundException e) {
-            log(e, "getFeatures(): FileNotFoundException");
-            SyncResultUtil.markConnectFailed(syncResult);
-            return new ExistFeatureResult(null, false, 0);
-        } catch (IOException e) {
-            log(e, "getFeatures(): IOException");
-            SyncResultUtil.markConnectFailed(syncResult);
-            return new ExistFeatureResult(null, false, 0);
-        } catch (NGException e) {
-            log(e, "getFeatures(): NGException");
-            syncResult.stats.numParseExceptions++;
-            return new ExistFeatureResult(null, false, 0);
-        } catch (OutOfMemoryError e) {
-            HyperLog.w(Constants.TAG, "NGW pull OOM layer=\"" + ProdLogUtil.truncateForLog(getName(), 100)
-                    + "\" res=" + mRemoteId);
-            e.printStackTrace();
-            syncResult.stats.numIoExceptions++;
-            syncResult.stats.numSkippedEntries++;
-            return new ExistFeatureResult(null, false, 0);
-        } catch (IllegalStateException | NumberFormatException e) {
-            log(e, "getFeatures(): IllegalStateException | NumberFormatException");
-            syncResult.stats.numParseExceptions++;
-            return new ExistFeatureResult(null, false, 0);
         }
 
-        //MapUtil.logFeatures(results);
-        return new ExistFeatureResult(results, true, 200);
+        return new ExistFeatureResult(null, false, 0);
+    }
+
+    private void sleepBeforeNgwSyncPullRetry(int attempt, String reason) {
+        HyperLog.w(Constants.TAG, "NGW sync pull retry layer=\""
+                + ProdLogUtil.truncateForLog(getName(), 100)
+                + "\" res=" + mRemoteId
+                + " attempt=" + attempt + "/" + NGW_SYNC_PULL_MAX_ATTEMPTS
+                + (TextUtils.isEmpty(reason) ? "" : " reason=\""
+                + ProdLogUtil.truncateForLog(reason, 160) + "\""));
+        SystemClock.sleep(NGW_SYNC_PULL_RETRY_DELAY_MS * attempt);
     }
 
     protected void readFeatures(JsonReader reader, List<Feature> features) throws IOException, IllegalStateException,

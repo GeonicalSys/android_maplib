@@ -34,6 +34,7 @@ import static com.nextgis.maplib.util.Constants.JSON_COLOR_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_OUTALPHA_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_OUTCOLOR_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_SCALE_SIZE_WITH_ZOOM_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_SIZE_ZOOM_STOPS_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_WIDTH_KEY;
 
 public abstract class Style implements IJSONStore, Cloneable {
@@ -43,6 +44,7 @@ public abstract class Style implements IJSONStore, Cloneable {
     protected int mOuterAlpha = 255;
     protected int mInnerAlpha = 255;
     protected boolean mScaleSizeWithZoom;
+    protected String mSizeZoomScaleStops;
 
     public Style() {
         mWidth = 3;
@@ -56,6 +58,7 @@ public abstract class Style implements IJSONStore, Cloneable {
         obj.mInnerAlpha = mInnerAlpha;
         obj.mOuterAlpha = mOuterAlpha;
         obj.mScaleSizeWithZoom = mScaleSizeWithZoom;
+        obj.mSizeZoomScaleStops = mSizeZoomScaleStops;
         return obj;
     }
 
@@ -108,6 +111,9 @@ public abstract class Style implements IJSONStore, Cloneable {
         if (mScaleSizeWithZoom) {
             rootConfig.put(JSON_SCALE_SIZE_WITH_ZOOM_KEY, true);
         }
+        if (mSizeZoomScaleStops != null && !mSizeZoomScaleStops.trim().isEmpty()) {
+            rootConfig.put(JSON_SIZE_ZOOM_STOPS_KEY, mSizeZoomScaleStops);
+        }
         return rootConfig;
     }
 
@@ -119,6 +125,10 @@ public abstract class Style implements IJSONStore, Cloneable {
         mInnerAlpha = jsonObject.optInt(JSON_ALPHA_KEY, 255);
         mOuterAlpha = jsonObject.optInt(JSON_OUTALPHA_KEY, 255);
         mScaleSizeWithZoom = jsonObject.optBoolean(JSON_SCALE_SIZE_WITH_ZOOM_KEY, false);
+        mSizeZoomScaleStops = jsonObject.optString(JSON_SIZE_ZOOM_STOPS_KEY, null);
+        if (mSizeZoomScaleStops != null && mSizeZoomScaleStops.trim().isEmpty()) {
+            mSizeZoomScaleStops = null;
+        }
     }
 
     public int getAlpha() {
@@ -143,5 +153,15 @@ public abstract class Style implements IJSONStore, Cloneable {
 
     public void setScaleSizeWithZoom(boolean scaleSizeWithZoom) {
         mScaleSizeWithZoom = scaleSizeWithZoom;
+    }
+
+    public String getSizeZoomScaleStops() {
+        return mSizeZoomScaleStops;
+    }
+
+    public void setSizeZoomScaleStops(String sizeZoomScaleStops) {
+        mSizeZoomScaleStops = sizeZoomScaleStops != null && !sizeZoomScaleStops.trim().isEmpty()
+                ? sizeZoomScaleStops.trim()
+                : null;
     }
 }

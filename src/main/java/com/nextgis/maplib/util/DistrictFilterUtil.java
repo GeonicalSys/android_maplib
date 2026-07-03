@@ -12,8 +12,6 @@
 
 package com.nextgis.maplib.util;
 
-import android.text.TextUtils;
-
 import com.nextgis.maplib.datasource.Field;
 import com.nextgis.maplib.datasource.ngw.Connection;
 
@@ -46,7 +44,7 @@ public final class DistrictFilterUtil {
     }
 
     public static boolean hasField(Collection<Field> fields, String keyname) {
-        if (fields == null || TextUtils.isEmpty(keyname)) {
+        if (fields == null || isEmpty(keyname)) {
             return false;
         }
         for (Field field : fields) {
@@ -58,14 +56,14 @@ public final class DistrictFilterUtil {
     }
 
     public static boolean hasField(Map<String, Field> fieldsByName, String keyname) {
-        return fieldsByName != null && !TextUtils.isEmpty(keyname) && fieldsByName.containsKey(keyname);
+        return fieldsByName != null && !isEmpty(keyname) && fieldsByName.containsKey(keyname);
     }
 
     /**
      * @return query fragment without leading {@code ?}, e.g. {@code fld_district=vologda}
      */
     public static String buildFldEqualsQuery(String fieldKey, String value) {
-        if (TextUtils.isEmpty(fieldKey) || TextUtils.isEmpty(value)) {
+        if (isEmpty(fieldKey) || isEmpty(value)) {
             return "";
         }
         String encoded;
@@ -85,7 +83,7 @@ public final class DistrictFilterUtil {
             Map<String, Field> fields,
             String collectorDistrict)
     {
-        if (TextUtils.isEmpty(collectorDistrict)) {
+        if (isEmpty(collectorDistrict)) {
             return new Decision(false, "", "collector district is empty");
         }
         if (ngwLayerType != Connection.NGWResourceTypePostgisLayer) {
@@ -99,9 +97,13 @@ public final class DistrictFilterUtil {
                     "schema has no field \"" + DISTRICT_FIELD_KEY + "\" (keys=" + fieldKeys + ")");
         }
         String serverWhere = buildFldEqualsQuery(DISTRICT_FIELD_KEY, collectorDistrict);
-        if (TextUtils.isEmpty(serverWhere)) {
+        if (isEmpty(serverWhere)) {
             return new Decision(false, "", "could not build fld_ query for district=" + collectorDistrict);
         }
         return new Decision(true, serverWhere, "");
+    }
+
+    private static boolean isEmpty(CharSequence value) {
+        return value == null || value.length() == 0;
     }
 }

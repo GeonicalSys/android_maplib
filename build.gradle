@@ -88,4 +88,5 @@ dependencies {
     implementation 'io.tus.android.client:tus-android-client:0.1.12'
 
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 }

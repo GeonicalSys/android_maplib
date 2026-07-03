@@ -967,6 +967,16 @@ public class VectorLayer
 //        Log.e("CCACHH","reloadCache mCache.load");
         mCache.load(new File(mPath, RTREE));
 
+        int dbRows = getSqliteTableRowCount();
+        int cacheRows = mCache.size();
+        if (dbRows >= 0 && cacheRows != dbRows) {
+            HyperLog.w(Constants.TAG, "VectorLayer: " + getName()
+                    + " spatial cache count mismatch cache=" + cacheRows
+                    + " db=" + dbRows + " - rebuilding");
+            rebuildCache(null);
+            return;
+        }
+
         mCacheLoaded = true;
     }
 
@@ -1381,6 +1391,7 @@ public class VectorLayer
     protected long insert(ContentValues contentValues)
     {
         if (!contentValues.containsKey(Constants.FIELD_GEOM)) {
+            logFeatureInsertFailure("missing geom", contentValues, null);
             return NOT_FOUND;
         }
 
@@ -1394,7 +1405,8 @@ public class VectorLayer
             try {
                 prepareGeometry(contentValues);
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                logFeatureInsertFailure("prepareGeometry failed", contentValues, e);
+                return Constants.NOT_FOUND;
             }
         }
 
@@ -1408,9 +1420,18 @@ public class VectorLayer
 
 
         //long rowId = db.insert(mPath.getName(), null, contentValues);
-        long rowId = insertViaSql(db, contentValues, mPath.getName());
+        long rowId;
+        try {
+            rowId = insertViaSql(db, contentValues, mPath.getName());
+        } catch (RuntimeException e) {
+            logFeatureInsertFailure("SQL insert failed", contentValues, e);
+            return Constants.NOT_FOUND;
+        }
 
-
+        if (rowId == Constants.NOT_FOUND) {
+            logFeatureInsertFailure("SQL insert returned NOT_FOUND", contentValues, null);
+            return Constants.NOT_FOUND;
+        }
 
         if (rowId != Constants.NOT_FOUND && !mBulkImportMode) {
             Intent notify = new Intent(Constants.NOTIFY_INSERT);
@@ -1444,7 +1465,7 @@ public class VectorLayer
                 " (" + cols + ") VALUES (" + vals + ")";
 
         Log.d("SSQL", sql);
-        Log.d("SSQL","args" +  args.toArray());
+        Log.d("SSQL", "args " + summarizeBindArgs(args));
 
         db.execSQL(sql, args.toArray());
 
@@ -1456,6 +1477,63 @@ public class VectorLayer
         }
         c.close();
         return id;
+    }
+
+    private void logFeatureInsertFailure(String reason, ContentValues contentValues, Exception error) {
+        String message = "FeatureInsert " + reason
+                + " layer=\"" + getName() + "\" path=" + getPath().getName()
+                + " id=" + getId()
+                + " geomType=" + getGeometryType()
+                + " values=" + summarizeContentValues(contentValues);
+        if (error == null) {
+            Log.w(Constants.TAG, message);
+            HyperLog.w(Constants.TAG, message);
+        } else {
+            Log.e(Constants.TAG, message, error);
+            HyperLog.w(Constants.TAG, message + " error=" + error.getClass().getSimpleName()
+                    + ": " + error.getMessage(), error);
+        }
+    }
+
+    private static String summarizeContentValues(ContentValues values) {
+        if (values == null) {
+            return "<null>";
+        }
+        StringBuilder sb = new StringBuilder("{size=").append(values.size()).append(", keys=[");
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : values.valueSet()) {
+            if (!first) {
+                sb.append(", ");
+            }
+            first = false;
+            Object value = entry.getValue();
+            sb.append(entry.getKey()).append(":");
+            if (value instanceof byte[]) {
+                sb.append("byte[").append(((byte[]) value).length).append("]");
+            } else {
+                sb.append(value == null ? "null" : value.getClass().getSimpleName());
+            }
+        }
+        return sb.append("]}").toString();
+    }
+
+    private static String summarizeBindArgs(List<Object> args) {
+        if (args == null) {
+            return "<null>";
+        }
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < args.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            Object arg = args.get(i);
+            if (arg instanceof byte[]) {
+                sb.append("byte[").append(((byte[]) arg).length).append("]");
+            } else {
+                sb.append(arg == null ? "null" : arg.getClass().getSimpleName());
+            }
+        }
+        return sb.append("]").toString();
     }
 
     public static int updateViaSql(SQLiteDatabase db,
@@ -3121,53 +3199,61 @@ public class VectorLayer
         }
 
         String columns[] = {FIELD_ID, FIELD_GEOM};
-        Cursor cursor = query(columns, null, null, null, null);
-        if (null != cursor) {
-            try {
-                if (cursor.moveToFirst()) {
-                    if (null != progressor) {
-                        progressor.setMax(cursor.getCount());
-                    }
+        Cursor cursor = null;
+        int counter = 0;
+        int cached = 0;
+        try {
+            mIsCacheRebuilding = true;
+            mCache = createNewCache();
+            mExtents.unInit();
 
-                    mIsCacheRebuilding = true;
-                    mCache = createNewCache();
-                    int counter = 0;
-                    do {
-                        GeoGeometry geometry = null;
-                        try {
-                            geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(1));
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+            cursor = query(columns, null, null, null, null);
+            if (null == cursor) {
+                return;
+            }
+            if (null != progressor) {
+                progressor.setMax(cursor.getCount());
+            }
 
-                        if (null != geometry) {
-                            long rowId = cursor.getLong(0);
-                            try { // fail on debugapp
-//                            Log.e("CCACHH","mCache.addItem: geometry.getEnvelope" );
-                                mCache.addItem(rowId, geometry.getEnvelope());
-                            } catch ( Exception ex){
-                                Log.e("rebuild cache envelope fail", ex != null ? ex.getMessage() : "null message");
-                            }
-                        }
-
-                        if (null != progressor) {
-                            if (progressor.isCanceled()) {
-                                break;
-                            }
-                            progressor.setValue(++counter);
-                            progressor.setMessage(
-                                    mContext.getString(R.string.process_features) + ": " + counter);
-                        }
-
-                    } while (cursor.moveToNext());
-
-                    mIsCacheRebuilding = false;
+            while (cursor.moveToNext()) {
+                GeoGeometry geometry = null;
+                try {
+                    geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(1));
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-            } finally {
+
+                if (null != geometry) {
+                    long rowId = cursor.getLong(0);
+                    try { // fail on debugapp
+//                            Log.e("CCACHH","mCache.addItem: geometry.getEnvelope" );
+                        cacheGeometryEnvelope(rowId, geometry);
+                        cached++;
+                    } catch ( Exception ex){
+                        Log.e("rebuild cache envelope fail", ex != null ? ex.getMessage() : "null message");
+                    }
+                }
+
+                if (null != progressor) {
+                    if (progressor.isCanceled()) {
+                        break;
+                    }
+                    progressor.setValue(++counter);
+                    progressor.setMessage(
+                            mContext.getString(R.string.process_features) + ": " + counter);
+                }
+            }
+
+            mCacheLoaded = true;
+        } finally {
+            if (null != cursor) {
                 cursor.close();
             }
-            save();
+            mIsCacheRebuilding = false;
         }
+        save();
+        HyperLog.d(Constants.TAG, "VectorLayer: " + getName()
+                + " spatial cache rebuilt features=" + cached);
     }
 
 

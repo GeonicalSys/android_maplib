@@ -112,6 +112,27 @@ public class LayerGroup
         return null;
     }
 
+    /**
+     * Clears collector project district metadata on this group and all nested groups.
+     *
+     * @return {@code true} if any group metadata changed.
+     */
+    public boolean clearCollectorDistrictRecursive() {
+        boolean changed = false;
+        if (!TextUtils.isEmpty(mCollectorDistrict)) {
+            setCollectorDistrict(null);
+            changed = true;
+        }
+        synchronized (this) {
+            for (ILayer layer : mLayers.values()) {
+                if (layer instanceof LayerGroup) {
+                    changed |= ((LayerGroup) layer).clearCollectorDistrictRecursive();
+                }
+            }
+        }
+        return changed;
+    }
+
 
     public LayerGroup(
             final Context context,

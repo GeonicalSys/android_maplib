@@ -71,6 +71,16 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
     public final static ArrayList<Integer> ALIGNMENTS = new ArrayList<>(Arrays.asList(
             new Integer[]{ALIGN_TOP, ALIGN_TOP_RIGHT, ALIGN_RIGHT, ALIGN_BOTTOM_RIGHT, ALIGN_BOTTOM, ALIGN_BOTTOM_LEFT, ALIGN_LEFT, ALIGN_TOP_LEFT}));
 
+    public final static int ICON_ANCHOR_CENTER = 0;
+    public final static int ICON_ANCHOR_TOP = 1;
+    public final static int ICON_ANCHOR_RIGHT = 2;
+    public final static int ICON_ANCHOR_BOTTOM = 3;
+    public final static int ICON_ANCHOR_LEFT = 4;
+    public final static int ICON_ANCHOR_TOP_LEFT = 5;
+    public final static int ICON_ANCHOR_TOP_RIGHT = 6;
+    public final static int ICON_ANCHOR_BOTTOM_RIGHT = 7;
+    public final static int ICON_ANCHOR_BOTTOM_LEFT = 8;
+
     protected int mType;
     protected float mSize, mTextSize = 3;
     protected Paint mOutPaint;
@@ -80,6 +90,14 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
     protected int mTextAlignment;
     protected int mTextColor = Color.BLACK;
     protected float mCircleBlur = MplStyleMapper.DEFAULT_CIRCLE_BLUR;
+    protected String mIconImage;
+    protected float mIconSize;
+    protected float mIconRotate;
+    protected float mIconOffsetX;
+    protected float mIconOffsetY;
+    protected int mIconAnchor = ICON_ANCHOR_CENTER;
+    protected boolean mIconAllowOverlap = true;
+    protected boolean mIconIgnorePlacement;
     protected LabelAttributes mLabelAttributes = LabelAttributes.defaults();
 
     public LabelAttributes getLabelAttributes() {
@@ -115,6 +133,14 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
         obj.mTextAlignment = mTextAlignment;
         obj.mTextColor = mTextColor;
         obj.mCircleBlur = mCircleBlur;
+        obj.mIconImage = mIconImage;
+        obj.mIconSize = mIconSize;
+        obj.mIconRotate = mIconRotate;
+        obj.mIconOffsetX = mIconOffsetX;
+        obj.mIconOffsetY = mIconOffsetY;
+        obj.mIconAnchor = mIconAnchor;
+        obj.mIconAllowOverlap = mIconAllowOverlap;
+        obj.mIconIgnorePlacement = mIconIgnorePlacement;
         obj.mText = mText;
         obj.mField = mField;
         obj.mLabelAttributes = mLabelAttributes.clone();
@@ -403,6 +429,72 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
         mCircleBlur = Math.max(0f, circleBlur);
     }
 
+    public String getIconImage() {
+        return mIconImage;
+    }
+
+    public void setIconImage(String iconImage) {
+        mIconImage = iconImage != null && !iconImage.trim().isEmpty()
+                ? iconImage.trim()
+                : null;
+    }
+
+    public float getIconSize() {
+        return mIconSize;
+    }
+
+    public void setIconSize(float iconSize) {
+        mIconSize = Math.max(0f, iconSize);
+    }
+
+    public float getIconRotate() {
+        return mIconRotate;
+    }
+
+    public void setIconRotate(float iconRotate) {
+        mIconRotate = iconRotate;
+    }
+
+    public float getIconOffsetX() {
+        return mIconOffsetX;
+    }
+
+    public void setIconOffsetX(float iconOffsetX) {
+        mIconOffsetX = iconOffsetX;
+    }
+
+    public float getIconOffsetY() {
+        return mIconOffsetY;
+    }
+
+    public void setIconOffsetY(float iconOffsetY) {
+        mIconOffsetY = iconOffsetY;
+    }
+
+    public int getIconAnchor() {
+        return mIconAnchor;
+    }
+
+    public void setIconAnchor(int iconAnchor) {
+        mIconAnchor = Math.max(ICON_ANCHOR_CENTER, Math.min(ICON_ANCHOR_BOTTOM_LEFT, iconAnchor));
+    }
+
+    public boolean isIconAllowOverlap() {
+        return mIconAllowOverlap;
+    }
+
+    public void setIconAllowOverlap(boolean iconAllowOverlap) {
+        mIconAllowOverlap = iconAllowOverlap;
+    }
+
+    public boolean isIconIgnorePlacement() {
+        return mIconIgnorePlacement;
+    }
+
+    public void setIconIgnorePlacement(boolean iconIgnorePlacement) {
+        mIconIgnorePlacement = iconIgnorePlacement;
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject rootConfig = super.toJSON();
@@ -421,6 +513,30 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
         }
         if (mCircleBlur > MplStyleMapper.DEFAULT_CIRCLE_BLUR) {
             rootConfig.put(JSON_CIRCLE_BLUR_KEY, mCircleBlur);
+        }
+        if (mIconImage != null) {
+            rootConfig.put(JSON_MARKER_ICON_IMAGE_KEY, mIconImage);
+        }
+        if (mIconSize > 0f) {
+            rootConfig.put(JSON_MARKER_ICON_SIZE_KEY, mIconSize);
+        }
+        if (mIconRotate != 0f) {
+            rootConfig.put(JSON_MARKER_ICON_ROTATE_KEY, mIconRotate);
+        }
+        if (mIconOffsetX != 0f) {
+            rootConfig.put(JSON_MARKER_ICON_OFFSET_X_KEY, mIconOffsetX);
+        }
+        if (mIconOffsetY != 0f) {
+            rootConfig.put(JSON_MARKER_ICON_OFFSET_Y_KEY, mIconOffsetY);
+        }
+        if (mIconAnchor != ICON_ANCHOR_CENTER) {
+            rootConfig.put(JSON_MARKER_ICON_ANCHOR_KEY, mIconAnchor);
+        }
+        if (!mIconAllowOverlap) {
+            rootConfig.put(JSON_MARKER_ICON_ALLOW_OVERLAP_KEY, false);
+        }
+        if (mIconIgnorePlacement) {
+            rootConfig.put(JSON_MARKER_ICON_IGNORE_PLACEMENT_KEY, true);
         }
         mLabelAttributes.mergeInto(rootConfig);
 
@@ -444,6 +560,14 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
         }
         mCircleBlur = (float) jsonObject.optDouble(
                 JSON_CIRCLE_BLUR_KEY, MplStyleMapper.DEFAULT_CIRCLE_BLUR);
+        setIconImage(jsonObject.optString(JSON_MARKER_ICON_IMAGE_KEY, null));
+        setIconSize((float) jsonObject.optDouble(JSON_MARKER_ICON_SIZE_KEY, 0));
+        mIconRotate = (float) jsonObject.optDouble(JSON_MARKER_ICON_ROTATE_KEY, 0);
+        mIconOffsetX = (float) jsonObject.optDouble(JSON_MARKER_ICON_OFFSET_X_KEY, 0);
+        mIconOffsetY = (float) jsonObject.optDouble(JSON_MARKER_ICON_OFFSET_Y_KEY, 0);
+        setIconAnchor(jsonObject.optInt(JSON_MARKER_ICON_ANCHOR_KEY, ICON_ANCHOR_CENTER));
+        mIconAllowOverlap = jsonObject.optBoolean(JSON_MARKER_ICON_ALLOW_OVERLAP_KEY, true);
+        mIconIgnorePlacement = jsonObject.optBoolean(JSON_MARKER_ICON_IGNORE_PLACEMENT_KEY, false);
         mLabelAttributes.readFrom(jsonObject);
 
         setPaintsColors();

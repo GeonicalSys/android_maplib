@@ -166,7 +166,16 @@ public class NetworkUtil
                             || u.contains("broken pipe")
                             || u.contains("econnreset")
                             || u.contains("etimedout")
-                            || u.contains("network is unreachable")) {
+                            || u.contains("network is unreachable")
+                            || u.contains("http 408")
+                            || u.contains("http 429")
+                            || u.contains("http 500")
+                            || u.contains("http 502")
+                            || u.contains("http 503")
+                            || u.contains("http 504")
+                            || u.contains("bad gateway")
+                            || u.contains("service unavailable")
+                            || u.contains("gateway timeout")) {
                         return true;
                     }
                 }
@@ -185,6 +194,36 @@ public class NetworkUtil
     public final static String HTTP_POST   = "POST";
     public final static String HTTP_PUT    = "PUT";
     public final static String HTTP_DELETE = "DELETE";
+
+    public static boolean isTransientHttpStatus(int responseCode) {
+        return responseCode == HttpURLConnection.HTTP_CLIENT_TIMEOUT
+                || responseCode == 429
+                || responseCode == HttpURLConnection.HTTP_INTERNAL_ERROR
+                || responseCode == HttpURLConnection.HTTP_BAD_GATEWAY
+                || responseCode == HttpURLConnection.HTTP_UNAVAILABLE
+                || responseCode == HttpURLConnection.HTTP_GATEWAY_TIMEOUT;
+    }
+
+    public static boolean isTransientNgwHttpError(
+            int responseCode,
+            String responseBody,
+            String responseMessage) {
+        if (isTransientHttpStatus(responseCode)) {
+            return true;
+        }
+        if (responseCode != 422) {
+            return false;
+        }
+        String text = ((responseBody == null ? "" : responseBody) + " "
+                + (responseMessage == null ? "" : responseMessage)).toLowerCase();
+        return text.contains("невозможно подключиться к базе данных")
+                || text.contains("ошибка внешней базы данных")
+                || text.contains("externaldatabaseerror")
+                || text.contains("external database error")
+                || text.contains("database connection")
+                || text.contains("could not connect")
+                || text.contains("connection refused");
+    }
 
 
     public NetworkUtil(Context context)
