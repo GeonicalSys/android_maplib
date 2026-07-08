@@ -27,6 +27,7 @@ import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.accounts.AccountManagerFuture;
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 
 import com.nextgis.maplib.datasource.ngw.Connection;
@@ -422,4 +423,5 @@ public interface IGISApplication
      */
     void scheduleCollectorLayerRemovalWithBackup(NGWVectorLayer layer);
 
+    Context getSelfContext();
 }

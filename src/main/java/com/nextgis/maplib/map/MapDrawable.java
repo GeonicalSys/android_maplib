@@ -454,23 +454,63 @@ public class MapDrawable
 
 
     // change feature id at map objects - features // objects
-    public void changeFeatureId(Long oldFeatureId,Long newFeatureId, int layerId){
+    public void changeFeatureId(Long oldFeatureId, Long newFeatureId, int layerId){
 
         String oldFeatureIdString = String.valueOf(oldFeatureId);
+        String newFeatureIdString = String.valueOf(newFeatureId);
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerId);
-        if (layerFeatures == null) return;
-        for (org.maplibre.geojson.Feature feature : layerFeatures){
-            if (feature.getStringProperty(prop_featureid).equals(oldFeatureIdString)) {
-                feature.addStringProperty(prop_featureid, String.valueOf(newFeatureId));
-                break;// only one feature with same id
+        if (layerFeatures != null) {
+            for (org.maplibre.geojson.Feature feature : layerFeatures){
+                if (feature.getStringProperty(prop_featureid).equals(oldFeatureIdString)) {
+                    feature.addStringProperty(prop_featureid, newFeatureIdString);
+                    break;// only one feature with same id
+                }
             }
         }
 
         for (org.maplibre.geojson.Feature feature : polygonFeatures){
             if (feature.getStringProperty(prop_featureid).equals(oldFeatureIdString)) {
-                feature.addStringProperty(prop_featureid, String.valueOf(newFeatureId));
+                feature.addStringProperty(prop_featureid, newFeatureIdString);
                 break;// only one feature with same id
             }
+        }
+
+        if (editingObject != null){
+            if (editingObject.editingFeature != null &&
+                    editingObject.editingFeature.hasProperty(prop_featureid) &&
+                    editingObject.editingFeature.getStringProperty(prop_featureid).
+                            equals(oldFeatureIdString)){
+                editingObject.editingFeature.addStringProperty(prop_featureid, newFeatureIdString);
+                Log.d("SELECC", "MapDrawable !!! changeFeatureId CHANGE editingFeature" );
+
+            }
+            if (editingObject.originalEditingFeature!=null && editingObject.originalEditingFeature.hasProperty(prop_featureid)
+                    && editingObject.originalEditingFeature.getStringProperty(prop_featureid).
+                    equals(oldFeatureIdString)) {
+                editingObject.originalEditingFeature
+                        .addStringProperty(prop_featureid, newFeatureIdString);
+                Log.d("SELECC", "MapDrawable !!! changeFeatureId CHANGE originalEditingFeature" );
+            }
+
+            if (originalSelectedFeature != null && originalSelectedFeature.getId() == oldFeatureId)
+                originalSelectedFeature.setId(newFeatureId);
+
+            if (selectedEditedSource != null) {
+
+                List<org.maplibre.geojson.Feature> layerFeaturesE = sourceFeaturesHashMap.get(layerId);
+                if (layerFeaturesE != null) {
+                    Iterator<org.maplibre.geojson.Feature> it = layerFeaturesE.iterator();
+                    while (it.hasNext()) {
+                        org.maplibre.geojson.Feature f = it.next();
+                        if (Objects.equals(f.getStringProperty(prop_featureid), newFeatureIdString)) {
+                            Log.d("SELECC", "MapDrawable layerFeaturesE " + it.toString() );
+                            it.remove();
+                        }
+                    }
+                    selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(layerFeaturesE));
+                }
+            }
+
         }
     }
 
@@ -2204,6 +2244,7 @@ public class MapDrawable
         style.addLayer(symbolLayer);
 
         if (!skipUserLayers) {
+            TrackLayer trackLayerSaved = null;
             final Map<Integer, Integer> layersType = new HashMap<>();
             final Map<Integer, com.nextgis.maplib.display.Style> layersStyle = new HashMap<>();
             final Map<Integer, String> rasterLayersURLMap = new HashMap<>();
@@ -2233,6 +2274,7 @@ public class MapDrawable
                     sourcesOrder.put(layer.getId(), new ArrayList<>());
                 } else if (iLayer instanceof TrackLayer) {
                     TrackLayer layer = (TrackLayer) iLayer;
+                    trackLayerSaved = layer;
                     layersType.put(layer.getId(), GT_TRACK_WA);
                     tracksFeatures.clear();
                     tracksFeatures.addAll(createFeatureListFromTrackLayer(layer));
@@ -2340,6 +2382,10 @@ public class MapDrawable
 
                     checkLayerVisibility(entry.getKey());
                 });
+            }
+
+            if (trackLayerSaved != null && trackLayerSaved.getId() != 0) {
+                checkLayerVisibility(trackLayerSaved.getId());
             }
         }
 
@@ -4225,6 +4271,8 @@ public class MapDrawable
     }
 
     public void reloadTrackListToMap(){
+        if (maplibreMap.get() == null)
+            return;
         List<ILayer> tracks = new ArrayList<>();
         LayerGroup.getLayersByType(this, Constants.LAYERTYPE_TRACKS, tracks);
         if (tracks.size() > 0){

@@ -57,6 +57,7 @@ import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.SettingsConstants;
 import com.nextgis.maplib.util.SyncResultUtil;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -405,6 +406,7 @@ public class SyncAdapter
             SyncResult syncResult,
             Bundle bundle)
     {
+        Log.e("SYNC2S", "sync syncAdapter account  " + account.name );
         Log.d("SSYNC", "sync syncAdapter account - " + account.name);
 
         HyperLog.v(Constants.TAG, "SyncAdapter: StartSynchronization");
