@@ -9,6 +9,7 @@ import org.json.JSONObject;
 
 import java.util.Iterator;
 
+import com.nextgis.maplib.map.LayerOriginMetadata;
 import com.nextgis.maplib.util.GeoConstants;
 
 import java.security.MessageDigest;
@@ -19,6 +20,10 @@ import java.security.NoSuchAlgorithmException;
  * Extracted from LayerFillService so the same logic can be used from NGWVectorLayer during sync.
  */
 public final class LayerConfigUtil {
+    public static final String JSON_MOBILE_RENDER_MODE = "mobile_render_mode";
+    public static final String JSON_RENDER_MODE = "render_mode";
+    public static final String JSON_LAYER_ORIGIN = "layer_origin";
+    public static final String JSON_MOBILE = "mobile";
 
     private LayerConfigUtil() {
     }
@@ -67,6 +72,57 @@ public final class LayerConfigUtil {
 
     public static JSONObject parseLayerConfigObject(String raw) throws JSONException {
         return parseLayerConfigObject(raw, 0);
+    }
+
+    /**
+     * Collector/local-vector-tiles foundation.
+     *
+     * The NGW mobile config may declare the rendering path independently of layer data. This helper
+     * intentionally accepts a few wrapper shapes so future Collector sync and manual NGW imports keep
+     * using the same contract instead of re-implementing string checks in several places.
+     */
+    public static String extractRenderMode(JSONObject cfg) {
+        if (cfg == null) {
+            return null;
+        }
+        String mode = readRenderModeValue(cfg);
+        if (!isEmptyString(mode)) {
+            return LayerOriginMetadata.normalizeRenderMode(mode);
+        }
+        JSONObject origin = cfg.optJSONObject(JSON_LAYER_ORIGIN);
+        mode = readRenderModeValue(origin);
+        if (!isEmptyString(mode)) {
+            return LayerOriginMetadata.normalizeRenderMode(mode);
+        }
+        JSONObject mobile = cfg.optJSONObject(JSON_MOBILE);
+        mode = readRenderModeValue(mobile);
+        return isEmptyString(mode) ? null : LayerOriginMetadata.normalizeRenderMode(mode);
+    }
+
+    public static String extractRenderModeFromRawConfig(String raw) {
+        if (isEmptyString(raw)) {
+            return null;
+        }
+        try {
+            return extractRenderMode(parseLayerConfigObject(raw));
+        } catch (JSONException ignored) {
+            return null;
+        }
+    }
+
+    private static String readRenderModeValue(JSONObject json) {
+        if (json == null) {
+            return null;
+        }
+        String mode = json.optString(JSON_MOBILE_RENDER_MODE, null);
+        if (!isEmptyString(mode)) {
+            return mode;
+        }
+        return json.optString(JSON_RENDER_MODE, null);
+    }
+
+    private static boolean isEmptyString(String value) {
+        return value == null || value.length() == 0;
     }
 
     private static void mergeCollectorNgwMetadataOntoLayerJson(JSONObject wrapper, JSONObject layerJson)

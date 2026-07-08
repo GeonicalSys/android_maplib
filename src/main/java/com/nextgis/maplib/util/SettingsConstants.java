@@ -34,6 +34,10 @@ public interface SettingsConstants
     String KEY_PREF_GEOM_CACHE_GENERATION = "geom_cache_generation";
     /** MD5 hash of last applied config description text; avoids false-positive config reloads. */
     String KEY_PREF_LAST_CONFIG_HASH        = "last_config_hash";
+    /** MD5 hash of last applied NGFP form payload; used by Collector form sync. */
+    String KEY_PREF_LAST_FORM_HASH          = "last_form_hash";
+    /** Collector architecture foundation: last project selected in multi-project UX. */
+    String KEY_PREF_ACTIVE_COLLECTOR_PROJECT_UID = "active_collector_project_uid";
     String KEY_PREF_LOCATION_SOURCE         = "location_source";
     String KEY_PREF_LOCATION_MIN_TIME       = "location_min_time";
     String KEY_PREF_LOCATION_MIN_DISTANCE   = "location_min_distance";

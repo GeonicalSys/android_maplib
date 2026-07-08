@@ -116,4 +116,9 @@
     <string name="map_loading_cache_hit">Чтение кэша: </string>
     <string name="ngw_schema_mismatch_title">Изменилась схема слоя</string>
     <string name="ngw_schema_mismatch_has_local_changes">Структура слоя на сервере больше не совпадает с картой. На устройстве есть несинхронизированные правки. Синхронизируйте или удалите локальные изменения, затем удалите слой и добавьте его снова из NextGIS Web.</string>
+    <string name="ngw_schema_mismatch_backup_reload">Ошибка в слое %1$s. Он будет перезагружен. Чтобы не потерять данные, отправьте администратору ГИС резервную копию.</string>
+    <string name="ngw_schema_mismatch_backup_failed">Ошибка в слое %1$s. Его нужно перезагрузить, но приложению не удалось создать резервную копию, поэтому слой оставлен без изменений.</string>
+    <string name="collector_layer_removed_title">Изменился состав проекта Collector</string>
+    <string name="collector_layer_removed_from_project">Слой %1$s будет удален из проекта.</string>
+    <string name="collector_layer_backup_failed">Слой %1$s удален из проекта Collector, но приложению не удалось создать резервную копию, поэтому локальный слой оставлен без изменений.</string>
 </resources>

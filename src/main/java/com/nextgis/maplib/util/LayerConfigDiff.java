@@ -1,6 +1,8 @@
 package com.nextgis.maplib.util;
 
 import com.nextgis.maplib.datasource.Field;
+import com.nextgis.maplib.map.LayerOriginMetadata;
+import com.nextgis.maplib.map.NGWVectorLayer;
 import com.nextgis.maplib.map.VectorLayer;
 
 import org.json.JSONArray;
@@ -34,6 +36,8 @@ public final class LayerConfigDiff {
     private boolean mLayerOpacityChanged;
     private boolean mEditableChanged;
     private boolean mSyncSettingsChanged;
+    private boolean mRenderModeChanged;
+    private String mServerRenderMode;
 
     private final JSONObject mServerConfig;
 
@@ -56,6 +60,8 @@ public final class LayerConfigDiff {
     public boolean isLayerOpacityChanged() { return mLayerOpacityChanged; }
     public boolean isEditableChanged() { return mEditableChanged; }
     public boolean isSyncSettingsChanged() { return mSyncSettingsChanged; }
+    public boolean isRenderModeChanged() { return mRenderModeChanged; }
+    public String getServerRenderMode() { return mServerRenderMode; }
     public JSONObject getServerConfig() { return mServerConfig; }
 
     /**
@@ -87,6 +93,7 @@ public final class LayerConfigDiff {
             diff.compareZoom(serverConfig, local);
             diff.compareName(serverConfig, local);
             diff.compareSyncSettings(serverConfig, local);
+            diff.compareRenderMode(serverConfig, local);
         } catch (JSONException e) {
             // parse error in config -- treat as match (fail open, don't break sync)
         }
@@ -235,6 +242,27 @@ public final class LayerConfigDiff {
         } catch (JSONException ignored) {}
     }
 
+    private void compareRenderMode(JSONObject cfg, VectorLayer local) {
+        // Local vector tiles foundation: render path is deliberately a soft config property.
+        String serverMode = LayerConfigUtil.extractRenderMode(cfg);
+        if (serverMode == null) {
+            return;
+        }
+        String localMode = LayerOriginMetadata.RENDER_MODE_CLASSIC;
+        if (local instanceof NGWVectorLayer) {
+            LayerOriginMetadata origin = ((NGWVectorLayer) local).getLayerOriginMetadata();
+            if (origin != null) {
+                localMode = origin.getRenderMode();
+            }
+        }
+        localMode = LayerOriginMetadata.normalizeRenderMode(localMode);
+        if (!serverMode.equals(localMode)) {
+            mRenderModeChanged = true;
+            mServerRenderMode = serverMode;
+            markSoft();
+        }
+    }
+
     private void markSoft() {
         if (mLevel == ChangeLevel.MATCH) {
             mLevel = ChangeLevel.SOFT;
@@ -294,6 +322,7 @@ public final class LayerConfigDiff {
         if (mLayerOpacityChanged) sb.append(" layerOpacity");
         if (mEditableChanged) sb.append(" editable");
         if (mSyncSettingsChanged) sb.append(" syncSettings");
+        if (mRenderModeChanged) sb.append(" renderMode=").append(mServerRenderMode);
         sb.append("]");
         return sb.toString();
     }

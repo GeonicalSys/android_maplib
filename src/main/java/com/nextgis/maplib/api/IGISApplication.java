@@ -357,8 +357,69 @@ public interface IGISApplication
     /**
      * Local NGW vector layer schema no longer matches server metadata during sync.
      * Implementation should remove the layer and enqueue {@code LayerFillService} refill on the main thread,
-     * unless unsynced local edits exist (then notify user only).
+     * after trying to send local edits and creating a data backup if unsent edits remain.
      */
     void scheduleNgwLayerRebuildAfterSchemaMismatch(NGWVectorLayer layer);
+
+    /**
+     * Collector composition sync apply path.
+     *
+     * Adds project-managed NGW layers that appeared in the Web GIS Collector project after the
+     * local project was imported. Implementations should enqueue {@code LayerFillService} tasks
+     * with Collector origin metadata; this is intentionally an app hook because maplib must not
+     * depend on maplibui service classes.
+     */
+    void scheduleCollectorProjectLayerFills(
+            int groupId,
+            String accountName,
+            String collectorProjectUid,
+            long[] remoteIds,
+            String[] names,
+            String[] configJsons,
+            long[] formIds,
+            boolean[] collectorEditables,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Update only the local NGFP files and form metadata for a project-managed Collector layer.
+     * Data tables must not be rebuilt here; failed downloads should leave the previous form intact
+     * so the next sync can retry.
+     */
+    void applyCollectorLayerForm(
+            NGWVectorLayer layer,
+            long formId,
+            String formHash);
+
+    /**
+     * Refill an existing project-managed Collector layer because the project definition changed
+     * (for example, the server form changed). Implementations must first try to send local edits
+     * and create a data-only backup if unsent edits remain.
+     */
+    void scheduleCollectorLayerRebuildFromProject(
+            NGWVectorLayer layer,
+            long formId,
+            int collectorOrder,
+            long[] fullCollectorProjectRemoteIds,
+            boolean collectorEditable,
+            String layerConfigJson);
+
+    /**
+     * Apply non-destructive Collector project state (order/editability/origin metadata) to an
+     * already present local layer. Data must not be deleted here.
+     */
+    void applyCollectorLayerProjectState(
+            NGWVectorLayer layer,
+            int collectorOrder,
+            long[] fullCollectorProjectRemoteIds,
+            boolean collectorEditable);
+
+    /**
+     * Collector composition sync foundation.
+     *
+     * Future Collector project composition sync should call this for a local project-managed layer
+     * that disappeared from the Web GIS Collector project. Implementations must create a data-only
+     * backup before deleting the local layer.
+     */
+    void scheduleCollectorLayerRemovalWithBackup(NGWVectorLayer layer);
 
 }

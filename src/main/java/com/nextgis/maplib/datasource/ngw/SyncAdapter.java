@@ -190,6 +190,8 @@ public class SyncAdapter
                             && (bundle == null || bundle.getString(ACTION_LPATH) == null)) {
                         syncNgwConfigForSyncDisabledLayers(
                                 account, mapContentProviderHelper, authority, syncResult);
+                        CollectorProjectCompositionSync.runApplyForAccount(
+                                getContext(), account, mapContentProviderHelper);
                     }
                 } else {
                     Log.d("SSYNC", "mapContentProviderHelper=null");

@@ -2518,10 +2518,27 @@ public class VectorLayer
             }
         }
 
+        if (diff.isRenderModeChanged() && this instanceof NGWVectorLayer) {
+            String renderMode = LayerOriginMetadata.normalizeRenderMode(diff.getServerRenderMode());
+            NGWVectorLayer ngwLayer = (NGWVectorLayer) this;
+            LayerOriginMetadata origin = ngwLayer.getLayerOriginMetadata();
+            if (origin == null) {
+                // Foundation for future local-vector-tiles: legacy NGW layers may not have origin
+                // metadata yet, but render mode still needs a stable place to live.
+                origin = LayerOriginMetadata.manualNgwLayer(0L, renderMode);
+            } else {
+                origin.setRenderMode(renderMode);
+            }
+            ngwLayer.setLayerOriginMetadata(origin);
+            changed = true;
+            Log.i(TAG, "applySoftConfigUpdate: render_mode updated to " + renderMode);
+        }
+
         if (changed) {
             save();
             if (diff.isRendererChanged() || diff.isZoomChanged() || diff.isVisibilityChanged()
-                    || diff.isLayerOpacityChanged() || diff.isEditableChanged()) {
+                    || diff.isLayerOpacityChanged() || diff.isEditableChanged()
+                    || diff.isRenderModeChanged()) {
                 notifyLayerChanged();
             }
         }

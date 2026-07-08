@@ -56,6 +56,13 @@ public interface Constants
             || MAP_STARTUP_PARALLEL_VECTOR_PREP;
 
     /**
+     * Foundation flag for Collector layers with {@code layer_origin.render_mode=local_vector_tiles}.
+     * Keep disabled until the local MVT/PMTiles provider is implemented and tested; while disabled,
+     * MapLibre falls back to the classic GeoJSON source path.
+     */
+    boolean LOCAL_VECTOR_TILES_ENABLED = true;
+
+    /**
      * @deprecated Use {@link #VECTOR_RENDER_DISK_CACHE_ENABLED} and {@link #MAP_STARTUP_PARALLEL_VECTOR_PREP}.
      */
     @Deprecated

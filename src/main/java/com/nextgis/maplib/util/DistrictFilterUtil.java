@@ -1,6 +1,6 @@
 /*
  * Project:  NextGIS Mobile
- * Purpose:  Optional PostGIS district filter for collector projects (fld_district=...).
+ * Purpose:  Optional district filter for collector project vector layers (fld_district=...).
  * *****************************************************************************
  * Copyright (c) 2016-2026 NextGIS, info@nextgis.com
  *
@@ -76,7 +76,7 @@ public final class DistrictFilterUtil {
     }
 
     /**
-     * Opt-in filter: PostGIS layer + non-empty collector district + {@code district} field in schema.
+     * Opt-in filter: vector/PostGIS layer + non-empty collector district + {@code district} field in schema.
      */
     public static Decision resolveDistrictFilter(
             int ngwLayerType,
@@ -86,10 +86,11 @@ public final class DistrictFilterUtil {
         if (isEmpty(collectorDistrict)) {
             return new Decision(false, "", "collector district is empty");
         }
-        if (ngwLayerType != Connection.NGWResourceTypePostgisLayer) {
+        if (!isSupportedLayerType(ngwLayerType)) {
             return new Decision(false, "",
-                    "layer type " + ngwLayerType + " is not PostGIS (expected "
-                            + Connection.NGWResourceTypePostgisLayer + ")");
+                    "layer type " + ngwLayerType + " does not support district filter"
+                            + " (expected " + Connection.NGWResourceTypePostgisLayer
+                            + " or " + Connection.NGWResourceTypeVectorLayer + ")");
         }
         if (!hasField(fields, DISTRICT_FIELD_KEY)) {
             String fieldKeys = fields == null ? "null" : fields.keySet().toString();
@@ -101,6 +102,11 @@ public final class DistrictFilterUtil {
             return new Decision(false, "", "could not build fld_ query for district=" + collectorDistrict);
         }
         return new Decision(true, serverWhere, "");
+    }
+
+    private static boolean isSupportedLayerType(int ngwLayerType) {
+        return ngwLayerType == Connection.NGWResourceTypePostgisLayer
+                || ngwLayerType == Connection.NGWResourceTypeVectorLayer;
     }
 
     private static boolean isEmpty(CharSequence value) {

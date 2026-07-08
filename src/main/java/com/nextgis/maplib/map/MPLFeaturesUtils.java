@@ -88,6 +88,7 @@ import org.maplibre.android.style.sources.GeoJsonSource;
 import org.maplibre.android.style.sources.RasterSource;
 import org.maplibre.android.style.sources.Source;
 import org.maplibre.android.style.sources.TileSet;
+import org.maplibre.android.style.sources.VectorSource;
 import org.maplibre.geojson.Feature;
 import org.maplibre.geojson.FeatureCollection;
 import org.maplibre.geojson.Geometry;
@@ -1082,6 +1083,211 @@ public class MPLFeaturesUtils {
             else
                 vectorTextSource.setGeoJson(FeatureCollection.fromFeatures(points));
             sourceHashMap.put(layerPath + source_polygon_text, vectorTextSource);
+        }
+    }
+
+    static public boolean createLocalVectorTileSourceForLayer(
+            int layerId,
+            final Style style,
+            String layerPath,
+            String tileUrl,
+            float minZoom,
+            float maxZoom) {
+        if (style == null || TextUtils.isEmpty(layerPath) || TextUtils.isEmpty(tileUrl)) {
+            return false;
+        }
+        Source existing = style.getSource(layerPath);
+        if (existing != null && !(existing instanceof VectorSource)) {
+            style.removeSource(layerPath);
+            existing = null;
+        }
+        if (existing == null) {
+            TileSet tileSet = new TileSet("2.2.0", tileUrl);
+            tileSet.setScheme("xyz");
+            if (minZoom >= 0f) {
+                tileSet.setMinZoom(minZoom);
+            }
+            if (maxZoom >= 0f) {
+                tileSet.setMaxZoom(maxZoom);
+            }
+            style.addSource(new VectorSource(layerPath, tileSet));
+            Log.d("Mbgl", "create local vector tile source: " + layerPath + " url=" + tileUrl);
+        }
+        return true;
+    }
+
+    static public void createFillLayerForLocalVectorTileLayer(
+            int layerId,
+            int layerType,
+            final Style style,
+            Map<Integer, org.maplibre.android.style.layers.Layer> layersHashMap,
+            Map<Integer, org.maplibre.android.style.layers.Layer> layersHashMap2,
+            Map<Integer, org.maplibre.android.style.layers.Layer> symbolsLayerHashMap,
+            @Nullable com.nextgis.maplib.display.Style layerStyle,
+            ILayer iLayer,
+            String layerPath,
+            org.maplibre.android.style.layers.Layer signaturesRootLayer) {
+        if (style == null || TextUtils.isEmpty(layerPath)) {
+            return;
+        }
+        if (layerType != GTPolygon && layerType != GTMultiPolygon) {
+            return;
+        }
+
+        float minZoom = -1;
+        float maxZoom = -1;
+        if (iLayer != null) {
+            minZoom = ((com.nextgis.maplib.map.Layer) iLayer).getMinZoom();
+            maxZoom = ((com.nextgis.maplib.map.Layer) iLayer).getMaxZoom();
+        }
+        float layerOpacityFactor = 1f;
+        if (iLayer instanceof com.nextgis.maplib.map.Layer) {
+            layerOpacityFactor = MplStyleMapper.alphaToOpacity(
+                    ((com.nextgis.maplib.map.Layer) iLayer).getLayerOpacity());
+        }
+
+        String fillId = namePrefix + layer_namepart + layerId;
+        String outlineId = fillId + outline_namepart;
+        String symbolId = "symbol-" + namePrefix + layer_namepart + layerId;
+
+        MplLayerStyleVars vars = MplLayerStyleVars.from(layerStyle, layerType);
+        LabelAttributes labelAttributes = LabelAttributes.fromStyle(layerStyle);
+
+        FillLayer fillLayer = style.getLayer(fillId) instanceof FillLayer
+                ? (FillLayer) style.getLayer(fillId) : null;
+        if (style.getLayer(fillId) != null && fillLayer == null) {
+            style.removeLayer(style.getLayer(fillId));
+        }
+        if (fillLayer == null) {
+            fillLayer = new FillLayer(fillId, layerPath)
+                    .withSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+        } else {
+            fillLayer.setSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+        }
+
+        LineLayer outlineLayer = style.getLayer(outlineId) instanceof LineLayer
+                ? (LineLayer) style.getLayer(outlineId) : null;
+        if (style.getLayer(outlineId) != null && outlineLayer == null) {
+            style.removeLayer(style.getLayer(outlineId));
+        }
+        if (outlineLayer == null) {
+            outlineLayer = new LineLayer(outlineId, layerPath)
+                    .withSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+        } else {
+            outlineLayer.setSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+        }
+
+        Expression sortKey = Expression.toNumber(Expression.get(prop_order));
+        fillLayer.setProperties(
+                PropertyFactory.fillColor(getColorName(vars.fillColor)),
+                PropertyFactory.fillOpacity(MplStyleMapper.opacityWithLayerMultiplier(
+                        Expression.literal(vars.fillOpacity), layerOpacityFactor)),
+                PropertyFactory.fillAntialias(true),
+                PropertyFactory.fillSortKey(sortKey));
+
+        outlineLayer.setProperties(
+                PropertyFactory.lineColor(getColorName(vars.outlineColor)),
+                PropertyFactory.lineWidth(MplStyleMapper.zoomScaleExpression(
+                        Expression.literal(getMPLThinkness(vars.thickness)),
+                        vars.scaleSizeWithZoom,
+                        vars.sizeZoomScaleStops)),
+                PropertyFactory.lineOpacity(MplStyleMapper.opacityWithLayerMultiplier(
+                        Expression.literal(vars.strokeOpacity), layerOpacityFactor)),
+                PropertyFactory.lineSortKey(sortKey));
+
+        if (style.getLayer(fillLayer.getId()) == null) {
+            if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null) {
+                style.addLayerBelow(fillLayer, signaturesRootLayer.getId());
+            } else {
+                style.addLayer(fillLayer);
+            }
+        }
+        if (style.getLayer(outlineLayer.getId()) == null) {
+            if (style.getLayer(fillLayer.getId()) != null) {
+                style.addLayerAbove(outlineLayer, fillLayer.getId());
+            } else if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null) {
+                style.addLayerBelow(outlineLayer, signaturesRootLayer.getId());
+            } else {
+                style.addLayer(outlineLayer);
+            }
+        }
+        layersHashMap.put(layerId, fillLayer);
+        layersHashMap2.put(layerId, outlineLayer);
+
+        boolean needLabels = false;
+        if (layerStyle instanceof ITextStyle) {
+            ITextStyle textStyle = (ITextStyle) layerStyle;
+            needLabels = !TextUtils.isEmpty(textStyle.getField())
+                    || !TextUtils.isEmpty(textStyle.getText())
+                    || LabelTemplate.hasTemplate(labelAttributes.getLabelTemplate());
+        }
+        org.maplibre.android.style.layers.Layer existingSymbol = style.getLayer(symbolId);
+        if (!needLabels) {
+            if (existingSymbol != null) {
+                style.removeLayer(existingSymbol);
+            }
+            symbolsLayerHashMap.remove(layerId);
+        } else {
+            SymbolLayer symbolLayer = existingSymbol instanceof SymbolLayer
+                    ? (SymbolLayer) existingSymbol : null;
+            if (existingSymbol != null && symbolLayer == null) {
+                style.removeLayer(existingSymbol);
+            }
+            if (symbolLayer == null) {
+                symbolLayer = new SymbolLayer(symbolId, layerPath)
+                        .withSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+            } else {
+                symbolLayer.setSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+            }
+            String[] font = labelAttributes.getTextFontStack();
+            float defaultTextOpacity = labelAttributes.textOpacityFloat();
+            symbolLayer.setProperties(
+                    PropertyFactory.textField("{" + prop_signature_text + "}"),
+                    PropertyFactory.textSize(buildTextSizeExpression(vars.textSize, labelAttributes, false)),
+                    PropertyFactory.textOpacity(MplStyleMapper.textOpacityExpression(
+                            prop_text_opacity, defaultTextOpacity, layerOpacityFactor)),
+                    PropertyFactory.textColor(getColorName(vars.textColor)),
+                    PropertyFactory.textHaloColor(getColorName(labelAttributes.getTextHaloColor())),
+                    PropertyFactory.textHaloWidth(labelAttributes.getTextHaloWidth()),
+                    PropertyFactory.textHaloBlur(labelAttributes.getTextHaloBlur()),
+                    PropertyFactory.symbolPlacement(Property.SYMBOL_PLACEMENT_POINT),
+                    PropertyFactory.textAllowOverlap(labelAttributes.getTextAllowOverlap() != null
+                            && labelAttributes.getTextAllowOverlap()),
+                    PropertyFactory.textOptional(labelAttributes.isTextOptional()),
+                    PropertyFactory.symbolSortKey(sortKey),
+                    PropertyFactory.textFont(font),
+                    PropertyFactory.textMaxWidth(Math.max(0f, labelAttributes.getTextMaxWidth())));
+            if (style.getLayer(symbolLayer.getId()) == null) {
+                if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null) {
+                    style.addLayerAbove(symbolLayer, signaturesRootLayer.getId());
+                } else if (style.getLayer(outlineLayer.getId()) != null) {
+                    style.addLayerAbove(symbolLayer, outlineLayer.getId());
+                } else {
+                    style.addLayer(symbolLayer);
+                }
+            }
+            symbolsLayerHashMap.put(layerId, symbolLayer);
+            float labelMinZoom = labelAttributes.getLabelMinZoom();
+            float labelMaxZoom = labelAttributes.getLabelMaxZoom();
+            if (labelMinZoom >= 0f) {
+                symbolLayer.setMinZoom(labelMinZoom);
+            } else if (minZoom != -1) {
+                symbolLayer.setMinZoom(minZoom);
+            }
+            if (labelMaxZoom >= 0f) {
+                symbolLayer.setMaxZoom(labelMaxZoom);
+            } else if (maxZoom != -1) {
+                symbolLayer.setMaxZoom(maxZoom);
+            }
+        }
+
+        if (minZoom != -1) {
+            fillLayer.setMinZoom(minZoom);
+            outlineLayer.setMinZoom(minZoom);
+        }
+        if (maxZoom != -1) {
+            fillLayer.setMaxZoom(maxZoom);
+            outlineLayer.setMaxZoom(maxZoom);
         }
     }
 

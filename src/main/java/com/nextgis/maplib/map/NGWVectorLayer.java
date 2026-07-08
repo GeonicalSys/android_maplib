@@ -81,6 +81,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.SocketException;
@@ -151,6 +152,28 @@ public class NGWVectorLayer
     private static final int NGW_FILL_SQL_TX_BATCH = 250;
     private static final int NGW_SYNC_PULL_MAX_ATTEMPTS = 3;
     private static final long NGW_SYNC_PULL_RETRY_DELAY_MS = 1200L;
+
+    private static final class FeaturePushResult {
+        final boolean success;
+        final long remoteFeatureId;
+
+        FeaturePushResult(boolean success, long remoteFeatureId) {
+            this.success = success;
+            this.remoteFeatureId = remoteFeatureId;
+        }
+
+        static FeaturePushResult failed() {
+            return new FeaturePushResult(false, Constants.NOT_FOUND);
+        }
+
+        static FeaturePushResult handledWithoutRemoteId() {
+            return new FeaturePushResult(true, Constants.NOT_FOUND);
+        }
+
+        static FeaturePushResult success(long remoteFeatureId) {
+            return new FeaturePushResult(true, remoteFeatureId);
+        }
+    }
 
     protected static final int DIRECTION_TO = 1;
     protected static final int DIRECTION_FROM = 2;
@@ -300,7 +323,7 @@ public class NGWVectorLayer
     }
 
     /**
-     * Opt-in PostGIS district filter from parent {@link LayerGroup#getCollectorDistrict()}.
+     * Opt-in collector district filter from parent {@link LayerGroup#getCollectorDistrict()}.
      *
      * @return {@code true} if {@code fld_district=} filter is active for this fill/pull
      */
@@ -317,6 +340,7 @@ public class NGWVectorLayer
                 + " districtSource=" + districtSource
                 + " district=" + (TextUtils.isEmpty(district) ? "<empty>" : district)
                 + " ngwLayerType=" + mNGWLayerType
+                + " vectorType=" + Connection.NGWResourceTypeVectorLayer
                 + " postgisType=" + NGWResourceTypePostgisLayer);
 
         DistrictFilterUtil.Decision decision = DistrictFilterUtil.resolveDistrictFilter(
@@ -1069,10 +1093,14 @@ public class NGWVectorLayer
                     } else if (0 != (changeOperation & Constants.CHANGE_OPERATION_NEW)) {
                         HyperLog.v(Constants.TAG, "NGWVectorLayer: feature add start featureID = "  + changeFeatureId );
 
-                        if (addFeatureOnServer(changeFeatureId, syncResult, accountData)) {
+                        FeaturePushResult pushResult =
+                                addFeatureOnServer(changeFeatureId, syncResult, accountData);
+                        if (pushResult.success) {
                             FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
                             FeatureChanges.removeChangesToLast(changeTableName, changeFeatureId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
+                            refreshFeatureFromServerAfterPush(
+                                    pushResult.remoteFeatureId, accountData, "addFeature");
                         } else {
                             HyperLog.v(Constants.TAG, "NGWVectorLayer: feature add FAILED featureID = "  + changeFeatureId );
 
@@ -1089,6 +1117,8 @@ public class NGWVectorLayer
                             FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
                             FeatureChanges.removeChangesToLast(changeTableName, changeFeatureId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
+                            refreshFeatureFromServerAfterPush(
+                                    changeFeatureId, accountData, "changeFeature");
                         } else {
                             HyperLog.v(Constants.TAG, "NGWVectorLayer: feature change FAILED featureID = "  + changeFeatureId );
 
@@ -2491,7 +2521,7 @@ public class NGWVectorLayer
                 + " fid=" + featureId);
     }
 
-    protected boolean addFeatureOnServer(
+    protected FeaturePushResult addFeatureOnServer(
             long featureId,
             SyncResult syncResult,
             AccountUtil.AccountData accountData )
@@ -2503,7 +2533,7 @@ public class NGWVectorLayer
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer !mNet.isNetworkAvailable() no network!!! ");
             SyncResultUtil.markNetworkUnavailable(syncResult);
-            return false;
+            return FeaturePushResult.failed();
         }
         Uri uri = ContentUris.withAppendedId(getContentUri(), featureId);
         uri = uri.buildUpon().fragment(NO_SYNC).build();
@@ -2511,7 +2541,7 @@ public class NGWVectorLayer
         Cursor cursor = query(uri, null, null, null, "_id", null);
         if (null == cursor) {
             logBuggyChangeDrop("addFeatureOnServer (null cursor)", featureId);
-            return true; //just remove buggy data
+            return FeaturePushResult.handledWithoutRemoteId(); //just remove buggy data
         }
 
         try {
@@ -2537,44 +2567,45 @@ public class NGWVectorLayer
                                 403);
                     }
                     reportSyncHttpFailure("addFeature", featureId, -1, syncResult, response);
-                    return false;
+                    return FeaturePushResult.failed();
                 }
 
                 //set new id from server // like: {"id": 24}
                 JSONObject result = new JSONObject(response.getResponseBody());
+                long id = Constants.NOT_FOUND;
                 if (result.has(Constants.JSON_ID_KEY)) {
-                    long id = result.getLong(Constants.JSON_ID_KEY);
+                    id = result.getLong(Constants.JSON_ID_KEY);
 //                    Log.e("FEA", "addFeatureOnServer start changeFeatureId from " + featureId + " to " + id  );
                     changeFeatureId(featureId, id);
                 }
 
-                return true;
+                return FeaturePushResult.success(id);
             } else {
                 logBuggyChangeDrop("addFeatureOnServer (empty cursor)", featureId);
-                return true; //just remove buggy data
+                return FeaturePushResult.handledWithoutRemoteId(); //just remove buggy data
             }
 
         } catch (JSONException e) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer JSONException: " + e.getMessage());
             log(e, "addFeatureOnServer JSONException");
             syncResult.stats.numParseExceptions++;
-            return false;
+            return FeaturePushResult.failed();
         } catch (IOException e) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer IOException: " + e.getMessage());
             log(e, "addFeatureOnServer IOException");
             SyncResultUtil.markConnectFailed(syncResult);
             syncResult.stats.numInserts++;
-            return false;
+            return FeaturePushResult.failed();
         } catch (SQLiteConstraintException e) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer SQLiteConstraintException: " + e.getMessage());
             log(e, "addFeatureOnServer SQLiteConstraintException");
             syncResult.stats.numConflictDetectedExceptions++;
-            return false;
+            return FeaturePushResult.failed();
         } catch (IllegalStateException e) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer IllegalStateException: " + e.getMessage());
             log(e, "addFeatureOnServer IllegalStateException");
             syncResult.stats.numAuthExceptions++;
-            return false;
+            return FeaturePushResult.failed();
         } finally {
             cursor.close();
         }
@@ -2698,6 +2729,164 @@ public class NGWVectorLayer
         // change on server
         String url = NGWUtil.getFeatureUrl(accountData.url, mRemoteId, featureId);
         return NetworkUtil.put(url, payload, accountData.login, accountData.password, false);
+    }
+
+    private void refreshFeatureFromServerAfterPush(
+            long featureId,
+            AccountUtil.AccountData accountData,
+            String sourceOperation)
+    {
+        if (featureId == Constants.NOT_FOUND) {
+            return;
+        }
+
+        String changeTableName = getChangeTableName();
+        if (hasPendingFeatureDataChanges(changeTableName, featureId)) {
+            HyperLog.d(Constants.TAG, "NGW post-push refresh skip: pending local data changes layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " fid=" + featureId
+                    + " op=" + sourceOperation);
+            return;
+        }
+
+        try {
+            Feature serverFeature = getFeatureFromServer(featureId, accountData);
+            if (serverFeature == null) {
+                return;
+            }
+
+            if (serverFeature.getId() != featureId) {
+                HyperLog.w(Constants.TAG, "NGW post-push refresh id mismatch layer=\""
+                        + ProdLogUtil.truncateForLog(getName(), 100)
+                        + "\" res=" + mRemoteId
+                        + " requestedFid=" + featureId
+                        + " responseFid=" + serverFeature.getId());
+                return;
+            }
+
+            if (hasPendingFeatureDataChanges(changeTableName, featureId)) {
+                HyperLog.d(Constants.TAG, "NGW post-push refresh skip after fetch: pending local data changes layer=\""
+                        + ProdLogUtil.truncateForLog(getName(), 100)
+                        + "\" res=" + mRemoteId
+                        + " fid=" + featureId
+                        + " op=" + sourceOperation);
+                return;
+            }
+
+            int updated = applyServerFeatureDataOnly(serverFeature);
+            HyperLog.d(Constants.TAG, "NGW post-push refresh layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " fid=" + featureId
+                    + " op=" + sourceOperation
+                    + " updated=" + updated);
+        } catch (IOException e) {
+            HyperLog.w(Constants.TAG, "NGW post-push refresh IOException layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " fid=" + featureId
+                    + " op=" + sourceOperation
+                    + (e.getMessage() == null ? "" : " " + ProdLogUtil.truncateForLog(e.getMessage(), 180)), e);
+        } catch (JSONException | NGException | IllegalStateException | NumberFormatException e) {
+            HyperLog.w(Constants.TAG, "NGW post-push refresh failed layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " fid=" + featureId
+                    + " op=" + sourceOperation
+                    + (e.getMessage() == null ? "" : " " + ProdLogUtil.truncateForLog(e.getMessage(), 180)), e);
+        } catch (SQLiteException e) {
+            HyperLog.w(Constants.TAG, "NGW post-push refresh SQLite failed layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " fid=" + featureId
+                    + " op=" + sourceOperation
+                    + (e.getMessage() == null ? "" : " " + ProdLogUtil.truncateForLog(e.getMessage(), 180)), e);
+        } catch (OutOfMemoryError e) {
+            HyperLog.w(Constants.TAG, "NGW post-push refresh OOM layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " fid=" + featureId
+                    + " op=" + sourceOperation);
+        }
+    }
+
+    protected Feature getFeatureFromServer(
+            long featureId,
+            AccountUtil.AccountData accountData)
+            throws IOException, JSONException, NGException
+    {
+        String url = NGWUtil.getFeatureUrl(accountData.url, mRemoteId, featureId);
+        HttpResponse response = NetworkUtil.get(
+                url, accountData.login, accountData.password, true);
+        if (!response.isOk()) {
+            HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure(
+                    "postPushFeatureRefresh", getName(), mRemoteId, featureId, -1, response)
+                    + " url=" + ProdLogUtil.scrubUrlForLog(url));
+            return null;
+        }
+
+        if (TextUtils.isEmpty(response.getResponseBody())) {
+            HyperLog.w(Constants.TAG, "NGW post-push refresh empty response layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" res=" + mRemoteId
+                    + " fid=" + featureId
+                    + " url=" + ProdLogUtil.scrubUrlForLog(url));
+            return null;
+        }
+
+        JsonReader reader = new JsonReader(new StringReader(response.getResponseBody()));
+        try {
+            Feature feature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
+            if (feature.getGeometry() == null || !feature.getGeometry().isValid()) {
+                HyperLog.w(Constants.TAG, "NGW post-push refresh invalid geometry layer=\""
+                        + ProdLogUtil.truncateForLog(getName(), 100)
+                        + "\" res=" + mRemoteId
+                        + " fid=" + featureId);
+                return null;
+            }
+            return feature;
+        } finally {
+            reader.close();
+        }
+    }
+
+    private boolean hasPendingFeatureDataChanges(String changeTableName, long featureId) {
+        if (FeatureChanges.hasFeatureFlags(changeTableName, featureId)) {
+            return true;
+        }
+
+        Cursor cursor = FeatureChanges.getChanges(changeTableName, featureId);
+        if (cursor == null) {
+            return true;
+        }
+
+        try {
+            int operationColumn = cursor.getColumnIndex(Constants.FIELD_OPERATION);
+            while (cursor.moveToNext()) {
+                int operation = cursor.getInt(operationColumn);
+                if (0 == (operation & Constants.CHANGE_OPERATION_ATTACH)) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            cursor.close();
+        }
+    }
+
+    private int applyServerFeatureDataOnly(Feature serverFeature) {
+        ContentValues values = serverFeature.getContentValues(false);
+        Uri uri = Uri.parse("content://" + mAuthority + "/" + getPath().getName());
+        Uri updateUri = ContentUris.withAppendedId(uri, serverFeature.getId())
+                .buildUpon()
+                .fragment(NO_SYNC)
+                .build();
+        int updated = update(updateUri, values, null, null);
+        if (updated > 0) {
+            VectorLayerRenderCache.invalidateOnDataChange(this);
+        }
+        return updated;
     }
 
     private String unNormalizeName(String name){

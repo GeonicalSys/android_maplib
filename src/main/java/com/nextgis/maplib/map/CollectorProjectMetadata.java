@@ -29,6 +29,10 @@ public class CollectorProjectMetadata {
     private static final String JSON_DISTRICT = "district";
     private static final String JSON_COMPOSITION_SYNC = "composition_sync";
     private static final String JSON_IMPORTED_AT = "imported_at";
+    private static final String JSON_LAST_COMPOSITION_CHECK_AT = "last_composition_check_at";
+    private static final String JSON_LAST_COMPOSITION_SUMMARY = "last_composition_summary";
+    private static final String JSON_LAST_COMPOSITION_INCOMPLETE = "last_composition_incomplete";
+    private static final String JSON_LAST_COMPOSITION_ERROR = "last_composition_error";
 
     private String mProjectUid;
     private String mAccountName;
@@ -37,6 +41,11 @@ public class CollectorProjectMetadata {
     private String mDistrict;
     private boolean mCompositionSync = true;
     private long mImportedAt;
+    /** Collector foundation: persisted diagnostics for future multi-project UI. */
+    private long mLastCompositionCheckAt;
+    private String mLastCompositionSummary;
+    private boolean mLastCompositionIncomplete;
+    private String mLastCompositionError;
 
     public static String buildProjectUid(String accountName, long projectRemoteId) {
         if (TextUtils.isEmpty(accountName) || projectRemoteId <= 0L) {
@@ -72,11 +81,21 @@ public class CollectorProjectMetadata {
         metadata.mDistrict = json.optString(JSON_DISTRICT, null);
         metadata.mCompositionSync = json.optBoolean(JSON_COMPOSITION_SYNC, true);
         metadata.mImportedAt = json.optLong(JSON_IMPORTED_AT, 0L);
+        metadata.mLastCompositionCheckAt = json.optLong(JSON_LAST_COMPOSITION_CHECK_AT, 0L);
+        metadata.mLastCompositionSummary = json.optString(JSON_LAST_COMPOSITION_SUMMARY, null);
+        metadata.mLastCompositionIncomplete = json.optBoolean(JSON_LAST_COMPOSITION_INCOMPLETE, false);
+        metadata.mLastCompositionError = json.optString(JSON_LAST_COMPOSITION_ERROR, null);
         if (TextUtils.isEmpty(metadata.mProjectUid)) {
             metadata.mProjectUid = buildProjectUid(metadata.mAccountName, metadata.mProjectRemoteId);
         }
         if (TextUtils.isEmpty(metadata.mDistrict)) {
             metadata.mDistrict = null;
+        }
+        if (TextUtils.isEmpty(metadata.mLastCompositionSummary)) {
+            metadata.mLastCompositionSummary = null;
+        }
+        if (TextUtils.isEmpty(metadata.mLastCompositionError)) {
+            metadata.mLastCompositionError = null;
         }
         return metadata.isValid() ? metadata : null;
     }
@@ -96,6 +115,18 @@ public class CollectorProjectMetadata {
         json.put(JSON_COMPOSITION_SYNC, mCompositionSync);
         if (mImportedAt > 0L) {
             json.put(JSON_IMPORTED_AT, mImportedAt);
+        }
+        if (mLastCompositionCheckAt > 0L) {
+            json.put(JSON_LAST_COMPOSITION_CHECK_AT, mLastCompositionCheckAt);
+        }
+        if (!TextUtils.isEmpty(mLastCompositionSummary)) {
+            json.put(JSON_LAST_COMPOSITION_SUMMARY, mLastCompositionSummary);
+        }
+        if (mLastCompositionIncomplete) {
+            json.put(JSON_LAST_COMPOSITION_INCOMPLETE, true);
+        }
+        if (!TextUtils.isEmpty(mLastCompositionError)) {
+            json.put(JSON_LAST_COMPOSITION_ERROR, mLastCompositionError);
         }
         return json;
     }
@@ -132,5 +163,38 @@ public class CollectorProjectMetadata {
 
     public void setCompositionSyncEnabled(boolean compositionSync) {
         mCompositionSync = compositionSync;
+    }
+
+    public long getLastCompositionCheckAt() {
+        return mLastCompositionCheckAt;
+    }
+
+    public String getLastCompositionSummary() {
+        return mLastCompositionSummary;
+    }
+
+    public boolean isLastCompositionIncomplete() {
+        return mLastCompositionIncomplete;
+    }
+
+    public String getLastCompositionError() {
+        return mLastCompositionError;
+    }
+
+    /**
+     * Collector architecture foundation.
+     *
+     * These diagnostics are not required for current sync decisions. They are persisted so a future
+     * multi-project UI can show project health without reparsing logs.
+     */
+    public void setLastCompositionDiagnostics(
+            long checkedAt,
+            String summary,
+            boolean incomplete,
+            String error) {
+        mLastCompositionCheckAt = checkedAt;
+        mLastCompositionSummary = TextUtils.isEmpty(summary) ? null : summary;
+        mLastCompositionIncomplete = incomplete;
+        mLastCompositionError = TextUtils.isEmpty(error) ? null : error;
     }
 }

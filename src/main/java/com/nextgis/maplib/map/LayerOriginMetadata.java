@@ -46,22 +46,34 @@ public class LayerOriginMetadata {
             String projectUid,
             int collectorOrder,
             long formId) {
+        return collectorLayer(projectUid, collectorOrder, formId, RENDER_MODE_CLASSIC);
+    }
+
+    public static LayerOriginMetadata collectorLayer(
+            String projectUid,
+            int collectorOrder,
+            long formId,
+            String renderMode) {
         LayerOriginMetadata metadata = new LayerOriginMetadata();
         metadata.mType = TYPE_COLLECTOR_PROJECT;
         metadata.mProjectUid = projectUid;
         metadata.mManagedByProject = true;
         metadata.mCollectorOrder = collectorOrder;
         metadata.mFormId = Math.max(0L, formId);
-        metadata.mRenderMode = RENDER_MODE_CLASSIC;
+        metadata.setRenderMode(renderMode);
         return metadata;
     }
 
     public static LayerOriginMetadata manualNgwLayer(long formId) {
+        return manualNgwLayer(formId, RENDER_MODE_CLASSIC);
+    }
+
+    public static LayerOriginMetadata manualNgwLayer(long formId, String renderMode) {
         LayerOriginMetadata metadata = new LayerOriginMetadata();
         metadata.mType = TYPE_MANUAL_NGW;
         metadata.mManagedByProject = false;
         metadata.mFormId = Math.max(0L, formId);
-        metadata.mRenderMode = RENDER_MODE_CLASSIC;
+        metadata.setRenderMode(renderMode);
         return metadata;
     }
 
@@ -75,10 +87,7 @@ public class LayerOriginMetadata {
         metadata.mManagedByProject = json.optBoolean(JSON_MANAGED_BY_PROJECT, false);
         metadata.mCollectorOrder = json.optInt(JSON_COLLECTOR_ORDER, -1);
         metadata.mFormId = json.optLong(JSON_FORM_ID, 0L);
-        metadata.mRenderMode = json.optString(JSON_RENDER_MODE, RENDER_MODE_CLASSIC);
-        if (TextUtils.isEmpty(metadata.mRenderMode)) {
-            metadata.mRenderMode = RENDER_MODE_CLASSIC;
-        }
+        metadata.setRenderMode(json.optString(JSON_RENDER_MODE, RENDER_MODE_CLASSIC));
         return TextUtils.isEmpty(metadata.mType) ? null : metadata;
     }
 
@@ -130,6 +139,18 @@ public class LayerOriginMetadata {
     }
 
     public void setRenderMode(String renderMode) {
-        mRenderMode = TextUtils.isEmpty(renderMode) ? RENDER_MODE_CLASSIC : renderMode;
+        mRenderMode = normalizeRenderMode(renderMode);
+    }
+
+    public static String normalizeRenderMode(String renderMode) {
+        if (renderMode == null || renderMode.trim().isEmpty()) {
+            return RENDER_MODE_CLASSIC;
+        }
+        String normalized = renderMode.trim().toLowerCase(java.util.Locale.ROOT)
+                .replace('-', '_');
+        if (RENDER_MODE_LOCAL_VECTOR_TILES.equals(normalized)) {
+            return RENDER_MODE_LOCAL_VECTOR_TILES;
+        }
+        return RENDER_MODE_CLASSIC;
     }
 }

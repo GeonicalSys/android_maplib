@@ -34,11 +34,23 @@ public class DistrictFilterUtilTest {
     }
 
     @Test
-    public void resolveDistrictFilter_vectorLayer_inactive() {
+    public void resolveDistrictFilter_vectorLayerWithField_active() {
         Map<String, Field> fields = new HashMap<>();
         fields.put("district", new Field(1, "district", "District"));
         DistrictFilterUtil.Decision d = DistrictFilterUtil.resolveDistrictFilter(
                 Connection.NGWResourceTypeVectorLayer,
+                fields,
+                "vologda");
+        assertTrue(d.active);
+        assertEquals("fld_district=vologda", d.serverWhere);
+    }
+
+    @Test
+    public void resolveDistrictFilter_unsupportedLayerType_inactive() {
+        Map<String, Field> fields = new HashMap<>();
+        fields.put("district", new Field(1, "district", "District"));
+        DistrictFilterUtil.Decision d = DistrictFilterUtil.resolveDistrictFilter(
+                Connection.NGWResourceTypeRasterLayer,
                 fields,
                 "vologda");
         assertFalse(d.active);

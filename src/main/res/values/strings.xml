@@ -100,6 +100,11 @@
 
     <string name="ngw_schema_mismatch_title">Layer schema changed</string>
     <string name="ngw_schema_mismatch_has_local_changes">The layer structure on the server no longer matches this map. You have unsynced edits on the device. Sync or remove your local changes, then remove the layer and add it again from NextGIS Web.</string>
+    <string name="ngw_schema_mismatch_backup_reload">Error in layer %1$s. It will be reloaded. To avoid losing data, send the backup copy to the GIS administrator.</string>
+    <string name="ngw_schema_mismatch_backup_failed">Error in layer %1$s. It must be reloaded, but the app could not create a backup copy, so the layer was left unchanged.</string>
+    <string name="collector_layer_removed_title">Collector layer changed</string>
+    <string name="collector_layer_removed_from_project">Layer %1$s will be removed from the project.</string>
+    <string name="collector_layer_backup_failed">Layer %1$s was removed from the Collector project, but the app could not create a backup copy, so the local layer was left unchanged.</string>
     <string name="self_intersection">Self intersection detected</string>
     <string name="ring_outside">One of the holes outside of the outer ring</string>
     <string name="error_geojson_invalid_geometry">Invalid geometry in GeoJSON feature</string>

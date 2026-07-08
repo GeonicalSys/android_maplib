@@ -116,6 +116,8 @@ import static com.nextgis.maplib.map.MPLFeaturesUtils.needsSourceStyleRefresh;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.refreshMaplibreStyleOnFeatures;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.createFeatureListFromTrackLayer;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.createFillLayerForLayer;
+import static com.nextgis.maplib.map.MPLFeaturesUtils.createFillLayerForLocalVectorTileLayer;
+import static com.nextgis.maplib.map.MPLFeaturesUtils.createLocalVectorTileSourceForLayer;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.createSourceForLayer;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.geoPointFromLatLng;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.getFeatureFromNGFeatureLine;
@@ -226,6 +228,9 @@ public class MapDrawable
     private final ExecutorService mMaplibreVectorReloadExecutor =
             Executors.newSingleThreadExecutor(r -> new Thread(r, "MaplibreVectorReload"));
 
+    private final java.util.concurrent.ConcurrentHashMap<Integer, Long> mVectorLayerReloadTokens =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourcesOrder = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
 
     // map sources added to maplibre  from layers
@@ -233,6 +238,9 @@ public class MapDrawable
 
     /** Per-layer native GeoJSON file URI when {@link VectorLayerRenderCache#USE_MAPLIBRE_NATIVE_GEOJSON_URI} is on. */
     LinkedHashMap<Integer, java.net.URI> sourceNativeUriMap = new LinkedHashMap<>();
+
+    /** Per-layer local MVT URL for {@code layer_origin.render_mode=local_vector_tiles}. */
+    LinkedHashMap<Integer, String> localVectorTileUrlMap = new LinkedHashMap<>();
 
     // map fill Layer of each added layer
     LinkedHashMap<Integer, org.maplibre.android.style.layers.Layer>  layersHashMap = new LinkedHashMap<Integer, org.maplibre.android.style.layers.Layer>();
@@ -502,6 +510,8 @@ public class MapDrawable
     }
 
     public void deleteLayerByID(int id){
+        localVectorTileUrlMap.remove(id);
+        LocalVectorTileServer.getInstance().unregisterLayer(id);
         MapLibreMap map = maplibreMap.get();
         if (map == null) {
             return;
@@ -605,6 +615,20 @@ public class MapDrawable
                     if (iLayer instanceof VectorLayer) {
                         VectorLayer layer = (VectorLayer) iLayer;
                         geoType = layer.getGeometryType();
+                        String tileUrl = null;
+                        if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
+                            tileUrl = LocalVectorTileServer.getInstance().registerLayer(layer);
+                        }
+                        if (tileUrl != null) {
+                            sourceFeaturesHashMap.put(layer.getId(), vectorPolygonFeatures);
+                            sourcesOrder.put(layer.getId(), new ArrayList<>());
+                            sourceNativeUriMap.remove(layer.getId());
+                            localVectorTileUrlMap.put(layer.getId(), tileUrl);
+                            ngStyle = ((VectorLayer) iLayer).getDefaultStyleNoExcept();
+                            HyperLog.d(Constants.TAG, "Local vector tiles enabled hot-add layer=\""
+                                    + layer.getName() + "\" url=" + tileUrl);
+                        } else {
+                        logLocalVectorTilesFallback(layer);
                         // this layer
 
                         ((IGISApplication) getContext().getApplicationContext()).setGetingStyleInProgress(true);
@@ -629,6 +653,7 @@ public class MapDrawable
                             }
                             sourceFeaturesHashMap.put(layer.getId(), vectorPolygonFeatures);
                             sourcesOrder.put(layer.getId(), new ArrayList<>());
+                            localVectorTileUrlMap.remove(layer.getId());
                             ngStyle = ((VectorLayer) iLayer).getDefaultStyleNoExcept();
 
                         } catch (Exception ex) {
@@ -645,6 +670,7 @@ public class MapDrawable
                             mainHandler.post(()-> {
                                 mapContext.get().changeProgress(false);
                             });
+                        }
                         }
                     } else if (iLayer instanceof NGWRasterLayer) {
                         geoType = GT_RASTER_WA;
@@ -681,15 +707,48 @@ public class MapDrawable
                         if (mainStyle == null) {
                             return;
                         }
-                        createSourceForLayer(iLayer.getId(), finalGeoType, vectorPolygonFeatures, mainStyle, sourceHashMap,
-                                rasterLayersURLMap, rasterLayersTmsTypeMap,
-                                iLayer.getPath().toString(), false, null);
+                        String localVectorTileUrl = localVectorTileUrlMap.get(iLayer.getId());
+                        if (localVectorTileUrl != null) {
+                            boolean sourceOk = createLocalVectorTileSourceForLayer(
+                                    iLayer.getId(),
+                                    mainStyle,
+                                    iLayer.getPath().toString(),
+                                    localVectorTileUrl,
+                                    iLayer instanceof com.nextgis.maplib.map.Layer
+                                            ? ((com.nextgis.maplib.map.Layer) iLayer).getMinZoom()
+                                            : -1,
+                                    iLayer instanceof com.nextgis.maplib.map.Layer
+                                            ? ((com.nextgis.maplib.map.Layer) iLayer).getMaxZoom()
+                                            : -1);
+                            if (!sourceOk) {
+                                Log.w(TAG, "addLayerByID: local vector tile source failed id="
+                                        + iLayer.getId());
+                                return;
+                            }
+                        } else {
+                            createSourceForLayer(iLayer.getId(), finalGeoType, vectorPolygonFeatures, mainStyle, sourceHashMap,
+                                    rasterLayersURLMap, rasterLayersTmsTypeMap,
+                                    iLayer.getPath().toString(), false, null);
+                        }
                         MPLFeaturesUtils.RasterSiblingAnchor rasterSiblingAnchor = null;
                         if (finalGeoType == GT_RASTER_WA && iLayer instanceof TMSLayer) {
                             rasterSiblingAnchor = MPLFeaturesUtils.resolveRasterSiblingAnchorOrNull(
                                     iLayer, mainStyle);
                         }
-                        createFillLayerForLayer(iLayer.getId(), finalGeoType, mainStyle, layersHashMap, layersHashMap2,
+                        if (localVectorTileUrl != null) {
+                            createFillLayerForLocalVectorTileLayer(
+                                    iLayer.getId(),
+                                    finalGeoType,
+                                    mainStyle,
+                                    layersHashMap,
+                                    layersHashMap2,
+                                    symbolsLayerHashMap,
+                                    finalStyle,
+                                    iLayer,
+                                    iLayer.getPath().toString(),
+                                    signaturesRootLayer);
+                        } else {
+                            createFillLayerForLayer(iLayer.getId(), finalGeoType, mainStyle, layersHashMap, layersHashMap2,
                                 layersHashMapLineDash,
                                 symbolsLayerHashMap,
                                 finalStyle, false, iLayer,
@@ -697,6 +756,7 @@ public class MapDrawable
                                 selectedDotCircleLayer,
                                 signaturesRootLayer,
                                 rasterSiblingAnchor);
+                        }
 
                         checkLayerVisibility(iLayer.getId());
                         /* Same as tapping the layer list (ReorderedLayerView ACTION_UP → loadLayersLite):
@@ -757,15 +817,32 @@ public class MapDrawable
                 }
                 if (! ((VectorLayer) iLayer).isVisible())
                     return;
-                createFillLayerForLayer(id, ((VectorLayer) iLayer).getGeometryType(),maplbrStyle ,layersHashMap,layersHashMap2,
+                if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles((VectorLayer) iLayer)
+                        && localVectorTileUrlMap.containsKey(id)) {
+                    createFillLayerForLocalVectorTileLayer(
+                            id,
+                            ((VectorLayer) iLayer).getGeometryType(),
+                            maplbrStyle,
+                            layersHashMap,
+                            layersHashMap2,
+                            symbolsLayerHashMap,
+                            newStyle,
+                            iLayer,
+                            iLayer.getPath().toString(),
+                            signaturesRootLayer);
+                } else {
+                    createFillLayerForLayer(id, ((VectorLayer) iLayer).getGeometryType(),maplbrStyle ,layersHashMap,layersHashMap2,
                         layersHashMapLineDash,
                         symbolsLayerHashMap,
                         newStyle, true, iLayer,
                         iLayer.getPath().toString(),
                         selectedDotCircleLayer,
                         signaturesRootLayer);
+                }
                 checkLayerVisibility(id);
-                reloadVectorLayerStylePropsToMaplibre(iLayer);
+                if (!localVectorTileUrlMap.containsKey(id)) {
+                    reloadVectorLayerStylePropsToMaplibre(iLayer);
+                }
                 return;
             }
         }
@@ -802,10 +879,17 @@ public class MapDrawable
             return;
         }
         com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
-        createFillLayerForLayer(layer.getId(), layer.getGeometryType(), maplbrStyle,
-                layersHashMap, layersHashMap2, layersHashMapLineDash, symbolsLayerHashMap,
-                ngStyle, true, layer, layer.getPath().toString(),
-                selectedDotCircleLayer, signaturesRootLayer);
+        if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)
+                && localVectorTileUrlMap.containsKey(layer.getId())) {
+            createFillLayerForLocalVectorTileLayer(layer.getId(), layer.getGeometryType(), maplbrStyle,
+                    layersHashMap, layersHashMap2, symbolsLayerHashMap,
+                    ngStyle, layer, layer.getPath().toString(), signaturesRootLayer);
+        } else {
+            createFillLayerForLayer(layer.getId(), layer.getGeometryType(), maplbrStyle,
+                    layersHashMap, layersHashMap2, layersHashMapLineDash, symbolsLayerHashMap,
+                    ngStyle, true, layer, layer.getPath().toString(),
+                    selectedDotCircleLayer, signaturesRootLayer);
+        }
         checkLayerVisibility(layer.getId());
     }
 
@@ -886,22 +970,129 @@ public class MapDrawable
     private void updateVectorLayerGeoJsonSources(
             VectorLayer layer,
             List<org.maplibre.geojson.Feature> features) {
-        if (features == null) {
+        if (layer == null || features == null || maplibreMap.get() == null) {
             return;
         }
-        GeoJsonSource layerSource = sourceHashMap.get(layer.getPath().toString());
+        Style style = maplibreMap.get().getStyle();
+        if (style == null) {
+            return;
+        }
+
+        String layerPath = layer.getPath().toString();
+        GeoJsonSource layerSource = resolveLiveVectorGeoJsonSource(
+                style, layerPath, layer, features);
         if (layerSource != null) {
             sourceNativeUriMap.remove(layer.getId());
             layerSource.setGeoJson(FeatureCollection.fromFeatures(features));
         }
         if (layer.mGeometryType == GTPolygon || layer.mGeometryType == GTMultiPolygon) {
-            GeoJsonSource layerSourceText = sourceHashMap.get(
-                    layer.getPath().toString() + source_polygon_text);
+            String textSourceId = layerPath + source_polygon_text;
+            GeoJsonSource layerSourceText = resolveLiveGeoJsonSource(style, textSourceId, layer);
+            if (layerSourceText == null) {
+                createSourceForLayer(layer.getId(), layer.getGeometryType(), features, style,
+                        sourceHashMap, new HashMap<>(), new HashMap<>(), layerPath, false, null);
+                layerSourceText = resolveLiveGeoJsonSource(style, textSourceId, layer);
+            }
             if (layerSourceText != null) {
                 List<org.maplibre.geojson.Feature> points = convertToPointFeatures(features);
                 layerSourceText.setGeoJson(FeatureCollection.fromFeatures(points));
             }
         }
+    }
+
+    private void scheduleVectorLayerGeoJsonReapply(
+            @NonNull final VectorLayer layer,
+            @NonNull final List<org.maplibre.geojson.Feature> features,
+            final long reloadToken) {
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(() -> runGuarded("reloadVectorLayerDataToMaplibre delayed reapply layer="
+                + layer.getName(), () -> {
+            Long currentToken = mVectorLayerReloadTokens.get(layer.getId());
+            if (currentToken == null || currentToken.longValue() != reloadToken) {
+                return;
+            }
+            applyMaplibreStyleLayersForVector(layer);
+            updateVectorLayerGeoJsonSources(layer, features);
+            logVectorLayerMaplibreState("delayed reapply", layer, features.size());
+        }), 4500);
+    }
+
+    private void logVectorLayerMaplibreState(
+            @NonNull String phase,
+            @NonNull VectorLayer layer,
+            int featureCount) {
+        if (maplibreMap.get() == null || maplibreMap.get().getStyle() == null) {
+            return;
+        }
+        Style style = maplibreMap.get().getStyle();
+        String layerPath = layer.getPath().toString();
+        boolean hasSource = style.getSource(layerPath) instanceof GeoJsonSource;
+        boolean hasTextSource = !(layer.getGeometryType() == GTPolygon
+                || layer.getGeometryType() == GTMultiPolygon)
+                || style.getSource(layerPath + source_polygon_text) instanceof GeoJsonSource;
+        boolean hasFillLayer = style.getLayer(namePrefix + layer_namepart + layer.getId()) != null;
+        boolean hasOutlineLayer = style.getLayer(
+                namePrefix + layer_namepart + layer.getId() + outline_namepart) != null;
+        HyperLog.d(TAG, "MapLibre vector reload " + phase
+                + " layer=\"" + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                + "\" id=" + layer.getId()
+                + " features=" + featureCount
+                + " source=" + hasSource
+                + " textSource=" + hasTextSource
+                + " fillLayer=" + hasFillLayer
+                + " outlineLayer=" + hasOutlineLayer
+                + " visible=" + layer.isVisible());
+    }
+
+    @Nullable
+    private GeoJsonSource resolveLiveVectorGeoJsonSource(
+            @NonNull Style style,
+            @NonNull String sourceId,
+            @NonNull VectorLayer layer,
+            @NonNull List<org.maplibre.geojson.Feature> features) {
+        GeoJsonSource liveSource = resolveLiveGeoJsonSource(style, sourceId, layer);
+        if (liveSource != null) {
+            return liveSource;
+        }
+
+        HyperLog.w(TAG, "MapLibre source missing; recreate layer=\""
+                + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                + "\" id=" + layer.getId()
+                + " features=" + features.size()
+                + " source=" + ProdLogUtil.truncateForLog(sourceId, 120));
+        createSourceForLayer(layer.getId(), layer.getGeometryType(), features, style,
+                sourceHashMap, new HashMap<>(), new HashMap<>(), sourceId, false, null);
+        return resolveLiveGeoJsonSource(style, sourceId, layer);
+    }
+
+    @Nullable
+    private GeoJsonSource resolveLiveGeoJsonSource(
+            @NonNull Style style,
+            @NonNull String sourceId,
+            @NonNull VectorLayer layer) {
+        Source live = style.getSource(sourceId);
+        if (live instanceof GeoJsonSource) {
+            GeoJsonSource liveGeoJson = (GeoJsonSource) live;
+            GeoJsonSource cached = sourceHashMap.get(sourceId);
+            if (cached != liveGeoJson) {
+                sourceHashMap.put(sourceId, liveGeoJson);
+                HyperLog.d(TAG, "MapLibre source cache refreshed layer=\""
+                        + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                        + "\" id=" + layer.getId()
+                        + " source=" + ProdLogUtil.truncateForLog(sourceId, 120));
+            }
+            return liveGeoJson;
+        }
+
+        sourceHashMap.remove(sourceId);
+        if (live != null) {
+            HyperLog.w(TAG, "MapLibre source has wrong type; remove layer=\""
+                    + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                    + "\" id=" + layer.getId()
+                    + " source=" + ProdLogUtil.truncateForLog(sourceId, 120));
+            style.removeSource(sourceId);
+        }
+        return null;
     }
 
     public void reloadVectorLayerDataToMaplibre(final  ILayer ilayer) {
@@ -921,6 +1112,36 @@ public class MapDrawable
                     return;
                 VectorLayer layer = (VectorLayer) ilayer;
 
+                if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
+                    String tileUrl = localVectorTileUrlMap.get(layer.getId());
+                    if (tileUrl == null) {
+                        tileUrl = LocalVectorTileServer.getInstance().registerLayer(layer);
+                    }
+                    if (tileUrl != null) {
+                        final String finalTileUrl = tileUrl;
+                        localVectorTileUrlMap.put(layer.getId(), finalTileUrl);
+                        sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
+                        sourcesOrder.put(layer.getId(), new ArrayList<>());
+                        postMainGuarded("reloadVectorLayerDataToMaplibre local tiles layer="
+                                + layer.getName(), () -> {
+                            if (maplibreMap.get() == null || maplibreMap.get().getStyle() == null) {
+                                return;
+                            }
+                            Style style = maplibreMap.get().getStyle();
+                            createLocalVectorTileSourceForLayer(
+                                    layer.getId(),
+                                    style,
+                                    layer.getPath().toString(),
+                                    finalTileUrl,
+                                    layer.getMinZoom(),
+                                    layer.getMaxZoom());
+                            applyMaplibreStyleLayersForVector(layer);
+                            checkLayerVisibility(layer.getId());
+                        });
+                        return;
+                    }
+                    logLocalVectorTilesFallback(layer);
+                }
 
                 ((IGISApplication)getContext().getApplicationContext()).setGetingStyleInProgress(true);
                 mainHandler.post(() -> {
@@ -949,10 +1170,14 @@ public class MapDrawable
                     VectorLayerRenderCache.save(layer, vectorPolygonFeatures);
                     sourceFeaturesHashMap.put(layer.getId(), vectorPolygonFeatures);
                     sourcesOrder.put(layer.getId(), new ArrayList<>());
+                    long reloadToken = System.nanoTime();
+                    mVectorLayerReloadTokens.put(layer.getId(), reloadToken);
 
                     postMainGuarded("reloadVectorLayerDataToMaplibre update layer=" + layer.getName(), () -> {
                         updateVectorLayerGeoJsonSources(layer, vectorPolygonFeatures);
                         applyMaplibreStyleLayersForVector(layer);
+                        logVectorLayerMaplibreState("apply", layer, vectorPolygonFeatures.size());
+                        scheduleVectorLayerGeoJsonReapply(layer, vectorPolygonFeatures, reloadToken);
                     });
                 } catch (OutOfMemoryError e) {
                     mainHandler.post(() -> Toast.makeText(mContext,
@@ -1008,6 +1233,20 @@ public class MapDrawable
         });
     }
 
+    private void logLocalVectorTilesFallback(VectorLayer layer) {
+        if (!LocalVectorTileRenderMode.isRequested(layer)) {
+            return;
+        }
+        String reason = !LocalVectorTileRenderMode.isEnabled()
+                ? "feature flag disabled"
+                : (!LocalVectorTileRenderMode.isProviderAvailable()
+                ? "provider unavailable" : "provider registration failed or unsupported geometry");
+        HyperLog.d(Constants.TAG, "Local vector tiles requested; classic fallback layer=\""
+                + layer.getName() + "\" remoteId="
+                + (layer instanceof NGWVectorLayer ? ((NGWVectorLayer) layer).getRemoteId() : -1)
+                + " reason=" + reason);
+    }
+
     private static final class VectorLayerPrepResult {
         final VectorLayer layer;
         final List<org.maplibre.geojson.Feature> features;
@@ -1015,19 +1254,22 @@ public class MapDrawable
         final com.nextgis.maplib.display.Style ngStyle;
         final boolean fromCache;
         final java.net.URI nativeGeoJsonUri;
+        final String localVectorTileUrl;
 
         VectorLayerPrepResult(VectorLayer layer,
                 List<org.maplibre.geojson.Feature> features,
                 int geometryType,
                 com.nextgis.maplib.display.Style ngStyle,
                 boolean fromCache,
-                java.net.URI nativeGeoJsonUri) {
+                java.net.URI nativeGeoJsonUri,
+                String localVectorTileUrl) {
             this.layer = layer;
             this.features = features;
             this.geometryType = geometryType;
             this.ngStyle = ngStyle;
             this.fromCache = fromCache;
             this.nativeGeoJsonUri = nativeGeoJsonUri;
+            this.localVectorTileUrl = localVectorTileUrl;
         }
     }
 
@@ -1037,6 +1279,17 @@ public class MapDrawable
      */
     private VectorLayerPrepResult prepareVectorLayerForMaplibre(VectorLayer layer, Handler mainHandler) {
         try {
+            if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
+                String tileUrl = LocalVectorTileServer.getInstance().registerLayer(layer);
+                if (tileUrl != null) {
+                    com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
+                    HyperLog.d(Constants.TAG, "Local vector tiles enabled layer=\""
+                            + layer.getName() + "\" url=" + tileUrl);
+                    return new VectorLayerPrepResult(layer, new ArrayList<>(), layer.getGeometryType(),
+                            ngStyle, false, null, tileUrl);
+                }
+            }
+            logLocalVectorTilesFallback(layer);
             List<org.maplibre.geojson.Feature> vectorFeatures = VectorLayerRenderCache.tryLoadFeatures(layer);
             boolean fromCache = vectorFeatures != null;
             if (!fromCache) {
@@ -1054,7 +1307,7 @@ public class MapDrawable
             com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
             java.net.URI nativeUri = fromCache ? VectorLayerRenderCache.tryLoadAsUri(layer) : null;
             return new VectorLayerPrepResult(layer, vectorFeatures, layer.getGeometryType(), ngStyle,
-                    fromCache, nativeUri);
+                    fromCache, nativeUri, null);
         } catch (OutOfMemoryError outOfMemoryError) {
             mainHandler.post(() -> Toast.makeText(mContext,
                     mContext.getString(R.string.outofmemory) + layer.getName(),
@@ -1132,6 +1385,8 @@ public class MapDrawable
             //sourceFeaturesHashMap.clear();
             //sourceHashMap.clear();
             sourcesOrder.clear();
+            localVectorTileUrlMap.clear();
+            LocalVectorTileServer.getInstance().clearLayers();
 
             if (Constants.MAP_STARTUP_PARALLEL_VECTOR_PREP) {
             final long tWorkerWallStart = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
@@ -1182,6 +1437,11 @@ public class MapDrawable
                         sourceNativeUriMap.put(r.layer.getId(), r.nativeGeoJsonUri);
                     } else {
                         sourceNativeUriMap.remove(r.layer.getId());
+                    }
+                    if (r.localVectorTileUrl != null) {
+                        localVectorTileUrlMap.put(r.layer.getId(), r.localVectorTileUrl);
+                    } else {
+                        localVectorTileUrlMap.remove(r.layer.getId());
                     }
                     sourcesOrder.put(r.layer.getId(), new ArrayList<>());
                 }
@@ -1330,6 +1590,24 @@ public class MapDrawable
                             if (skipInvisibleLayers && !layer.isVisible()) {
                                 continue;
                             }
+                            String tileUrl = null;
+                            if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
+                                tileUrl = LocalVectorTileServer.getInstance().registerLayer(layer);
+                            }
+                            if (tileUrl != null) {
+                                com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
+                                layersType.put(layer.getId(), layer.getGeometryType());
+                                layersPath.put(layer.getId(), layer.getPath().toString());
+                                layersStyle.put(layer.getId(), ngStyle);
+                                sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
+                                sourceNativeUriMap.remove(layer.getId());
+                                localVectorTileUrlMap.put(layer.getId(), tileUrl);
+                                sourcesOrder.put(layer.getId(), new ArrayList<>());
+                                HyperLog.d(Constants.TAG, "Local vector tiles enabled layer=\""
+                                        + layer.getName() + "\" url=" + tileUrl);
+                                continue;
+                            }
+                            logLocalVectorTilesFallback(layer);
                             List<org.maplibre.geojson.Feature> vectorFeatures =
                                     VectorLayerRenderCache.tryLoadFeatures(layer);
                             boolean fromCache = vectorFeatures != null;
@@ -1363,6 +1641,7 @@ public class MapDrawable
                             } else {
                                 sourceNativeUriMap.remove(layer.getId());
                             }
+                            localVectorTileUrlMap.remove(layer.getId());
                             sourcesOrder.put(layer.getId(), new ArrayList<>());
                         } else if (iLayer instanceof TrackLayer) {
                             TrackLayer layer = (TrackLayer) iLayer;
@@ -1669,12 +1948,44 @@ public class MapDrawable
                                 Log.w(TAG, "loadLayersToMaplibreMap: skip incomplete layer id=" + entry.getKey());
                                 continue;
                             }
+                            String localVectorTileUrl = localVectorTileUrlMap.get(entry.getKey());
                             ILayer phaseLayer = getLayerById(entry.getKey());
                             ProdLogUtil.setPhase("loadLayers apply id=" + entry.getKey()
                                     + (phaseLayer != null ? " name=" + phaseLayer.getName() : ""));
 
-                            if (createSource)
-                                createSourceForLayer(entry.getKey(),
+                            if (localVectorTileUrl != null) {
+                                if (createSource) {
+                                    boolean sourceOk = createLocalVectorTileSourceForLayer(
+                                            entry.getKey(),
+                                            style,
+                                            pathForLayer,
+                                            localVectorTileUrl,
+                                            phaseLayer instanceof com.nextgis.maplib.map.Layer
+                                                    ? ((com.nextgis.maplib.map.Layer) phaseLayer).getMinZoom()
+                                                    : -1,
+                                            phaseLayer instanceof com.nextgis.maplib.map.Layer
+                                                    ? ((com.nextgis.maplib.map.Layer) phaseLayer).getMaxZoom()
+                                                    : -1);
+                                    if (!sourceOk) {
+                                        Log.w(TAG, "loadLayersToMaplibreMap: local vector tile source failed id="
+                                                + entry.getKey());
+                                        continue;
+                                    }
+                                }
+                                createFillLayerForLocalVectorTileLayer(
+                                        entry.getKey(),
+                                        geoType,
+                                        style,
+                                        layersHashMap,
+                                        layersHashMap2,
+                                        symbolsLayerHashMap,
+                                        layersStyle.get(entry.getKey()),
+                                        phaseLayer,
+                                        pathForLayer,
+                                        signaturesRootLayer);
+                            } else {
+                                if (createSource)
+                                    createSourceForLayer(entry.getKey(),
                                         geoType,
                                         featuresForLayer,
                                         style,
@@ -1684,7 +1995,7 @@ public class MapDrawable
                                         pathForLayer, false,
                                         sourceNativeUriMap.get(entry.getKey()));
 
-                            createFillLayerForLayer(entry.getKey(),
+                                createFillLayerForLayer(entry.getKey(),
                                     geoType,
                                     style,
                                     layersHashMap,
@@ -1695,6 +2006,7 @@ public class MapDrawable
                                     getLayerById(entry.getKey()),
                                     pathForLayer, selectedDotCircleLayer,
                                     signaturesRootLayer);
+                            }
 
                             checkLayerVisibility(entry.getKey());
                         }
@@ -2000,17 +2312,31 @@ public class MapDrawable
                 }
                 runGuarded("loadLayersToMaplibreMapLite layer id=" + entry.getKey()
                         + " name=" + entryLayer.getName(), () -> {
-                    createFillLayerForLayer(entry.getKey(),
-                            entryType,
-                            style,
-                            layersHashMap,
-                            layersHashMap2,
-                            layersHashMapLineDash,
-                            symbolsLayerHashMap,
-                            layersStyle.get(entry.getKey()), false,
-                            entryLayer,
-                            entryLayer.getPath().toString(), selectedDotCircleLayer,
-                            signaturesRootLayer);
+                    if (localVectorTileUrlMap.containsKey(entry.getKey())) {
+                        createFillLayerForLocalVectorTileLayer(
+                                entry.getKey(),
+                                entryType,
+                                style,
+                                layersHashMap,
+                                layersHashMap2,
+                                symbolsLayerHashMap,
+                                layersStyle.get(entry.getKey()),
+                                entryLayer,
+                                entryLayer.getPath().toString(),
+                                signaturesRootLayer);
+                    } else {
+                        createFillLayerForLayer(entry.getKey(),
+                                entryType,
+                                style,
+                                layersHashMap,
+                                layersHashMap2,
+                                layersHashMapLineDash,
+                                symbolsLayerHashMap,
+                                layersStyle.get(entry.getKey()), false,
+                                entryLayer,
+                                entryLayer.getPath().toString(), selectedDotCircleLayer,
+                                signaturesRootLayer);
+                    }
 
                     checkLayerVisibility(entry.getKey());
                 });
@@ -2346,13 +2672,23 @@ public class MapDrawable
 
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerd.getId());
 
-        for (org.maplibre.geojson.Feature item : layerFeatures){
-            if (item!= null && item.hasProperty(prop_featureid)) {
-                long id = item.getNumberProperty(prop_featureid).longValue();
-                if (id == selectedFeatureId) {
-                    viewedFeature = item;
-                    break;
+        if (layerFeatures != null && !layerFeatures.isEmpty()) {
+            for (org.maplibre.geojson.Feature item : layerFeatures){
+                if (item!= null && item.hasProperty(prop_featureid)) {
+                    long id = item.getNumberProperty(prop_featureid).longValue();
+                    if (id == selectedFeatureId) {
+                        viewedFeature = item;
+                        break;
+                    }
                 }
+            }
+        } else if (localVectorTileUrlMap.containsKey(layerd.getId())
+                && originalSelectedFeature.getGeometry() != null) {
+            viewedFeature = MPLFeaturesUtils.getFeatureFromNGFeature(originalSelectedFeature.getGeometry());
+            if (viewedFeature != null) {
+                viewedFeature.addNumberProperty(prop_featureid, selectedFeatureId);
+                viewedFeature.addNumberProperty(prop_layerid, layerd.getId());
+                viewedFeature.addNumberProperty(prop_order, selectedFeatureId);
             }
         }
 
@@ -3439,6 +3775,7 @@ public class MapDrawable
     public boolean moveToPoint(LatLng point){
         if (editingObject != null) {
             editingObject.movePointTo(point);
+            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
         }
         return true;
     }
