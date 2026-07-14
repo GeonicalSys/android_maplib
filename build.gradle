@@ -27,7 +27,7 @@ android {
     defaultConfig {
         minSdkVersion 26
         compileSdk 36
-        versionName '3.0.3.4'
+        versionName '3.0.3.5'
         buildConfigField "String", "VERSION_NAME", "\"$versionName\""
     }
     productFlavors {
