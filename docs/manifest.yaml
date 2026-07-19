@@ -1,0 +1,44 @@
+schema_version: 1
+module_id: maplib
+repository_id: maplib
+maturity: maintained
+last_verified: 2026-07-19
+entrypoints:
+  - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+  - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
+  - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
+key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+    responsibility: MapLibre style, sources, layers, hot add and reload coordination.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
+    responsibility: MapLibre style utilities and raster sibling anchor resolution.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
+    responsibility: Cache prepared vector rendering payload for map startup.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectCompositionSync.java
+    responsibility: Compare and apply Collector server composition decisions.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LayerConfigUtil.java
+    responsibility: Parse mobile render mode and layer origin configuration.
+public_contracts:
+  - id: map-host
+    symbol: MaplibreMapInteraction
+    path: maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java
+    consumers: [app, maplibui]
+  - id: gis-application
+    symbol: IGISApplication
+    path: maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
+    consumers: [maplibui, app]
+  - id: collector-metadata
+    symbol: CollectorProjectMetadata
+    path: maplib/src/main/java/com/nextgis/maplib/map/CollectorProjectMetadata.java
+    consumers: [maplibui, app]
+settings_refs: [mobile_render_mode, render_mode, layer_origin, mobile]
+storage_contracts:
+  - id: layer-json
+    path: maplib/src/main/java/com/nextgis/maplib/map/Layer.java
+invariant_refs: [INV-LAYER-ORDER, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-ISOLATION, INV-VERSION-COUPLING]
+global_docs:
+  - docs/architecture/map-rendering.md
+  - docs/architecture/collector-projects.md
+  - docs/architecture/ngw-sync-and-storage.md
+smoke_tests: [AUTO-MAPLIB-UNIT, SMOKE-MAP-COLD-START, SMOKE-NGRC-ORDER, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-TRACK-NO-FLAGS]
+upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, MAP-HOST, COLLECTOR-RESOURCE]
