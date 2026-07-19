@@ -16,6 +16,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
 - `MaplibreMapInteraction`, `IGISApplication` — API верхних слоёв;
 - `Connection`, `SyncAdapter`, `NGWSyncService` — NGW;
+- `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное
+  получение NGW-ресурса без загрузки всего дерева;
 - `CollectorProjectMetadata`, `CollectorProjectCompositionSync` — Collector;
 - `LayerConfigUtil` — server/local render and origin config.
 
@@ -25,6 +27,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - LayerGroup index `0` — bottom.
 - Track start/end flag layers не включаются.
 - Collector resource type не удаляется без продуктового решения.
+- URL ресурса принимает только HTTP(S), не содержит credentials/fragment и
+  заканчивается на `/resource/<positive-id>`; server path до `/resource` сохраняется.
 - Изменение public interface требует compile/manifest updates consumers.
 
 ## Диагностика
@@ -33,6 +37,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   MapLibre style.
 - «После restart стало правильно»: проверить hot-add/deferred reload contract.
 - NGW config/data issue: отделить config parsing от feature sync decision.
+- Импорт по URL: сначала проверить parser/server/account, затем response code,
+  тип ресурса и `data.read`/`data.write` permissions.
 - Collector composition: проверить stable remote IDs/project metadata до UI.
 
 ## Проверки

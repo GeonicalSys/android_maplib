@@ -276,6 +276,10 @@ public class GeoEnvelope
             throws JSONException
     {
         JSONObject oJSONBBox = new JSONObject();
+        if (!isInit()) {
+            return oJSONBBox;
+        }
+
         oJSONBBox.put(JSON_BBOX_MINX_KEY, getMinX());
         oJSONBBox.put(JSON_BBOX_MINY_KEY, getMinY());
         oJSONBBox.put(JSON_BBOX_MAXX_KEY, getMaxX());

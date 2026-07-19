@@ -2382,9 +2382,9 @@ public class VectorLayer
         mCollectorEditable = collectorEditable;
     }
 
-    /** Whether the user may create or edit features (collector policy; independent of {@link #isEditable()}). */
+    /** Whether both the server/layer configuration and Collector policy allow feature editing. */
     public boolean isEditingAllowed() {
-        return mCollectorEditable;
+        return mIsEditable && mCollectorEditable;
     }
 
     public boolean isFieldsInitialized() {

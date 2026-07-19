@@ -94,10 +94,14 @@ public class Connection
     }
 
     public boolean connect(boolean guest) {
+        return connect(guest, 0L);
+    }
+
+    public boolean connect(boolean guest, long rootRemoteId) {
         setNgwVersion();
         fillCapabilities();
 
-        mRootResource = new ResourceGroup(0, this);
+        mRootResource = new ResourceGroup(rootRemoteId, this);
         mRootResource.setParent(this);
 
         if (!guest) {
@@ -217,6 +221,10 @@ public class Connection
                 return NGWResourceTypeWMSClient;
             case "lookup_table":
                 return NGWResourceTypeLookupTable;
+            case "qgis_vector_style":
+                return NGWResourceTypeVectorLayerStyle;
+            case "qgis_raster_style":
+                return NGWResourceTypeRasterLayerStyle;
             case "demo_project":
                 return NGWResourceTypeResourceGroup;
             case "collector_project":
@@ -399,4 +407,3 @@ public class Connection
         return mPassword;
     }
 }
-

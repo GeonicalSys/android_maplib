@@ -57,6 +57,63 @@ public class ResourceGroup extends Resource {
         mChildrenLoaded = false;
     }
 
+    public static final class ResourceLoadResult {
+        private final Resource mResource;
+        private final int mResponseCode;
+
+        private ResourceLoadResult(Resource resource, int responseCode) {
+            mResource = resource;
+            mResponseCode = responseCode;
+        }
+
+        public Resource getResource() {
+            return mResource;
+        }
+
+        public int getResponseCode() {
+            return mResponseCode;
+        }
+
+        public boolean isSuccessful() {
+            return mResponseCode >= 200 && mResponseCode < 300 && mResource != null;
+        }
+    }
+
+    /** Loads only this group's remote resource, resolving a QGIS style URL to its parent layer. */
+    public ResourceLoadResult loadTargetResource() {
+        try {
+            HttpResponse response = NetworkUtil.get(
+                    NGWUtil.getResourceUrl(mConnection.getURL(), mRemoteId),
+                    mConnection.getLogin(), mConnection.getPassword(), false);
+            if (!response.isOk()) {
+                return new ResourceLoadResult(null, response.getResponseCode());
+            }
+
+            JSONObject data = new JSONObject(response.getResponseBody());
+            int type = getType(data);
+            if (type == Connection.NGWResourceTypeVectorLayerStyle
+                    || type == Connection.NGWResourceTypeRasterLayerStyle) {
+                JSONObject parent = data.optJSONObject("resource") != null
+                        ? data.optJSONObject("resource").optJSONObject("parent") : null;
+                long parentId = parent != null ? parent.optLong("id", 0L) : 0L;
+                if (parentId <= 0L) {
+                    return new ResourceLoadResult(null, 200);
+                }
+                response = NetworkUtil.get(
+                        NGWUtil.getResourceUrl(mConnection.getURL(), parentId),
+                        mConnection.getLogin(), mConnection.getPassword(), false);
+                if (!response.isOk()) {
+                    return new ResourceLoadResult(null, response.getResponseCode());
+                }
+                data = new JSONObject(response.getResponseBody());
+            }
+
+            return new ResourceLoadResult(createResource(data, false), 200);
+        } catch (IOException | JSONException | RuntimeException e) {
+            return new ResourceLoadResult(null, -1);
+        }
+    }
+
     public void loadChildren(boolean skipSubLoad) {
         if (mChildrenLoaded)
             return;
@@ -95,6 +152,13 @@ public class ResourceGroup extends Resource {
     }
 
     protected void addResource(JSONObject data, boolean skipSubLoad) {
+        Resource resource = createResource(data, skipSubLoad);
+        if (resource != null) {
+            mChildren.add(resource);
+        }
+    }
+
+    private Resource createResource(JSONObject data, boolean skipSubLoad) {
         int type = getType(data);
         Resource resource = null;
         switch (type) {
@@ -133,8 +197,8 @@ public class ResourceGroup extends Resource {
             resource.setParent(this);
             if (!skipSubLoad)
                 resource.fillPermissions();
-            mChildren.add(resource);
         }
+        return resource;
     }
 
     protected int getType(JSONObject data) {

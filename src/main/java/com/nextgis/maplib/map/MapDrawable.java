@@ -468,10 +468,12 @@ public class MapDrawable
             }
         }
 
-        for (org.maplibre.geojson.Feature feature : polygonFeatures){
-            if (feature.getStringProperty(prop_featureid).equals(oldFeatureIdString)) {
-                feature.addStringProperty(prop_featureid, newFeatureIdString);
-                break;// only one feature with same id
+        if (polygonFeatures != null) {
+            for (org.maplibre.geojson.Feature feature : polygonFeatures){
+                if (feature.getStringProperty(prop_featureid).equals(oldFeatureIdString)) {
+                    feature.addStringProperty(prop_featureid, newFeatureIdString);
+                    break;// only one feature with same id
+                }
             }
         }
 
@@ -2132,12 +2134,18 @@ public class MapDrawable
         executor.shutdown();
     }
 
-    public void updateWalkingFeature(Feature featureToUpate){
-        editingFeature = MPLFeaturesUtils.getFeatureFromNGFeature(featureToUpate.getGeometry());
-        editingObject.editingFeature = editingFeature;
-        editingObject.extractVertices(editingFeature,  false);
-        editingObject.hideVertext();
-        editingObject.selectLastPoint();
+    public void updateWalkingFeature(Feature featureToUpdate){
+        if (featureToUpdate == null) {
+            return;
+        }
+
+        editingFeature = MPLFeaturesUtils.getFeatureFromNGFeature(featureToUpdate.getGeometry());
+        if (editingObject != null) {
+            editingObject.editingFeature = editingFeature;
+            editingObject.extractVertices(editingFeature,  false);
+            editingObject.hideVertext();
+            editingObject.selectLastPoint();
+        }
     }
 
     public void loadLayersToMaplibreMapLite(final  List<ILayer> allLayers, boolean skipUserLayers){
@@ -3819,9 +3827,25 @@ public class MapDrawable
     }
 
     public boolean moveToPoint(LatLng point){
-        if (editingObject != null) {
+        if (editingObject != null && point != null) {
             editingObject.movePointTo(point);
-            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+
+            MaplibreMapInteraction context = mapContext.get();
+            if (context != null) {
+                context.updateGeometryFromMaplibre(
+                        editingObject.editingFeature, originalSelectedFeature, editingObject);
+            }
+            editingObject.regenerateVertexFeatures();
+            editingObject.displayMiddlePoints(false, true);
+            LatLng pointReleased = editingObject.getSelectedPoint();
+
+            if (pointReleased != null) {
+                setMarker(pointReleased);
+            }
+
+            if (editingObject instanceof MeasurmentLine) {
+                updateMeasurmentCaptions(editingObject);
+            }
         }
         return true;
     }
