@@ -44,7 +44,8 @@ public interface Constants
 
     /**
      * Parallel {@code prepareVectorLayerForMaplibre} in a thread pool during startup.
-     * Keep {@code false} until disk cache passes on-device regression (see CUSTOMIZATIONS.md).
+     * Keep {@code false} until disk cache passes the on-device regression documented in
+     * {@code docs/architecture/map-performance.md} in the root repository.
      */
     boolean MAP_STARTUP_PARALLEL_VECTOR_PREP = false;
 
