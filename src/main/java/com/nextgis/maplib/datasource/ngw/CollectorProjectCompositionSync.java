@@ -122,6 +122,21 @@ public final class CollectorProjectCompositionSync {
                         "snapshot_unavailable");
                 continue;
             }
+            if (Thread.currentThread().isInterrupted()) {
+                remote.setIncomplete(true);
+            }
+            if (remote.isIncomplete()) {
+                String summary = "snapshot_incomplete remote=" + remote.getLayerCount();
+                HyperLog.w(Constants.TAG, logPrefix(apply) + ": " + summary
+                        + " uid=" + metadata.getProjectUid() + " - diff/apply skipped");
+                recordCompositionDiagnostics(
+                        projectGroup,
+                        metadata,
+                        summary,
+                        true,
+                        "snapshot_incomplete");
+                continue;
+            }
             CollectorProjectDiff diff = CollectorProjectDiff.compare(projectGroup, metadata, remote);
             logDiff(metadata, remote, diff, apply);
             recordCompositionDiagnostics(
@@ -218,6 +233,9 @@ public final class CollectorProjectCompositionSync {
                 return snapshot;
             }
             walkCollectorItems(accountData, children, snapshot);
+            if (Thread.currentThread().isInterrupted()) {
+                snapshot.setIncomplete(true);
+            }
             return snapshot;
         } catch (IOException | JSONException e) {
             HyperLog.w(Constants.TAG, LOG_PREFIX + ": fetch failed projectUid="
@@ -251,6 +269,7 @@ public final class CollectorProjectCompositionSync {
             CollectorProjectSnapshot snapshot) throws JSONException {
         for (int i = 0; i < children.length(); i++) {
             if (Thread.currentThread().isInterrupted()) {
+                snapshot.setIncomplete(true);
                 return;
             }
             JSONObject item = children.optJSONObject(i);
@@ -301,8 +320,21 @@ public final class CollectorProjectCompositionSync {
             return;
         }
         String name = readDisplayName(resource, fallbackName);
-        long formId = fetchFirstFormId(accountData, resourceId);
-        String formHash = formId > 0L ? fetchFormHash(accountData, formId) : "";
+        FormLookupResult formLookup = fetchFirstFormId(accountData, resourceId);
+        if (!formLookup.isComplete()) {
+            snapshot.setIncomplete(true);
+            return;
+        }
+        long formId = formLookup.getFormId();
+        String formHash = "";
+        if (formId > 0L) {
+            FormHashResult formHashResult = fetchFormHash(accountData, formId);
+            if (!formHashResult.isComplete()) {
+                snapshot.setIncomplete(true);
+                return;
+            }
+            formHash = formHashResult.getHash();
+        }
         String descriptionRaw = envelope != null
                 ? LayerConfigUtil.extractNgwResourceDescriptionJson(envelope)
                 : null;
@@ -342,12 +374,16 @@ public final class CollectorProjectCompositionSync {
         throw new JSONException("resource envelope missing");
     }
 
-    private static long fetchFirstFormId(AccountUtil.AccountData accountData, long resourceId) {
+    private static FormLookupResult fetchFirstFormId(
+            AccountUtil.AccountData accountData,
+            long resourceId) {
         try {
             String url = NGWUtil.getResourceChildrenUrl(accountData.url, resourceId);
             HttpResponse response = NetworkUtil.get(url, accountData.login, accountData.password, false);
             if (!response.isOk()) {
-                return 0L;
+                HyperLog.w(Constants.TAG, LOG_PREFIX + ": form lookup HTTP "
+                        + response.getResponseCode() + " rid=" + resourceId);
+                return FormLookupResult.failure();
             }
             JSONArray children = new JSONArray(response.getResponseBody());
             for (int i = 0; i < children.length(); i++) {
@@ -355,19 +391,25 @@ public final class CollectorProjectCompositionSync {
                 JSONObject resource = child != null ? child.optJSONObject("resource") : null;
                 if (resource != null
                         && "formbuilder_form".equals(resource.optString("cls", ""))) {
-                    return resource.optLong("id", 0L);
+                    long formId = resource.optLong("id", 0L);
+                    return formId > 0L
+                            ? FormLookupResult.success(formId)
+                            : FormLookupResult.failure();
                 }
             }
+            return FormLookupResult.success(0L);
         } catch (IOException | JSONException e) {
             HyperLog.w(Constants.TAG, LOG_PREFIX + ": form lookup failed rid=" + resourceId
                     + ": " + e.getMessage());
+            return FormLookupResult.failure();
         }
-        return 0L;
     }
 
-    private static String fetchFormHash(AccountUtil.AccountData accountData, long formId) {
+    private static FormHashResult fetchFormHash(
+            AccountUtil.AccountData accountData,
+            long formId) {
         if (accountData == null || formId <= 0L) {
-            return "";
+            return FormHashResult.failure();
         }
         HttpURLConnection conn = null;
         try {
@@ -375,7 +417,7 @@ public final class CollectorProjectCompositionSync {
             conn = NetworkUtil.getHttpConnection(
                     NetworkUtil.HTTP_GET, url, accountData.login, accountData.password);
             if (conn == null) {
-                return "";
+                return FormHashResult.failure();
             }
             int code = conn.getResponseCode();
             if (code == HttpURLConnection.HTTP_MOVED_PERM
@@ -389,18 +431,21 @@ public final class CollectorProjectCompositionSync {
             if (code != HttpURLConnection.HTTP_OK) {
                 HyperLog.w(Constants.TAG, LOG_PREFIX + ": form hash HTTP " + code
                         + " formId=" + formId);
-                return "";
+                return FormHashResult.failure();
             }
             InputStream in = conn.getInputStream();
             try {
-                return LayerFormHashUtil.md5NgfpZip(in);
+                String hash = LayerFormHashUtil.md5NgfpZip(in);
+                return TextUtils.isEmpty(hash)
+                        ? FormHashResult.failure()
+                        : FormHashResult.success(hash);
             } finally {
                 in.close();
             }
         } catch (IOException e) {
             HyperLog.w(Constants.TAG, LOG_PREFIX + ": form hash failed formId=" + formId
                     + ": " + e.getMessage());
-            return "";
+            return FormHashResult.failure();
         } finally {
             if (conn != null) {
                 conn.disconnect();
@@ -666,6 +711,58 @@ public final class CollectorProjectCompositionSync {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private static final class FormLookupResult {
+        private final boolean mComplete;
+        private final long mFormId;
+
+        private FormLookupResult(boolean complete, long formId) {
+            mComplete = complete;
+            mFormId = formId;
+        }
+
+        static FormLookupResult success(long formId) {
+            return new FormLookupResult(true, formId);
+        }
+
+        static FormLookupResult failure() {
+            return new FormLookupResult(false, 0L);
+        }
+
+        boolean isComplete() {
+            return mComplete;
+        }
+
+        long getFormId() {
+            return mFormId;
+        }
+    }
+
+    private static final class FormHashResult {
+        private final boolean mComplete;
+        private final String mHash;
+
+        private FormHashResult(boolean complete, String hash) {
+            mComplete = complete;
+            mHash = hash;
+        }
+
+        static FormHashResult success(String hash) {
+            return new FormHashResult(true, hash);
+        }
+
+        static FormHashResult failure() {
+            return new FormHashResult(false, "");
+        }
+
+        boolean isComplete() {
+            return mComplete;
+        }
+
+        String getHash() {
+            return mHash;
+        }
     }
 
     private static final class CollectorProjectSnapshot {

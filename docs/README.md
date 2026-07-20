@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-07-19
+last_verified: 2026-07-20
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -14,6 +14,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 ## Критичные области
 
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
+- `user-location-layer` остаётся служебным верхним overlay независимо от порядка пользовательских слоёв;
+- `LayerContentProvider` разрешает активный `IGISApplication.getMap()` на каждой операции и не
+  маршрутизирует треки/объекты через карту предыдущего Collector workspace;
 - `MaplibreMapInteraction`, `IGISApplication` — API верхних слоёв;
 - `Connection`, `SyncAdapter`, `NGWSyncService` — NGW;
 - `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное
@@ -35,7 +38,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 - Неверный style order: проверить model order, sibling anchor и момент создания
   MapLibre style.
+- Курсор перекрывается треком/вектором: проверить, что `user-location-layer`
+  последний в live style после cold/lite/hot reload.
 - «После restart стало правильно»: проверить hot-add/deferred reload contract.
+- Пустой список треков после project switch: проверить строку
+  `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;
 - NGW config/data issue: отделить config parsing от feature sync decision.
 - Импорт по URL: сначала проверить parser/server/account, затем response code,
   тип ресурса и `data.read`/`data.write` permissions.

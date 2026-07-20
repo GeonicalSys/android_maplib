@@ -280,6 +280,11 @@ public class MapDrawable
     FeatureCollection markerFeatureCollection = FeatureCollection.fromFeatures(new ArrayList<>());
     GeoJsonSource markerSource = null; // marker source - select point
 
+    private static final String USER_LOCATION_SOURCE_ID = "user-location-source";
+    private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
+    private static final String USER_LOCATION_STANDING_ICON_ID = "user-marker-location-stand";
+    private static final String USER_LOCATION_MOVING_ICON_ID = "user-marker-location-go";
+
     GeoJsonSource locationSource = null;
 
     List<org.maplibre.geojson.Feature> polygonFeatures = new ArrayList<org.maplibre.geojson.Feature>();  //
@@ -382,7 +387,60 @@ public class MapDrawable
      */
     private void postMainGuarded(final String where, final Runnable block) {
         Handler h = new Handler(Looper.getMainLooper());
-        h.post(() -> runGuarded(where, block));
+        h.post(() -> {
+            runGuarded(where, block);
+            MapLibreMap map = maplibreMap.get();
+            ensureUserLocationLayerOnTop(map != null ? map.getStyle() : null);
+        });
+    }
+
+    /**
+     * Keeps the location cursor outside the user {@link LayerGroup} order and above every rendered
+     * map object. MapLibre paints style layers bottom-to-top, so the cursor must be the last layer.
+     * Re-adding a removed {@link Layer} is supported by MapLibre and preserves its properties.
+     */
+    private void ensureUserLocationLayerOnTop(@Nullable Style style) {
+        if (style == null || style.getSource(USER_LOCATION_SOURCE_ID) == null) {
+            return;
+        }
+
+        Layer locationLayer = style.getLayer(USER_LOCATION_LAYER_ID);
+        if (locationLayer == null) {
+            style.addLayer(createUserLocationLayer());
+            if (Constants.DEBUG_MODE) {
+                Log.d(TAG, "MapLibre location cursor added as top style layer");
+            }
+            return;
+        }
+
+        List<Layer> layers = style.getLayers();
+        if (!layers.isEmpty()
+                && USER_LOCATION_LAYER_ID.equals(layers.get(layers.size() - 1).getId())) {
+            return;
+        }
+        if (style.removeLayer(locationLayer)) {
+            style.addLayer(locationLayer);
+            if (Constants.DEBUG_MODE) {
+                Log.d(TAG, "MapLibre location cursor moved above all style layers");
+            }
+        } else {
+            Log.w(TAG, "MapLibre location cursor could not be moved to top");
+        }
+    }
+
+    private SymbolLayer createUserLocationLayer() {
+        return new SymbolLayer(USER_LOCATION_LAYER_ID, USER_LOCATION_SOURCE_ID)
+                .withProperties(
+                        PropertyFactory.iconImage(
+                                Expression.switchCase(
+                                        Expression.eq(Expression.get("type"), Expression.literal("stand")), Expression.literal(USER_LOCATION_STANDING_ICON_ID),
+                                        Expression.eq(Expression.get("type"), Expression.literal("go")), Expression.literal(USER_LOCATION_MOVING_ICON_ID),
+                                        Expression.literal(USER_LOCATION_STANDING_ICON_ID))),
+                        PropertyFactory.iconRotate(Expression.get("bearing")),
+                        PropertyFactory.iconSize(1.0f),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP));
     }
 
     /** Runs a block on the current thread under a Throwable guard, logging context on failure. */
@@ -885,6 +943,7 @@ public class MapDrawable
                 if (!localVectorTileUrlMap.containsKey(id)) {
                     reloadVectorLayerStylePropsToMaplibre(iLayer);
                 }
+                ensureUserLocationLayerOnTop(maplbrStyle);
                 return;
             }
         }
@@ -907,6 +966,7 @@ public class MapDrawable
                         signaturesRootLayer);
                 checkLayerVisibility(id);
                 reloadVectorLayerDataToMaplibre(iLayer);
+                ensureUserLocationLayerOnTop(maplbrStyle);
                 return;
             }
         }
@@ -933,6 +993,7 @@ public class MapDrawable
                     selectedDotCircleLayer, signaturesRootLayer);
         }
         checkLayerVisibility(layer.getId());
+        ensureUserLocationLayerOnTop(maplbrStyle);
     }
 
     /**
@@ -1895,26 +1956,11 @@ public class MapDrawable
 
                         final Drawable drawableStand = getContext().getResources().getDrawable( R.drawable.ic_location_standing);
                         final Bitmap bitmapStand = drawableToBitmap(drawableStand);
-                        String iconStandId = "user-marker-location-stand";
-                        style.addImage(iconStandId, bitmapStand);
+                        style.addImage(USER_LOCATION_STANDING_ICON_ID, bitmapStand);
 
                         final Drawable drawableGo = getContext().getResources().getDrawable( R.drawable.ic_location_moving);
                         final Bitmap bitmapGo = drawableToBitmap(drawableGo);
-                        String iconGoId = "user-marker-location-go";
-                        style.addImage(iconGoId, bitmapGo);
-
-                        SymbolLayer locationLayer = new SymbolLayer("user-location-layer", "user-location-source")
-                                .withProperties(
-                                        PropertyFactory.iconImage(
-                                                Expression.switchCase(
-                                                        Expression.eq(Expression.get("type"), Expression.literal("stand")), Expression.literal("user-marker-location-stand"),
-                                                        Expression.eq(Expression.get("type"), Expression.literal("go")), Expression.literal("user-marker-location-go"),
-                                                        Expression.literal("user-marker-location-stand"))),
-                                        PropertyFactory.iconRotate(Expression.get("bearing")),
-                                        PropertyFactory.iconSize(1.0f),
-                                        PropertyFactory.iconAllowOverlap(true),
-                                        PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP));
-                        style.addLayer(locationLayer);
+                        style.addImage(USER_LOCATION_MOVING_ICON_ID, bitmapGo);
 
 
                         // TRACKING
@@ -1974,7 +2020,7 @@ public class MapDrawable
                         style.addLayer(symbolLayer);
 
                         if (createSource) {
-                            locationSource = new GeoJsonSource("user-location-source", Point.fromLngLat(-100.0, -100.0));
+                            locationSource = new GeoJsonSource(USER_LOCATION_SOURCE_ID, Point.fromLngLat(-100.0, -100.0));
                             style.addSource(locationSource);
                         }
 
@@ -2096,6 +2142,7 @@ public class MapDrawable
                                 Log.e(TAG, "loadLayersToMaplibreMap: post-load hooks", th);
                             }
                         }
+                        ensureUserLocationLayerOnTop(style);
 
                         } catch (Throwable t) {
                             logErr("loadLayersToMaplibreMap: onDidFinishLoadingStyle", t);
@@ -2200,26 +2247,11 @@ public class MapDrawable
 
         final Drawable drawableStand = getContext().getResources().getDrawable( R.drawable.ic_location_standing);
         final Bitmap bitmapStand = drawableToBitmap(drawableStand);
-        String iconStandId = "user-marker-location-stand";
-        style.addImage(iconStandId, bitmapStand);
+        style.addImage(USER_LOCATION_STANDING_ICON_ID, bitmapStand);
 
         final Drawable drawableGo = getContext().getResources().getDrawable( R.drawable.ic_location_moving);
         final Bitmap bitmapGo = drawableToBitmap(drawableGo);
-        String iconGoId = "user-marker-location-go";
-        style.addImage(iconGoId, bitmapGo);
-
-        SymbolLayer locationLayer = new SymbolLayer("user-location-layer", "user-location-source")
-                .withProperties(
-                        PropertyFactory.iconImage(
-                                Expression.switchCase(
-                                        Expression.eq(Expression.get("type"), Expression.literal("stand")), Expression.literal("user-marker-location-stand"),
-                                        Expression.eq(Expression.get("type"), Expression.literal("go")), Expression.literal("user-marker-location-go"),
-                                        Expression.literal("user-marker-location-stand"))),
-                        PropertyFactory.iconRotate(Expression.get("bearing")),
-                        PropertyFactory.iconSize(1.0f),
-                        PropertyFactory.iconAllowOverlap(true),
-                        PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP));
-        style.addLayer(locationLayer);
+        style.addImage(USER_LOCATION_MOVING_ICON_ID, bitmapGo);
 
         // TRACKING
         // saved track line
@@ -2397,6 +2429,7 @@ public class MapDrawable
             }
         }
 
+        ensureUserLocationLayerOnTop(style);
         syncUserLocationSourceFromStyle(style);
     }
 
@@ -2409,7 +2442,7 @@ public class MapDrawable
         if (style == null) {
             return;
         }
-        Source src = style.getSource("user-location-source");
+        Source src = style.getSource(USER_LOCATION_SOURCE_ID);
         if (src instanceof GeoJsonSource) {
             locationSource = (GeoJsonSource) src;
         }

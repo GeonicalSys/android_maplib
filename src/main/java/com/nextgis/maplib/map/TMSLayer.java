@@ -45,7 +45,11 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.net.URL;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -59,6 +63,12 @@ public abstract class TMSLayer
 {
     protected static final String JSON_TMSTYPE_KEY     = "tms_type";
     protected static final String JSON_CACHE_SIZE_MULT = "cache_size_multiply";
+    private static final String JSON_NGRC_PROVENANCE = "ngrc_provenance";
+    private static final String JSON_NGRC_SOURCE_NAME = "source_name";
+    private static final String JSON_NGRC_ARCHIVE_SHA256 = "archive_sha256";
+    private static final String JSON_NGRC_IMPORTED_AT = "imported_at";
+    private static final String JSON_NGRC_UPDATE_POLICY = "update_policy";
+    public static final String NGRC_UPDATE_POLICY_IMMUTABLE_LOCAL = "immutable_local";
     public static final String TILE_EXT = ".tile";
 
     protected int mTMSType;
@@ -67,6 +77,10 @@ public abstract class TMSLayer
     protected int                 mCacheSize, mCacheSizeMult;
     protected int mViewWidth, mViewHeight;
     protected final Object lock = new Object();
+    private String mNgrcSourceName;
+    private String mNgrcArchiveSha256;
+    private long mNgrcImportedAt;
+    private String mLastArchiveSha256;
 
 
     protected TMSLayer(
@@ -140,6 +154,14 @@ public abstract class TMSLayer
 
 
         rootConfig.put(JSON_CACHE_SIZE_MULT, mCacheSizeMult);
+        if (mNgrcArchiveSha256 != null && !mNgrcArchiveSha256.isEmpty()) {
+            JSONObject provenance = new JSONObject();
+            provenance.put(JSON_NGRC_SOURCE_NAME, mNgrcSourceName);
+            provenance.put(JSON_NGRC_ARCHIVE_SHA256, mNgrcArchiveSha256);
+            provenance.put(JSON_NGRC_IMPORTED_AT, mNgrcImportedAt);
+            provenance.put(JSON_NGRC_UPDATE_POLICY, NGRC_UPDATE_POLICY_IMMUTABLE_LOCAL);
+            rootConfig.put(JSON_NGRC_PROVENANCE, provenance);
+        }
         return rootConfig;
     }
 
@@ -159,6 +181,12 @@ public abstract class TMSLayer
 
         if (jsonObject.has(JSON_CACHE_SIZE_MULT)) {
             mCacheSizeMult = jsonObject.getInt(JSON_CACHE_SIZE_MULT);
+        }
+        JSONObject provenance = jsonObject.optJSONObject(JSON_NGRC_PROVENANCE);
+        if (provenance != null) {
+            mNgrcSourceName = provenance.optString(JSON_NGRC_SOURCE_NAME, null);
+            mNgrcArchiveSha256 = provenance.optString(JSON_NGRC_ARCHIVE_SHA256, null);
+            mNgrcImportedAt = provenance.optLong(JSON_NGRC_IMPORTED_AT, 0L);
         }
 
         if(Constants.DEBUG_MODE) {
@@ -255,25 +283,46 @@ public abstract class TMSLayer
         int increment = 0;
         byte[] buffer = new byte[Constants.IO_BUFFER_SIZE];
 
-        ZipInputStream zis = new ZipInputStream(inputStream);
-        ZipEntry ze;
-        while ((ze = zis.getNextEntry()) != null) {
-            FileUtil.unzipEntry(zis, ze, buffer, mPath);
-            increment += ze.getCompressedSize();
-            zis.closeEntry();
-            if (null != progressor) {
-                if(progressor.isCanceled())
-                    return;
-                progressor.setValue(increment);
-                progressor.setMessage(getContext().getString(R.string.processed) + " " + increment + " " + getContext().getString(R.string.of) + " " + streamSize);
+        final MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IOException("SHA-256 unavailable", e);
+        }
+        try (DigestInputStream digestInput = new DigestInputStream(inputStream, digest);
+             ZipInputStream zis = new ZipInputStream(digestInput)) {
+            ZipEntry ze;
+            while ((ze = zis.getNextEntry()) != null) {
+                FileUtil.unzipEntry(zis, ze, buffer, mPath);
+                long compressedSize = ze.getCompressedSize();
+                if (compressedSize > 0L) {
+                    increment += (int) Math.min(Integer.MAX_VALUE, compressedSize);
+                }
+                zis.closeEntry();
+                if (null != progressor) {
+                    if(progressor.isCanceled()) {
+                        throw new InterruptedIOException("Archive import cancelled");
+                    }
+                    progressor.setValue(increment);
+                    progressor.setMessage(getContext().getString(R.string.processed) + " " + increment + " " + getContext().getString(R.string.of) + " " + streamSize);
+                }
+            }
+            // ZipInputStream may stop after recognizing the central directory while unread archive
+            // bytes (for example a ZIP comment) still remain in the wrapped stream. Drain them so
+            // provenance is the SHA-256 of the complete source archive, not only extracted entries.
+            while (digestInput.read(buffer) != -1) {
+                // DigestInputStream updates the digest while draining.
             }
         }
+        mLastArchiveSha256 = toHex(digest.digest());
     }
 
 
     public void fillFromZip(Uri uri, IProgressor progressor) throws IOException, NumberFormatException, SecurityException, NGException {
         fillFromZipInt(uri, progressor);
-        save();
+        if (!save()) {
+            throw new IOException("Cannot save imported TMS layer configuration");
+        }
     }
 
     /** Extra zoom levels beyond tile min/max so the layer stays visible when slightly over-zoomed. */
@@ -281,12 +330,38 @@ public abstract class TMSLayer
 
     public void fillFromNgrc(Uri uri, IProgressor progressor) throws IOException, NumberFormatException, SecurityException, NGException {
         fillFromZipInt(uri, progressor);
-        load();
+        if (!load()) {
+            throw new IOException("Cannot load imported NGRC configuration");
+        }
         float minZ = getMinZoom();
         float maxZ = getMaxZoom();
         setMinZoom(Math.max(GeoConstants.DEFAULT_MIN_ZOOM, minZ - NGRC_VISIBILITY_ZOOM_PADDING));
         setMaxZoom(Math.min(GeoConstants.DEFAULT_MAX_ZOOM, maxZ + NGRC_VISIBILITY_ZOOM_PADDING));
-        save();
+        if (!save()) {
+            throw new IOException("Cannot save imported NGRC configuration");
+        }
+    }
+
+    public void setNgrcImportProvenance(String sourceName, String archiveSha256) {
+        mNgrcSourceName = sourceName;
+        mNgrcArchiveSha256 = archiveSha256;
+        mNgrcImportedAt = System.currentTimeMillis();
+    }
+
+    public String getLastArchiveSha256() {
+        return mLastArchiveSha256;
+    }
+
+    public String getNgrcArchiveSha256() {
+        return mNgrcArchiveSha256;
+    }
+
+    private static String toHex(byte[] bytes) {
+        StringBuilder value = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            value.append(String.format(java.util.Locale.US, "%02x", b & 0xff));
+        }
+        return value.toString();
     }
 
 }

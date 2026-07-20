@@ -50,6 +50,8 @@ public class CollectorResource extends Resource {
     private final List<LayerWithStyles> mLayers = new ArrayList<>();
     private final Set<Long> mResolvedLayerRemoteIds = new HashSet<>();
     private String mProjectDistrict;
+    private boolean mSnapshotComplete = true;
+    private String mSnapshotError;
 
     public CollectorResource(JSONObject json, Connection connection) {
         super(json, connection);
@@ -62,6 +64,7 @@ public class CollectorResource extends Resource {
                 fetchCollectorProjectDetails();
             }
         } catch (JSONException e) {
+            markSnapshotIncomplete("collector_project JSON: " + e.getMessage());
             Log.e(TAG, "parse collector_project", e);
             HyperLog.exception(Constants.TAG, e);
         }
@@ -79,6 +82,9 @@ public class CollectorResource extends Resource {
                 mLayers.add(layer);
             }
         }
+        mProjectDistrict = in.readString();
+        mSnapshotComplete = in.readByte() != 0;
+        mSnapshotError = in.readString();
     }
 
     public static final Parcelable.Creator<CollectorResource> CREATOR =
@@ -102,6 +108,9 @@ public class CollectorResource extends Resource {
         for (LayerWithStyles layer : mLayers) {
             parcel.writeParcelable(layer, flags);
         }
+        parcel.writeString(mProjectDistrict);
+        parcel.writeByte((byte) (mSnapshotComplete ? 1 : 0));
+        parcel.writeString(mSnapshotError);
     }
 
     /**
@@ -116,6 +125,24 @@ public class CollectorResource extends Resource {
      */
     public String getProjectDistrict() {
         return mProjectDistrict;
+    }
+
+    /** True only when the complete project tree and every referenced vector resource were resolved. */
+    public boolean isSnapshotComplete() {
+        return mSnapshotComplete;
+    }
+
+    public String getSnapshotError() {
+        return mSnapshotError;
+    }
+
+    private void markSnapshotIncomplete(String error) {
+        mSnapshotComplete = false;
+        if (TextUtils.isEmpty(mSnapshotError)) {
+            mSnapshotError = error;
+        }
+        HyperLog.w(Constants.TAG, "CollectorResource: incomplete snapshot remoteId="
+                + mRemoteId + " error=" + error);
     }
 
     private void applyEnvelopeMetadata(JSONObject envelope) {
@@ -141,6 +168,7 @@ public class CollectorResource extends Resource {
             HttpResponse response =
                     NetworkUtil.get(url, mConnection.getLogin(), mConnection.getPassword(), false);
             if (!response.isOk()) {
+                markSnapshotIncomplete("project HTTP " + response.getResponseCode());
                 HyperLog.w(Constants.TAG, "CollectorResource: full fetch HTTP " + response.getResponseCode());
                 return;
             }
@@ -150,9 +178,11 @@ public class CollectorResource extends Resource {
             if (cp != null) {
                 parseCollectorProject(cp);
             } else {
+                markSnapshotIncomplete("full JSON has no collector_project");
                 HyperLog.w(Constants.TAG, "CollectorResource: full JSON has no collector_project");
             }
         } catch (IOException | JSONException e) {
+            markSnapshotIncomplete("project fetch: " + e.getMessage());
             Log.e(TAG, "fetch collector_project", e);
             HyperLog.exception(Constants.TAG, e);
         }
@@ -163,11 +193,13 @@ public class CollectorResource extends Resource {
         mResolvedLayerRemoteIds.clear();
         JSONObject rootItem = collectorProject.optJSONObject("root_item");
         if (rootItem == null) {
+            markSnapshotIncomplete("collector_project has no root_item");
             HyperLog.w(Constants.TAG, "CollectorResource: collector_project has no root_item");
             return;
         }
         JSONArray childrenArray = rootItem.optJSONArray("children");
         if (childrenArray == null) {
+            markSnapshotIncomplete("root_item has no children array");
             HyperLog.w(Constants.TAG, "CollectorResource: root_item has no children");
             return;
         }
@@ -210,6 +242,7 @@ public class CollectorResource extends Resource {
                 tryFetchAndAddLayer(rid, collectorEditable);
             }
         } catch (JSONException e) {
+            markSnapshotIncomplete("collector item JSON: " + e.getMessage());
             Log.e(TAG, "tryConsumeCollectorItem", e);
             HyperLog.exception(Constants.TAG, e);
         }
@@ -294,10 +327,12 @@ public class CollectorResource extends Resource {
             }
             JSONObject envelope = fetchResourceEnvelope(resourceId);
             if (envelope == null) {
+                markSnapshotIncomplete("resource " + resourceId + " response has no resource");
                 return;
             }
             tryAddLayerFromWrapped(envelope, collectorEditable);
         } catch (JSONException | IOException e) {
+            markSnapshotIncomplete("resource " + resourceId + ": " + e.getMessage());
             Log.e(TAG, "tryFetchAndAddLayer", e);
             HyperLog.exception(Constants.TAG, e);
         }
@@ -310,6 +345,8 @@ public class CollectorResource extends Resource {
         HttpResponse response =
                 NetworkUtil.get(url, mConnection.getLogin(), mConnection.getPassword(), false);
         if (!response.isOk()) {
+            markSnapshotIncomplete("resource " + resourceId + " HTTP "
+                    + response.getResponseCode());
             HyperLog.w(Constants.TAG, "CollectorResource: GET resource " + resourceId + " -> HTTP "
                     + response.getResponseCode());
             return null;
@@ -323,6 +360,7 @@ public class CollectorResource extends Resource {
             out.put("resource", root);
             return out;
         }
+        markSnapshotIncomplete("resource " + resourceId + " has unexpected JSON envelope");
         return null;
     }
 
@@ -360,6 +398,7 @@ public class CollectorResource extends Resource {
         try {
             JSONObject env = fetchResourceEnvelope(layer.getRemoteId());
             if (env == null) {
+                markSnapshotIncomplete("description resource " + layer.getRemoteId() + " unavailable");
                 return;
             }
             JSONObject res = env.getJSONObject("resource");
@@ -370,6 +409,8 @@ public class CollectorResource extends Resource {
                 }
             }
         } catch (JSONException | IOException e) {
+            markSnapshotIncomplete("description resource " + layer.getRemoteId() + ": "
+                    + e.getMessage());
             Log.e(TAG, "ensureDescriptionFromServer", e);
             HyperLog.exception(Constants.TAG, e);
         }

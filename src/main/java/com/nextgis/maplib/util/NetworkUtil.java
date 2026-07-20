@@ -144,7 +144,11 @@ public class NetworkUtil
     /** NGW / slow links: allow long TLS and routing (e.g. Wi‑Fi to mobile handoff). */
     public final static int TIMEOUT_CONNECTION = 45000;
     /** Large single-request GeoJSON feature downloads from NGW. */
-    public final static int TIMEOUT_SOCKET = 900000; // 15 min
+    // Read inactivity timeout, not a total transfer timeout. A 15 minute stall here
+    // blocked every following account in the serial Android sync adapter queue.
+    // Three minutes still allows large responses to stream while bounding a dead
+    // connection to a recoverable interval.
+    public final static int TIMEOUT_SOCKET = 180000; // 3 min without incoming data
 
     /**
      * Whether a failed request is worth retrying (timeouts, disconnects, DNS blips during handover).

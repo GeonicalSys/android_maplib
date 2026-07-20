@@ -5,8 +5,6 @@
 
 package com.nextgis.maplib.util;
 
-import android.text.TextUtils;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -51,7 +49,7 @@ public final class LayerFormHashUtil {
             if (!entry.isDirectory()) {
                 String name = normalizeZipEntryName(entry.getName());
                 String canonical = canonicalFormPartName(name);
-                if (!TextUtils.isEmpty(canonical)) {
+                if (!isEmpty(canonical)) {
                     parts.put(canonical, normalizePartBytes(canonical, readEntryBytes(zis, buffer)));
                 }
             }
@@ -66,9 +64,18 @@ public final class LayerFormHashUtil {
             return "";
         }
         String prefix = formId + "_";
+        return md5NgfpFiles(
+                new File(layerPath, prefix + FILE_FORM),
+                new File(layerPath, prefix + FILE_META_LOCAL));
+    }
+
+    /**
+     * Hash an already unpacked NGFP pair before it is installed in a layer directory.
+     */
+    public static String md5NgfpFiles(File formFile, File metaFile) throws IOException {
         TreeMap<String, byte[]> parts = new TreeMap<>();
-        readLocalPart(parts, new File(layerPath, prefix + FILE_FORM), FILE_FORM);
-        readLocalPart(parts, new File(layerPath, prefix + FILE_META_LOCAL), FILE_META_ZIP);
+        readLocalPart(parts, formFile, FILE_FORM);
+        readLocalPart(parts, metaFile, FILE_META_ZIP);
         return md5Parts(parts);
     }
 
@@ -92,7 +99,7 @@ public final class LayerFormHashUtil {
     }
 
     private static String normalizeZipEntryName(String raw) {
-        if (TextUtils.isEmpty(raw)) {
+        if (isEmpty(raw)) {
             return "";
         }
         String name = raw.replace('\\', '/');
@@ -102,7 +109,7 @@ public final class LayerFormHashUtil {
         int pos = name.indexOf('/');
         if (pos != Constants.NOT_FOUND) {
             String folderName = name.substring(0, pos);
-            if (!TextUtils.isDigitsOnly(folderName)) {
+            if (!isDigitsOnly(folderName)) {
                 name = name.substring(pos + 1);
             }
         }
@@ -110,7 +117,7 @@ public final class LayerFormHashUtil {
     }
 
     private static String canonicalFormPartName(String name) {
-        if (TextUtils.isEmpty(name)) {
+        if (isEmpty(name)) {
             return "";
         }
         String lower = name.toLowerCase();
@@ -147,6 +154,22 @@ public final class LayerFormHashUtil {
             out.write(buffer, 0, read);
         }
         return out.toByteArray();
+    }
+
+    private static boolean isEmpty(String value) {
+        return value == null || value.isEmpty();
+    }
+
+    private static boolean isDigitsOnly(String value) {
+        if (isEmpty(value)) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String md5Parts(TreeMap<String, byte[]> parts) {
