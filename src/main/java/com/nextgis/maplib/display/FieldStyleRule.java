@@ -109,6 +109,108 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
         return mOtherStyle != null ? mOtherStyle : rendererFallback;
     }
 
+    /**
+     * Effective style for a matched rule value: rule paint fields win; unset optional fields are
+     * filled from {@code other} (style for others / default).
+     */
+    public static Style mergeRuleWithOther(Style rule, Style other) {
+        if (rule == null) {
+            return other;
+        }
+        if (other == null) {
+            return rule;
+        }
+        try {
+            Style effective = rule.clone();
+            fillUnsetOptionalFrom(effective, other);
+            return effective;
+        } catch (CloneNotSupportedException e) {
+            fillUnsetOptionalFrom(rule, other);
+            return rule;
+        }
+    }
+
+    /**
+     * Resolves style for a field value: unmatched → other/default; matched → rule with unset
+     * optionals filled from other/default.
+     */
+    public Style resolveEffectiveStyle(String value, Style rendererFallback) {
+        Style other = resolveOtherStyle(rendererFallback);
+        Style rule = value != null ? getStyle(value) : null;
+        if (rule == null) {
+            return other;
+        }
+        return mergeRuleWithOther(rule, other);
+    }
+
+    private static void fillUnsetOptionalFrom(Style target, Style source) {
+        if (target == null || source == null) {
+            return;
+        }
+        if (isBlank(target.getSizeZoomScaleStops()) && !isBlank(source.getSizeZoomScaleStops())) {
+            target.setSizeZoomScaleStops(source.getSizeZoomScaleStops());
+        }
+        if (!target.isScaleSizeWithZoom() && source.isScaleSizeWithZoom()) {
+            target.setScaleSizeWithZoom(true);
+        }
+        if (target instanceof SimpleMarkerStyle && source instanceof SimpleMarkerStyle) {
+            SimpleMarkerStyle t = (SimpleMarkerStyle) target;
+            SimpleMarkerStyle s = (SimpleMarkerStyle) source;
+            if (t.getField() == null && s.getField() != null) {
+                t.setField(s.getField());
+            }
+            if (t.getText() == null && s.getText() != null) {
+                t.setText(s.getText());
+            }
+            if (isBlank(t.getIconImage()) && !isBlank(s.getIconImage())) {
+                t.setIconImage(s.getIconImage());
+            }
+            if (t.getIconSize() <= 0f && s.getIconSize() > 0f) {
+                t.setIconSize(s.getIconSize());
+            }
+            LabelAttributes labels = t.getLabelAttributes();
+            if (labels != null) {
+                labels.fillUnsetFrom(s.getLabelAttributes());
+            }
+        } else if (target instanceof SimpleLineStyle && source instanceof SimpleLineStyle) {
+            SimpleLineStyle t = (SimpleLineStyle) target;
+            SimpleLineStyle s = (SimpleLineStyle) source;
+            if (t.getField() == null && s.getField() != null) {
+                t.setField(s.getField());
+            }
+            if (t.getText() == null && s.getText() != null) {
+                t.setText(s.getText());
+            }
+            if (t.getDashArray() == null && s.getDashArray() != null) {
+                t.setDashArray(s.getDashArray());
+            }
+            LabelAttributes labels = t.getLabelAttributes();
+            if (labels != null) {
+                labels.fillUnsetFrom(s.getLabelAttributes());
+            }
+        } else if (target instanceof SimplePolygonStyle && source instanceof SimplePolygonStyle) {
+            SimplePolygonStyle t = (SimplePolygonStyle) target;
+            SimplePolygonStyle s = (SimplePolygonStyle) source;
+            if (t.getField() == null && s.getField() != null) {
+                t.setField(s.getField());
+            }
+            if (t.getText() == null && s.getText() != null) {
+                t.setText(s.getText());
+            }
+            if (isBlank(t.getFillPatternImage()) && !isBlank(s.getFillPatternImage())) {
+                t.setFillPatternImage(s.getFillPatternImage());
+            }
+            LabelAttributes labels = t.getLabelAttributes();
+            if (labels != null) {
+                labels.fillUnsetFrom(s.getLabelAttributes());
+            }
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
     public void applyStyleForFeatureId(Style target, long featureId, Style rendererFallback) {
         if (mKey == null) {
             return;
@@ -119,13 +221,7 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
                 ? feature.getId() + ""
                 : feature.getFieldValueAsString(mKey);
 
-        Style source = null;
-        if (value != null) {
-            source = getStyle(value);
-        }
-        if (source == null) {
-            source = resolveOtherStyle(rendererFallback);
-        }
+        Style source = resolveEffectiveStyle(value, rendererFallback);
         if (source != null) {
             copyStyleParams(target, source);
         }
@@ -216,12 +312,13 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
         Feature feature = mLayer.getFeature(featureId);
         String value = mKey.equals(Constants.FIELD_ID) ? feature.getId() + "" : feature.getFieldValueAsString(mKey);
 
-        if (value != null) {
-            Style rule = getStyle(value);
-            if (rule == null)
-                return;
-
-            copyStyleParams(style, rule);
+        Style rule = value != null ? getStyle(value) : null;
+        if (rule == null) {
+            return;
+        }
+        Style source = mergeRuleWithOther(rule, resolveOtherStyle(null));
+        if (source != null) {
+            copyStyleParams(style, source);
         }
     }
 

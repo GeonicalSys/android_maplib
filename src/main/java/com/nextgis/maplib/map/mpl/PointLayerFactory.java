@@ -97,7 +97,7 @@ public final class PointLayerFactory {
         Expression scaleSizeWithZoom = ctx.ruleStyling
                 ? Expression.get(MplFeatureStyleProps.SCALE_SIZE_WITH_ZOOM)
                 : null;
-        boolean defaultScaleSizeWithZoom = !ctx.ruleStyling && vars.scaleSizeWithZoom;
+        boolean defaultScaleSizeWithZoom = vars.scaleSizeWithZoom;
         Expression fillIconSize = MplStyleMapper.zoomScaleExpression(
                 fillIconSizeBase,
                 scaleSizeWithZoom,

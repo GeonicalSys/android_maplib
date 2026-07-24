@@ -152,7 +152,7 @@ public final class PolygonLayerFactory {
                         ctx.ruleStyling
                                 ? Expression.get(MplFeatureStyleProps.SCALE_SIZE_WITH_ZOOM)
                                 : null,
-                        !ctx.ruleStyling && vars.scaleSizeWithZoom,
+                        vars.scaleSizeWithZoom,
                         vars.sizeZoomScaleStops)),
                 PropertyFactory.lineSortKey(Expression.toNumber(Expression.get(MplFeatureStyleProps.ORDER))),
                 PropertyFactory.lineOpacity(

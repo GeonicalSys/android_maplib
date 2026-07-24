@@ -57,6 +57,8 @@ public final class MplFeatureStyleProps {
     public static final String TEXT_ROTATION_ALIGNMENT = "textrotationalignment";
     public static final String SYMBOL_SPACING = "symbolspacing";
     public static final String SYMBOL_PLACEMENT = "symbolplacement";
+    public static final String LABEL_MIN_ZOOM = "labelminzoom";
+    public static final String LABEL_MAX_ZOOM = "labelmaxzoom";
 
     public static final String COLOR_FILL = "colorfill";
     public static final String COLOR_STROKE = "colorstroke";
@@ -366,6 +368,8 @@ public final class MplFeatureStyleProps {
         feature.addStringProperty(
                 TEXT_ROTATION_ALIGNMENT,
                 textRotationAlignmentValue(geoType, labelAttributes));
+        feature.addNumberProperty(LABEL_MIN_ZOOM, labelAttributes.getLabelMinZoom());
+        feature.addNumberProperty(LABEL_MAX_ZOOM, labelAttributes.getLabelMaxZoom());
     }
 
     /** Removes label-related GeoJSON properties only (not geometry paint props). */
@@ -397,6 +401,8 @@ public final class MplFeatureStyleProps {
         feature.removeProperty(TEXT_ROTATION_ALIGNMENT);
         feature.removeProperty(SYMBOL_SPACING);
         feature.removeProperty(SYMBOL_PLACEMENT);
+        feature.removeProperty(LABEL_MIN_ZOOM);
+        feature.removeProperty(LABEL_MAX_ZOOM);
     }
 
     private static String symbolPlacementValue(int geoType, LabelAttributes labelAttributes) {

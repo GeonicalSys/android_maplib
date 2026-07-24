@@ -157,6 +157,8 @@ public class MPLFeaturesUtils {
     static public String prop_text_rotation_alignment = MplFeatureStyleProps.TEXT_ROTATION_ALIGNMENT;
     static public String prop_symbol_spacing = MplFeatureStyleProps.SYMBOL_SPACING;
     static public String prop_symbol_placement = MplFeatureStyleProps.SYMBOL_PLACEMENT;
+    static public String prop_label_min_zoom = MplFeatureStyleProps.LABEL_MIN_ZOOM;
+    static public String prop_label_max_zoom = MplFeatureStyleProps.LABEL_MAX_ZOOM;
 
     // common properties — aliases of {@link MplFeatureStyleProps}
     static public String prop_color_fill = MplFeatureStyleProps.COLOR_FILL;
@@ -735,10 +737,12 @@ public class MPLFeaturesUtils {
                 : Expression.literal(baseSize);
 
         if (ruleStyle) {
+            boolean defaultScaleWithZoom = labelAttributes != null
+                    && labelAttributes.isTextScaleWithZoom();
             return MplStyleMapper.zoomScaleExpression(
                     sizeExpr,
                     Expression.get(prop_text_scale_with_zoom),
-                    false,
+                    defaultScaleWithZoom,
                     labelAttributes != null ? labelAttributes.getTextZoomScaleStops() : null);
         }
 
@@ -765,17 +769,12 @@ public class MPLFeaturesUtils {
         boolean isIdKey = "_id".equals(key);
 
         String keyValue = isIdKey   ? String.valueOf(ngFeature.getId()): getNullableValue(ngFeature, key);
-        com.nextgis.maplib.display.Style style = fsr.getStyle(keyValue);
+        com.nextgis.maplib.display.Style style = fsr.resolveEffectiveStyle(keyValue, rfr.getStyle());
 
         if (style != null) {
             String ruleCommonText = style.getText();
             applyText(style, ngFeature, feature, ruleCommonText != null? ruleCommonText : commonText);
             MplFeatureStyleProps.apply(style, feature, geoType);
-        } else {
-            com.nextgis.maplib.display.Style otherStyle = fsr.resolveOtherStyle(rfr.getStyle());
-            String otherText = otherStyle.getText();
-            applyText(otherStyle, ngFeature, feature, otherText != null ? otherText : commonText);
-            MplFeatureStyleProps.apply(otherStyle, feature, geoType);
         }
     }
 
@@ -1696,11 +1695,26 @@ public class MPLFeaturesUtils {
 
         String currentNamePrefixSymbol = "symbol-" + namePrefix;
 
-        MplLayerStyleVars styleVars = MplLayerStyleVars.from(layerStyle, layerType);
-        LabelAttributes layerLabelAttributes = LabelAttributes.fromStyle(layerStyle);
+        MplLayerStyleVars styleVars;
+        LabelAttributes layerLabelAttributes;
 
         boolean ruleStyling = iLayer instanceof VectorLayer
                 && ((VectorLayer) iLayer).getRenderer() instanceof RuleFeatureRenderer;
+
+        // Rule mode: MapLibre layer defaults come from "other (default)" style, not renderer base.
+        com.nextgis.maplib.display.Style layerDefaultsStyle = layerStyle;
+        if (ruleStyling) {
+            RuleFeatureRenderer rfr = (RuleFeatureRenderer) ((VectorLayer) iLayer).getRenderer();
+            if (rfr.getStyleRule() instanceof FieldStyleRule) {
+                FieldStyleRule fsr = (FieldStyleRule) rfr.getStyleRule();
+                com.nextgis.maplib.display.Style otherStyle = fsr.resolveOtherStyle(layerStyle);
+                if (otherStyle != null) {
+                    layerDefaultsStyle = otherStyle;
+                }
+            }
+        }
+        styleVars = MplLayerStyleVars.from(layerDefaultsStyle, layerType);
+        layerLabelAttributes = LabelAttributes.fromStyle(layerDefaultsStyle);
 
         // polygon makes signature other way: - create points for polygones
         // - differ source for points () (layerPath + source_text)
@@ -1835,8 +1849,15 @@ public class MPLFeaturesUtils {
                     float defaultTextOpacity = layerLabelAttributes != null
                             ? layerLabelAttributes.textOpacityFloat()
                             : 1f;
-                    Expression textOpacityExpression = MplStyleMapper.textOpacityExpression(
-                            prop_text_opacity, defaultTextOpacity, layerOpacityFactor);
+                    Expression textOpacityExpression = ruleStyling
+                            ? MplStyleMapper.textOpacityWithLabelZoomExpression(
+                                    prop_text_opacity,
+                                    prop_label_min_zoom,
+                                    prop_label_max_zoom,
+                                    defaultTextOpacity,
+                                    layerOpacityFactor)
+                            : MplStyleMapper.textOpacityExpression(
+                                    prop_text_opacity, defaultTextOpacity, layerOpacityFactor);
                     Expression textAllowOverlapExpression = Expression.coalesce(
                             Expression.get(prop_text_allow_overlap),
                             Expression.literal(allowOverlap));
@@ -2032,19 +2053,25 @@ public class MPLFeaturesUtils {
                 markerIconLayer.setMaxZoom(maxZoom);
         }
 
-        // Label zoom can differ from layer geometry zoom
+        // Label zoom can differ from layer geometry zoom. Always reset so a prior clamp cannot stick.
         if (simbolLayer != null) {
-            float labelMinZoom = layerLabelAttributes.getLabelMinZoom();
-            float labelMaxZoom = layerLabelAttributes.getLabelMaxZoom();
+            float labelMinZoom = layerLabelAttributes != null
+                    ? layerLabelAttributes.getLabelMinZoom() : -1f;
+            float labelMaxZoom = layerLabelAttributes != null
+                    ? layerLabelAttributes.getLabelMaxZoom() : -1f;
             if (labelMinZoom >= 0f) {
                 simbolLayer.setMinZoom(labelMinZoom);
             } else if (minZoom != -1) {
                 simbolLayer.setMinZoom(minZoom);
+            } else {
+                simbolLayer.setMinZoom(0f);
             }
             if (labelMaxZoom >= 0f) {
                 simbolLayer.setMaxZoom(labelMaxZoom);
             } else if (maxZoom != -1) {
                 simbolLayer.setMaxZoom(maxZoom);
+            } else {
+                simbolLayer.setMaxZoom(24f);
             }
         }
     }

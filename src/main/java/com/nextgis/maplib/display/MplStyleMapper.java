@@ -107,6 +107,56 @@ public final class MplStyleMapper {
                 fillOpacityExpression(propName, defaultOpacity), layerOpacityFactor);
     }
 
+    /**
+     * Text opacity with optional per-feature label zoom range.
+     * <p>
+     * MapLibre requires {@code ["zoom"]} only as the input of a top-level {@code step}/
+     * {@code interpolate}. Nesting zoom under {@code case} is rejected, so visibility is
+     * encoded as {@code step(zoom, ...)} with data-only outputs per integer level.
+     */
+    public static Expression textOpacityWithLabelZoomExpression(
+            String opacityProp,
+            String minZoomProp,
+            String maxZoomProp,
+            float defaultOpacity,
+            float layerOpacityFactor) {
+        Expression baseOpacity = opacityWithLayerMultiplier(
+                fillOpacityExpression(opacityProp, defaultOpacity), layerOpacityFactor);
+        Expression minZoom = Expression.toNumber(Expression.coalesce(
+                Expression.get(minZoomProp),
+                Expression.literal(-1.0)));
+        Expression maxZoom = Expression.toNumber(Expression.coalesce(
+                Expression.get(maxZoomProp),
+                Expression.literal(-1.0)));
+
+        Expression.Stop[] stops = new Expression.Stop[24];
+        for (int z = 1; z <= 24; z++) {
+            stops[z - 1] = Expression.stop((double) z, opacityAtZoomLevel(z, minZoom, maxZoom, baseOpacity));
+        }
+        return Expression.step(
+                Expression.zoom(),
+                opacityAtZoomLevel(0, minZoom, maxZoom, baseOpacity),
+                stops);
+    }
+
+    /** Data-only gate for a fixed integer zoom (no {@code ["zoom"]} operator). */
+    private static Expression opacityAtZoomLevel(
+            int zoomLevel,
+            Expression minZoom,
+            Expression maxZoom,
+            Expression baseOpacity) {
+        Expression belowMin = Expression.all(
+                Expression.gte(minZoom, Expression.literal(0.0)),
+                Expression.lt(Expression.literal((double) zoomLevel), minZoom));
+        Expression aboveMax = Expression.all(
+                Expression.gte(maxZoom, Expression.literal(0.0)),
+                Expression.gt(Expression.literal((double) zoomLevel), maxZoom));
+        return Expression.switchCase(
+                Expression.any(belowMin, aboveMax),
+                Expression.literal(0.0),
+                baseOpacity);
+    }
+
     public static float lineMiterLimit(int lineJoin, float miterLimit) {
         if (lineJoin != LINE_JOIN_MITER) {
             return DEFAULT_LINE_MITER_LIMIT;
@@ -195,6 +245,10 @@ public final class MplStyleMapper {
 
     /**
      * Same zoom curve as label text-size scaling in {@code MPLFeaturesUtils.buildTextSizeExpression}.
+     * <p>
+     * When the scale flag is data-driven, {@code ["zoom"]} must stay the input of a top-level
+     * {@code interpolate}; put feature {@code case} only in stop outputs. Nesting
+     * {@code interpolate(zoom)} under {@code case} is rejected by the MapLibre style spec.
      */
     public static Expression zoomScaleExpression(Expression baseSize, boolean scaleWithZoom) {
         return zoomScaleExpression(baseSize, scaleWithZoom, null);
@@ -236,9 +290,10 @@ public final class MplStyleMapper {
         if (scaleWithZoom == null) {
             return zoomScaleExpression(baseSize, defaultScaleWithZoom, customStops);
         }
-        Expression effectiveScaleWithZoom = Expression.coalesce(
-                scaleWithZoom,
-                Expression.literal(defaultScaleWithZoom));
+        Expression effectiveScaleWithZoom = Expression.toBool(
+                Expression.coalesce(
+                        scaleWithZoom,
+                        Expression.literal(defaultScaleWithZoom)));
         ZoomStop[] stops = parseZoomStops(customStops);
         if (stops != null) {
             Expression.Stop[] expressionStops = new Expression.Stop[stops.length];

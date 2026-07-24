@@ -324,6 +324,46 @@ public class LabelAttributes implements IJSONStore, Cloneable {
         mLineLabelHorizontal = lineLabelHorizontal;
     }
 
+    /**
+     * Fills unset optional fields from {@code other}. Does not overwrite values already set on this
+     * instance (sentinel/empty checks per FieldStyleRule merge contract).
+     */
+    public void fillUnsetFrom(LabelAttributes other) {
+        if (other == null) {
+            return;
+        }
+        if (mLabelMinZoom < 0f && other.mLabelMinZoom >= 0f) {
+            mLabelMinZoom = other.mLabelMinZoom;
+        }
+        if (mLabelMaxZoom < 0f && other.mLabelMaxZoom >= 0f) {
+            mLabelMaxZoom = other.mLabelMaxZoom;
+        }
+        if (isBlank(mTextZoomScaleStops) && !isBlank(other.mTextZoomScaleStops)) {
+            mTextZoomScaleStops = other.mTextZoomScaleStops;
+        }
+        if (isBlank(mLabelTemplate) && !isBlank(other.mLabelTemplate)) {
+            mLabelTemplate = other.mLabelTemplate;
+        }
+        if (mTextAllowOverlap == null && other.mTextAllowOverlap != null) {
+            mTextAllowOverlap = other.mTextAllowOverlap;
+        }
+        if (mTextKeepUpright == null && other.mTextKeepUpright != null) {
+            mTextKeepUpright = other.mTextKeepUpright;
+        }
+        // false / DEFAULT opacity are type-defaults (same as mergeInto omit rules)
+        if (!mTextScaleWithZoom && other.mTextScaleWithZoom) {
+            mTextScaleWithZoom = true;
+        }
+        if (mTextOpacity == DEFAULT_TEXT_OPACITY
+                && other.mTextOpacity != DEFAULT_TEXT_OPACITY) {
+            mTextOpacity = other.mTextOpacity;
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
     public void mergeInto(JSONObject rootConfig) throws JSONException {
         if (mTextHaloColor != DEFAULT_HALO_COLOR) {
             rootConfig.put(JSON_LABEL_HALO_COLOR_KEY, mTextHaloColor);

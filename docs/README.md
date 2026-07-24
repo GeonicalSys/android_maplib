@@ -14,6 +14,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 ## Критичные области
 
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
+- `FieldStyleRule` / `MplFeatureStyleProps` — rule-based стили: layer defaults и
+  merge unset ← «прочие (по умолчанию)» (зум подписей, stops, scale flags,
+  opacity); per-feature `labelminzoom`/`labelmaxzoom` через text-opacity gate;
 - `user-location-layer` остаётся служебным верхним overlay независимо от порядка пользовательских слоёв;
 - `LayerContentProvider` разрешает активный `IGISApplication.getMap()` на каждой операции и не
   маршрутизирует треки/объекты через карту предыдущего Collector workspace;
@@ -53,6 +56,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 - Неверный style order: проверить model order, sibling anchor и момент создания
   MapLibre style.
+- Rule-based подписи игнорируют зум/opacity/scale: проверить, что слойные
+  дефолты взяты из «прочих», props после merge, и SymbolLayer min/max сброшены;
+  пустой зум/scale=false/opacity=255 в категории наследуются из other.
+- Zoom-stops «не действуют»: кривая слоя общая из other; нужен флаг scale
+  (на other или унаследованный); data-driven scale — outer switchCase.
 - Курсор перекрывается треком/вектором: проверить, что `user-location-layer`
   последний в live style после cold/lite/hot reload.
 - «После restart стало правильно»: проверить hot-add/deferred reload contract.

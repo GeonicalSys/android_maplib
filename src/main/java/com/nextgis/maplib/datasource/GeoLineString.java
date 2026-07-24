@@ -275,6 +275,12 @@ public class GeoLineString
                 GeoPoint pt1 = mPoints.get(i);
                 GeoPoint pt2 = mPoints.get(i + 1);
 
+                // Segment fully inside the envelope (no edge crossing) must still hit —
+                // critical for tap-sized envelopes used by identify.
+                if (envelope.contains(pt1) || envelope.contains(pt2)) {
+                    return true;
+                }
+
                 //test top
                 if (linesIntersect(
                         pt1.getX(), pt1.getY(), pt2.getX(), pt2.getY(), pte1.getX(), pte1.getY(),

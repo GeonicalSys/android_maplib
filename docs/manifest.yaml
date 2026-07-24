@@ -15,7 +15,9 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
     responsibility: MapLibre style, sources, layers, hot add/reload coordination and topmost location-cursor overlay.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
-    responsibility: MapLibre style utilities and raster sibling anchor resolution.
+    responsibility: MapLibre style utilities, rule-style apply/merge hooks, label zoom gate and raster sibling anchor resolution.
+  - path: maplib/src/main/java/com/nextgis/maplib/display/FieldStyleRule.java
+    responsibility: Rule categories plus other/default style; merge unset optional fields into the effective style at render time.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerGroup.java
     responsibility: Maintain bottom-to-top model order and mixed vector/raster Collector project insertions below the top tracks layer.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
