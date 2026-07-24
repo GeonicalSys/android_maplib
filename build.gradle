@@ -23,12 +23,15 @@
 
 apply plugin: 'com.android.library'
 
+def productionVersionName = '3.1.2.4'
+def debugVersionName = '3.1.2.4'
+
 android {
     defaultConfig {
         minSdkVersion 26
         compileSdk 36
-        versionName '3.1.2.2'
-        buildConfigField "String", "VERSION_NAME", "\"$versionName\""
+        versionName productionVersionName
+        buildConfigField "String", "VERSION_NAME", "\"${productionVersionName}\""
     }
     productFlavors {
     }
@@ -41,6 +44,9 @@ android {
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Library build types do not own application version metadata. This field is the
+            // maplib diagnostic/protocol version coupled to the consuming debug app.
+            buildConfigField "String", "VERSION_NAME", "\"${debugVersionName}\""
         }
     }
     dataBinding {

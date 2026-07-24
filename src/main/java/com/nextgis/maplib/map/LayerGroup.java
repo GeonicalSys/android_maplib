@@ -29,6 +29,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
+import com.nextgis.maplib.api.INGWLayer;
 import com.nextgis.maplib.api.ILayer;
 import com.nextgis.maplib.api.ILayerView;
 import com.nextgis.maplib.api.IRenderer;
@@ -317,6 +318,58 @@ public class LayerGroup
     }
 
     /**
+     * Finds a layer owned by the selected Collector project.
+     *
+     * <p>Both locally materialized vectors and server-rendered style layers participate. Manual
+     * NGW layers are deliberately excluded even when account and resource id happen to match.</p>
+     */
+    public static ILayer findCollectorManagedLayerByRemoteIdRecursive(
+            LayerGroup layerGroup,
+            long remoteId,
+            String accountName,
+            String projectUid) {
+        if (layerGroup == null || accountName == null || TextUtils.isEmpty(projectUid)) {
+            return null;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                ILayer found = findCollectorManagedLayerByRemoteIdRecursive(
+                        (LayerGroup) layer, remoteId, accountName, projectUid);
+                if (found != null) {
+                    return found;
+                }
+                continue;
+            }
+            if (!(layer instanceof INGWLayer)) {
+                continue;
+            }
+            INGWLayer ngwLayer = (INGWLayer) layer;
+            if (ngwLayer.getRemoteId() != remoteId
+                    || !accountName.equals(ngwLayer.getAccountName())) {
+                continue;
+            }
+            LayerOriginMetadata origin = getCollectorOriginMetadata(layer);
+            if (origin != null
+                    && origin.isManagedByProject()
+                    && projectUid.equals(origin.getProjectUid())) {
+                return layer;
+            }
+        }
+        return null;
+    }
+
+    private static LayerOriginMetadata getCollectorOriginMetadata(ILayer layer) {
+        if (layer instanceof NGWVectorLayer) {
+            return ((NGWVectorLayer) layer).getLayerOriginMetadata();
+        }
+        if (layer instanceof NGWRasterLayer) {
+            return ((NGWRasterLayer) layer).getLayerOriginMetadata();
+        }
+        return null;
+    }
+
+    /**
      * Insert index for a collector NGW layer among siblings (same account, remote id listed in
      * {@code collectorRemoteIdsInProjectOrder}). Ranks are inverted so visual list order matches the
      * collector project: internal layer index 0 is the bottom row in the UI drawer, the last internal index
@@ -338,24 +391,31 @@ public class LayerGroup
         }
         int targetRank = L - 1 - targetIndexInProjectOrder;
         int count = group.getLayerCount();
+        int tracksIndex = -1;
         for (int gi = 0; gi < count; gi++) {
             ILayer child = group.getLayer(gi);
-            if (!(child instanceof NGWVectorLayer)) {
+            if (0 != (child.getType() & LAYERTYPE_TRACKS)) {
+                if (tracksIndex < 0) {
+                    tracksIndex = gi;
+                }
                 continue;
             }
-            NGWVectorLayer nv = (NGWVectorLayer) child;
-            if (!accountName.equals(nv.getAccountName())) {
+            if (!(child instanceof INGWLayer)) {
                 continue;
             }
-            Integer rank = internalRank.get(nv.getRemoteId());
+            INGWLayer ngwLayer = (INGWLayer) child;
+            if (!accountName.equals(ngwLayer.getAccountName())) {
+                continue;
+            }
+            Integer rank = internalRank.get(ngwLayer.getRemoteId());
             if (rank == null) {
                 continue;
             }
             if (rank >= targetRank) {
-                return gi;
+                return CollectorLayerOrderPolicy.keepBelowTracks(gi, tracksIndex);
             }
         }
-        return count;
+        return CollectorLayerOrderPolicy.keepBelowTracks(count, tracksIndex);
     }
 
     public static ILayer getVectorLayersById(

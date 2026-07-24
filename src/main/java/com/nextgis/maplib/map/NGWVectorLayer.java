@@ -1008,6 +1008,17 @@ public class NGWVectorLayer
         return (mSyncDirection & DIRECTION_TO) != 0;
     }
 
+    @Override
+    public boolean isEditingAllowed() {
+        boolean collectorManaged = mLayerOriginMetadata != null
+                && mLayerOriginMetadata.isManagedByProject();
+        return LayerEditingPolicy.isEditingAllowed(
+                mIsEditable,
+                mCollectorEditable,
+                collectorManaged,
+                isRemoteSendAllowed());
+    }
+
     public int getSyncDirection() {
         return mSyncDirection;
     }

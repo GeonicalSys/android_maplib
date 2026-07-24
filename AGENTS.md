@@ -12,6 +12,17 @@ central docs из root-репозитория GeonicalSystem как отдель
 Изменения `MaplibreMapInteraction`, `IGISApplication`, `MapDrawable`, storage,
 NGW или Collector metadata имеют consumers в верхних репозиториях.
 
+`BuildConfig.VERSION_NAME` maplib сопряжён с версией consuming app отдельно для
+debug и release. На AGP 9.x не задавай `versionName` в library `buildTypes`;
+debug override делается через `buildConfigField`, затем проверяется совместно с
+APK командой `..\tools\verify-apk-version-matrix.ps1` из root workspace.
+
 Сохраняй layer order, hot-add consistency, no-track-flags, Collector resource и
 backup-related contracts. После изменения выполняй релевантные unit tests и
 проверяй compile consumers. Обновляй local docs и central registry по DoD.
+
+Collector snapshot поддерживает только уже известные `Connection` типы:
+vector/PostGIS и `qgis_vector_style`/`qgis_raster_style`. Style resource имеет
+собственный remote id для tile URL/identity, parent id только для extent и
+никогда не становится редактируемым. Не добавляй в `Connection.java` новые
+resource classes ради Collector без отдельного продуктового решения.

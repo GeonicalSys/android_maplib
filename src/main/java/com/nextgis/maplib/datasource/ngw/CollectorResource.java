@@ -48,6 +48,7 @@ public class CollectorResource extends Resource {
     private static final String TAG = "CollectorResource";
 
     private final List<LayerWithStyles> mLayers = new ArrayList<>();
+    private final List<CollectorProjectItem> mProjectItems = new ArrayList<>();
     private final Set<Long> mResolvedLayerRemoteIds = new HashSet<>();
     private String mProjectDistrict;
     private boolean mSnapshotComplete = true;
@@ -68,8 +69,16 @@ public class CollectorResource extends Resource {
             Log.e(TAG, "parse collector_project", e);
             HyperLog.exception(Constants.TAG, e);
         }
+        int rasterStyleCount = 0;
+        for (CollectorProjectItem item : mProjectItems) {
+            if (item.isRasterStyle()) {
+                rasterStyleCount++;
+            }
+        }
         HyperLog.d(Constants.TAG, "CollectorResource \"" + getName() + "\" remoteId=" + mRemoteId
-                + " vector-like layers=" + mLayers.size());
+                + " supported items=" + mProjectItems.size()
+                + " vectors=" + mLayers.size()
+                + " rasterStyles=" + rasterStyleCount);
     }
 
     protected CollectorResource(Parcel in) {
@@ -80,6 +89,14 @@ public class CollectorResource extends Resource {
             LayerWithStyles layer = in.readParcelable(LayerWithStyles.class.getClassLoader());
             if (layer != null) {
                 mLayers.add(layer);
+            }
+        }
+        count = in.readInt();
+        for (int i = 0; i < count; i++) {
+            CollectorProjectItem item =
+                    in.readParcelable(CollectorProjectItem.class.getClassLoader());
+            if (item != null) {
+                mProjectItems.add(item);
             }
         }
         mProjectDistrict = in.readString();
@@ -108,6 +125,10 @@ public class CollectorResource extends Resource {
         for (LayerWithStyles layer : mLayers) {
             parcel.writeParcelable(layer, flags);
         }
+        parcel.writeInt(mProjectItems.size());
+        for (CollectorProjectItem item : mProjectItems) {
+            parcel.writeParcelable(item, flags);
+        }
         parcel.writeString(mProjectDistrict);
         parcel.writeByte((byte) (mSnapshotComplete ? 1 : 0));
         parcel.writeString(mSnapshotError);
@@ -118,6 +139,16 @@ public class CollectorResource extends Resource {
      */
     public List<LayerWithStyles> getLayers() {
         return Collections.unmodifiableList(mLayers);
+    }
+
+    /**
+     * All supported project items in Collector display order.
+     *
+     * <p>At present this contains vector/PostGIS layers and the two style resource types already
+     * supported by {@link Connection}: QGIS vector and QGIS raster styles.</p>
+     */
+    public List<CollectorProjectItem> getProjectItems() {
+        return Collections.unmodifiableList(mProjectItems);
     }
 
     /**
@@ -190,6 +221,7 @@ public class CollectorResource extends Resource {
 
     private void parseCollectorProject(JSONObject collectorProject) throws JSONException {
         mLayers.clear();
+        mProjectItems.clear();
         mResolvedLayerRemoteIds.clear();
         JSONObject rootItem = collectorProject.optJSONObject("root_item");
         if (rootItem == null) {
@@ -234,12 +266,12 @@ public class CollectorResource extends Resource {
             final boolean collectorEditable = parseCollectorItemEditable(item);
             if (item.has("resource")) {
                 JSONObject wrapped = wrapResourceIfNeeded(item);
-                tryAddLayerFromWrapped(wrapped, collectorEditable);
+                tryAddLayerFromWrapped(wrapped, item, collectorEditable);
                 return;
             }
             long rid = extractLayerResourceId(item);
             if (rid > 0) {
-                tryFetchAndAddLayer(rid, collectorEditable);
+                tryFetchAndAddLayer(rid, item, collectorEditable);
             }
         } catch (JSONException e) {
             markSnapshotIncomplete("collector item JSON: " + e.getMessage());
@@ -320,7 +352,10 @@ public class CollectorResource extends Resource {
         }
     }
 
-    private void tryFetchAndAddLayer(long resourceId, boolean collectorEditable) {
+    private void tryFetchAndAddLayer(
+            long resourceId,
+            JSONObject collectorItem,
+            boolean collectorEditable) {
         try {
             if (mResolvedLayerRemoteIds.contains(resourceId)) {
                 return;
@@ -330,7 +365,7 @@ public class CollectorResource extends Resource {
                 markSnapshotIncomplete("resource " + resourceId + " response has no resource");
                 return;
             }
-            tryAddLayerFromWrapped(envelope, collectorEditable);
+            tryAddLayerFromWrapped(envelope, collectorItem, collectorEditable);
         } catch (JSONException | IOException e) {
             markSnapshotIncomplete("resource " + resourceId + ": " + e.getMessage());
             Log.e(TAG, "tryFetchAndAddLayer", e);
@@ -364,7 +399,10 @@ public class CollectorResource extends Resource {
         return null;
     }
 
-    private void tryAddLayerFromWrapped(JSONObject envelope, boolean collectorEditable) throws JSONException {
+    private void tryAddLayerFromWrapped(
+            JSONObject envelope,
+            JSONObject collectorItem,
+            boolean collectorEditable) throws JSONException {
         JSONObject wrapped = wrapResourceIfNeeded(envelope);
         LayerWithStyles layer = new LayerWithStyles(wrapped, mConnection);
         int t = layer.getType();
@@ -372,18 +410,43 @@ public class CollectorResource extends Resource {
                 && mConnection.getNgwVersionMajor() < Constants.NGW_v3) {
             return;
         }
-        if (t != Connection.NGWResourceTypeVectorLayer && t != Connection.NGWResourceTypePostgisLayer) {
+        boolean vector = t == Connection.NGWResourceTypeVectorLayer
+                || t == Connection.NGWResourceTypePostgisLayer;
+        boolean rasterStyle = t == Connection.NGWResourceTypeVectorLayerStyle
+                || t == Connection.NGWResourceTypeRasterLayerStyle;
+        if (!vector && !rasterStyle) {
             return;
         }
         long rid = layer.getRemoteId();
+        if (rid <= 0L) {
+            markSnapshotIncomplete("supported collector item has no positive resource id");
+            return;
+        }
         if (mResolvedLayerRemoteIds.contains(rid)) {
             return;
         }
-        layer.setCollectorEditable(collectorEditable);
-        layer.fillExtent();
-        layer.fillStyles();
-        ensureDescriptionFromServer(layer);
-        mLayers.add(layer);
+        JSONObject resource = wrapped.getJSONObject("resource");
+        if (vector) {
+            layer.setCollectorEditable(collectorEditable);
+            layer.fillExtent();
+            layer.fillStyles();
+            ensureDescriptionFromServer(layer);
+            mLayers.add(layer);
+
+            long formId = 0L;
+            if (layer.getFormCount() > 0 && layer.getFormId(0) != null) {
+                formId = layer.getFormId(0);
+            }
+            String description = layer.getDescription();
+            mProjectItems.add(CollectorProjectItem.vector(
+                    collectorItem,
+                    resource,
+                    collectorEditable,
+                    formId,
+                    TextUtils.isEmpty(description) ? null : description));
+        } else {
+            mProjectItems.add(CollectorProjectItem.rasterStyle(collectorItem, resource));
+        }
         mResolvedLayerRemoteIds.add(rid);
     }
 

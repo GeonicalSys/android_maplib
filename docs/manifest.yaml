@@ -2,24 +2,34 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-07-20
+last_verified: 2026-07-24
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/build.gradle
+    responsibility: Keep release and debug diagnostic VERSION_NAME values coupled to their consuming application variants without unsupported library build-type version DSL.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
     responsibility: MapLibre style, sources, layers, hot add/reload coordination and topmost location-cursor overlay.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
     responsibility: MapLibre style utilities and raster sibling anchor resolution.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LayerGroup.java
+    responsibility: Maintain bottom-to-top model order and mixed vector/raster Collector project insertions below the top tracks layer.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
+    responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
+    responsibility: Apply Collector-managed editability and outbound synchronization policy while preserving ordinary layer permission gates.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
     responsibility: Cache prepared vector rendering payload for map startup.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectCompositionSync.java
-    responsibility: Compare and apply Collector server composition decisions.
+    responsibility: Compare and apply Collector vector and already-supported QGIS style composition decisions without broadening Connection resource classes.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectItem.java
+    responsibility: Normalize a supported Collector vector or raster-style item, display state, identity and extent source.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorResource.java
-    responsibility: Resolve a complete Collector project snapshot and reject incomplete referenced resources.
+    responsibility: Resolve a complete Collector project snapshot containing vectors and already-supported QGIS styles, and reject incomplete referenced resources.
   - path: maplib/src/main/java/com/nextgis/maplib/map/TMSLayer.java
     responsibility: Safely unpack local tile archives and retain immutable NGRc provenance.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
@@ -49,10 +59,14 @@ settings_refs: [mobile_render_mode, render_mode, layer_origin, mobile]
 storage_contracts:
   - id: layer-json
     path: maplib/src/main/java/com/nextgis/maplib/map/Layer.java
-invariant_refs: [INV-LAYER-ORDER, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING]
+  - id: ngw-raster-layer-json
+    path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
+invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING]
 global_docs:
   - docs/architecture/map-rendering.md
   - docs/architecture/collector-projects.md
   - docs/architecture/ngw-sync-and-storage.md
-smoke_tests: [AUTO-MAPLIB-UNIT, SMOKE-MAP-COLD-START, SMOKE-LOCATION-CURSOR-TOP, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-URL-IMPORT, SMOKE-WALK, SMOKE-TRACK-NO-FLAGS]
+  - docs/reference/build-matrix.md
+  - docs/reference/flavors-and-versioning.md
+smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-LOCATION-CURSOR-TOP, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-URL-IMPORT, SMOKE-WALK, SMOKE-TRACK-NO-FLAGS]
 upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, MAP-HOST, COLLECTOR-RESOURCE]

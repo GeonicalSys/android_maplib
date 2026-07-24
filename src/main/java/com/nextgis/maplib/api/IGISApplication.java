@@ -30,6 +30,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 
+import com.nextgis.maplib.datasource.ngw.CollectorProjectItem;
 import com.nextgis.maplib.datasource.ngw.Connection;
 import com.nextgis.maplib.location.GpsEventSource;
 import com.nextgis.maplib.map.LayerFactory;
@@ -37,6 +38,7 @@ import com.nextgis.maplib.map.LayerGroup;
 import com.nextgis.maplib.map.MLP.AuthInterceptorNG;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MaplibreMapInteraction;
+import com.nextgis.maplib.map.NGWRasterLayer;
 import com.nextgis.maplib.map.NGWVectorLayer;
 import com.nextgis.maplib.util.Constants;
 
@@ -285,9 +287,9 @@ public interface IGISApplication
      * Register expected NGW vector layers for a collector import (layers being downloaded this run).
      * Clears any previous batch state.
      *
-     * @param fullCollectorProjectRemoteIds remote ids of <em>all</em> vector layers in the collector project,
-     *        in project list order (as returned by the collector resource). Used to insert new or repaired
-     *        layers next to already-present siblings when the map stacks new layers at the top.
+     * @param fullCollectorProjectRemoteIds remote ids of <em>all supported</em> vector and style items in
+     *        the collector project, in project list order. Used to insert new or repaired vectors next to
+     *        already-present vector/raster siblings when the map stacks new layers at the top.
      * @param formIds server form id per layer, or 0 when the layer has no form (plain NGW fill)
      * @param collectorProjectUid persistent project uid stored in each imported layer origin; used by future
      *        Collector composition/form sync and by repair tasks to preserve project ownership metadata.
@@ -380,6 +382,33 @@ public interface IGISApplication
             long[] formIds,
             boolean[] collectorEditables,
             long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Materialize already-supported NGW style resources as authenticated raster tile layers.
+     * These layers are project-managed but never editable.
+     */
+    void addCollectorRasterStyleLayers(
+            int groupId,
+            String accountName,
+            String collectorProjectUid,
+            CollectorProjectItem[] items,
+            int[] collectorOrders,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Apply display properties and Collector order to an existing project-managed style layer.
+     */
+    void applyCollectorRasterStyleProjectState(
+            NGWRasterLayer layer,
+            CollectorProjectItem item,
+            int collectorOrder,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Remove a project-managed server-rendered style layer. Its cache is recreatable, so this path
+     * does not use the vector data backup workflow.
+     */
+    void removeCollectorRasterStyleLayer(NGWRasterLayer layer);
 
     /**
      * Update only the local NGFP files and form metadata for a project-managed Collector layer.

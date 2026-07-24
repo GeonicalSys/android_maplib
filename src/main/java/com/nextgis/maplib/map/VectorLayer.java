@@ -2382,9 +2382,16 @@ public class VectorLayer
         mCollectorEditable = collectorEditable;
     }
 
-    /** Whether both the server/layer configuration and Collector policy allow feature editing. */
+    /**
+     * Whether this layer may be edited outside a managed Collector project.
+     *
+     * <p>{@link NGWVectorLayer} overrides this for project-managed layers, whose user-facing
+     * policy comes from the Collector item rather than the generic mobile {@code is_editable}
+     * flag.</p>
+     */
     public boolean isEditingAllowed() {
-        return mIsEditable && mCollectorEditable;
+        return LayerEditingPolicy.isEditingAllowed(
+                mIsEditable, mCollectorEditable, false, true);
     }
 
     public boolean isFieldsInitialized() {

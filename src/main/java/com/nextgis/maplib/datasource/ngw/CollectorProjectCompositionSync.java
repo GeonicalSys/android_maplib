@@ -20,6 +20,7 @@ import com.nextgis.maplib.api.ILayer;
 import com.nextgis.maplib.map.CollectorProjectMetadata;
 import com.nextgis.maplib.map.LayerGroup;
 import com.nextgis.maplib.map.LayerOriginMetadata;
+import com.nextgis.maplib.map.NGWRasterLayer;
 import com.nextgis.maplib.map.NGWVectorLayer;
 import com.nextgis.maplib.util.AccountUtil;
 import com.nextgis.maplib.util.Constants;
@@ -62,6 +63,7 @@ public final class CollectorProjectCompositionSync {
     private static final String TYPE_UPDATE_FORM = "update_form";
     private static final String TYPE_UPDATE_CONFIG = "update_config";
     private static final String TYPE_UPDATE_EDITABLE = "update_editable";
+    private static final String TYPE_UPDATE_RASTER = "update_raster";
 
     private CollectorProjectCompositionSync() {
     }
@@ -300,7 +302,6 @@ public final class CollectorProjectCompositionSync {
 
         boolean collectorEditable = parseCollectorItemEditable(item);
         JSONObject localResource = item.optJSONObject("resource");
-        String fallbackName = readDisplayName(localResource, "resource-" + resourceId);
         String fallbackCls = readCls(localResource);
         JSONObject envelope = null;
         try {
@@ -316,10 +317,27 @@ public final class CollectorProjectCompositionSync {
         if (TextUtils.isEmpty(cls)) {
             cls = fallbackCls;
         }
-        if (!isVectorLikeLayer(cls)) {
+        boolean vector = isVectorLikeLayer(cls);
+        boolean rasterStyle = isSupportedRasterStyle(cls);
+        if (!vector && !rasterStyle) {
             return;
         }
-        String name = readDisplayName(resource, fallbackName);
+        if (resource == null) {
+            snapshot.setIncomplete(true);
+            return;
+        }
+        if (rasterStyle) {
+            CollectorProjectItem projectItem =
+                    CollectorProjectItem.rasterStyle(item, resource);
+            snapshot.addLayer(new CollectorProjectLayerSnapshot(
+                    projectItem,
+                    snapshot.getLayerCount(),
+                    "",
+                    "",
+                    null));
+            return;
+        }
+
         FormLookupResult formLookup = fetchFirstFormId(accountData, resourceId);
         if (!formLookup.isComplete()) {
             snapshot.setIncomplete(true);
@@ -342,13 +360,15 @@ public final class CollectorProjectCompositionSync {
                 ? ""
                 : LayerConfigUtil.md5(descriptionRaw.trim());
 
-        snapshot.addLayer(new CollectorProjectLayerSnapshot(
-                resourceId,
-                snapshot.getLayerCount(),
-                name,
-                cls,
+        CollectorProjectItem projectItem = CollectorProjectItem.vector(
+                item,
+                resource,
                 collectorEditable,
                 formId,
+                descriptionRaw);
+        snapshot.addLayer(new CollectorProjectLayerSnapshot(
+                projectItem,
+                snapshot.getLayerCount(),
                 formHash,
                 configHash,
                 descriptionRaw));
@@ -457,16 +477,12 @@ public final class CollectorProjectCompositionSync {
         return "vector_layer".equals(cls) || "postgis_layer".equals(cls);
     }
 
-    private static String readCls(JSONObject resource) {
-        return resource == null ? "" : resource.optString("cls", "");
+    static boolean isSupportedRasterStyle(String cls) {
+        return "qgis_vector_style".equals(cls) || "qgis_raster_style".equals(cls);
     }
 
-    private static String readDisplayName(JSONObject resource, String fallback) {
-        if (resource == null) {
-            return fallback;
-        }
-        String name = resource.optString("display_name", null);
-        return TextUtils.isEmpty(name) ? fallback : name;
+    private static String readCls(JSONObject resource) {
+        return resource == null ? "" : resource.optString("cls", "");
     }
 
     private static boolean parseCollectorItemEditable(JSONObject item) {
@@ -539,7 +555,8 @@ public final class CollectorProjectCompositionSync {
                 + " reorder=" + diff.count(TYPE_REORDER)
                 + " updateForm=" + diff.count(TYPE_UPDATE_FORM)
                 + " updateConfig=" + diff.count(TYPE_UPDATE_CONFIG)
-                + " updateEditable=" + diff.count(TYPE_UPDATE_EDITABLE));
+                + " updateEditable=" + diff.count(TYPE_UPDATE_EDITABLE)
+                + " updateRaster=" + diff.count(TYPE_UPDATE_RASTER));
         for (DiffEntry entry : diff.getEntries()) {
             HyperLog.d(Constants.TAG, prefix + " diff " + entry);
         }
@@ -567,6 +584,18 @@ public final class CollectorProjectCompositionSync {
         IGISApplication app = (IGISApplication) context.getApplicationContext();
         long[] fullOrder = remote.getRemoteIdsInOrder();
 
+        for (DiffEntry entry : diff.getEntries()) {
+            if (!TYPE_REMOVE.equals(entry.getType()) || entry.getLocalLayer() == null) {
+                continue;
+            }
+            ILayer localLayer = entry.getLocalLayer();
+            if (localLayer instanceof NGWVectorLayer) {
+                app.scheduleCollectorLayerRemovalWithBackup((NGWVectorLayer) localLayer);
+            } else if (localLayer instanceof NGWRasterLayer) {
+                app.removeCollectorRasterStyleLayer((NGWRasterLayer) localLayer);
+            }
+        }
+
         List<CollectorProjectLayerSnapshot> additions = new ArrayList<>();
         for (DiffEntry entry : diff.getEntries()) {
             if (TYPE_ADD.equals(entry.getType()) && entry.getRemoteLayer() != null) {
@@ -580,31 +609,42 @@ public final class CollectorProjectCompositionSync {
 
         for (DiffEntry entry : diff.getEntries()) {
             String type = entry.getType();
-            if (TYPE_REMOVE.equals(type)) {
-                if (entry.getLocalLayer() != null) {
-                    app.scheduleCollectorLayerRemovalWithBackup(entry.getLocalLayer());
-                }
-            } else if (TYPE_UPDATE_FORM.equals(type)) {
+            if (TYPE_UPDATE_FORM.equals(type)) {
                 CollectorProjectLayerSnapshot remoteLayer = entry.getRemoteLayer();
-                NGWVectorLayer localLayer = entry.getLocalLayer();
-                if (remoteLayer != null && localLayer != null) {
+                ILayer localLayer = entry.getLocalLayer();
+                if (remoteLayer != null && localLayer instanceof NGWVectorLayer) {
                     app.applyCollectorLayerForm(
-                            localLayer,
+                            (NGWVectorLayer) localLayer,
                             remoteLayer.getFormId(),
                             remoteLayer.getFormHash());
                 }
             } else if (TYPE_REORDER.equals(type) || TYPE_UPDATE_EDITABLE.equals(type)) {
-                if (entry.getLocalLayer() != null
+                if (entry.getLocalLayer() instanceof NGWVectorLayer
                         && entry.getRemoteLayer() != null) {
                     CollectorProjectLayerSnapshot remoteLayer = entry.getRemoteLayer();
                     app.applyCollectorLayerProjectState(
-                            entry.getLocalLayer(),
+                            (NGWVectorLayer) entry.getLocalLayer(),
                             remoteLayer.getOrder(),
                             fullOrder,
                             remoteLayer.isCollectorEditable());
                 }
             } else if (TYPE_UPDATE_CONFIG.equals(type)) {
-                applyCollectorLayerConfig(app, entry.getLocalLayer(), entry.getRemoteLayer(), fullOrder);
+                if (entry.getLocalLayer() instanceof NGWVectorLayer) {
+                    applyCollectorLayerConfig(
+                            app,
+                            (NGWVectorLayer) entry.getLocalLayer(),
+                            entry.getRemoteLayer(),
+                            fullOrder);
+                }
+            } else if (TYPE_UPDATE_RASTER.equals(type)
+                    && entry.getLocalLayer() instanceof NGWRasterLayer
+                    && entry.getRemoteLayer() != null) {
+                CollectorProjectLayerSnapshot remoteLayer = entry.getRemoteLayer();
+                app.applyCollectorRasterStyleProjectState(
+                        (NGWRasterLayer) entry.getLocalLayer(),
+                        remoteLayer.getItem(),
+                        remoteLayer.getOrder(),
+                        fullOrder);
             }
         }
     }
@@ -679,30 +719,60 @@ public final class CollectorProjectCompositionSync {
             CollectorProjectMetadata metadata,
             List<CollectorProjectLayerSnapshot> additions,
             long[] fullOrder) {
-        int n = additions.size();
-        long[] remoteIds = new long[n];
-        String[] names = new String[n];
-        String[] configJsons = new String[n];
-        long[] formIds = new long[n];
-        boolean[] editables = new boolean[n];
-        for (int i = 0; i < n; i++) {
-            CollectorProjectLayerSnapshot layer = additions.get(i);
-            remoteIds[i] = layer.getRemoteId();
-            names[i] = layer.getName();
-            configJsons[i] = layer.getConfigJson();
-            formIds[i] = layer.getFormId();
-            editables[i] = layer.isCollectorEditable();
+        List<CollectorProjectLayerSnapshot> vectors = new ArrayList<>();
+        List<CollectorProjectLayerSnapshot> rasterStyles = new ArrayList<>();
+        for (CollectorProjectLayerSnapshot addition : additions) {
+            if (addition.isVector()) {
+                vectors.add(addition);
+            } else if (addition.isRasterStyle()) {
+                rasterStyles.add(addition);
+            }
         }
-        app.scheduleCollectorProjectLayerFills(
-                projectGroup.getId(),
-                metadata.getAccountName(),
-                metadata.getProjectUid(),
-                remoteIds,
-                names,
-                configJsons,
-                formIds,
-                editables,
-                fullOrder);
+
+        int n = vectors.size();
+        if (n > 0) {
+            long[] remoteIds = new long[n];
+            String[] names = new String[n];
+            String[] configJsons = new String[n];
+            long[] formIds = new long[n];
+            boolean[] editables = new boolean[n];
+            for (int i = 0; i < n; i++) {
+                CollectorProjectLayerSnapshot layer = vectors.get(i);
+                remoteIds[i] = layer.getRemoteId();
+                names[i] = layer.getName();
+                configJsons[i] = layer.getConfigJson();
+                formIds[i] = layer.getFormId();
+                editables[i] = layer.isCollectorEditable();
+            }
+            app.scheduleCollectorProjectLayerFills(
+                    projectGroup.getId(),
+                    metadata.getAccountName(),
+                    metadata.getProjectUid(),
+                    remoteIds,
+                    names,
+                    configJsons,
+                    formIds,
+                    editables,
+                    fullOrder);
+        }
+
+        int rasterCount = rasterStyles.size();
+        if (rasterCount > 0) {
+            CollectorProjectItem[] items = new CollectorProjectItem[rasterCount];
+            int[] orders = new int[rasterCount];
+            for (int i = 0; i < rasterCount; i++) {
+                CollectorProjectLayerSnapshot layer = rasterStyles.get(i);
+                items[i] = layer.getItem();
+                orders[i] = layer.getOrder();
+            }
+            app.addCollectorRasterStyleLayers(
+                    projectGroup.getId(),
+                    metadata.getAccountName(),
+                    metadata.getProjectUid(),
+                    items,
+                    orders,
+                    fullOrder);
+        }
     }
 
     private static String logPrefix(boolean apply) {
@@ -841,39 +911,27 @@ public final class CollectorProjectCompositionSync {
     }
 
     private static final class CollectorProjectLayerSnapshot {
-        private final long mRemoteId;
+        private final CollectorProjectItem mItem;
         private final int mOrder;
-        private final String mName;
-        private final String mCls;
-        private final boolean mCollectorEditable;
-        private final long mFormId;
         private final String mFormHash;
         private final String mConfigHash;
         private final String mConfigJson;
 
         CollectorProjectLayerSnapshot(
-                long remoteId,
+                CollectorProjectItem item,
                 int order,
-                String name,
-                String cls,
-                boolean collectorEditable,
-                long formId,
                 String formHash,
                 String configHash,
                 String configJson) {
-            mRemoteId = remoteId;
+            mItem = item;
             mOrder = order;
-            mName = name;
-            mCls = cls;
-            mCollectorEditable = collectorEditable;
-            mFormId = formId;
             mFormHash = TextUtils.isEmpty(formHash) ? "" : formHash;
             mConfigHash = TextUtils.isEmpty(configHash) ? "" : configHash;
             mConfigJson = configJson;
         }
 
         long getRemoteId() {
-            return mRemoteId;
+            return mItem.getRemoteId();
         }
 
         int getOrder() {
@@ -881,15 +939,27 @@ public final class CollectorProjectCompositionSync {
         }
 
         String getName() {
-            return mName;
+            return mItem.getName();
+        }
+
+        CollectorProjectItem getItem() {
+            return mItem;
+        }
+
+        boolean isVector() {
+            return mItem.isVector();
+        }
+
+        boolean isRasterStyle() {
+            return mItem.isRasterStyle();
         }
 
         boolean isCollectorEditable() {
-            return mCollectorEditable;
+            return mItem.isCollectorEditable();
         }
 
         long getFormId() {
-            return mFormId;
+            return mItem.getFormId();
         }
 
         String getFormHash() {
@@ -907,12 +977,12 @@ public final class CollectorProjectCompositionSync {
         @Override
         public String toString() {
             return "Layer{"
-                    + "rid=" + mRemoteId
+                    + "rid=" + getRemoteId()
                     + ", order=" + mOrder
-                    + ", name=" + mName
-                    + ", cls=" + mCls
-                    + ", editable=" + mCollectorEditable
-                    + ", formId=" + mFormId
+                    + ", name=" + getName()
+                    + ", cls=" + mItem.getResourceClass()
+                    + ", editable=" + isCollectorEditable()
+                    + ", formId=" + getFormId()
                     + ", formHash=" + mFormHash
                     + ", configHash=" + mConfigHash
                     + '}';
@@ -928,22 +998,58 @@ public final class CollectorProjectCompositionSync {
                 CollectorProjectMetadata metadata,
                 CollectorProjectSnapshot remote) {
             CollectorProjectDiff diff = new CollectorProjectDiff();
-            Map<Long, NGWVectorLayer> local = new LinkedHashMap<>();
+            Map<Long, ILayer> local = new LinkedHashMap<>();
             collectLocalManagedLayers(projectGroup, metadata.getProjectUid(), local);
             diff.mLocalManagedLayerCount = local.size();
 
             for (CollectorProjectLayerSnapshot remoteLayer : remote.getLayers()) {
-                NGWVectorLayer localLayer = local.get(remoteLayer.getRemoteId());
+                ILayer localLayer = local.get(remoteLayer.getRemoteId());
                 if (localLayer == null) {
                     diff.add(TYPE_ADD, remoteLayer.getRemoteId(), remoteLayer.getName(),
                             null, remoteLayer,
                             "remote order=" + remoteLayer.getOrder());
                     continue;
                 }
-                LayerOriginMetadata origin = localLayer.getLayerOriginMetadata();
+                if (!isExpectedLayerKind(localLayer, remoteLayer)) {
+                    diff.add(TYPE_REMOVE, remoteLayer.getRemoteId(), localLayer.getName(),
+                            localLayer, null, "local kind differs from remote project item");
+                    diff.add(TYPE_ADD, remoteLayer.getRemoteId(), remoteLayer.getName(),
+                            null, remoteLayer, "replace local kind");
+                    continue;
+                }
+                LayerOriginMetadata origin = getOrigin(localLayer);
                 if (origin == null) {
                     continue;
                 }
+
+                if (remoteLayer.isRasterStyle()) {
+                    NGWRasterLayer raster = (NGWRasterLayer) localLayer;
+                    CollectorProjectItem item = remoteLayer.getItem();
+                    boolean orderChanged =
+                            origin.getCollectorOrder() != remoteLayer.getOrder();
+                    boolean stateChanged =
+                            !TextUtils.equals(raster.getName(), item.getName())
+                                    || raster.isVisible() != item.isVisible()
+                                    || Float.compare(
+                                    raster.getMinZoom(), item.getMinZoom()) != 0
+                                    || Float.compare(
+                                    raster.getMaxZoom(), item.getMaxZoom()) != 0
+                                    || raster.getTileMaxAge() != item.getTileMaxAge()
+                                    || raster.getExtentRemoteId() != item.getExtentRemoteId();
+                    if (orderChanged || stateChanged) {
+                        diff.add(
+                                TYPE_UPDATE_RASTER,
+                                remoteLayer.getRemoteId(),
+                                raster.getName(),
+                                raster,
+                                remoteLayer,
+                                "orderChanged=" + orderChanged
+                                        + " stateChanged=" + stateChanged);
+                    }
+                    continue;
+                }
+
+                NGWVectorLayer vector = (NGWVectorLayer) localLayer;
                 if (origin.getCollectorOrder() != remoteLayer.getOrder()) {
                     diff.add(TYPE_REORDER, remoteLayer.getRemoteId(), localLayer.getName(),
                             localLayer, remoteLayer,
@@ -957,15 +1063,15 @@ public final class CollectorProjectCompositionSync {
                                     + " remoteForm=" + remoteLayer.getFormId());
                 } else if (remoteLayer.getFormId() > 0L
                         && !TextUtils.isEmpty(remoteLayer.getFormHash())) {
-                    String localFormHash = localLayer.getPreferences().getString(
+                    String localFormHash = vector.getPreferences().getString(
                             SettingsConstants.KEY_PREF_LAST_FORM_HASH, "");
                     if (TextUtils.isEmpty(localFormHash)) {
                         try {
                             localFormHash = LayerFormHashUtil.md5LocalNgfpFiles(
-                                    localLayer.getPath(), remoteLayer.getFormId());
+                                    vector.getPath(), remoteLayer.getFormId());
                         } catch (IOException e) {
                             HyperLog.w(Constants.TAG, LOG_PREFIX
-                                    + ": local form hash failed layer=\"" + localLayer.getName()
+                                    + ": local form hash failed layer=\"" + vector.getName()
                                     + "\": " + e.getMessage());
                         }
                     }
@@ -979,7 +1085,7 @@ public final class CollectorProjectCompositionSync {
                 }
                 String remoteHash = remoteLayer.getConfigHash();
                 if (!TextUtils.isEmpty(remoteHash)) {
-                    String localHash = localLayer.getPreferences().getString(
+                    String localHash = vector.getPreferences().getString(
                             SettingsConstants.KEY_PREF_LAST_CONFIG_HASH, "");
                     if (TextUtils.isEmpty(localHash)) {
                         diff.add(TYPE_UPDATE_CONFIG, remoteLayer.getRemoteId(), localLayer.getName(),
@@ -991,15 +1097,15 @@ public final class CollectorProjectCompositionSync {
                                 "localHash=" + localHash + " remoteHash=" + remoteHash);
                     }
                 }
-                if (localLayer.isCollectorEditable() != remoteLayer.isCollectorEditable()) {
+                if (vector.isCollectorEditable() != remoteLayer.isCollectorEditable()) {
                     diff.add(TYPE_UPDATE_EDITABLE, remoteLayer.getRemoteId(), localLayer.getName(),
                             localLayer, remoteLayer,
-                            "localEditable=" + localLayer.isCollectorEditable()
+                            "localEditable=" + vector.isCollectorEditable()
                                     + " remoteEditable=" + remoteLayer.isCollectorEditable());
                 }
             }
 
-            for (Map.Entry<Long, NGWVectorLayer> localEntry : local.entrySet()) {
+            for (Map.Entry<Long, ILayer> localEntry : local.entrySet()) {
                 if (remote.getLayer(localEntry.getKey()) == null) {
                     diff.add(TYPE_REMOVE, localEntry.getKey(), localEntry.getValue().getName(),
                             localEntry.getValue(), null,
@@ -1012,7 +1118,7 @@ public final class CollectorProjectCompositionSync {
         private static void collectLocalManagedLayers(
                 LayerGroup group,
                 String projectUid,
-                Map<Long, NGWVectorLayer> out) {
+                Map<Long, ILayer> out) {
             for (int i = 0; i < group.getLayerCount(); i++) {
                 ILayer child = group.getLayer(i);
                 if (child instanceof LayerGroup) {
@@ -1025,15 +1131,40 @@ public final class CollectorProjectCompositionSync {
                             && projectUid.equals(origin.getProjectUid())) {
                         out.put(layer.getRemoteId(), layer);
                     }
+                } else if (child instanceof NGWRasterLayer) {
+                    NGWRasterLayer layer = (NGWRasterLayer) child;
+                    LayerOriginMetadata origin = layer.getLayerOriginMetadata();
+                    if (origin != null
+                            && origin.isManagedByProject()
+                            && projectUid.equals(origin.getProjectUid())) {
+                        out.put(layer.getRemoteId(), layer);
+                    }
                 }
             }
+        }
+
+        private static boolean isExpectedLayerKind(
+                ILayer localLayer,
+                CollectorProjectLayerSnapshot remoteLayer) {
+            return (remoteLayer.isVector() && localLayer instanceof NGWVectorLayer)
+                    || (remoteLayer.isRasterStyle() && localLayer instanceof NGWRasterLayer);
+        }
+
+        private static LayerOriginMetadata getOrigin(ILayer layer) {
+            if (layer instanceof NGWVectorLayer) {
+                return ((NGWVectorLayer) layer).getLayerOriginMetadata();
+            }
+            if (layer instanceof NGWRasterLayer) {
+                return ((NGWRasterLayer) layer).getLayerOriginMetadata();
+            }
+            return null;
         }
 
         private void add(
                 String type,
                 long remoteId,
                 String name,
-                NGWVectorLayer localLayer,
+                ILayer localLayer,
                 CollectorProjectLayerSnapshot remoteLayer,
                 String detail) {
             mEntries.add(new DiffEntry(type, remoteId, name, localLayer, remoteLayer, detail));
@@ -1066,7 +1197,8 @@ public final class CollectorProjectCompositionSync {
                     + " reorder=" + count(TYPE_REORDER)
                     + " updateForm=" + count(TYPE_UPDATE_FORM)
                     + " updateConfig=" + count(TYPE_UPDATE_CONFIG)
-                    + " updateEditable=" + count(TYPE_UPDATE_EDITABLE);
+                    + " updateEditable=" + count(TYPE_UPDATE_EDITABLE)
+                    + " updateRaster=" + count(TYPE_UPDATE_RASTER);
         }
     }
 
@@ -1074,7 +1206,7 @@ public final class CollectorProjectCompositionSync {
         private final String mType;
         private final long mRemoteId;
         private final String mName;
-        private final NGWVectorLayer mLocalLayer;
+        private final ILayer mLocalLayer;
         private final CollectorProjectLayerSnapshot mRemoteLayer;
         private final String mDetail;
 
@@ -1082,7 +1214,7 @@ public final class CollectorProjectCompositionSync {
                 String type,
                 long remoteId,
                 String name,
-                NGWVectorLayer localLayer,
+                ILayer localLayer,
                 CollectorProjectLayerSnapshot remoteLayer,
                 String detail) {
             mType = type;
@@ -1101,7 +1233,7 @@ public final class CollectorProjectCompositionSync {
             return mRemoteId;
         }
 
-        NGWVectorLayer getLocalLayer() {
+        ILayer getLocalLayer() {
             return mLocalLayer;
         }
 
