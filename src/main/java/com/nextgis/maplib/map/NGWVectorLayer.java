@@ -88,14 +88,17 @@ import java.net.SocketException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -152,6 +155,8 @@ public class NGWVectorLayer
     private static final int NGW_FILL_SQL_TX_BATCH = 250;
     private static final int NGW_SYNC_PULL_MAX_ATTEMPTS = 3;
     private static final long NGW_SYNC_PULL_RETRY_DELAY_MS = 1200L;
+    private transient boolean mDeferTransientPullFailureAccounting;
+    private transient boolean mLastSyncHadTransientPullFailure;
 
     private static final class FeaturePushResult {
         final boolean success;
@@ -416,6 +421,97 @@ public class NGWVectorLayer
         mSyncDirection = jsonObject.optInt(JSON_SYNC_DIRECTION_KEY, DIRECTION_BOTH);
         mLayerOriginMetadata = LayerOriginMetadata.fromJSON(
                 jsonObject.optJSONObject(JSON_LAYER_ORIGIN_KEY));
+
+        if (recoverNgwIdentityFromBackupIfNeeded()) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: restored durable identity layer=\""
+                    + getName() + "\" account=" + mAccountName + " remoteId=" + mRemoteId);
+            if (!save()) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: failed to heal config after identity"
+                        + " recovery layer=\"" + getName() + "\" remoteId=" + mRemoteId);
+            }
+        } else if (!persistNgwIdentityBackup()) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: failed to refresh identity backup after"
+                    + " load layer=\"" + getName() + "\" remoteId=" + mRemoteId);
+        }
+    }
+
+
+    @Override
+    public boolean save()
+    {
+        if (!super.save()) {
+            return false;
+        }
+        persistNgwIdentityBackup();
+        return true;
+    }
+
+
+    private boolean persistNgwIdentityBackup()
+    {
+        try {
+            String encoded = NgwLayerIdentityBackup.encode(
+                    mAccountName,
+                    mRemoteId,
+                    mSyncType,
+                    mNGWLayerType,
+                    mSyncDirection,
+                    mTracked,
+                    mLayerOriginMetadata);
+            if (encoded == null) {
+                // Never erase the last complete identity with partially initialized defaults.
+                return true;
+            }
+            boolean committed = getPreferences().edit()
+                    .putString(SettingsConstants.KEY_PREF_NGW_IDENTITY_BACKUP, encoded)
+                    .commit();
+            if (!committed) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: identity backup commit failed layer=\""
+                        + getName() + "\" remoteId=" + mRemoteId);
+            }
+            return committed;
+        } catch (JSONException | RuntimeException e) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: identity backup failed layer=\""
+                    + getName() + "\" remoteId=" + mRemoteId + ": " + e.getMessage(), e);
+            return false;
+        }
+    }
+
+
+    private boolean recoverNgwIdentityFromBackupIfNeeded()
+    {
+        NgwLayerIdentityBackup.Snapshot backup = NgwLayerIdentityBackup.decode(
+                getPreferences().getString(
+                        SettingsConstants.KEY_PREF_NGW_IDENTITY_BACKUP, null));
+        if (backup == null) {
+            return false;
+        }
+
+        boolean accountMissing = TextUtils.isEmpty(mAccountName);
+        boolean remoteIdMissing = mRemoteId <= 0L;
+        boolean identityIncomplete = accountMissing || remoteIdMissing;
+        boolean accountCompatible = accountMissing
+                || TextUtils.equals(mAccountName, backup.accountName);
+        boolean remoteIdCompatible = remoteIdMissing || mRemoteId == backup.remoteId;
+        boolean changed = false;
+
+        if (identityIncomplete && accountCompatible && remoteIdCompatible) {
+            setAccountName(backup.accountName);
+            mRemoteId = backup.remoteId;
+            mSyncType = backup.syncType;
+            mNGWLayerType = backup.ngwLayerType;
+            mSyncDirection = backup.syncDirection;
+            mTracked = backup.tracked;
+            changed = true;
+        }
+
+        boolean sameIdentity = TextUtils.equals(mAccountName, backup.accountName)
+                && mRemoteId == backup.remoteId;
+        if (sameIdentity && mLayerOriginMetadata == null && backup.layerOrigin != null) {
+            mLayerOriginMetadata = LayerOriginMetadata.fromJSON(backup.layerOrigin);
+            changed = mLayerOriginMetadata != null || changed;
+        }
+        return changed;
     }
 
 
@@ -940,6 +1036,7 @@ public class NGWVectorLayer
             Pair<Integer, Integer> ver,
             SyncResult syncResult)
     {
+        mLastSyncHadTransientPullFailure = false;
 
         Log.d("SSYNC", "sync of " + getName());
         if (0 != (mSyncType & Constants.SYNC_NONE) || mFields == null) {
@@ -998,6 +1095,34 @@ public class NGWVectorLayer
                     Log.d(Constants.TAG, "Set local changes failed");
                 }
             }
+    }
+
+
+    /**
+     * Run the normal layer sync but leave a final transient pull failure unaccounted so the account
+     * adapter can retry only this layer after the first pass. All non-transient errors are reported
+     * immediately.
+     *
+     * @return {@code true} when the pull should be retried in the deferred layer pass
+     */
+    public boolean syncDeferringTransientPullFailure(
+            String authority,
+            Pair<Integer, Integer> ver,
+            SyncResult syncResult)
+    {
+        mDeferTransientPullFailureAccounting = true;
+        try {
+            sync(authority, ver, syncResult);
+            return mLastSyncHadTransientPullFailure;
+        } finally {
+            mDeferTransientPullFailureAccounting = false;
+        }
+    }
+
+
+    public boolean didLastSyncHaveTransientPullFailure()
+    {
+        return mLastSyncHadTransientPullFailure;
     }
 
     private boolean isRemoteGetAllowed() {
@@ -1394,12 +1519,27 @@ public class NGWVectorLayer
                 return false;
             }
 
-            // need delete attach locally ?
+            // Keep local file under server attach id and register online metadata so
+            // identification works without waiting for a second pull.
             FeatureChanges.removeAttachChanges(getChangeTableName(), featureId, attachId);
-            deleteAttach(String.valueOf(featureId), String.valueOf(attachId));
-//            long newAttachId = result.getLong(Constants.JSON_ID_KEY);
-//            setNewAttachId("" + featureId, attach, "" + newAttachId);
-            // now sended attach deleted from device - it becomes online attach
+            long newAttachId = result.getLong(Constants.JSON_ID_KEY);
+            setNewAttachId(String.valueOf(featureId), attach, String.valueOf(newAttachId));
+            try {
+                FeatureAttachments.checkTable(getAttachmentsTableName());
+                FeatureAttachments.add(
+                        getAttachmentsTableName(),
+                        featureId,
+                        newAttachId,
+                        attach.getDescription(),
+                        attach.getDisplayName(),
+                        attach.getMimetype());
+            } catch (RuntimeException e) {
+                HyperLog.w(Constants.TAG, "sendAttachOnServer: FeatureAttachments.add failed"
+                        + " featureId=" + featureId + " attachId=" + newAttachId
+                        + ": " + e.getMessage(), e);
+            }
+            HyperLog.v(Constants.TAG, "NGWVectorLayer: attach kept locally as server id="
+                    + newAttachId + " featureId=" + featureId + " layer=\"" + getName() + "\"");
 
             return true;
         } catch (IOException e) {
@@ -1681,6 +1821,14 @@ public class NGWVectorLayer
     // true - 404 was and proceed, false - no 404 happen
     public void clearLayerSync(final NGWVectorLayer ngwVectorLayer) {
 
+        if (!shouldConvertMissingNgwLayerToLocal(
+                ngwVectorLayer == null ? null : ngwVectorLayer.getLayerOriginMetadata())) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: managed layer 404 deferred to Collector"
+                    + " composition sync layer=\"" + ngwVectorLayer.getName() + "\" remoteId="
+                    + ngwVectorLayer.getRemoteId());
+            return;
+        }
+
         // 404 response  on get feature - reature not on server (deleted)
         // need to turn off sync,
         ngwVectorLayer.setSyncType(Constants.SYNC_NONE);
@@ -1699,6 +1847,12 @@ public class NGWVectorLayer
         getContext().sendBroadcast(msg);
         com.nextgis.maplib.datasource.ngw.SyncAdapter.showNotify(getContext(), message, title);
         return;
+    }
+
+
+    static boolean shouldConvertMissingNgwLayerToLocal(LayerOriginMetadata origin)
+    {
+        return origin == null || !origin.isManagedByProject();
     }
 
     private enum ConfigRefreshOutcome {
@@ -1921,6 +2075,16 @@ public class NGWVectorLayer
             String changeTableName = getChangeTableName();
             HashSet<Long> remoteIdSet = null;
             if (mTracked) {
+                Set<Long> destructiveIds = new LinkedHashSet<>();
+                collectRemoteDeleteFeatureIds(deleted, destructiveIds);
+                collectRemoteOverwriteFeatureIds(changed, changeTableName, destructiveIds);
+                collectRemoteOverwriteFeatureIds(added, changeTableName, destructiveIds);
+                if (!backupBeforeRemoteDestructiveApply(destructiveIds)) {
+                    HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                            + " tracked pull aborted: backup gate blocked destructive apply");
+                    syncResult.stats.numConflictDetectedExceptions++;
+                    return false;
+                }
                 proceedAddedFeatures(added, authority, changeTableName);
                 proceedChangedFeatures(changed, authority, changeTableName);
                 proceedDeletedFeatures(deleted, changeTableName);
@@ -1928,6 +2092,34 @@ public class NGWVectorLayer
                 remoteIdSet = new HashSet<>(Math.max(16, features.size() * 2));
                 for (Feature f : features) {
                     remoteIdSet.add(f.getId());
+                }
+
+                Set<Long> destructiveIds = new LinkedHashSet<>();
+                collectRemoteOverwriteFeatureIds(features, changeTableName, destructiveIds);
+                try {
+                    for (Long featureId : queryAllFeatureIdsFromDb()) {
+                        boolean bDeleteFeature = !remoteIdSet.contains(featureId)
+                                && !FeatureChanges.isChanges(changeTableName, featureId,
+                                        Constants.CHANGE_OPERATION_NEW)
+                                && !FeatureChanges.hasFeatureFlags(changeTableName, featureId);
+                        if (bDeleteFeature) {
+                            destructiveIds.add(featureId);
+                            deleteItems.add(featureId);
+                        }
+                    }
+                } catch (Exception ex) {
+                    HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                            + " getChangesFromServer collect deletes Exception error "
+                            + ex.getMessage());
+                    Log.e(TAG, "error on query:" + ex.getMessage());
+                }
+
+                if (!backupBeforeRemoteDestructiveApply(destructiveIds)) {
+                    HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                            + " pull aborted: backup gate blocked destructive apply ids="
+                            + destructiveIds.size());
+                    syncResult.stats.numConflictDetectedExceptions++;
+                    return false;
                 }
 
                 // analyse feature
@@ -1983,24 +2175,6 @@ public class NGWVectorLayer
                             + ", skipped create (pending change) " + skippedCreateDueToPendingChange);
                 }
 
-                // remove features not exist on server from local layer
-                // if no operation is in changes array or change operation for local feature present
-                try {
-                    for (Long featureId : queryAllFeatureIdsFromDb()) {
-                        boolean bDeleteFeature = !remoteIdSet.contains(featureId)
-                                && !FeatureChanges.isChanges(changeTableName, featureId,
-                                        Constants.CHANGE_OPERATION_NEW)
-                                && !FeatureChanges.hasFeatureFlags(changeTableName, featureId);
-
-                        if (bDeleteFeature) {
-                            deleteItems.add(featureId);
-                        }
-                    }
-                } catch (Exception ex){
-                    HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer remove features Exception error " + ex.getMessage());
-
-                    Log.e(TAG, "error on query:" + ex.getMessage());
-                }
                 HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " delete features " + deleteItems.size());
                 deleteFeatures(deleteItems);
             }
@@ -2196,6 +2370,153 @@ public class NGWVectorLayer
                 Log.d(Constants.TAG, "Delete feature #" + itemId + " not exist on server");
             }
             delete(itemId, Constants.FIELD_ID + " = " + itemId, null);
+        }
+    }
+
+    /**
+     * Reason string must match {@code LayerBackupManager.REASON_SYNC_REMOTE_APPLY}.
+     */
+    private static final String BACKUP_REASON_SYNC_REMOTE_APPLY = "sync_remote_apply";
+    /**
+     * Reason string must match {@code LayerBackupManager.REASON_MANUAL_FEATURE_DELETE}.
+     */
+    private static final String BACKUP_REASON_MANUAL_FEATURE_DELETE = "manual_feature_delete";
+
+    protected boolean backupBeforeRemoteDestructiveApply(Collection<Long> featureIds) {
+        if (featureIds == null || featureIds.isEmpty()) {
+            return true;
+        }
+        try {
+            Context appCtx = mContext.getApplicationContext();
+            if (!(appCtx instanceof IGISApplication)) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                        + " backup gate unavailable (no IGISApplication)");
+                return false;
+            }
+            return ((IGISApplication) appCtx).backupEditableLayerFeatures(
+                    this, featureIds, BACKUP_REASON_SYNC_REMOTE_APPLY);
+        } catch (RuntimeException e) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                    + " backupBeforeRemoteDestructiveApply failed: " + e.getMessage(), e);
+            return false;
+        }
+    }
+
+    protected void collectRemoteDeleteFeatureIds(
+            List<Feature> deleted,
+            Set<Long> outIds) {
+        if (deleted == null || outIds == null) {
+            return;
+        }
+        for (Feature remoteFeature : deleted) {
+            if (remoteFeature == null) {
+                continue;
+            }
+            long id = remoteFeature.getId();
+            Cursor cursor = query(null, Constants.FIELD_ID + " = " + id, null, null, null);
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    outIds.add(id);
+                }
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
+    }
+
+    protected void collectRemoteOverwriteFeatureIds(
+            List<Feature> remotes,
+            String changeTableName,
+            Set<Long> outIds) {
+        if (remotes == null || outIds == null) {
+            return;
+        }
+        for (Feature remoteFeature : remotes) {
+            if (remoteFeature == null) {
+                continue;
+            }
+            if (willRemoteOverwriteLocalFeature(remoteFeature, changeTableName)) {
+                outIds.add(remoteFeature.getId());
+            }
+        }
+    }
+
+    /**
+     * True when remote apply would replace local geometry/attributes and/or attachments.
+     */
+    protected boolean willRemoteOverwriteLocalFeature(
+            Feature remoteFeature,
+            String changeTableName) {
+        Cursor cursor = query(null, Constants.FIELD_ID + " = " + remoteFeature.getId(),
+                null, null, null);
+        try {
+            if (cursor == null || !cursor.moveToFirst()) {
+                return false;
+            }
+            Feature currentFeature = cursorToFeature(cursor);
+            boolean eqData = remoteFeature.equalsData(currentFeature);
+            boolean eqAttach = remoteFeature.equalsAttachments(currentFeature);
+            if (eqData && eqAttach) {
+                return false;
+            }
+            if (!eqAttach) {
+                return true;
+            }
+            return !FeatureChanges.isChanges(changeTableName, remoteFeature.getId());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    @Override
+    public int deleteAddChanges(long id) {
+        if (id == Constants.NOT_FOUND) {
+            List<Long> ids = queryAllFeatureIdsFromDb();
+            if (!backupBeforeManualFeatureDelete(ids)) {
+                return 0;
+            }
+            return super.deleteAddChanges(id);
+        }
+        List<Long> ids = new ArrayList<>(1);
+        ids.add(id);
+        if (!backupBeforeManualFeatureDelete(ids)) {
+            return 0;
+        }
+        return super.deleteAddChanges(id);
+    }
+
+    @Override
+    public void deleteAllFeatures(IProgressor progressor) {
+        List<Long> ids = queryAllFeatureIdsFromDb();
+        if (!backupBeforeManualFeatureDelete(ids)) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                    + " deleteAllFeatures aborted: backup gate blocked");
+            return;
+        }
+        super.deleteAllFeatures(progressor);
+    }
+
+    protected boolean backupBeforeManualFeatureDelete(Collection<Long> featureIds) {
+        if (featureIds == null || featureIds.isEmpty()) {
+            return true;
+        }
+        try {
+            Context appCtx = mContext.getApplicationContext();
+            if (!(appCtx instanceof IGISApplication)) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                        + " manual feature backup gate unavailable");
+                return false;
+            }
+            return ((IGISApplication) appCtx).backupEditableLayerFeatures(
+                    this, featureIds, BACKUP_REASON_MANUAL_FEATURE_DELETE);
+        } catch (RuntimeException e) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                    + " backupBeforeManualFeatureDelete failed: " + e.getMessage(), e);
+            return false;
         }
     }
 
@@ -2399,13 +2720,17 @@ public class NGWVectorLayer
                         Log.d("SSYNC", "url: " + urlConnection.getURL().toString() + " = FAIL 404");
                         return new ExistFeatureResult(null, false, 404);
                     }
-                    if (NetworkUtil.isTransientNgwHttpError(code, errorBody, responseMessage)
-                            && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
+                    boolean transientHttpError =
+                            NetworkUtil.isTransientNgwHttpError(code, errorBody, responseMessage);
+                    if (transientHttpError && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
                         sleepBeforeNgwSyncPullRetry(attempt, "HTTP " + code);
                         continue;
                     }
-                    if (NetworkUtil.isTransientNgwHttpError(code, errorBody, responseMessage)) {
-                        SyncResultUtil.markConnectFailed(syncResult);
+                    if (transientHttpError) {
+                        recordTransientPullFailure(
+                                syncResult,
+                                NetworkUtil.isTemporaryNgwServerFailure(
+                                        code, errorBody, responseMessage));
                     } else {
                         syncResult.stats.numIoExceptions++;
                     }
@@ -2465,13 +2790,17 @@ public class NGWVectorLayer
                 SyncResultUtil.markConnectFailed(syncResult);
                 return new ExistFeatureResult(null, false, 0);
             } catch (IOException e) {
-                if (NetworkUtil.isTransientNetworkFailure(e)
-                        && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
+                boolean transientNetworkFailure = NetworkUtil.isTransientNetworkFailure(e);
+                if (transientNetworkFailure && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
                     sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
                     continue;
                 }
                 log(e, "getFeatures(): IOException");
-                SyncResultUtil.markConnectFailed(syncResult);
+                if (transientNetworkFailure) {
+                    recordTransientPullFailure(syncResult, false);
+                } else {
+                    SyncResultUtil.markConnectFailed(syncResult);
+                }
                 return new ExistFeatureResult(null, false, 0);
             } catch (NGException e) {
                 log(e, "getFeatures(): NGException");
@@ -2496,6 +2825,21 @@ public class NGWVectorLayer
         }
 
         return new ExistFeatureResult(null, false, 0);
+    }
+
+    private void recordTransientPullFailure(
+            SyncResult syncResult,
+            boolean temporaryServerFailure)
+    {
+        mLastSyncHadTransientPullFailure = true;
+        if (mDeferTransientPullFailureAccounting) {
+            return;
+        }
+        if (temporaryServerFailure) {
+            SyncResultUtil.markServerTemporarilyUnavailable(syncResult);
+        } else {
+            SyncResultUtil.markConnectFailed(syncResult);
+        }
     }
 
     private void sleepBeforeNgwSyncPullRetry(int attempt, String reason) {

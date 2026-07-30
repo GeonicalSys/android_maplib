@@ -23,8 +23,8 @@
 
 apply plugin: 'com.android.library'
 
-def productionVersionName = '3.1.2.4'
-def debugVersionName = '3.1.2.5'
+def productionVersionName = '3.1.2.7'
+def debugVersionName = '3.1.2.7'
 
 android {
     defaultConfig {
@@ -77,6 +77,8 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
     implementation 'org.maplibre.gl:android-sdk:13.0.2'
+
+    implementation 'org.locationtech.jts:jts-core:1.20.0'
 
     implementation 'com.squareup.okhttp3:okhttp:5.3.2'
 

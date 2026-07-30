@@ -54,6 +54,31 @@ public class LocalVectorTileEncoderTest {
     }
 
     @Test
+    public void pointTile_encodesPointTypeCoordinatesAndLabel() throws Exception {
+        Feature feature = new Feature();
+        feature.setId(9);
+        feature.setGeometry(new GeoPoint(2.5, 7.5));
+
+        byte[] tile = LocalVectorTileEncoder.encodePointTile(
+                Collections.singletonList(feature),
+                new LocalVectorTileEncoder.TileBounds(0, 0, 10, 10),
+                7,
+                null,
+                "point label");
+
+        assertEquals(1, firstFeatureType(tile));
+        int[] geometry = firstFeatureGeometry(tile);
+        assertEquals(3, geometry.length);
+        assertEquals((1 << 3) | 1, geometry[0]);
+        assertEquals(1024, unZigZag(geometry[1]), 1);
+        assertEquals(1024, unZigZag(geometry[2]), 1);
+
+        String bytes = new String(tile, StandardCharsets.ISO_8859_1);
+        assertTrue(bytes.contains(MplFeatureStyleProps.SIGNATURE));
+        assertTrue(bytes.contains("point label"));
+    }
+
+    @Test
     public void multiPolygonTile_keepsContinuousGeometryCursor() throws Exception {
         GeoMultiPolygon multiPolygon = new GeoMultiPolygon();
         multiPolygon.add(square(1, 1, 2, 2));
@@ -123,6 +148,50 @@ public class LocalVectorTileEncoderTest {
             skipField(tile, offset, wireType);
         }
         return new int[0];
+    }
+
+    private static int firstFeatureType(byte[] tile) {
+        int[] offset = new int[]{0};
+        while (offset[0] < tile.length) {
+            long tag = readVarint(tile, offset);
+            int field = (int) (tag >> 3);
+            int wireType = (int) (tag & 0x7);
+            if (field == 3 && wireType == 2) {
+                int length = (int) readVarint(tile, offset);
+                return firstFeatureTypeInLayer(tile, offset[0], offset[0] + length);
+            }
+            skipField(tile, offset, wireType);
+        }
+        return 0;
+    }
+
+    private static int firstFeatureTypeInLayer(byte[] bytes, int start, int end) {
+        int[] offset = new int[]{start};
+        while (offset[0] < end) {
+            long tag = readVarint(bytes, offset);
+            int field = (int) (tag >> 3);
+            int wireType = (int) (tag & 0x7);
+            if (field == 2 && wireType == 2) {
+                int length = (int) readVarint(bytes, offset);
+                return featureType(bytes, offset[0], offset[0] + length);
+            }
+            skipField(bytes, offset, wireType);
+        }
+        return 0;
+    }
+
+    private static int featureType(byte[] bytes, int start, int end) {
+        int[] offset = new int[]{start};
+        while (offset[0] < end) {
+            long tag = readVarint(bytes, offset);
+            int field = (int) (tag >> 3);
+            int wireType = (int) (tag & 0x7);
+            if (field == 3 && wireType == 0) {
+                return (int) readVarint(bytes, offset);
+            }
+            skipField(bytes, offset, wireType);
+        }
+        return 0;
     }
 
     private static int[] firstFeatureGeometryInLayer(byte[] bytes, int start, int end) {

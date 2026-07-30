@@ -17,6 +17,7 @@ import android.text.TextUtils;
 import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.api.IGISApplication;
 import com.nextgis.maplib.api.ILayer;
+import com.nextgis.maplib.api.INGWLayer;
 import com.nextgis.maplib.map.CollectorProjectMetadata;
 import com.nextgis.maplib.map.LayerGroup;
 import com.nextgis.maplib.map.LayerOriginMetadata;
@@ -41,9 +42,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Synchronizes local project-managed layers with live NGW Collector project contents.
@@ -64,6 +67,8 @@ public final class CollectorProjectCompositionSync {
     private static final String TYPE_UPDATE_CONFIG = "update_config";
     private static final String TYPE_UPDATE_EDITABLE = "update_editable";
     private static final String TYPE_UPDATE_RASTER = "update_raster";
+    private static final String TYPE_REPAIR_ORIGIN = "repair_origin";
+    private static final String TYPE_IDENTITY_CONFLICT = "identity_conflict";
 
     private CollectorProjectCompositionSync() {
     }
@@ -145,8 +150,8 @@ public final class CollectorProjectCompositionSync {
                     projectGroup,
                     metadata,
                     diff.toDiagnosticSummary(remote),
-                    remote.isIncomplete(),
-                    remote.isIncomplete() ? "snapshot_incomplete" : null);
+                    false,
+                    diff.isUnsafe() ? "local_identity_conflict" : null);
             if (apply) {
                 applyDiff(context, projectGroup, metadata, remote, diff);
             }
@@ -549,14 +554,18 @@ public final class CollectorProjectCompositionSync {
                 + " uid=" + metadata.getProjectUid()
                 + " remoteLayers=" + remote.getLayerCount()
                 + " localManagedLayers=" + diff.getLocalManagedLayerCount()
+                + " localPhysicalLayers=" + diff.getLocalPhysicalLayerCount()
                 + " incomplete=" + remote.isIncomplete()
+                + " unsafe=" + diff.isUnsafe()
                 + " add=" + diff.count(TYPE_ADD)
                 + " remove=" + diff.count(TYPE_REMOVE)
                 + " reorder=" + diff.count(TYPE_REORDER)
                 + " updateForm=" + diff.count(TYPE_UPDATE_FORM)
                 + " updateConfig=" + diff.count(TYPE_UPDATE_CONFIG)
                 + " updateEditable=" + diff.count(TYPE_UPDATE_EDITABLE)
-                + " updateRaster=" + diff.count(TYPE_UPDATE_RASTER));
+                + " updateRaster=" + diff.count(TYPE_UPDATE_RASTER)
+                + " repairOrigin=" + diff.count(TYPE_REPAIR_ORIGIN)
+                + " identityConflict=" + diff.count(TYPE_IDENTITY_CONFLICT));
         for (DiffEntry entry : diff.getEntries()) {
             HyperLog.d(Constants.TAG, prefix + " diff " + entry);
         }
@@ -577,12 +586,25 @@ public final class CollectorProjectCompositionSync {
                     + metadata.getProjectUid());
             return;
         }
+        if (diff.isUnsafe()) {
+            HyperLog.w(Constants.TAG, LOG_PREFIX
+                    + ": apply skipped because local NGW identity is ambiguous uid="
+                    + metadata.getProjectUid() + " conflicts="
+                    + diff.count(TYPE_IDENTITY_CONFLICT));
+            return;
+        }
         if (!(context.getApplicationContext() instanceof IGISApplication)) {
             HyperLog.w(Constants.TAG, LOG_PREFIX + ": application does not implement IGISApplication");
             return;
         }
         IGISApplication app = (IGISApplication) context.getApplicationContext();
         long[] fullOrder = remote.getRemoteIdsInOrder();
+
+        for (DiffEntry entry : diff.getEntries()) {
+            if (TYPE_REPAIR_ORIGIN.equals(entry.getType())) {
+                repairCollectorLayerOrigin(app, metadata, entry, fullOrder);
+            }
+        }
 
         for (DiffEntry entry : diff.getEntries()) {
             if (!TYPE_REMOVE.equals(entry.getType()) || entry.getLocalLayer() == null) {
@@ -603,7 +625,11 @@ public final class CollectorProjectCompositionSync {
             }
         }
 
-        if (!additions.isEmpty()) {
+        if (!additions.isEmpty() && app.hasCollectorImportBatchRegistered()) {
+            HyperLog.w(Constants.TAG, LOG_PREFIX + ": additions deferred while a durable Collector"
+                    + " import batch is active uid=" + metadata.getProjectUid()
+                    + " count=" + additions.size());
+        } else if (!additions.isEmpty()) {
             scheduleAdditions(app, projectGroup, metadata, additions, fullOrder);
         }
 
@@ -646,6 +672,56 @@ public final class CollectorProjectCompositionSync {
                         remoteLayer.getOrder(),
                         fullOrder);
             }
+        }
+    }
+
+    private static void repairCollectorLayerOrigin(
+            IGISApplication app,
+            CollectorProjectMetadata metadata,
+            DiffEntry entry,
+            long[] fullOrder) {
+        if (app == null || metadata == null || entry == null
+                || entry.getLocalLayer() == null || entry.getRemoteLayer() == null) {
+            return;
+        }
+        ILayer localLayer = entry.getLocalLayer();
+        CollectorProjectLayerSnapshot remoteLayer = entry.getRemoteLayer();
+        LayerOriginMetadata recovered = LayerOriginMetadata.collectorLayer(
+                metadata.getProjectUid(),
+                -1,
+                remoteLayer.isVector() ? remoteLayer.getFormId() : 0L);
+        if (localLayer instanceof NGWVectorLayer) {
+            NGWVectorLayer vector = (NGWVectorLayer) localLayer;
+            vector.setLayerOriginMetadata(recovered);
+            if (!vector.save()) {
+                vector.setLayerOriginMetadata(null);
+                HyperLog.w(Constants.TAG, LOG_PREFIX + ": origin repair save failed layer=\""
+                        + vector.getName() + "\" remoteId=" + vector.getRemoteId());
+                return;
+            }
+            app.applyCollectorLayerProjectState(
+                    vector,
+                    remoteLayer.getOrder(),
+                    fullOrder,
+                    remoteLayer.isCollectorEditable());
+            HyperLog.w(Constants.TAG, LOG_PREFIX + ": restored project ownership layer=\""
+                    + vector.getName() + "\" remoteId=" + vector.getRemoteId());
+        } else if (localLayer instanceof NGWRasterLayer) {
+            NGWRasterLayer raster = (NGWRasterLayer) localLayer;
+            raster.setLayerOriginMetadata(recovered);
+            if (!raster.save()) {
+                raster.setLayerOriginMetadata(null);
+                HyperLog.w(Constants.TAG, LOG_PREFIX + ": raster origin repair save failed layer=\""
+                        + raster.getName() + "\" remoteId=" + raster.getRemoteId());
+                return;
+            }
+            app.applyCollectorRasterStyleProjectState(
+                    raster,
+                    remoteLayer.getItem(),
+                    remoteLayer.getOrder(),
+                    fullOrder);
+            HyperLog.w(Constants.TAG, LOG_PREFIX + ": restored raster project ownership layer=\""
+                    + raster.getName() + "\" remoteId=" + raster.getRemoteId());
         }
     }
 
@@ -992,35 +1068,90 @@ public final class CollectorProjectCompositionSync {
     private static final class CollectorProjectDiff {
         private final List<DiffEntry> mEntries = new ArrayList<>();
         private int mLocalManagedLayerCount;
+        private int mLocalPhysicalLayerCount;
+        private boolean mUnsafe;
 
         static CollectorProjectDiff compare(
                 LayerGroup projectGroup,
                 CollectorProjectMetadata metadata,
                 CollectorProjectSnapshot remote) {
             CollectorProjectDiff diff = new CollectorProjectDiff();
-            Map<Long, ILayer> local = new LinkedHashMap<>();
-            collectLocalManagedLayers(projectGroup, metadata.getProjectUid(), local);
-            diff.mLocalManagedLayerCount = local.size();
+            LocalLayerIndex localIndex = new LocalLayerIndex();
+            collectLocalLayers(
+                    projectGroup,
+                    metadata.getProjectUid(),
+                    metadata.getAccountName(),
+                    localIndex);
+            diff.mLocalManagedLayerCount = localIndex.mManagedLayerCount;
+            diff.mLocalPhysicalLayerCount = localIndex.mPhysicalLayerCount;
+            for (IdentityConflict conflict : localIndex.mConflicts) {
+                diff.markUnsafe(
+                        conflict.mRemoteId,
+                        conflict.mLayer == null ? "" : conflict.mLayer.getName(),
+                        conflict.mLayer,
+                        null,
+                        conflict.mDetail);
+            }
+            Map<Long, ILayer> local = localIndex.getUniqueManagedLayers();
+            Set<Long> seenRemoteIds = new HashSet<>();
 
             for (CollectorProjectLayerSnapshot remoteLayer : remote.getLayers()) {
-                ILayer localLayer = local.get(remoteLayer.getRemoteId());
-                if (localLayer == null) {
+                long remoteId = remoteLayer.getRemoteId();
+                if (!seenRemoteIds.add(remoteId)) {
+                    diff.markUnsafe(
+                            remoteId,
+                            remoteLayer.getName(),
+                            null,
+                            remoteLayer,
+                            "remote project contains duplicate resource identity");
+                    continue;
+                }
+
+                List<ILayer> managedMatches = localIndex.getManaged(remoteId);
+                List<ILayer> physicalMatches = localIndex.getPhysical(remoteId);
+                ILayer candidate = managedMatches.size() == 1
+                        ? managedMatches.get(0)
+                        : physicalMatches.size() == 1 ? physicalMatches.get(0) : null;
+                boolean expectedKind = candidate != null
+                        && isExpectedLayerKind(candidate, remoteLayer);
+                boolean originMissing = candidate != null && getOrigin(candidate) == null;
+                LocalIdentityAction action = decideLocalIdentityAction(
+                        managedMatches.size(),
+                        physicalMatches.size(),
+                        expectedKind,
+                        originMissing);
+
+                if (action == LocalIdentityAction.ADD) {
                     diff.add(TYPE_ADD, remoteLayer.getRemoteId(), remoteLayer.getName(),
                             null, remoteLayer,
                             "remote order=" + remoteLayer.getOrder());
                     continue;
                 }
-                if (!isExpectedLayerKind(localLayer, remoteLayer)) {
-                    diff.add(TYPE_REMOVE, remoteLayer.getRemoteId(), localLayer.getName(),
-                            localLayer, null, "local kind differs from remote project item");
-                    diff.add(TYPE_ADD, remoteLayer.getRemoteId(), remoteLayer.getName(),
-                            null, remoteLayer, "replace local kind");
+                if (action == LocalIdentityAction.REPAIR_ORIGIN) {
+                    diff.add(
+                            TYPE_REPAIR_ORIGIN,
+                            remoteId,
+                            candidate.getName(),
+                            candidate,
+                            remoteLayer,
+                            "account+remoteId match; project ownership metadata missing");
                     continue;
                 }
+                if (action == LocalIdentityAction.BLOCK) {
+                    diff.markUnsafe(
+                            remoteId,
+                            candidate == null ? remoteLayer.getName() : candidate.getName(),
+                            candidate,
+                            remoteLayer,
+                            "ambiguous local identity managedMatches=" + managedMatches.size()
+                                    + " physicalMatches=" + physicalMatches.size()
+                                    + " expectedKind=" + expectedKind
+                                    + " originMissing=" + originMissing);
+                    continue;
+                }
+
+                ILayer localLayer = candidate;
                 LayerOriginMetadata origin = getOrigin(localLayer);
-                if (origin == null) {
-                    continue;
-                }
 
                 if (remoteLayer.isRasterStyle()) {
                     NGWRasterLayer raster = (NGWRasterLayer) localLayer;
@@ -1115,29 +1246,58 @@ public final class CollectorProjectCompositionSync {
             return diff;
         }
 
-        private static void collectLocalManagedLayers(
+        private static void collectLocalLayers(
                 LayerGroup group,
                 String projectUid,
-                Map<Long, ILayer> out) {
+                String accountName,
+                LocalLayerIndex out) {
             for (int i = 0; i < group.getLayerCount(); i++) {
                 ILayer child = group.getLayer(i);
                 if (child instanceof LayerGroup) {
-                    collectLocalManagedLayers((LayerGroup) child, projectUid, out);
-                } else if (child instanceof NGWVectorLayer) {
-                    NGWVectorLayer layer = (NGWVectorLayer) child;
-                    LayerOriginMetadata origin = layer.getLayerOriginMetadata();
-                    if (origin != null
-                            && origin.isManagedByProject()
-                            && projectUid.equals(origin.getProjectUid())) {
-                        out.put(layer.getRemoteId(), layer);
+                    collectLocalLayers((LayerGroup) child, projectUid, accountName, out);
+                    continue;
+                }
+                if (!(child instanceof NGWVectorLayer)
+                        && !(child instanceof NGWRasterLayer)) {
+                    continue;
+                }
+
+                INGWLayer ngwLayer = (INGWLayer) child;
+                long remoteId = ngwLayer.getRemoteId();
+                boolean accountMatches = TextUtils.equals(
+                        accountName, ngwLayer.getAccountName());
+                LayerOriginMetadata origin = getOrigin(child);
+                boolean managedByThisProject = origin != null
+                        && origin.isManagedByProject()
+                        && TextUtils.equals(projectUid, origin.getProjectUid());
+                boolean identityIncomplete = TextUtils.isEmpty(ngwLayer.getAccountName())
+                        || remoteId <= 0L;
+
+                if (accountMatches && remoteId > 0L) {
+                    out.addPhysical(remoteId, child);
+                }
+                if (identityIncomplete) {
+                    out.mConflicts.add(new IdentityConflict(
+                            remoteId,
+                            child,
+                            "NGW layer has incomplete identity account=\""
+                                    + safe(ngwLayer.getAccountName()) + "\" remoteId=" + remoteId
+                                    + " managedByThisProject=" + managedByThisProject));
+                }
+                if (managedByThisProject) {
+                    out.mManagedLayerCount++;
+                    if (identityIncomplete) {
+                        continue;
                     }
-                } else if (child instanceof NGWRasterLayer) {
-                    NGWRasterLayer layer = (NGWRasterLayer) child;
-                    LayerOriginMetadata origin = layer.getLayerOriginMetadata();
-                    if (origin != null
-                            && origin.isManagedByProject()
-                            && projectUid.equals(origin.getProjectUid())) {
-                        out.put(layer.getRemoteId(), layer);
+                    if (!accountMatches) {
+                        out.mConflicts.add(new IdentityConflict(
+                                remoteId,
+                                child,
+                                "managed layer has mismatched identity account=\""
+                                        + safe(ngwLayer.getAccountName()) + "\" expectedAccount=\""
+                                        + safe(accountName) + "\" remoteId=" + remoteId));
+                    } else {
+                        out.addManaged(remoteId, child);
                     }
                 }
             }
@@ -1170,12 +1330,30 @@ public final class CollectorProjectCompositionSync {
             mEntries.add(new DiffEntry(type, remoteId, name, localLayer, remoteLayer, detail));
         }
 
+        private void markUnsafe(
+                long remoteId,
+                String name,
+                ILayer localLayer,
+                CollectorProjectLayerSnapshot remoteLayer,
+                String detail) {
+            mUnsafe = true;
+            add(TYPE_IDENTITY_CONFLICT, remoteId, name, localLayer, remoteLayer, detail);
+        }
+
         List<DiffEntry> getEntries() {
             return mEntries;
         }
 
         int getLocalManagedLayerCount() {
             return mLocalManagedLayerCount;
+        }
+
+        int getLocalPhysicalLayerCount() {
+            return mLocalPhysicalLayerCount;
+        }
+
+        boolean isUnsafe() {
+            return mUnsafe;
         }
 
         int count(String type) {
@@ -1192,13 +1370,103 @@ public final class CollectorProjectCompositionSync {
             int remoteCount = remote != null ? remote.getLayerCount() : 0;
             return "remote=" + remoteCount
                     + " local=" + mLocalManagedLayerCount
+                    + " physical=" + mLocalPhysicalLayerCount
+                    + " unsafe=" + mUnsafe
                     + " add=" + count(TYPE_ADD)
                     + " remove=" + count(TYPE_REMOVE)
                     + " reorder=" + count(TYPE_REORDER)
                     + " updateForm=" + count(TYPE_UPDATE_FORM)
                     + " updateConfig=" + count(TYPE_UPDATE_CONFIG)
                     + " updateEditable=" + count(TYPE_UPDATE_EDITABLE)
-                    + " updateRaster=" + count(TYPE_UPDATE_RASTER);
+                    + " updateRaster=" + count(TYPE_UPDATE_RASTER)
+                    + " repairOrigin=" + count(TYPE_REPAIR_ORIGIN)
+                    + " identityConflict=" + count(TYPE_IDENTITY_CONFLICT);
+        }
+    }
+
+    enum LocalIdentityAction {
+        USE_MANAGED,
+        REPAIR_ORIGIN,
+        ADD,
+        BLOCK
+    }
+
+    static LocalIdentityAction decideLocalIdentityAction(
+            int managedMatches,
+            int physicalMatches,
+            boolean expectedKind,
+            boolean originMissing) {
+        if (managedMatches == 1 && physicalMatches == 1 && expectedKind) {
+            return LocalIdentityAction.USE_MANAGED;
+        }
+        if (managedMatches == 0 && physicalMatches == 0) {
+            return LocalIdentityAction.ADD;
+        }
+        if (managedMatches == 0 && physicalMatches == 1
+                && expectedKind && originMissing) {
+            return LocalIdentityAction.REPAIR_ORIGIN;
+        }
+        return LocalIdentityAction.BLOCK;
+    }
+
+    private static final class LocalLayerIndex {
+        private final Map<Long, List<ILayer>> mPhysicalByRemoteId = new LinkedHashMap<>();
+        private final Map<Long, List<ILayer>> mManagedByRemoteId = new LinkedHashMap<>();
+        private final List<IdentityConflict> mConflicts = new ArrayList<>();
+        private int mManagedLayerCount;
+        private int mPhysicalLayerCount;
+
+        void addPhysical(long remoteId, ILayer layer) {
+            addToIndex(mPhysicalByRemoteId, remoteId, layer);
+            mPhysicalLayerCount++;
+        }
+
+        void addManaged(long remoteId, ILayer layer) {
+            addToIndex(mManagedByRemoteId, remoteId, layer);
+        }
+
+        List<ILayer> getPhysical(long remoteId) {
+            List<ILayer> layers = mPhysicalByRemoteId.get(remoteId);
+            return layers == null ? new ArrayList<>() : layers;
+        }
+
+        List<ILayer> getManaged(long remoteId) {
+            List<ILayer> layers = mManagedByRemoteId.get(remoteId);
+            return layers == null ? new ArrayList<>() : layers;
+        }
+
+        Map<Long, ILayer> getUniqueManagedLayers() {
+            Map<Long, ILayer> result = new LinkedHashMap<>();
+            for (Map.Entry<Long, List<ILayer>> entry : mManagedByRemoteId.entrySet()) {
+                if (entry.getValue().size() == 1) {
+                    result.put(entry.getKey(), entry.getValue().get(0));
+                }
+            }
+            return result;
+        }
+
+        private static void addToIndex(
+                Map<Long, List<ILayer>> index,
+                long remoteId,
+                ILayer layer) {
+            List<ILayer> layers = index.get(remoteId);
+            if (layers == null) {
+                layers = new ArrayList<>();
+                index.put(remoteId, layers);
+            }
+            layers.add(layer);
+        }
+    }
+
+    private static final class IdentityConflict {
+        private final long mRemoteId;
+        private final ILayer mLayer;
+        private final String mDetail;
+
+        IdentityConflict(long remoteId, ILayer layer, String detail) {
+            mRemoteId = remoteId;
+            mLayer = layer;
+            mDetail = detail;
         }
     }
 

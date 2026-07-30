@@ -36,6 +36,7 @@ import android.content.SharedPreferences;
 import android.content.SyncResult;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -50,10 +51,12 @@ import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
 import com.nextgis.maplib.map.NGWVectorLayer;
 import com.nextgis.maplib.map.TrackLayer;
+import com.nextgis.maplib.service.NGWSyncService;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.NgwSyncRetryPolicy;
 import com.nextgis.maplib.util.SettingsConstants;
 import com.nextgis.maplib.util.SyncResultUtil;
 
@@ -99,6 +102,12 @@ public class SyncAdapter
     protected String mError;
 
     private HashMap<String, Pair<Integer, Integer>> mVersions;
+
+    private static final class DeferredVectorRetryBatch
+    {
+        final List<NGWVectorLayer> layers = new ArrayList<>();
+        long retryNotBefore;
+    }
 
     public SyncAdapter(
             Context context,
@@ -159,6 +168,7 @@ public class SyncAdapter
                 SyncResultUtil.beginSync();
                 try {
                     gisApp.stopHandler();
+                    NGWSyncService.markSyncStarted();
                     getContext().sendBroadcast(
                             (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
                     SyncResultUtil.markNetworkUnavailable(syncResult);
@@ -178,6 +188,7 @@ public class SyncAdapter
             try {
                 MapContentProviderHelper mapContentProviderHelper = (MapContentProviderHelper) MapBase.getInstance();
 
+                NGWSyncService.markSyncStarted();
                 getContext().sendBroadcast(
                         (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
 
@@ -209,6 +220,7 @@ public class SyncAdapter
             HyperLog.w(Constants.TAG, "SyncAdapter.onPerformSync uncaught for " + account.name, t);
             syncResult.stats.numIoExceptions++;
         } finally {
+            NGWSyncService.markSyncFinished();
             if (!finishBroadcast) {
                 Intent finish = new Intent(SYNC_FINISH).setPackage(getContext().getPackageName());
                 HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH (safety/early-exit) sent");
@@ -285,6 +297,7 @@ public class SyncAdapter
         if (isCanceled()) {
             Log.d(Constants.TAG, "onPerformSync - SYNC_CANCELED is sent");
             HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_CANCELED is sent");
+            NGWSyncService.markSyncFinished();
             getContext().sendBroadcast(new Intent(SYNC_CANCELED).setPackage(getContext().getPackageName()));
             return;
         }
@@ -320,11 +333,12 @@ public class SyncAdapter
         Log.d("SSYNC", "onPerformSync END error - " + mError);
 
         Intent finish = new Intent(SYNC_FINISH);
-        if (manualSync && !TextUtils.isEmpty(mError)) {
+        if (!TextUtils.isEmpty(mError)) {
             finish.putExtra(EXCEPTION, mError);
         }
         HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH is sent / mError is "
                 + (TextUtils.isEmpty(mError) ? null : mError));
+        NGWSyncService.markSyncFinished();
         finish.setPackage(getContext().getPackageName());
         getContext().sendBroadcast(finish);
     }
@@ -406,6 +420,23 @@ public class SyncAdapter
             SyncResult syncResult,
             Bundle bundle)
     {
+        DeferredVectorRetryBatch retryBatch = new DeferredVectorRetryBatch();
+        syncFirstPass(account, layerGroup, authority, syncResult, bundle, retryBatch);
+        retryDeferredVectorLayers(
+                retryBatch.layers,
+                retryBatch.retryNotBefore,
+                authority,
+                syncResult);
+    }
+
+    private void syncFirstPass(
+            Account account,
+            LayerGroup layerGroup,
+            String authority,
+            SyncResult syncResult,
+            Bundle bundle,
+            DeferredVectorRetryBatch retryBatch)
+    {
         Log.e("SYNC2S", "sync syncAdapter account  " + account.name );
         Log.d("SSYNC", "sync syncAdapter account - " + account.name);
 
@@ -418,7 +449,6 @@ public class SyncAdapter
         boolean trackSync = mSharedPreferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, false);
 
         List<ILayer> layersToSync = new ArrayList<>();
-
         Log.d("SSYNC", "pre check bundle != null && bundle.getString(ACTION_LPATH) != null" );
 
         if (bundle != null && bundle.getString(ACTION_LPATH) != null){
@@ -485,7 +515,13 @@ public class SyncAdapter
             }
             if (layer instanceof LayerGroup) {
                 HyperLog.v(Constants.TAG, "SyncAdapter: start sync " + layer.getName() + " is a layer group");
-                sync(account, (LayerGroup) layer, authority, syncResult, bundle);
+                syncFirstPass(
+                        account,
+                        (LayerGroup) layer,
+                        authority,
+                        syncResult,
+                        bundle,
+                        retryBatch);
             } else if (layer instanceof INGWLayer) {
                 HyperLog.v(Constants.TAG, "SyncAdapter: start sync " + layer.getName() + " is a NGW layer");
                 INGWLayer ngwLayer = (INGWLayer) layer;
@@ -494,14 +530,83 @@ public class SyncAdapter
                     mVersions.put(accountName, NGWUtil.getNgwVersion(getContext(), accountName));
 
                 Pair<Integer, Integer> ver = mVersions.get(accountName);
-                ngwLayer.sync(authority, ver, syncResult);
+                if (ngwLayer instanceof NGWVectorLayer) {
+                    NGWVectorLayer vectorLayer = (NGWVectorLayer) ngwLayer;
+                    if (vectorLayer.syncDeferringTransientPullFailure(
+                            authority, ver, syncResult)) {
+                        retryBatch.layers.add(vectorLayer);
+                        retryBatch.retryNotBefore = Math.max(
+                                retryBatch.retryNotBefore,
+                                NgwSyncRetryPolicy.retryNotBefore(
+                                        SystemClock.elapsedRealtime()));
+                        HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry layer=\""
+                                + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                                + "\" res=" + vectorLayer.getRemoteId());
+                    }
+                } else {
+                    ngwLayer.sync(authority, ver, syncResult);
+                }
             } else if (layer instanceof TrackLayer) {
                 HyperLog.v(Constants.TAG, "SyncAdapter: start sync" + layer.getName() + " is a tracking layer");
                 ((TrackLayer) layer).sync();
             }
             HyperLog.v(Constants.TAG, "SyncAdapter: Sync Ended for " + layer.getName() + " layer");
         }
+
         Log.d("SSYNC", "END sync syncAdapter account - " + account.name);
+    }
+
+    private void retryDeferredVectorLayers(
+            List<NGWVectorLayer> layers,
+            long retryNotBefore,
+            String authority,
+            SyncResult syncResult)
+    {
+        if (layers.isEmpty() || isCanceled()) {
+            return;
+        }
+
+        long waitMs = NgwSyncRetryPolicy.remainingDelay(
+                retryNotBefore,
+                SystemClock.elapsedRealtime());
+        HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry pass layers="
+                + layers.size() + " waitMs=" + waitMs);
+        while (waitMs > 0L && !isCanceled()) {
+            SystemClock.sleep(Math.min(waitMs, 1_000L));
+            waitMs = NgwSyncRetryPolicy.remainingDelay(
+                    retryNotBefore,
+                    SystemClock.elapsedRealtime());
+        }
+        if (isCanceled()) {
+            return;
+        }
+
+        for (NGWVectorLayer layer : layers) {
+            if (isCanceled()) {
+                return;
+            }
+
+            Pair<Integer, Integer> ver = mVersions.get(layer.getAccountName());
+            long ioBefore = syncResult.stats.numIoExceptions;
+            HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry start layer=\""
+                    + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                    + "\" res=" + layer.getRemoteId());
+            layer.sync(authority, ver, syncResult);
+
+            if (layer.didLastSyncHaveTransientPullFailure()) {
+                HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry exhausted layer=\""
+                        + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                        + "\" res=" + layer.getRemoteId());
+            } else if (syncResult.stats.numIoExceptions > ioBefore) {
+                HyperLog.w(Constants.TAG, "SyncAdapter: deferred retry failed non-transient layer=\""
+                        + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                        + "\" res=" + layer.getRemoteId());
+            } else {
+                HyperLog.v(Constants.TAG, "SyncAdapter: deferred transient retry succeeded layer=\""
+                        + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                        + "\" res=" + layer.getRemoteId());
+            }
+        }
     }
 
     private void syncNgwConfigForSyncDisabledLayers(

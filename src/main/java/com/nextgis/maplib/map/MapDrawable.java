@@ -326,6 +326,9 @@ public class MapDrawable
     private volatile boolean mPendingReload = false;
     /** At most one deferred full reload per started {@link #loadLayersToMaplibreMap} run. */
     private volatile boolean mDeferReloadOnceAllowed = true;
+    /** Avoid an endless retry loop for a permanently invalid visible vector layer. */
+    private int mPostLoadVisibleLayerVerificationRetries = 0;
+    private static final int MAX_POST_LOAD_VISIBLE_LAYER_VERIFICATION_RETRIES = 1;
 
     @Nullable
     private MapView.OnDidFinishLoadingStyleListener mLoadLayersStyleListener;
@@ -1422,6 +1425,40 @@ public class MapDrawable
         }
     }
 
+    private boolean verifyVisibleVectorLayersApplied(
+            Style style,
+            List<ILayer> allLayers,
+            boolean skipInvisibleLayers) {
+        if (style == null || allLayers == null) {
+            return false;
+        }
+
+        boolean complete = true;
+        for (ILayer item : allLayers) {
+            if (!(item instanceof VectorLayer) || item instanceof TrackLayer) {
+                continue;
+            }
+            VectorLayer layer = (VectorLayer) item;
+            if (skipInvisibleLayers && !layer.isVisible()) {
+                continue;
+            }
+
+            String mainLayerId = namePrefix + layer_namepart + layer.getId();
+            String symbolLayerId = "symbol-" + mainLayerId;
+            boolean hasStyleLayer = style.getLayer(mainLayerId) != null
+                    || style.getLayer(symbolLayerId) != null;
+            boolean hasSource = style.getSource(layer.getPath().toString()) != null;
+            if (!hasStyleLayer || !hasSource) {
+                complete = false;
+                HyperLog.w(Constants.TAG, "MapLibre post-load verification missing visible layer"
+                        + " name=\"" + layer.getName() + "\" id=" + layer.getId()
+                        + " source=" + hasSource + " styleLayer=" + hasStyleLayer
+                        + " path=" + layer.getPath().getName());
+            }
+        }
+        return complete;
+    }
+
     public void loadLayersToMaplibreMap(final String styleJson,
                                         final  List<ILayer> allLayers,
                                         final boolean createSource,
@@ -2132,15 +2169,31 @@ public class MapDrawable
                             }
                         }
 
+                        boolean visibleVectorLayersApplied = verifyVisibleVectorLayersApplied(
+                                style, allLayers, skipInvisibleLayers);
+                        if (visibleVectorLayersApplied) {
+                            mPostLoadVisibleLayerVerificationRetries = 0;
+                        } else if (!mPendingReload
+                                && mPostLoadVisibleLayerVerificationRetries
+                                < MAX_POST_LOAD_VISIBLE_LAYER_VERIFICATION_RETRIES) {
+                            mPostLoadVisibleLayerVerificationRetries++;
+                            mPendingReload = true;
+                            HyperLog.w(Constants.TAG,
+                                    "MapLibre post-load verification scheduled one full retry");
+                        }
+
                         /* Upstream: collector hooks — must run after layers are applied. */
                         MaplibreMapInteraction loadedFrag = mapContext.get();
-                        if (loadedFrag != null) {
+                        if (loadedFrag != null && visibleVectorLayersApplied && !mPendingReload) {
                             try {
                                 loadedFrag.setMapLayersLoaded();
                                 loadedFrag.checkCreateIfNeed();
                             } catch (Throwable th) {
                                 Log.e(TAG, "loadLayersToMaplibreMap: post-load hooks", th);
                             }
+                        } else if (loadedFrag != null) {
+                            HyperLog.d(Constants.TAG,
+                                    "MapLibre post-load hooks postponed until deferred reload");
                         }
                         ensureUserLocationLayerOnTop(style);
 
@@ -3937,7 +3990,12 @@ public class MapDrawable
             }
 
         }
-        originalSelectedFeature.setId(newFeatureID);
+        if (originalSelectedFeature != null) {
+            originalSelectedFeature.setId(newFeatureID);
+        } else {
+            Log.w(TAG, "finishCreateNewFeature called without an active original feature; id="
+                    + newFeatureID + " layer=" + (layer == null ? "null" : layer.getId()));
+        }
 
         // WA for sign by id field for new feature
         if (editingObject != null)
@@ -3954,12 +4012,24 @@ public class MapDrawable
             long newFeatureID,
             VectorLayer layer){
 
-        org.maplibre.geojson.Feature targetMlFeature = viewedFeature;
+        org.maplibre.geojson.Feature targetMlFeature =
+                isMaplibreFeature(viewedFeature, layer.getId(), newFeatureID)
+                        ? viewedFeature
+                        : null;
         if (targetMlFeature == null) {
             targetMlFeature = findMaplibreFeatureById(layer.getId(), newFeatureID);
         }
         if (targetMlFeature == null) {
-            reloadVectorLayerStyleToMaplibre(layer.getId());
+            /*
+             * A new feature saved after cold form recovery has no temporary MapLibre edit object
+             * and is not present in the process-local GeoJSON list.  A style-only refresh reuses
+             * that stale list, so the SQLite row remains selectable but invisible until restart.
+             */
+            viewedFeature = null;
+            VectorLayerRenderCache.invalidateOnDataChange(layer);
+            HyperLog.d(Constants.TAG, "MapLibre feature missing after form Save; full data reload"
+                    + " layer=" + layer.getId() + " feature=" + newFeatureID);
+            reloadVectorLayerDataToMaplibre(layer);
             return;
         }
 
@@ -4043,14 +4113,33 @@ public class MapDrawable
             return null;
         }
         for (org.maplibre.geojson.Feature item : layerFeatures) {
-            if (item != null && item.hasProperty(prop_featureid)) {
-                long id = item.getNumberProperty(prop_featureid).longValue();
-                if (id == featureId) {
-                    return item;
-                }
+            if (isMaplibreFeature(item, layerId, featureId)) {
+                return item;
             }
         }
         return null;
+    }
+
+    private boolean isMaplibreFeature(
+            @Nullable org.maplibre.geojson.Feature feature,
+            int layerId,
+            long featureId) {
+        if (feature == null
+                || !feature.hasNonNullValueForProperty(prop_layerid)
+                || !feature.hasNonNullValueForProperty(prop_featureid)) {
+            return false;
+        }
+        try {
+            return feature.getNumberProperty(prop_layerid).intValue() == layerId
+                    && feature.getNumberProperty(prop_featureid).longValue() == featureId;
+        } catch (RuntimeException ignored) {
+            try {
+                return Integer.parseInt(feature.getStringProperty(prop_layerid)) == layerId
+                        && Long.parseLong(feature.getStringProperty(prop_featureid)) == featureId;
+            } catch (RuntimeException malformedProperty) {
+                return false;
+            }
+        }
     }
 
     public boolean getLayerVisible(int id){
@@ -4118,17 +4207,31 @@ public class MapDrawable
             layerSymbol.setProperties(visibility(isVisible ? VISIBLE:NONE));
 
 
-        if (isVisible && targetlayer instanceof VectorLayer){
-            List<org.maplibre.geojson.Feature> features  = sourceFeaturesHashMap.get(targetlayer.getId());
-            if (features == null
-            //        || features.isEmpty() // if only one feature - stuc on edit
-            ){
-                // layer was not uploaded by start - skipped
-                // start load layer
-                if (features == null)
-                    addLayerByID(id);
-                else //
-                    reloadVectorLayerDataToMaplibre(targetlayer);
+        if (targetlayer instanceof VectorLayer) {
+            Style liveStyle = maplibreMap.get().getStyle();
+            String mainLayerId = namePrefix + layer_namepart + id;
+            boolean sourcePresent = liveStyle.getSource(targetlayer.getPath().toString()) != null;
+            boolean renderLayerPresent = liveStyle.getLayer(mainLayerId) != null
+                    || liveStyle.getLayer("symbol-" + mainLayerId) != null;
+            boolean preparedEntryPresent = sourceFeaturesHashMap.containsKey(id);
+
+            if (LayerVisibilityReloadPolicy.shouldReload(
+                    isVisible,
+                    sourcePresent,
+                    renderLayerPresent,
+                    preparedEntryPresent)) {
+                /*
+                 * A layer skipped by full load because visible=false may still have an old
+                 * sourceFeaturesHashMap entry from an earlier import hot-add. That process cache
+                 * does not prove that the current MapLibre style contains its source/layers.
+                 */
+                HyperLog.w(Constants.TAG, "MapLibre visibility enable requires data reload layer=\""
+                        + ProdLogUtil.truncateForLog(targetlayer.getName(), 100)
+                        + "\" id=" + id
+                        + " source=" + sourcePresent
+                        + " styleLayer=" + renderLayerPresent
+                        + " preparedEntry=" + preparedEntryPresent);
+                reloadVectorLayerDataToMaplibre(targetlayer);
             }
         }
 

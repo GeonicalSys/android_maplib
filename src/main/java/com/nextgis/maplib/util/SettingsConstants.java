@@ -36,6 +36,10 @@ public interface SettingsConstants
     String KEY_PREF_LAST_CONFIG_HASH        = "last_config_hash";
     /** MD5 hash of last applied NGFP form payload; used by Collector form sync. */
     String KEY_PREF_LAST_FORM_HASH          = "last_form_hash";
+    /** Legacy per-layer storage mirrored into VectorLayer.feature_label_field. */
+    String KEY_PREF_LAYER_LABEL             = "layer_label";
+    /** Last complete NGW identity for recovery from an interrupted/partial layer config write. */
+    String KEY_PREF_NGW_IDENTITY_BACKUP     = "ngw_identity_backup";
     /** Collector architecture foundation: last project selected in multi-project UX. */
     String KEY_PREF_ACTIVE_COLLECTOR_PROJECT_UID = "active_collector_project_uid";
     String KEY_PREF_LOCATION_SOURCE         = "location_source";
@@ -49,6 +53,8 @@ public interface SettingsConstants
     String KEY_PREF_TRACKS_SOURCE           = "tracks_location_source";
     String KEY_PREF_TRACK_RESTORE           = "track_restore";
     String KEY_PREF_TRACK_SEND              = "track_send";
+    /** Durable: user started track recording; cleared only by explicit menu finish. */
+    String KEY_PREF_TRACK_RECORDING_ENABLED = "track_recording_enabled";
     String KEY_PREF_UNITS                   = "preferred_units";
     String KEY_PREF_TRACK_UID_CUSTOM        = "track_uid_custom";
 

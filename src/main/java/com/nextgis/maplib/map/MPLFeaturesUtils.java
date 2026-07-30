@@ -722,8 +722,11 @@ public class MPLFeaturesUtils {
 
     /**
      * MapLibre text-size for the layer symbol. For simple renderer the size comes only from layer
-     * style; for rule renderer per-feature {@link #prop_text_textsize} may override the default.
+     * style; for rule renderer per-feature {@link #prop_text_textsize} may override the default
+     * (layer default comes from "other/default" style).
      * Zoom scaling must wrap the size expression (not sit inside coalesce) so ["zoom"] is evaluated.
+     * When scale-with-zoom is off for the others/default style, keep a plain coalesce/literal so
+     * changing others label size is not masked by a no-op zoom interpolate.
      */
     private static Expression buildTextSizeExpression(
             float textSizeNg,
@@ -736,17 +739,21 @@ public class MPLFeaturesUtils {
                 Expression.literal(baseSize))
                 : Expression.literal(baseSize);
 
+        boolean defaultScaleWithZoom = labelAttributes != null
+                && labelAttributes.isTextScaleWithZoom();
+
         if (ruleStyle) {
-            boolean defaultScaleWithZoom = labelAttributes != null
-                    && labelAttributes.isTextScaleWithZoom();
+            if (!defaultScaleWithZoom) {
+                return sizeExpr;
+            }
             return MplStyleMapper.zoomScaleExpression(
                     sizeExpr,
                     Expression.get(prop_text_scale_with_zoom),
-                    defaultScaleWithZoom,
-                    labelAttributes != null ? labelAttributes.getTextZoomScaleStops() : null);
+                    true,
+                    labelAttributes.getTextZoomScaleStops());
         }
 
-        if (labelAttributes != null && labelAttributes.isTextScaleWithZoom()) {
+        if (defaultScaleWithZoom) {
             return MplStyleMapper.zoomScaleExpression(
                     sizeExpr,
                     true,
@@ -1129,6 +1136,19 @@ public class MPLFeaturesUtils {
         if (style == null || TextUtils.isEmpty(layerPath)) {
             return;
         }
+        if (layerType == GTPoint) {
+            createCircleLayerForLocalVectorTileLayer(
+                    layerId,
+                    style,
+                    layersHashMap,
+                    layersHashMap2,
+                    symbolsLayerHashMap,
+                    layerStyle,
+                    iLayer,
+                    layerPath,
+                    signaturesRootLayer);
+            return;
+        }
         if (layerType != GTPolygon && layerType != GTMultiPolygon) {
             return;
         }
@@ -1287,6 +1307,167 @@ public class MPLFeaturesUtils {
         if (maxZoom != -1) {
             fillLayer.setMaxZoom(maxZoom);
             outlineLayer.setMaxZoom(maxZoom);
+        }
+    }
+
+    private static void createCircleLayerForLocalVectorTileLayer(
+            int layerId,
+            final Style style,
+            Map<Integer, org.maplibre.android.style.layers.Layer> layersHashMap,
+            Map<Integer, org.maplibre.android.style.layers.Layer> layersHashMap2,
+            Map<Integer, org.maplibre.android.style.layers.Layer> symbolsLayerHashMap,
+            @Nullable com.nextgis.maplib.display.Style layerStyle,
+            ILayer iLayer,
+            String layerPath,
+            org.maplibre.android.style.layers.Layer signaturesRootLayer) {
+        float minZoom = -1;
+        float maxZoom = -1;
+        if (iLayer instanceof com.nextgis.maplib.map.Layer) {
+            minZoom = ((com.nextgis.maplib.map.Layer) iLayer).getMinZoom();
+            maxZoom = ((com.nextgis.maplib.map.Layer) iLayer).getMaxZoom();
+        }
+        float layerOpacityFactor = iLayer instanceof com.nextgis.maplib.map.Layer
+                ? MplStyleMapper.alphaToOpacity(
+                        ((com.nextgis.maplib.map.Layer) iLayer).getLayerOpacity())
+                : 1f;
+
+        String circleId = namePrefix + layer_namepart + layerId;
+        String outlineId = circleId + outline_namepart;
+        String markerIconId = circleId + PointLayerFactory.MARKER_ICON_LAYER_SUFFIX;
+        String symbolId = "symbol-" + namePrefix + layer_namepart + layerId;
+        MplLayerStyleVars vars = MplLayerStyleVars.from(layerStyle, GTPoint);
+        LabelAttributes labelAttributes = LabelAttributes.fromStyle(layerStyle);
+
+        org.maplibre.android.style.layers.Layer existingMain = style.getLayer(circleId);
+        CircleLayer circleLayer = existingMain instanceof CircleLayer
+                ? (CircleLayer) existingMain : null;
+        if (existingMain != null && circleLayer == null) {
+            style.removeLayer(existingMain);
+        }
+        if (circleLayer == null) {
+            circleLayer = new CircleLayer(circleId, layerPath)
+                    .withSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+        } else {
+            circleLayer.setSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+        }
+
+        removeLocalVectorTileStyleLayer(style, outlineId);
+        removeLocalVectorTileStyleLayer(style, markerIconId);
+        layersHashMap2.remove(layerId);
+
+        Expression sortKey = Expression.toNumber(Expression.get(prop_order));
+        circleLayer.setProperties(
+                PropertyFactory.circleRadius(MplStyleMapper.zoomScaleExpression(
+                        Expression.literal(getMPLThinkness(vars.markerRadius)),
+                        vars.scaleSizeWithZoom,
+                        vars.sizeZoomScaleStops)),
+                PropertyFactory.circleColor(getColorName(vars.fillColor)),
+                PropertyFactory.circleStrokeColor(getColorName(vars.outlineColor)),
+                PropertyFactory.circleStrokeWidth(getMPLThinkness(vars.thickness)),
+                PropertyFactory.circleOpacity(MplStyleMapper.opacityWithLayerMultiplier(
+                        Expression.literal(vars.fillOpacity), layerOpacityFactor)),
+                PropertyFactory.circleStrokeOpacity(MplStyleMapper.opacityWithLayerMultiplier(
+                        Expression.literal(vars.strokeOpacity), layerOpacityFactor)),
+                PropertyFactory.circleBlur(vars.circleBlur),
+                PropertyFactory.circleSortKey(sortKey));
+
+        if (style.getLayer(circleLayer.getId()) == null) {
+            if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null) {
+                style.addLayerBelow(circleLayer, signaturesRootLayer.getId());
+            } else {
+                style.addLayer(circleLayer);
+            }
+        }
+        layersHashMap.put(layerId, circleLayer);
+
+        boolean needLabels = false;
+        if (layerStyle instanceof ITextStyle) {
+            ITextStyle textStyle = (ITextStyle) layerStyle;
+            needLabels = !TextUtils.isEmpty(textStyle.getField())
+                    || !TextUtils.isEmpty(textStyle.getText());
+        }
+        org.maplibre.android.style.layers.Layer existingSymbol = style.getLayer(symbolId);
+        if (!needLabels) {
+            if (existingSymbol != null) {
+                style.removeLayer(existingSymbol);
+            }
+            symbolsLayerHashMap.remove(layerId);
+        } else {
+            SymbolLayer symbolLayer = existingSymbol instanceof SymbolLayer
+                    ? (SymbolLayer) existingSymbol : null;
+            if (existingSymbol != null && symbolLayer == null) {
+                style.removeLayer(existingSymbol);
+            }
+            if (symbolLayer == null) {
+                symbolLayer = new SymbolLayer(symbolId, layerPath)
+                        .withSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+            } else {
+                symbolLayer.setSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
+            }
+            boolean allowOverlap = labelAttributes.getTextAllowOverlap() != null
+                    && labelAttributes.getTextAllowOverlap();
+            boolean textOptional = labelAttributes.isTextOptional();
+            symbolLayer.setProperties(
+                    PropertyFactory.textField("{" + prop_signature_text + "}"),
+                    PropertyFactory.textSize(
+                            buildTextSizeExpression(vars.textSize, labelAttributes, false)),
+                    PropertyFactory.textOpacity(MplStyleMapper.opacityWithLayerMultiplier(
+                            Expression.literal(labelAttributes.textOpacityFloat()),
+                            layerOpacityFactor)),
+                    PropertyFactory.textColor(getColorName(vars.textColor)),
+                    PropertyFactory.textHaloColor(
+                            getColorName(labelAttributes.getTextHaloColor())),
+                    PropertyFactory.textHaloWidth(labelAttributes.getTextHaloWidth()),
+                    PropertyFactory.textHaloBlur(labelAttributes.getTextHaloBlur()),
+                    PropertyFactory.textAnchor(getTextAnchor(vars.textAlignment)),
+                    PropertyFactory.textOffset(
+                            getTextAnchorOffsets(vars.textAlignment, vars.textSize)),
+                    PropertyFactory.symbolPlacement(Property.SYMBOL_PLACEMENT_POINT),
+                    PropertyFactory.textAllowOverlap(allowOverlap),
+                    PropertyFactory.textOptional(textOptional),
+                    PropertyFactory.textIgnorePlacement(allowOverlap && !textOptional),
+                    PropertyFactory.symbolSortKey(sortKey),
+                    PropertyFactory.textFont(labelAttributes.getTextFontStack()),
+                    PropertyFactory.textMaxWidth(
+                            Math.max(0f, labelAttributes.getTextMaxWidth())));
+            if (style.getLayer(symbolLayer.getId()) == null) {
+                if (signaturesRootLayer != null
+                        && style.getLayer(signaturesRootLayer.getId()) != null) {
+                    style.addLayerAbove(symbolLayer, signaturesRootLayer.getId());
+                } else if (style.getLayer(circleLayer.getId()) != null) {
+                    style.addLayerAbove(symbolLayer, circleLayer.getId());
+                } else {
+                    style.addLayer(symbolLayer);
+                }
+            }
+            symbolsLayerHashMap.put(layerId, symbolLayer);
+
+            float labelMinZoom = labelAttributes.getLabelMinZoom();
+            float labelMaxZoom = labelAttributes.getLabelMaxZoom();
+            if (labelMinZoom >= 0f) {
+                symbolLayer.setMinZoom(labelMinZoom);
+            } else if (minZoom != -1) {
+                symbolLayer.setMinZoom(minZoom);
+            }
+            if (labelMaxZoom >= 0f) {
+                symbolLayer.setMaxZoom(labelMaxZoom);
+            } else if (maxZoom != -1) {
+                symbolLayer.setMaxZoom(maxZoom);
+            }
+        }
+
+        if (minZoom != -1) {
+            circleLayer.setMinZoom(minZoom);
+        }
+        if (maxZoom != -1) {
+            circleLayer.setMaxZoom(maxZoom);
+        }
+    }
+
+    private static void removeLocalVectorTileStyleLayer(Style style, String layerId) {
+        org.maplibre.android.style.layers.Layer layer = style.getLayer(layerId);
+        if (layer != null) {
+            style.removeLayer(layer);
         }
     }
 

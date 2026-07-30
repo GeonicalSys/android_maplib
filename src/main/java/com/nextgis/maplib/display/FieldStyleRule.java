@@ -241,6 +241,8 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
             markerStyle.setWidth(ruleStyle.getWidth());
             markerStyle.setText(ruleStyle.getText());
             markerStyle.setField(ruleStyle.getField());
+            markerStyle.setTextSize(ruleStyle.getTextSize());
+            markerStyle.setTextAlignment(ruleStyle.getTextAlignment());
             markerStyle.setTextColor(ruleStyle.getTextColor());
             markerStyle.setAlpha(ruleStyle.getAlpha());
             markerStyle.setOutAlpha(ruleStyle.getOutAlpha());
@@ -312,11 +314,8 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
         Feature feature = mLayer.getFeature(featureId);
         String value = mKey.equals(Constants.FIELD_ID) ? feature.getId() + "" : feature.getFieldValueAsString(mKey);
 
-        Style rule = value != null ? getStyle(value) : null;
-        if (rule == null) {
-            return;
-        }
-        Style source = mergeRuleWithOther(rule, resolveOtherStyle(null));
+        // Unmatched values use other/default style (same as applyStyleForFeatureId).
+        Style source = resolveEffectiveStyle(value, null);
         if (source != null) {
             copyStyleParams(style, source);
         }

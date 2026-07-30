@@ -81,6 +81,7 @@ import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.DatabaseContext;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
+import com.nextgis.maplib.util.FeatureLabelUtil;
 import com.nextgis.maplib.util.FileUtil;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.GeoJSONUtil;
@@ -90,6 +91,7 @@ import com.nextgis.maplib.util.MapUtil;
 import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.SettingsConstants;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -195,6 +197,7 @@ public class VectorLayer
 {
     protected static final String JSON_GEOMETRY_TYPE_KEY = "geometry_type";
     protected static final String JSON_FIELDS_KEY        = "fields";
+    public static final String JSON_FEATURE_LABEL_FIELD_KEY = "feature_label_field";
     protected static final String JSON_EDITABLE_KEY           = "is_editable";
     /** Collector project item policy (NGW «Редактируемый»); not the mobile edit-mode toggle. */
     protected static final String JSON_COLLECTOR_EDITABLE_KEY = "collector_editable";
@@ -231,6 +234,7 @@ public class VectorLayer
     protected LinkedHashMap<String, Field> mFields;
 
     protected boolean mCacheLoaded, mIsCacheRebuilding;
+    private transient boolean mDeferredConfigSaveAfterLoad;
     /** When true, bulk inserts skip insert broadcast and notifyInsert skips save/cache refresh (NGW/GeoJSON import). */
     protected boolean mBulkImportMode;
     protected int     mGeometryType;
@@ -553,22 +557,28 @@ public class VectorLayer
         } else
             rowId = insertInternal(values);
 
-        if (rowId != Constants.NOT_FOUND) {
-            //update bbox
-            cacheGeometryEnvelope(rowId, feature.getGeometry());
-            // add attach info
+        if (rowId == Constants.NOT_FOUND) {
+            // A batch cannot be considered valid after even one failed SQL insert. Let the
+            // surrounding transaction/fill task roll back and delete the incomplete layer instead
+            // of logging the same schema mismatch once for every remaining server feature.
+            throw new SQLiteException("Bulk feature insert failed for layer \""
+                    + getName() + "\" table=" + getPath().getName());
+        }
 
-            if (feature.getAttachments().keySet().size() > 0) {
-                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        for ( String key :  feature.getAttachments().keySet()){
-                            final AttachItem item = feature.getAttachments().get(key);
-                            putOneAttachment(item, feature);
-                        }
+        //update bbox
+        cacheGeometryEnvelope(rowId, feature.getGeometry());
+        // add attach info
+
+        if (feature.getAttachments().keySet().size() > 0) {
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    for ( String key :  feature.getAttachments().keySet()){
+                        final AttachItem item = feature.getAttachments().get(key);
+                        putOneAttachment(item, feature);
                     }
-                }, 500);
-            }
+                }
+            }, 500);
         }
     }
 
@@ -871,6 +881,7 @@ public class VectorLayer
         rootConfig.put(JSON_GEOMETRY_TYPE_KEY, mGeometryType);
         rootConfig.put(JSON_EDITABLE_KEY, mIsEditable);
         rootConfig.put(JSON_COLLECTOR_EDITABLE_KEY, mCollectorEditable);
+        rootConfig.put(JSON_FEATURE_LABEL_FIELD_KEY, getFeatureLabelField());
 
         if (null != mFields) {
             JSONArray fields = new JSONArray();
@@ -925,6 +936,18 @@ public class VectorLayer
             }
         }
 
+        if (jsonObject.has(JSON_FEATURE_LABEL_FIELD_KEY)) {
+            String fieldName = FeatureLabelUtil.normalizeFieldName(
+                    jsonObject.optString(JSON_FEATURE_LABEL_FIELD_KEY, FIELD_ID),
+                    getFields());
+            getPreferences().edit()
+                    .putString(SettingsConstants.KEY_PREF_LAYER_LABEL, fieldName)
+                    .apply();
+        } else if (getPreferences().contains(SettingsConstants.KEY_PREF_LAYER_LABEL)) {
+            // Migrate the old preference after the complete (possibly NGW-subclass) load returns.
+            mDeferredConfigSaveAfterLoad = true;
+        }
+
         if (jsonObject.has(Constants.JSON_BBOX_MAXX_KEY)) {
             mExtents.setMaxX(jsonObject.getDouble(Constants.JSON_BBOX_MAXX_KEY));
         }
@@ -938,7 +961,10 @@ public class VectorLayer
             mExtents.setMinY(jsonObject.getDouble(Constants.JSON_BBOX_MINY_KEY));
         }
 
-        reloadCache();
+        // fromJSON() is also called by NGWVectorLayer before the subclass restores account,
+        // remote id, sync flags and ownership metadata. A cache mismatch may rebuild the R-tree,
+        // but it must not save the partially initialized layer config at this point.
+        reloadCache(false);
 
         if (jsonObject.has(Constants.JSON_RENDERERPROPS_KEY)) {
             try {
@@ -957,8 +983,30 @@ public class VectorLayer
         }
     }
 
+    @Override
+    public boolean load()
+    {
+        mDeferredConfigSaveAfterLoad = false;
+        boolean loaded = super.load();
+        if (loaded && mDeferredConfigSaveAfterLoad) {
+            mDeferredConfigSaveAfterLoad = false;
+            if (!save()) {
+                HyperLog.w(Constants.TAG, "VectorLayer: failed to persist complete config after"
+                        + " spatial cache rebuild layer=\"" + getName() + "\"");
+            }
+        }
+        return loaded;
+    }
+
 
     protected synchronized void reloadCache()
+            throws SQLiteException
+    {
+        reloadCache(true);
+    }
+
+
+    private synchronized void reloadCache(boolean persistLayerConfigAfterRebuild)
             throws SQLiteException
     {
         //load vector cache
@@ -973,7 +1021,7 @@ public class VectorLayer
             HyperLog.w(Constants.TAG, "VectorLayer: " + getName()
                     + " spatial cache count mismatch cache=" + cacheRows
                     + " db=" + dbRows + " - rebuilding");
-            rebuildCache(null);
+            rebuildCache(null, persistLayerConfigAfterRebuild);
             return;
         }
 
@@ -2408,6 +2456,52 @@ public class VectorLayer
     }
 
 
+    /**
+     * Field used for feature titles and identify candidate names. This is independent from the
+     * renderer's text-label field.
+     */
+    public String getFeatureLabelField()
+    {
+        String fieldName = getPreferences().getString(
+                SettingsConstants.KEY_PREF_LAYER_LABEL,
+                FIELD_ID);
+        return FeatureLabelUtil.normalizeFieldName(fieldName, getFields());
+    }
+
+
+    /**
+     * Persist the feature-title field both in the legacy per-layer preference and layer config.
+     */
+    public boolean setFeatureLabelField(String fieldName)
+    {
+        String normalized = FeatureLabelUtil.normalizeFieldName(fieldName, getFields());
+        String previous = getPreferences().getString(
+                SettingsConstants.KEY_PREF_LAYER_LABEL,
+                FIELD_ID);
+
+        if (!getPreferences().edit()
+                .putString(SettingsConstants.KEY_PREF_LAYER_LABEL, normalized)
+                .commit()) {
+            return false;
+        }
+
+        if (save()) {
+            return true;
+        }
+
+        getPreferences().edit()
+                .putString(SettingsConstants.KEY_PREF_LAYER_LABEL, previous)
+                .apply();
+        return false;
+    }
+
+
+    public String getFeatureLabel(Feature feature)
+    {
+        return FeatureLabelUtil.resolve(feature, getFeatureLabelField());
+    }
+
+
     public Field getFieldByName(String name)
     {
         return mFields.get(name);
@@ -3218,6 +3312,14 @@ public class VectorLayer
 
     public void rebuildCache(IProgressor progressor)
     {
+        rebuildCache(progressor, true);
+    }
+
+
+    private void rebuildCache(
+            IProgressor progressor,
+            boolean persistLayerConfigAfterRebuild)
+    {
         if (null != progressor) {
             progressor.setMessage(mContext.getString(R.string.rebuild_cache));
         }
@@ -3275,7 +3377,14 @@ public class VectorLayer
             }
             mIsCacheRebuilding = false;
         }
-        save();
+        if (persistLayerConfigAfterRebuild) {
+            save();
+        } else {
+            // The enclosing fromJSON() still has subclass fields to restore. Persist only the
+            // rebuilt index; a normal save after the complete load may persist updated extents.
+            mCache.save(new File(mPath, RTREE));
+            mDeferredConfigSaveAfterLoad = true;
+        }
         HyperLog.d(Constants.TAG, "VectorLayer: " + getName()
                 + " spatial cache rebuilt features=" + cached);
     }

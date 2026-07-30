@@ -84,6 +84,7 @@
     <string name="sync_finished">Синхронизация завершена</string>
     <string name="text">Подпись</string>
     <string name="error_connect_failed">Соединение не установлено</string>
+    <string name="error_server_temporarily_unavailable">Сервер или внешняя база данных временно недоступны</string>
     <string name="error_ngw_feature_count_mismatch">Данные слоя неполные: локально %1$d объектов, на сервере указано %2$d. Попробуйте загрузить слой снова.</string>
     <string name="error_403">Не хватает прав</string>
     <string name="error_404">Ресурс не найден</string>
@@ -121,4 +122,9 @@
     <string name="collector_layer_removed_title">Изменился состав проекта Collector</string>
     <string name="collector_layer_removed_from_project">Слой %1$s будет удален из проекта.</string>
     <string name="collector_layer_backup_failed">Слой %1$s удален из проекта Collector, но приложению не удалось создать резервную копию, поэтому локальный слой оставлен без изменений.</string>
+    <string name="layer_data_backup_failed">Не удалось создать резервную копию слоя %1$s, поэтому разрушительная операция отменена.</string>
+    <string name="layer_feature_backup_failed">Не удалось создать резервную копию объектов слоя %1$s, поэтому удаление или перезапись отменены.</string>
+    <string name="layer_backup_delete_cancelled_title">Удаление отменено</string>
+    <string name="layer_backup_delete_cancelled_detail">Удаление отменено: не удалось сохранить резервную копию слоя %1$s.\nПричина: %2$s</string>
+    <string name="layer_backup_feature_delete_cancelled_detail">Удаление отменено: не удалось сохранить резервную копию объектов слоя %1$s.\nПричина: %2$s</string>
 </resources>

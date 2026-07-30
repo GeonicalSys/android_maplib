@@ -24,7 +24,7 @@ import java.util.Map;
 /**
  * Local vector tiles foundation.
  *
- * Encodes a small subset of Mapbox Vector Tile 2.x needed for the first read-only
+ * Encodes a small subset of Mapbox Vector Tile 2.x needed for read-only point and
  * polygon/multipolygon Collector layers. This intentionally avoids a new dependency while the
  * feature is being proven on-device.
  */
@@ -32,6 +32,7 @@ final class LocalVectorTileEncoder {
     static final int EXTENT = 4096;
     static final String SOURCE_LAYER = "features";
 
+    private static final int GEOM_TYPE_POINT = 1;
     private static final int GEOM_TYPE_POLYGON = 3;
 
     private final List<byte[]> mFeatures = new ArrayList<>();
@@ -47,10 +48,43 @@ final class LocalVectorTileEncoder {
             int layerId,
             String labelField,
             String commonLabel) throws IOException {
+        return encodeTile(
+                features,
+                bounds,
+                layerId,
+                labelField,
+                commonLabel,
+                GEOM_TYPE_POLYGON);
+    }
+
+    static byte[] encodePointTile(
+            List<Feature> features,
+            TileBounds bounds,
+            int layerId,
+            String labelField,
+            String commonLabel) throws IOException {
+        return encodeTile(
+                features,
+                bounds,
+                layerId,
+                labelField,
+                commonLabel,
+                GEOM_TYPE_POINT);
+    }
+
+    private static byte[] encodeTile(
+            List<Feature> features,
+            TileBounds bounds,
+            int layerId,
+            String labelField,
+            String commonLabel,
+            int mvtGeometryType) throws IOException {
         LocalVectorTileEncoder encoder = new LocalVectorTileEncoder();
         int order = 0;
         for (Feature feature : features) {
-            if (feature == null || feature.getGeometry() == null) {
+            if (feature == null
+                    || feature.getGeometry() == null
+                    || !isExpectedGeometry(feature.getGeometry(), mvtGeometryType)) {
                 continue;
             }
             byte[] geometry = encoder.encodeGeometry(feature.getGeometry(), bounds);
@@ -65,9 +99,21 @@ final class LocalVectorTileEncoder {
             if (!isEmpty(label)) {
                 props.put(MplFeatureStyleProps.SIGNATURE, label);
             }
-            encoder.mFeatures.add(encoder.encodeFeature(feature.getId(), props, geometry));
+            encoder.mFeatures.add(encoder.encodeFeature(
+                    feature.getId(), props, geometry, mvtGeometryType));
         }
         return encoder.encodeTile();
+    }
+
+    private static boolean isExpectedGeometry(GeoGeometry geometry, int mvtGeometryType) {
+        if (geometry == null) {
+            return false;
+        }
+        if (mvtGeometryType == GEOM_TYPE_POINT) {
+            return geometry.getType() == GeoConstants.GTPoint;
+        }
+        return geometry.getType() == GeoConstants.GTPolygon
+                || geometry.getType() == GeoConstants.GTMultiPolygon;
     }
 
     private static String resolveLabel(Feature feature, String labelField, String commonLabel) {
@@ -107,7 +153,11 @@ final class LocalVectorTileEncoder {
         return tile.toByteArray();
     }
 
-    private byte[] encodeFeature(long id, Map<String, Object> props, byte[] geometry)
+    private byte[] encodeFeature(
+            long id,
+            Map<String, Object> props,
+            byte[] geometry,
+            int geometryType)
             throws IOException {
         ProtoWriter feature = new ProtoWriter();
         if (id >= 0) {
@@ -115,7 +165,7 @@ final class LocalVectorTileEncoder {
         }
         int[] tags = encodeTags(props);
         feature.writePackedUInt32(2, tags);
-        feature.writeUInt32(3, GEOM_TYPE_POLYGON);
+        feature.writeUInt32(3, geometryType);
         feature.writePackedUInt32(4, decodeCommandStream(geometry));
         return feature.toByteArray();
     }
@@ -167,6 +217,10 @@ final class LocalVectorTileEncoder {
 
     private byte[] encodeGeometry(GeoGeometry geometry, TileBounds bounds) throws IOException {
         GeometryCommandWriter writer = new GeometryCommandWriter(bounds);
+        if (geometry.getType() == GeoConstants.GTPoint && geometry instanceof GeoPoint) {
+            writer.writePoint((GeoPoint) geometry);
+            return writer.toByteArray();
+        }
         if (geometry.getType() == GeoConstants.GTPolygon) {
             writePolygonGeometry(writer, (GeoPolygon) geometry);
             return writer.toByteArray();
@@ -244,6 +298,16 @@ final class LocalVectorTileEncoder {
 
         GeometryCommandWriter(TileBounds bounds) {
             mBounds = bounds;
+        }
+
+        void writePoint(GeoPoint source) throws IOException {
+            if (source == null) {
+                return;
+            }
+            command(1, 1);
+            point(new TilePoint(
+                    mBounds.tileX(source.getX()),
+                    mBounds.tileY(source.getY())));
         }
 
         void writeRing(GeoLineString ring, boolean outer) throws IOException {

@@ -18,6 +18,10 @@ import com.nextgis.maplib.datasource.GeoLinearRing;
 import com.nextgis.maplib.datasource.GeoMultiPolygon;
 import com.nextgis.maplib.datasource.GeoPoint;
 import com.nextgis.maplib.datasource.GeoPolygon;
+import com.nextgis.maplib.display.LabelAttributes;
+import com.nextgis.maplib.display.LabelTemplate;
+import com.nextgis.maplib.display.RuleFeatureRenderer;
+import com.nextgis.maplib.display.SimpleMarkerStyle;
 import com.nextgis.maplib.display.Style;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.GeoConstants;
@@ -28,9 +32,9 @@ import java.util.List;
 /**
  * Local vector tiles foundation.
  *
- * Generates MVT tiles lazily from the existing local SQLite layer. The first vertical slice is
- * intentionally scoped to read-only polygon/multipolygon layers; unsupported geometry types return
- * empty tiles instead of breaking map loading.
+ * Generates MVT tiles lazily from the existing local SQLite layer. Supported geometry is scoped to
+ * polygon/multipolygon plus read-only simple points rendered as ordinary circles. Unsupported
+ * geometry/style combinations return empty tiles instead of breaking map loading.
  */
 final class LocalVectorTileProvider {
     private static final String TAG = "LocalVectorTiles";
@@ -50,7 +54,8 @@ final class LocalVectorTileProvider {
             return new byte[0];
         }
         int geometryType = layer.getGeometryType();
-        if (geometryType != GeoConstants.GTPolygon
+        if (geometryType != GeoConstants.GTPoint
+                && geometryType != GeoConstants.GTPolygon
                 && geometryType != GeoConstants.GTMultiPolygon) {
             return new byte[0];
         }
@@ -59,12 +64,8 @@ final class LocalVectorTileProvider {
         GeoEnvelope queryEnvelope = queryEnvelope(bounds);
         List<Long> ids = layer.query(queryEnvelope);
         if (ids == null || ids.isEmpty()) {
-            return LocalVectorTileEncoder.encodePolygonTile(
-                    new ArrayList<>(),
-                    bounds,
-                    layer.getId(),
-                    null,
-                    null);
+            return encodeTile(
+                    geometryType, new ArrayList<>(), bounds, layer.getId(), null, null);
         }
 
         Style style = layer.getDefaultStyleNoExcept();
@@ -89,7 +90,8 @@ final class LocalVectorTileProvider {
                 tileFeatures.add(clippedFeature);
             }
         }
-        byte[] tile = LocalVectorTileEncoder.encodePolygonTile(
+        byte[] tile = encodeTile(
+                geometryType,
                 tileFeatures,
                 bounds,
                 layer.getId(),
@@ -111,17 +113,79 @@ final class LocalVectorTileProvider {
         }
         int geometryType = layer.getGeometryType();
         boolean supported = geometryType == GeoConstants.GTPolygon
-                || geometryType == GeoConstants.GTMultiPolygon;
+                || geometryType == GeoConstants.GTMultiPolygon
+                || isSupportedSimplePointLayer(layer);
         if (!supported) {
-            HyperLog.w(Constants.TAG, "Local vector tiles unsupported geometry layer=\""
-                    + layer.getName() + "\" geometryType=" + geometryType);
+            HyperLog.w(Constants.TAG, "Local vector tiles unsupported geometry/style layer=\""
+                    + layer.getName() + "\" geometryType=" + geometryType
+                    + " editingAllowed=" + layer.isEditingAllowed());
         }
         return supported;
+    }
+
+    private static boolean isSupportedSimplePointLayer(VectorLayer layer) {
+        if (layer == null || layer.getGeometryType() != GeoConstants.GTPoint) {
+            return false;
+        }
+        return isSupportedSimplePointStyle(
+                layer.getDefaultStyleNoExcept(),
+                layer.isEditingAllowed(),
+                layer.getRenderer() instanceof RuleFeatureRenderer);
+    }
+
+    static boolean isSupportedSimplePointStyle(
+            Style style,
+            boolean editingAllowed,
+            boolean ruleRenderer) {
+        if (!(style instanceof SimpleMarkerStyle)) {
+            return false;
+        }
+        SimpleMarkerStyle markerStyle = (SimpleMarkerStyle) style;
+        return isSupportedSimplePointStyle(
+                markerStyle.getType(),
+                markerStyle.getIconImage(),
+                LabelTemplate.hasTemplate(
+                        LabelAttributes.fromStyle(style).getLabelTemplate()),
+                editingAllowed,
+                ruleRenderer);
+    }
+
+    static boolean isSupportedSimplePointStyle(
+            int markerType,
+            String iconImage,
+            boolean hasLabelTemplate,
+            boolean editingAllowed,
+            boolean ruleRenderer) {
+        return !editingAllowed
+                && !ruleRenderer
+                && markerType == SimpleMarkerStyle.MarkerStyleCircle
+                && (iconImage == null || iconImage.length() == 0)
+                && !hasLabelTemplate;
+    }
+
+    private static byte[] encodeTile(
+            int geometryType,
+            List<Feature> features,
+            LocalVectorTileEncoder.TileBounds bounds,
+            int layerId,
+            String labelField,
+            String commonLabel) throws Exception {
+        if (geometryType == GeoConstants.GTPoint) {
+            return LocalVectorTileEncoder.encodePointTile(
+                    features, bounds, layerId, labelField, commonLabel);
+        }
+        return LocalVectorTileEncoder.encodePolygonTile(
+                features, bounds, layerId, labelField, commonLabel);
     }
 
     static Feature clipFeatureToEnvelope(Feature feature, GeoEnvelope envelope) {
         if (feature == null || feature.getGeometry() == null || envelope == null) {
             return null;
+        }
+        if (feature.getGeometry() instanceof GeoPoint) {
+            return envelope.contains((GeoPoint) feature.getGeometry())
+                    ? new Feature(feature)
+                    : null;
         }
         GeoGeometry clippedGeometry = clipGeometry(feature.getGeometry(), envelope);
         if (clippedGeometry == null) {

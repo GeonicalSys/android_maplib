@@ -45,15 +45,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 import static com.nextgis.maplib.util.Constants.*;
 import static com.nextgis.maplib.util.SettingsConstants.KEY_PREF_MAP;
@@ -983,13 +980,9 @@ public class LayerGroup
      */
     public File createLayerStorage()
     {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-        String layerDir = LAYER_PREFIX + sdf.format(new Date()) + getLayerCount();
-        final Random r = new Random();
-        layerDir += r.nextInt(99);
-
-        Log.d(Constants.TAG, "createLayerStorage: " + layerDir);
-        return new File(mPath, layerDir);
+        File layerStorage = LayerStorageAllocator.reserve(mPath, LAYER_PREFIX);
+        Log.d(Constants.TAG, "createLayerStorage: " + layerStorage.getName());
+        return layerStorage;
     }
 
 

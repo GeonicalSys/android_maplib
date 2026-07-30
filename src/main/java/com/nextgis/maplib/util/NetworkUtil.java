@@ -202,10 +202,7 @@ public class NetworkUtil
     public static boolean isTransientHttpStatus(int responseCode) {
         return responseCode == HttpURLConnection.HTTP_CLIENT_TIMEOUT
                 || responseCode == 429
-                || responseCode == HttpURLConnection.HTTP_INTERNAL_ERROR
-                || responseCode == HttpURLConnection.HTTP_BAD_GATEWAY
-                || responseCode == HttpURLConnection.HTTP_UNAVAILABLE
-                || responseCode == HttpURLConnection.HTTP_GATEWAY_TIMEOUT;
+                || responseCode >= 500 && responseCode <= 599;
     }
 
     public static boolean isTransientNgwHttpError(
@@ -224,6 +221,27 @@ public class NetworkUtil
                 || text.contains("ошибка внешней базы данных")
                 || text.contains("externaldatabaseerror")
                 || text.contains("external database error")
+                || text.contains("database connection")
+                || text.contains("could not connect")
+                || text.contains("connection refused");
+    }
+
+    /**
+     * Transient HTTP failure caused by NGW or its external database rather than device connectivity.
+     */
+    public static boolean isTemporaryNgwServerFailure(
+            int responseCode,
+            String responseBody,
+            String responseMessage) {
+        if (responseCode == 429 || (responseCode >= 500 && responseCode <= 599)) {
+            return true;
+        }
+        String text = ((responseBody == null ? "" : responseBody) + " "
+                + (responseMessage == null ? "" : responseMessage)).toLowerCase();
+        return text.contains("externaldatabaseerror")
+                || text.contains("external database error")
+                || text.contains("ошибка внешней базы данных")
+                || text.contains("невозможно подключиться к базе данных")
                 || text.contains("database connection")
                 || text.contains("could not connect")
                 || text.contains("connection refused");

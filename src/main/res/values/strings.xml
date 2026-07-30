@@ -91,6 +91,7 @@
     <string name="sync_error_conflict">Conflicts found</string>
     <string name="text">Text</string>
     <string name="error_connect_failed">Connect failed</string>
+    <string name="error_server_temporarily_unavailable">Server or external database is temporarily unavailable</string>
     <string name="error_ngw_feature_count_mismatch">Layer data incomplete: %1$d features stored locally, %2$d reported by server. Try downloading the layer again.</string>
     <string name="error_401">Authorization required</string>
     <string name="error_403">Forbidden</string>
@@ -105,6 +106,11 @@
     <string name="collector_layer_removed_title">Collector layer changed</string>
     <string name="collector_layer_removed_from_project">Layer %1$s will be removed from the project.</string>
     <string name="collector_layer_backup_failed">Layer %1$s was removed from the Collector project, but the app could not create a backup copy, so the local layer was left unchanged.</string>
+    <string name="layer_data_backup_failed">Could not create a backup for layer %1$s, so the destructive operation was cancelled.</string>
+    <string name="layer_feature_backup_failed">Could not create a backup for objects in layer %1$s, so deletion or overwrite was cancelled.</string>
+    <string name="layer_backup_delete_cancelled_title">Deletion cancelled</string>
+    <string name="layer_backup_delete_cancelled_detail">Deletion cancelled: could not save a backup for layer %1$s.\nReason: %2$s</string>
+    <string name="layer_backup_feature_delete_cancelled_detail">Deletion cancelled: could not save a backup for objects in layer %1$s.\nReason: %2$s</string>
     <string name="self_intersection">Self intersection detected</string>
     <string name="ring_outside">One of the holes outside of the outer ring</string>
     <string name="error_geojson_invalid_geometry">Invalid geometry in GeoJSON feature</string>

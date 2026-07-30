@@ -452,5 +452,22 @@ public interface IGISApplication
      */
     void scheduleCollectorLayerRemovalWithBackup(NGWVectorLayer layer);
 
+    /**
+     * Fail-closed backup gate for editable NGW vector layers before remote sync apply or manual
+     * feature deletion. Non-editable layers return {@code true} without creating a ZIP. Empty
+     * {@code featureIds} is a no-op success. On failure, implementations must alert the user and
+     * leave local data unchanged.
+     */
+    boolean backupEditableLayerFeatures(
+            NGWVectorLayer layer,
+            java.util.Collection<Long> featureIds,
+            String reason);
+
+    /**
+     * Fail-closed full-layer data backup before destructive layer removal/rebuild for editable
+     * NGW vector layers. Non-editable layers return {@code true} without creating a ZIP.
+     */
+    boolean backupEditableLayerData(NGWVectorLayer layer, String reason);
+
     Context getSelfContext();
 }
