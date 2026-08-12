@@ -74,7 +74,11 @@ public class RuleFeatureRenderer
 
         try {
             Style styleClone = mStyle.clone();
-            mStyleRule.setStyleParams(styleClone, featureId);
+            if (mStyleRule instanceof FieldStyleRule) {
+                ((FieldStyleRule) mStyleRule).applyStyleForFeatureId(styleClone, featureId, mStyle);
+            } else {
+                mStyleRule.setStyleParams(styleClone, featureId);
+            }
             applyField(styleClone, featureId);
             return styleClone;
         } catch (CloneNotSupportedException e) {

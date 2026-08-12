@@ -254,9 +254,9 @@ public class GpsEventSource {
         String minTime = SettingsConstants.KEY_PREF_LOCATION_MIN_TIME;
         String minTimeStr = sharedPreferences.getString(minTime, "2");
         String minDistance = SettingsConstants.KEY_PREF_LOCATION_MIN_DISTANCE;
-        String minDistanceStr = sharedPreferences.getString(minDistance, "10");
+        String minDistanceStr = sharedPreferences.getString(minDistance, "5");
         mUpdateMinTime = Long.parseLong(minTimeStr != null ? minTimeStr : "2") * 1000;
-        mUpdateMinDistance = Float.parseFloat(minDistanceStr != null ? minDistanceStr : "1000");
+        mUpdateMinDistance = Float.parseFloat(minDistanceStr != null ? minDistanceStr : "5");
 
         if (!PermissionUtil.hasLocationPermissions(mContext))
             return;
@@ -376,6 +376,7 @@ public class GpsEventSource {
                 for (GpsEventListener listener : mListeners) {
                     listener.onBestLocationChanged(mCurrentBestLocation);
                 }
+                return;
             }
 
             for (GpsEventListener listener : mListeners) {

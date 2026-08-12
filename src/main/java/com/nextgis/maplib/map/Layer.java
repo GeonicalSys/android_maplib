@@ -43,6 +43,7 @@ public class Layer extends Table
         implements ILayerView, IRenderer
 {
     protected boolean     mIsVisible;
+    protected int         mLayerOpacity = 255;
     protected float       mMaxZoom;
     protected float       mMinZoom;
     protected IRenderer   mRenderer;
@@ -112,6 +113,15 @@ public class Layer extends Table
         mMinZoom = minZoom;
     }
 
+    /** Whole-layer opacity multiplier 0–255 (255 = opaque). */
+    public int getLayerOpacity() {
+        return mLayerOpacity;
+    }
+
+    public void setLayerOpacity(int layerOpacity) {
+        mLayerOpacity = Math.max(0, Math.min(255, layerOpacity));
+    }
+
     @Override
     public JSONObject toJSON()
             throws JSONException
@@ -120,6 +130,9 @@ public class Layer extends Table
         rootConfig.put(JSON_MAXLEVEL_KEY, getMaxZoom());
         rootConfig.put(JSON_MINLEVEL_KEY, getMinZoom());
         rootConfig.put(JSON_VISIBILITY_KEY, isVisible());
+        if (mLayerOpacity != 255) {
+            rootConfig.put(JSON_LAYER_OPACITY_KEY, mLayerOpacity);
+        }
         return rootConfig;
     }
 
@@ -139,7 +152,8 @@ public class Layer extends Table
             mMinZoom = GeoConstants.DEFAULT_MIN_ZOOM;
         }
 
-        mIsVisible = jsonObject.getBoolean(JSON_VISIBILITY_KEY);
+        mIsVisible = jsonObject.optBoolean(JSON_VISIBILITY_KEY, true);
+        mLayerOpacity = jsonObject.optInt(JSON_LAYER_OPACITY_KEY, 255);
 
         if(Constants.DEBUG_MODE){
             Log.d(Constants.TAG, "Layer " + getName() + " is visible " + mIsVisible);
@@ -181,5 +195,8 @@ public class Layer extends Table
     @Override
     public void setRenderer(IRenderer renderer) {
         mRenderer = renderer;
+        if (this instanceof VectorLayer) {
+            VectorLayerRenderCache.invalidateOnStyleChange((VectorLayer) this);
+        }
     }
 }

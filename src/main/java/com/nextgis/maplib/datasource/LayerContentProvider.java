@@ -29,12 +29,15 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
+import android.util.Log;
+import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.api.IGISApplication;
 import com.nextgis.maplib.map.Layer;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
 import com.nextgis.maplib.map.TrackLayer;
 import com.nextgis.maplib.map.VectorLayer;
+import com.nextgis.maplib.util.Constants;
 
 import java.io.FileNotFoundException;
 
@@ -44,7 +47,15 @@ import static com.nextgis.maplib.util.Constants.URI_PARAMETER_LIMIT;
 public class LayerContentProvider
         extends ContentProvider
 {
-    protected MapContentProviderHelper mMap;
+    /**
+     * Last map observed by the provider. It is used only for diagnostics: every operation resolves
+     * the active map again through {@link IGISApplication#getMap()}.
+     *
+     * <p>A ContentProvider lives for the whole application process while Collector project
+     * switching replaces the MapBase instance without restarting that process. Caching the first
+     * map here therefore routes track and feature operations to the previous project's database.</p>
+     */
+    protected volatile MapContentProviderHelper mMap;
 
 
     @Override
@@ -63,16 +74,49 @@ public class LayerContentProvider
     }
 
 
+    protected MapContentProviderHelper getActiveMap()
+    {
+        MapBase activeMap;
+        try {
+            if (getContext() != null
+                    && getContext().getApplicationContext() instanceof IGISApplication) {
+                IGISApplication application =
+                        (IGISApplication) getContext().getApplicationContext();
+                activeMap = application.getMap();
+            } else {
+                activeMap = MapBase.getInstance();
+            }
+        } catch (RuntimeException error) {
+            logAccessFailure("cannot resolve active map", null, error);
+            return null;
+        }
+
+        if (!(activeMap instanceof MapContentProviderHelper)) {
+            logAccessFailure("active map is unavailable", null, null);
+            return null;
+        }
+
+        MapContentProviderHelper currentMap = (MapContentProviderHelper) activeMap;
+        if (mMap != currentMap) {
+            mMap = currentMap;
+            String message = "LayerContentProvider bound to active map path="
+                    + currentMap.getPath().getPath();
+            Log.i(Constants.TAG, message);
+            HyperLog.v(Constants.TAG, message);
+        }
+        return currentMap;
+    }
+
+
     protected Layer getLayerByUri(Uri uri)
     {
-        if(null == mMap) {
-            mMap = (MapContentProviderHelper) MapBase.getInstance();
-        }
-        if(null == mMap) {
+        MapContentProviderHelper activeMap = getActiveMap();
+        if (activeMap == null || uri == null || uri.getPathSegments().isEmpty()) {
+            logAccessFailure("layer lookup has no active map or path", uri, null);
             return null;
         }
         String path = uri.getPathSegments().get(0);
-        return MapContentProviderHelper.getVectorLayerByPath(mMap, path);
+        return MapContentProviderHelper.getVectorLayerByPath(activeMap, path);
     }
 
 
@@ -108,9 +152,15 @@ public class LayerContentProvider
 
         if (layer instanceof TrackLayer) {
             try {
-                return ((TrackLayer) layer).query(
+                Cursor cursor = ((TrackLayer) layer).query(
                         uri, projection, selection, selectionArgs, sortOrder, limit);
+                if (Constants.DEBUG_MODE && cursor != null) {
+                    Log.d(Constants.TAG, "LayerContentProvider track query rows="
+                            + cursor.getCount() + " mapPath=" + layer.getPath().getParent());
+                }
+                return cursor;
             } catch (SQLException e) {
+                logAccessFailure("track query failed", uri, e);
                 return null;
             }
         }
@@ -173,18 +223,51 @@ public class LayerContentProvider
     {
         Layer layer = getLayerByUri(uri);
         if (null == layer) {
+            logInsertFailure("layer not found", uri, null);
             return null;
         }
 
-        if (layer instanceof VectorLayer) {
-            return ((VectorLayer) layer).insert(uri, contentValues);
+        try {
+            if (layer instanceof VectorLayer) {
+                return ((VectorLayer) layer).insert(uri, contentValues);
+            }
+
+            if (layer instanceof TrackLayer) {
+                return ((TrackLayer) layer).insert(uri, contentValues);
+            }
+        } catch (RuntimeException e) {
+            logInsertFailure("insert threw", uri, e);
+            throw e;
         }
 
-        if (layer instanceof TrackLayer) {
-            return ((TrackLayer) layer).insert(uri, contentValues);
-        }
-
+        logInsertFailure("unsupported layer type " + layer.getClass().getSimpleName(), uri, null);
         return null;
+    }
+
+
+    protected void logInsertFailure(String reason, Uri uri, RuntimeException error) {
+        String message = "LayerContentProvider.insert " + reason + " uri=" + uri;
+        if (error == null) {
+            Log.w(Constants.TAG, message);
+            HyperLog.w(Constants.TAG, message);
+        } else {
+            Log.e(Constants.TAG, message, error);
+            HyperLog.w(Constants.TAG, message + " error=" + error.getClass().getSimpleName()
+                    + ": " + error.getMessage(), error);
+        }
+    }
+
+
+    protected void logAccessFailure(String reason, Uri uri, RuntimeException error) {
+        String message = "LayerContentProvider " + reason + (uri == null ? "" : " uri=" + uri);
+        if (error == null) {
+            Log.w(Constants.TAG, message);
+            HyperLog.w(Constants.TAG, message);
+        } else {
+            Log.e(Constants.TAG, message, error);
+            HyperLog.w(Constants.TAG, message + " error=" + error.getClass().getSimpleName()
+                    + ": " + error.getMessage(), error);
+        }
     }
 
 

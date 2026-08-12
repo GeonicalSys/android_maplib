@@ -24,13 +24,26 @@
 package com.nextgis.maplib.api;
 
 import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.accounts.AccountManagerFuture;
 import android.app.Activity;
+import android.content.Context;
+import android.os.Bundle;
 
+import com.nextgis.maplib.datasource.ngw.CollectorProjectItem;
+import com.nextgis.maplib.datasource.ngw.Connection;
 import com.nextgis.maplib.location.GpsEventSource;
 import com.nextgis.maplib.map.LayerFactory;
+import com.nextgis.maplib.map.LayerGroup;
 import com.nextgis.maplib.map.MLP.AuthInterceptorNG;
 import com.nextgis.maplib.map.MapBase;
+import com.nextgis.maplib.map.MaplibreMapInteraction;
+import com.nextgis.maplib.map.NGWRasterLayer;
+import com.nextgis.maplib.map.NGWVectorLayer;
+import com.nextgis.maplib.util.Constants;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -228,6 +241,233 @@ public interface IGISApplication
 
     void startCreateNGWLayerSync(String lpath);
 
+    /* Upstream: refresh offline raster layers after tile download completes. */
+    void setLayerToRefresh(int id);
+    void removeLayerToRefresh(int id);
+    List<Integer> getlayersToRefresh();
 
+    /* Upstream: ensure the default tracks layer exists. */
+    void checkTracksLayerExist();
 
+    /**
+     * While true, map UI may skip heavy MapLibre reload on layer-changed events
+     * (e.g. during a multi-layer {@code LayerFillService} queue).
+     */
+    boolean isLayerFillBatchDeferringHeavyMapReload();
+
+    void setLayerFillBatchDeferringHeavyMapReload(boolean defer);
+
+    /**
+     * After a deferred batch finishes, reload map style and all layers (main thread).
+     */
+    void requestMapReloadAfterLayerFillBatch();
+
+    /**
+     * If {@link #requestMapReloadAfterLayerFillBatch} could not run (e.g. fragment not ready), call from
+     * {@code MapFragment} when the map UI is attached again.
+     */
+    void flushPendingMapReloadAfterLayerFillIfNeeded(MaplibreMapInteraction mapFragment);
+
+    /**
+     * Clears the internal &quot;pending map reload after layer fill&quot; flag after a successful reload
+     * (e.g. from {@link com.nextgis.maplib.map.MaplibreMapInteraction#reloadMapStyleAndLayersAfterLayerFillBatch()} scheduled retries).
+     */
+    void clearMapReloadAfterLayerFillPending();
+
+    /**
+     * True while {@code LayerFillService} has a non-empty queue or is draining it.
+     * Used to skip {@link com.nextgis.maplib.datasource.ngw.SyncAdapter} work so sync does not
+     * compete with NGW layer import.
+     */
+    boolean isLayerFillServiceBusy();
+
+    void setLayerFillServiceBusy(boolean busy);
+
+    /**
+     * Register expected NGW vector layers for a collector import (layers being downloaded this run).
+     * Clears any previous batch state.
+     *
+     * @param fullCollectorProjectRemoteIds remote ids of <em>all supported</em> vector and style items in
+     *        the collector project, in project list order. Used to insert new or repaired vectors next to
+     *        already-present vector/raster siblings when the map stacks new layers at the top.
+     * @param formIds server form id per layer, or 0 when the layer has no form (plain NGW fill)
+     * @param collectorProjectUid persistent project uid stored in each imported layer origin; used by future
+     *        Collector composition/form sync and by repair tasks to preserve project ownership metadata.
+     */
+    /**
+     * @return {@code true} if the batch was registered (verify/repair will run); {@code false} if the
+     *         input failed validation (caller must not import as a verified collector batch).
+     */
+    boolean registerCollectorImportBatch(
+            int groupId,
+            String accountName,
+            String collectorProjectUid,
+            long[] remoteIds,
+            String[] names,
+            String[] configJsons,
+            long[] formIds,
+            boolean[] collectorEditables,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Called when a collector import task finishes ({@code success} false = unzip/NGW fill failed or cancelled mid-task).
+     * {@code remoteId} is the collector resource id (stable tracking id on the fill intent).
+     */
+    void notifyCollectorLayerFillResult(long remoteId, boolean success);
+
+    /**
+     * After the import queue drains, compare the map to the registered batch; remove broken layers and re-enqueue fill.
+     * No-op if no batch was registered. Safe to call on the main thread only.
+     */
+    void finalizeCollectorImportVerifyAndRepairIfNeeded();
+
+    /**
+     * If {@code LayerFillService} is already running (e.g. drain worker is blocked in finalize), enqueue repair
+     * bundles on that instance synchronously so the queue is non-empty before the worker resumes — avoids
+     * {@code startForegroundService} racing with {@code stopSelf}. Call from the main thread only.
+     *
+     * @param repairBundles same shape as {@code LayerFillService.KEY_REPAIR_BATCH_EXTRAS}
+     * @param deferMapReload when true, {@link #setLayerFillBatchDeferringHeavyMapReload(boolean)} with true
+     * @return true if at least one task was enqueued on the active service (caller should skip {@code startForegroundService})
+     */
+    boolean tryEnqueueLayerFillRepairBatch(ArrayList<Bundle> repairBundles, boolean deferMapReload);
+
+    /**
+     * After a successful standalone vector/NGW fill (not a collector batch), register extras for post-drain verification.
+     * The bundle must contain layer group id and the same extras used to enqueue the fill task (for re-queue on repair).
+     * Local GeoJSON fills should also include the map layer id under key {@code standalone_verify_layer_id}.
+     */
+    void registerStandaloneLayerFillVerifyAfterSuccess(Bundle fillTaskIntentExtrasCopy);
+
+    /**
+     * After the import queue drains, verify standalone fills: missing layer or missing SQLite table → delete and re-enqueue
+     * (same idea as {@link #finalizeCollectorImportVerifyAndRepairIfNeeded()}, limited repair waves).
+     * Safe to call on the main thread only.
+     */
+    void finalizeStandaloneLayerFillVerifyIfNeeded();
+
+    /**
+     * Drop an in-progress collector import batch without verification (e.g. user cancelled fill).
+     */
+    void clearCollectorImportBatch();
+
+    /**
+     * True while a collector import batch is registered ({@link #registerCollectorImportBatch}) and not yet cleared.
+     * Used with {@link #isLayerFillBatchDeferringHeavyMapReload()} to keep blocking progress UI until verify/repair finishes.
+     */
+    boolean hasCollectorImportBatchRegistered();
+
+    /**
+     * Local NGW vector layer schema no longer matches server metadata during sync.
+     * Implementation should remove the layer and enqueue {@code LayerFillService} refill on the main thread,
+     * after trying to send local edits and creating a data backup if unsent edits remain.
+     */
+    void scheduleNgwLayerRebuildAfterSchemaMismatch(NGWVectorLayer layer);
+
+    /**
+     * Collector composition sync apply path.
+     *
+     * Adds project-managed NGW layers that appeared in the Web GIS Collector project after the
+     * local project was imported. Implementations should enqueue {@code LayerFillService} tasks
+     * with Collector origin metadata; this is intentionally an app hook because maplib must not
+     * depend on maplibui service classes.
+     */
+    void scheduleCollectorProjectLayerFills(
+            int groupId,
+            String accountName,
+            String collectorProjectUid,
+            long[] remoteIds,
+            String[] names,
+            String[] configJsons,
+            long[] formIds,
+            boolean[] collectorEditables,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Materialize already-supported NGW style resources as authenticated raster tile layers.
+     * These layers are project-managed but never editable.
+     */
+    void addCollectorRasterStyleLayers(
+            int groupId,
+            String accountName,
+            String collectorProjectUid,
+            CollectorProjectItem[] items,
+            int[] collectorOrders,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Apply display properties and Collector order to an existing project-managed style layer.
+     */
+    void applyCollectorRasterStyleProjectState(
+            NGWRasterLayer layer,
+            CollectorProjectItem item,
+            int collectorOrder,
+            long[] fullCollectorProjectRemoteIds);
+
+    /**
+     * Remove a project-managed server-rendered style layer. Its cache is recreatable, so this path
+     * does not use the vector data backup workflow.
+     */
+    void removeCollectorRasterStyleLayer(NGWRasterLayer layer);
+
+    /**
+     * Update only the local NGFP files and form metadata for a project-managed Collector layer.
+     * Data tables must not be rebuilt here; failed downloads should leave the previous form intact
+     * so the next sync can retry.
+     */
+    void applyCollectorLayerForm(
+            NGWVectorLayer layer,
+            long formId,
+            String formHash);
+
+    /**
+     * Refill an existing project-managed Collector layer because the project definition changed
+     * (for example, the server form changed). Implementations must first try to send local edits
+     * and create a data-only backup if unsent edits remain.
+     */
+    void scheduleCollectorLayerRebuildFromProject(
+            NGWVectorLayer layer,
+            long formId,
+            int collectorOrder,
+            long[] fullCollectorProjectRemoteIds,
+            boolean collectorEditable,
+            String layerConfigJson);
+
+    /**
+     * Apply non-destructive Collector project state (order/editability/origin metadata) to an
+     * already present local layer. Data must not be deleted here.
+     */
+    void applyCollectorLayerProjectState(
+            NGWVectorLayer layer,
+            int collectorOrder,
+            long[] fullCollectorProjectRemoteIds,
+            boolean collectorEditable);
+
+    /**
+     * Collector composition sync foundation.
+     *
+     * Future Collector project composition sync should call this for a local project-managed layer
+     * that disappeared from the Web GIS Collector project. Implementations must create a data-only
+     * backup before deleting the local layer.
+     */
+    void scheduleCollectorLayerRemovalWithBackup(NGWVectorLayer layer);
+
+    /**
+     * Fail-closed backup gate for editable NGW vector layers before remote sync apply or manual
+     * feature deletion. Non-editable layers return {@code true} without creating a ZIP. Empty
+     * {@code featureIds} is a no-op success. On failure, implementations must alert the user and
+     * leave local data unchanged.
+     */
+    boolean backupEditableLayerFeatures(
+            NGWVectorLayer layer,
+            java.util.Collection<Long> featureIds,
+            String reason);
+
+    /**
+     * Fail-closed full-layer data backup before destructive layer removal/rebuild for editable
+     * NGW vector layers. Non-editable layers return {@code true} without creating a ZIP.
+     */
+    boolean backupEditableLayerData(NGWVectorLayer layer, String reason);
+
+    Context getSelfContext();
 }

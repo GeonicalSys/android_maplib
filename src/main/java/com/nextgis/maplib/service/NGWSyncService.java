@@ -44,7 +44,7 @@ public class  NGWSyncService
     protected static final Object mSyncAdapterLock = new Object();
 
     protected SyncReceiver mSyncReceiver;
-    public static boolean  mIsSyncStarted = false;
+    public static volatile boolean mIsSyncStarted = false;
 
 
     /*
@@ -120,6 +120,18 @@ public class  NGWSyncService
         return mIsSyncStarted;
     }
 
+    /**
+     * Direct adapter-to-UI state update. Broadcast receivers remain for compatibility, but the
+     * process state no longer depends on a lifecycle-sensitive receiver seeing every event.
+     */
+    public static void markSyncStarted() {
+        mIsSyncStarted = true;
+    }
+
+    public static void markSyncFinished() {
+        mIsSyncStarted = false;
+    }
+
 
     public class SyncReceiver
             extends BroadcastReceiver
@@ -134,23 +146,23 @@ public class  NGWSyncService
             switch (action) {
                 case SyncAdapter.SYNC_START:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_START");
-                    mIsSyncStarted = true;
+                    markSyncStarted();
                     break;
 
                 case SyncAdapter.SYNC_FINISH:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_FINISH");
-                    mIsSyncStarted = false;
+                    markSyncFinished();
                     break;
 
                 case SyncAdapter.SYNC_CANCELED:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_CANCELED");
                     Log.d(Constants.TAG, "SyncAdapter - SYNC_CANCELED is received");
-                    mIsSyncStarted = false;
+                    markSyncFinished();
                     break;
 
                 case SyncAdapter.SYNC_CHANGES:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_CHANGES");
-                    mIsSyncStarted = false;
+                    markSyncFinished();
                     // TODO:  ???  mIsSyncStarted = true;  ???
                     break;
             }

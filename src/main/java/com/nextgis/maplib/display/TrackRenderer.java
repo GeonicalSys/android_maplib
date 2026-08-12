@@ -23,14 +23,7 @@
 
 package com.nextgis.maplib.display;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.ColorFilter;
 import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import com.nextgis.maplib.api.ILayer;
 import com.nextgis.maplib.datasource.GeoLineString;
 import com.nextgis.maplib.datasource.GeoPoint;
@@ -46,7 +39,6 @@ public class TrackRenderer
         extends Renderer
 {
     private Paint mPaint;
-    private Bitmap mEndingMarker;
 
     public TrackRenderer(ILayer layer)
     {
@@ -71,13 +63,6 @@ public class TrackRenderer
             throws JSONException
     {
 
-    }
-
-
-    public void setEndingMarker(int drawableResId)
-    {
-        mEndingMarker =
-                BitmapFactory.decodeResource(getLayer().getContext().getResources(), drawableResId);
     }
 
 
@@ -115,25 +100,6 @@ public class TrackRenderer
                 display.drawLine(
                         (float) points.get(k - 1).getX(), (float) points.get(k - 1).getY(),
                         (float) points.get(k).getX(), (float) points.get(k).getY(), mPaint);
-            }
-
-            // draw start and finish flag
-            if (mEndingMarker != null) {
-                GeoPoint endings = points.get(0);
-                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                ColorFilter filter = new PorterDuffColorFilter(Color.GREEN, PorterDuff.Mode.SRC_ATOP);
-                paint.setColorFilter(filter);
-                Bitmap ending = mEndingMarker.copy(Bitmap.Config.ARGB_8888, true);
-                Canvas canvas = new Canvas(ending);
-                canvas.drawBitmap(ending, 0, 0, paint);
-                display.drawBitmap(ending, endings, 0, ending.getHeight());
-
-                endings = points.get(points.size() - 1);
-                filter = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.SRC_ATOP);
-                paint.setColorFilter(filter);
-                canvas = new Canvas(ending);
-                canvas.drawBitmap(ending, 0, 0, paint);
-                display.drawBitmap(ending, endings, 0, ending.getHeight());
             }
 
             float percent = (float) i / trackLinesSize;

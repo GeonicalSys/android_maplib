@@ -75,8 +75,7 @@ public class Connection
     public final static int NGWResourceTypeConnections       = 1 << 14;
     public final static int NGWResourceTypeWMSClient         = 1 << 15;
     public final static int NGWResourceTypeLookupTable       = 1 << 16;
-    //public final static int NGWResourceTypeDEMODEMO          = 1 << 17;
-//    public final static int NGWResourceTypeCollector         = 1 << 17;
+    public final static int NGWResourceTypeCollector         = 1 << 17;
 
 
     public Connection(
@@ -95,10 +94,14 @@ public class Connection
     }
 
     public boolean connect(boolean guest) {
+        return connect(guest, 0L);
+    }
+
+    public boolean connect(boolean guest, long rootRemoteId) {
         setNgwVersion();
         fillCapabilities();
 
-        mRootResource = new ResourceGroup(0, this);
+        mRootResource = new ResourceGroup(rootRemoteId, this);
         mRootResource.setParent(this);
 
         if (!guest) {
@@ -218,10 +221,14 @@ public class Connection
                 return NGWResourceTypeWMSClient;
             case "lookup_table":
                 return NGWResourceTypeLookupTable;
+            case "qgis_vector_style":
+                return NGWResourceTypeVectorLayerStyle;
+            case "qgis_raster_style":
+                return NGWResourceTypeRasterLayerStyle;
             case "demo_project":
                 return NGWResourceTypeResourceGroup;
-//            case "collector_project":
-//                    return NGWResourceTypeCollector;
+            case "collector_project":
+                return NGWResourceTypeCollector;
             default:
                 return NGWResourceTypeNone;
         }
@@ -308,10 +315,10 @@ public class Connection
     }
 
 
-    public void loadChildren()
+    public void loadChildren(boolean skipSubLoad)
     {
         if (null != mRootResource) {
-            mRootResource.loadChildren();
+            mRootResource.loadChildren(skipSubLoad);
         }
     }
 
@@ -400,4 +407,3 @@ public class Connection
         return mPassword;
     }
 }
-

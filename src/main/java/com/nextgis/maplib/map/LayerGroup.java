@@ -29,12 +29,14 @@ import android.database.sqlite.SQLiteDatabase;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
+import com.nextgis.maplib.api.INGWLayer;
 import com.nextgis.maplib.api.ILayer;
 import com.nextgis.maplib.api.ILayerView;
 import com.nextgis.maplib.api.IRenderer;
 import com.nextgis.maplib.datasource.GeoEnvelope;
 import com.nextgis.maplib.datasource.GeoPoint;
 import com.nextgis.maplib.display.GISDisplay;
+import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.FileUtil;
 
@@ -43,14 +45,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 import static com.nextgis.maplib.util.Constants.*;
 import static com.nextgis.maplib.util.SettingsConstants.KEY_PREF_MAP;
@@ -60,16 +60,94 @@ import static com.nextgis.maplib.util.SettingsConstants.KEY_PREF_MAP_PATH;
 public class LayerGroup
         extends Layer
 {
+    protected static final String JSON_COLLECTOR_DISTRICT_KEY = "collector_district";
+    protected static final String JSON_COLLECTOR_PROJECT_KEY = "collector_project";
+
     protected final LinkedHashMap<Integer, ILayer> mLayers = new LinkedHashMap<>();
     protected LayerFactory mLayerFactory;
     protected int          mLayerDrawIndex;
     protected GISDisplay   mDisplay;
     protected OnAllLayersAddedListener mOnAllLayersAddedListener;
+    protected String       mCollectorDistrict;
+    protected CollectorProjectMetadata mCollectorProjectMetadata;
 
 
     public interface OnAllLayersAddedListener
     {
         void onAllLayersAdded(LinkedHashMap<Integer, ILayer> layers);
+    }
+
+    /**
+     * Collector project district from {@code resmeta.items.district} (stored on import).
+     */
+    public String getCollectorDistrict() {
+        return mCollectorDistrict;
+    }
+
+    public void setCollectorDistrict(String collectorDistrict) {
+        mCollectorDistrict = TextUtils.isEmpty(collectorDistrict) ? null : collectorDistrict.trim();
+        HyperLog.d(Constants.TAG, NGWVectorLayer.LOG_DISTRICT_FILTER + " group=\"" + getName()
+                + "\" setCollectorDistrict="
+                + (mCollectorDistrict != null ? mCollectorDistrict : "<cleared>"));
+    }
+
+    /**
+     * Persistent identity of the imported Collector project represented by this group.
+     *
+     * Collector architecture foundation: future project-composition sync and project switching
+     * depend on this even though the current runtime only uses the district immediately.
+     */
+    public CollectorProjectMetadata getCollectorProjectMetadata() {
+        return mCollectorProjectMetadata;
+    }
+
+    public void setCollectorProjectMetadata(CollectorProjectMetadata metadata) {
+        mCollectorProjectMetadata = metadata != null && metadata.isValid() ? metadata : null;
+        if (mCollectorProjectMetadata != null) {
+            setCollectorDistrict(mCollectorProjectMetadata.getDistrict());
+        }
+    }
+
+    /**
+     * Walks parent {@link LayerGroup} chain for the nearest non-empty {@link #getCollectorDistrict()}.
+     */
+    public static String findCollectorDistrict(ILayer layer) {
+        ILayer current = layer;
+        while (current != null) {
+            if (current instanceof LayerGroup) {
+                String district = ((LayerGroup) current).getCollectorDistrict();
+                if (!TextUtils.isEmpty(district)) {
+                    return district;
+                }
+            }
+            if (current instanceof Table) {
+                current = ((Table) current).getParent();
+            } else {
+                break;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Clears collector project district metadata on this group and all nested groups.
+     *
+     * @return {@code true} if any group metadata changed.
+     */
+    public boolean clearCollectorDistrictRecursive() {
+        boolean changed = false;
+        if (!TextUtils.isEmpty(mCollectorDistrict)) {
+            setCollectorDistrict(null);
+            changed = true;
+        }
+        synchronized (this) {
+            for (ILayer layer : mLayers.values()) {
+                if (layer instanceof LayerGroup) {
+                    changed |= ((LayerGroup) layer).clearCollectorDistrictRecursive();
+                }
+            }
+        }
+        return changed;
     }
 
 
@@ -178,6 +256,163 @@ public class LayerGroup
                 getLayersByType((LayerGroup) layer, types, layerList);
             }
         }
+    }
+
+    /**
+     * Depth-first search for a non-group layer whose display name matches (trimmed equals).
+     */
+    public static ILayer findLayerByDisplayNameRecursive(LayerGroup layerGroup, String name) {
+        if (layerGroup == null || name == null) {
+            return null;
+        }
+        final String want = name.trim();
+        if (want.isEmpty()) {
+            return null;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                ILayer found = findLayerByDisplayNameRecursive((LayerGroup) layer, name);
+                if (found != null) {
+                    return found;
+                }
+            } else {
+                String n = layer.getName();
+                if (n != null && want.equals(n.trim())) {
+                    return layer;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Depth-first search for an NGW vector layer with the given server resource id and account name.
+     */
+    public static NGWVectorLayer findNgwVectorLayerByRemoteIdRecursive(
+            LayerGroup layerGroup,
+            long remoteId,
+            String accountName) {
+        if (layerGroup == null || accountName == null) {
+            return null;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                NGWVectorLayer found = findNgwVectorLayerByRemoteIdRecursive(
+                        (LayerGroup) layer, remoteId, accountName);
+                if (found != null) {
+                    return found;
+                }
+            } else if (layer instanceof NGWVectorLayer) {
+                NGWVectorLayer nv = (NGWVectorLayer) layer;
+                if (nv.getRemoteId() == remoteId && accountName.equals(nv.getAccountName())) {
+                    return nv;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Finds a layer owned by the selected Collector project.
+     *
+     * <p>Both locally materialized vectors and server-rendered style layers participate. Manual
+     * NGW layers are deliberately excluded even when account and resource id happen to match.</p>
+     */
+    public static ILayer findCollectorManagedLayerByRemoteIdRecursive(
+            LayerGroup layerGroup,
+            long remoteId,
+            String accountName,
+            String projectUid) {
+        if (layerGroup == null || accountName == null || TextUtils.isEmpty(projectUid)) {
+            return null;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                ILayer found = findCollectorManagedLayerByRemoteIdRecursive(
+                        (LayerGroup) layer, remoteId, accountName, projectUid);
+                if (found != null) {
+                    return found;
+                }
+                continue;
+            }
+            if (!(layer instanceof INGWLayer)) {
+                continue;
+            }
+            INGWLayer ngwLayer = (INGWLayer) layer;
+            if (ngwLayer.getRemoteId() != remoteId
+                    || !accountName.equals(ngwLayer.getAccountName())) {
+                continue;
+            }
+            LayerOriginMetadata origin = getCollectorOriginMetadata(layer);
+            if (origin != null
+                    && origin.isManagedByProject()
+                    && projectUid.equals(origin.getProjectUid())) {
+                return layer;
+            }
+        }
+        return null;
+    }
+
+    private static LayerOriginMetadata getCollectorOriginMetadata(ILayer layer) {
+        if (layer instanceof NGWVectorLayer) {
+            return ((NGWVectorLayer) layer).getLayerOriginMetadata();
+        }
+        if (layer instanceof NGWRasterLayer) {
+            return ((NGWRasterLayer) layer).getLayerOriginMetadata();
+        }
+        return null;
+    }
+
+    /**
+     * Insert index for a collector NGW layer among siblings (same account, remote id listed in
+     * {@code collectorRemoteIdsInProjectOrder}). Ranks are inverted so visual list order matches the
+     * collector project: internal layer index 0 is the bottom row in the UI drawer, the last internal index
+     * is the top row (adapter uses reversed indexing).
+     */
+    public static int computeCollectorOrderedInsertIndex(
+            LayerGroup group,
+            String accountName,
+            long[] collectorRemoteIdsInProjectOrder,
+            int targetIndexInProjectOrder) {
+        if (group == null || accountName == null || collectorRemoteIdsInProjectOrder == null
+                || targetIndexInProjectOrder < 0) {
+            return group != null ? group.getLayerCount() : 0;
+        }
+        final int L = collectorRemoteIdsInProjectOrder.length;
+        Map<Long, Integer> internalRank = new HashMap<>();
+        for (int i = 0; i < L; i++) {
+            internalRank.put(collectorRemoteIdsInProjectOrder[i], L - 1 - i);
+        }
+        int targetRank = L - 1 - targetIndexInProjectOrder;
+        int count = group.getLayerCount();
+        int tracksIndex = -1;
+        for (int gi = 0; gi < count; gi++) {
+            ILayer child = group.getLayer(gi);
+            if (0 != (child.getType() & LAYERTYPE_TRACKS)) {
+                if (tracksIndex < 0) {
+                    tracksIndex = gi;
+                }
+                continue;
+            }
+            if (!(child instanceof INGWLayer)) {
+                continue;
+            }
+            INGWLayer ngwLayer = (INGWLayer) child;
+            if (!accountName.equals(ngwLayer.getAccountName())) {
+                continue;
+            }
+            Integer rank = internalRank.get(ngwLayer.getRemoteId());
+            if (rank == null) {
+                continue;
+            }
+            if (rank >= targetRank) {
+                return CollectorLayerOrderPolicy.keepBelowTracks(gi, tracksIndex);
+            }
+        }
+        return CollectorLayerOrderPolicy.keepBelowTracks(count, tracksIndex);
     }
 
     public static ILayer getVectorLayersById(
@@ -382,12 +617,15 @@ public class LayerGroup
             mDisplay = display;
         }
 
-        if (mLayers.size() == 0) {
-            return;
+        List<ILayer> layersCopy;
+        synchronized (this) {
+            if (mLayers.size() == 0) {
+                return;
+            }
+            layersCopy = new ArrayList<>(mLayers.values());
         }
 
-        //synchronized (this) {
-            for (ILayer layer : mLayers.values()) {
+            for (ILayer layer : layersCopy) {
                 if (Thread.currentThread().isInterrupted()) {
                     break;
                 }
@@ -413,7 +651,6 @@ public class LayerGroup
                     }
                 }
             }
-        //}
     }
 
 
@@ -529,6 +766,12 @@ public class LayerGroup
             layerObject.put(JSON_PATH_KEY, layer.getPath().getName());
             jsonArray.put(layerObject);
         }
+        if (!TextUtils.isEmpty(mCollectorDistrict)) {
+            rootConfig.put(JSON_COLLECTOR_DISTRICT_KEY, mCollectorDistrict);
+        }
+        if (mCollectorProjectMetadata != null && mCollectorProjectMetadata.isValid()) {
+            rootConfig.put(JSON_COLLECTOR_PROJECT_KEY, mCollectorProjectMetadata.toJSON());
+        }
         return rootConfig;
     }
 
@@ -549,6 +792,17 @@ public class LayerGroup
             throws JSONException
     {
         super.fromJSON(jsonObject);
+
+        if (jsonObject.has(JSON_COLLECTOR_DISTRICT_KEY) && !jsonObject.isNull(JSON_COLLECTOR_DISTRICT_KEY)) {
+            setCollectorDistrict(jsonObject.optString(JSON_COLLECTOR_DISTRICT_KEY, null));
+        } else {
+            mCollectorDistrict = null;
+        }
+        mCollectorProjectMetadata = CollectorProjectMetadata.fromJSON(
+                jsonObject.optJSONObject(JSON_COLLECTOR_PROJECT_KEY));
+        if (mCollectorProjectMetadata != null && TextUtils.isEmpty(mCollectorDistrict)) {
+            setCollectorDistrict(mCollectorProjectMetadata.getDistrict());
+        }
 
         clearLayers();
 
@@ -726,13 +980,9 @@ public class LayerGroup
      */
     public File createLayerStorage()
     {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-        String layerDir = LAYER_PREFIX + sdf.format(new Date()) + getLayerCount();
-        final Random r = new Random();
-        layerDir += r.nextInt(99);
-
-        Log.d(Constants.TAG, "createLayerStorage: " + layerDir);
-        return new File(mPath, layerDir);
+        File layerStorage = LayerStorageAllocator.reserve(mPath, LAYER_PREFIX);
+        Log.d(Constants.TAG, "createLayerStorage: " + layerStorage.getName());
+        return layerStorage;
     }
 
 
@@ -792,7 +1042,7 @@ public class LayerGroup
 
     public static int indexOfLayer(LinkedHashMap<Integer, ILayer> map, ILayer layer) {
         int index = 0;
-        for (ILayer value : map.values()) {
+        for (ILayer value : new ArrayList<>(map.values())) {
             if (value == layer) { // or equals()
                 return index;
             }
@@ -801,22 +1051,30 @@ public class LayerGroup
         return -1;
     }
 
+    /** Iteration index of a direct child in {@link #getLayer(int)} order (0 = first / bottom of stack). */
+    public int getChildLayerIndex(ILayer layer) {
+        return indexOfLayer(mLayers, layer);
+    }
+
     public static ILayer getLayerByindex(LinkedHashMap<Integer, ILayer> map, int index) {
-        int indextmp = 0;
-        for (ILayer value : map.values()) {
-            if (indextmp == index) { // or equals()
-                return value;
-            }
-            indextmp++;
+        if (index < 0) {
+            return null;
+        }
+        ArrayList<ILayer> snapshot = new ArrayList<>(map.values());
+        if (index < snapshot.size()) {
+            return snapshot.get(index);
         }
         return null;
     }
 
     public static Integer removeLayer(LinkedHashMap<Integer, ILayer> map, ILayer layer) {
-        for (Map.Entry<Integer, ILayer> e : map.entrySet()) {
+        Iterator<Map.Entry<Integer, ILayer>> it = map.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, ILayer> e = it.next();
             if (e.getValue() == layer) {
-                map.remove(e.getKey());
-                return e.getKey();
+                Integer key = e.getKey();
+                it.remove();
+                return key;
             }
         }
         return null;

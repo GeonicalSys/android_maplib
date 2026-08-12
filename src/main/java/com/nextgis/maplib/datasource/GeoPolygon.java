@@ -180,6 +180,36 @@ public class GeoPolygon
             }
         }
         reader.endArray();
+        validateImportedRings();
+    }
+
+    private void validateImportedRings() throws IOException {
+        if (mOuterRing.getPointCount() < 4) {
+            throw new IOException("Polygon outer ring must have at least 4 positions");
+        }
+        if (!mOuterRing.isClosed()) {
+            mOuterRing.closeRing();
+        }
+        if (!mOuterRing.isClosed()) {
+            throw new IOException("Polygon outer ring is not closed");
+        }
+        for (GeoLinearRing ring : mInnerRings) {
+            if (ring.getPointCount() < 4) {
+                throw new IOException("Polygon inner ring must have at least 4 positions");
+            }
+            if (!ring.isClosed()) {
+                ring.closeRing();
+            }
+            if (!ring.isClosed()) {
+                throw new IOException("Polygon inner ring is not closed");
+            }
+        }
+        if (!isHolesInside()) {
+            throw new IOException("Polygon hole is outside the outer ring");
+        }
+        if (isHolesIntersect()) {
+            throw new IOException("Polygon holes intersect");
+        }
     }
 
 
@@ -400,11 +430,15 @@ public class GeoPolygon
 
     @Override
     public boolean isValid() {
-        for (GeoLinearRing ring : mInnerRings)
-            if (!ring.isValid())
+        if (!mOuterRing.isValid()) {
+            return false;
+        }
+        for (GeoLinearRing ring : mInnerRings) {
+            if (!ring.isValid()) {
                 return false;
-
-        return mOuterRing.isValid();
+            }
+        }
+        return isHolesInside() && !isHolesIntersect() && !intersects();
     }
 
     @Override

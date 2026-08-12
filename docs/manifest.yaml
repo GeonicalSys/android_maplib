@@ -1,0 +1,97 @@
+schema_version: 1
+module_id: maplib
+repository_id: maplib
+maturity: maintained
+last_verified: 2026-07-30
+entrypoints:
+  - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+  - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
+  - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
+key_components:
+  - path: maplib/build.gradle
+    responsibility: Keep release and debug diagnostic VERSION_NAME values coupled to their consuming application variants and provide the shared JTS topology runtime without unsupported library build-type version DSL.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
+    responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+    responsibility: MapLibre style, sources, layers, hot add/reload coordination, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
+    responsibility: MapLibre style utilities, rule-style apply/merge hooks, label zoom gate and raster sibling anchor resolution.
+  - path: maplib/src/main/java/com/nextgis/maplib/display/FieldStyleRule.java
+    responsibility: Rule categories plus other/default style; merge unset optional fields into the effective style at render time.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LayerGroup.java
+    responsibility: Maintain bottom-to-top model order, atomically reserve collision-free layer storage, and insert mixed vector/raster Collector project layers below the top tracks layer.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
+    responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
+    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, and expose transient pull failures for a deferred retry pass.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
+    responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
+    responsibility: Load vector configuration, fail a bulk fill on the first rejected SQL insert, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
+    responsibility: Encode and validate the last fully initialized NGW vector-layer identity for partial-config recovery.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
+    responsibility: Cache prepared vector rendering payload for map startup.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileProvider.java
+    responsibility: Query and clip local SQLite features into lazy MVT tiles for polygon/multipolygon and read-only simple circle Point layers.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileEncoder.java
+    responsibility: Encode Point and Polygon MVT command streams plus feature identity and simple label properties.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectCompositionSync.java
+    responsibility: Compare and apply Collector composition with account-plus-remote-id uniqueness preflight, in-place origin repair and fail-closed conflict handling.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectItem.java
+    responsibility: Normalize a supported Collector vector or raster-style item, display state, identity and extent source.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorResource.java
+    responsibility: Resolve a complete Collector project snapshot containing vectors and already-supported QGIS styles, and reject incomplete referenced resources.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/TMSLayer.java
+    responsibility: Safely unpack local tile archives and retain immutable NGRc provenance.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
+    responsibility: Parse and normalize a direct NGW resource URL without Android dependencies.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
+    responsibility: Load one target NGW resource and resolve QGIS style URLs to their parent layer.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LayerConfigUtil.java
+    responsibility: Parse mobile render mode and layer origin configuration.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
+    responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, recovering an unset collection CRS from nested geometry while rejecting empty or non-polygonal results.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
+    responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter and expose safe provider-qualified diagnostics plus aggregate counters.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
+    responsibility: Retain valid movement through 160 km/h, reject corrupt fixes and material isolated spikes, and preserve delayed fixes across long sampling gaps without Android test dependencies.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiter.java
+    responsibility: Adapt Android providers to GPS-first recording while retaining timed network fallback.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiterCore.java
+    responsibility: Suppress network fixes for 12 seconds after usable GPS and restore network fallback without Android test dependencies.
+public_contracts:
+  - id: map-host
+    symbol: MaplibreMapInteraction
+    path: maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java
+    consumers: [app, maplibui]
+  - id: gis-application
+    symbol: IGISApplication
+    path: maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
+    consumers: [maplibui, app]
+  - id: collector-metadata
+    symbol: CollectorProjectMetadata
+    path: maplib/src/main/java/com/nextgis/maplib/map/CollectorProjectMetadata.java
+    consumers: [maplibui, app]
+  - id: ngw-resource-url
+    symbol: NGWResourceUrl and ResourceGroup.loadTargetResource
+    path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
+    consumers: [app, maplibui]
+settings_refs: [feature_label_field, mobile_render_mode, render_mode, layer_origin, mobile, ngw_identity_backup]
+storage_contracts:
+  - id: layer-json
+    path: maplib/src/main/java/com/nextgis/maplib/map/Layer.java
+  - id: ngw-raster-layer-json
+    path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
+  - id: ngw-vector-identity-backup
+    path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
+invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GPS-TRACK-FILTER]
+global_docs:
+  - docs/architecture/map-rendering.md
+  - docs/architecture/collector-projects.md
+  - docs/architecture/ngw-sync-and-storage.md
+  - docs/architecture/crash-recovery.md
+  - docs/reference/build-matrix.md
+  - docs/reference/flavors-and-versioning.md
+smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-LOCATION-CURSOR-TOP, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-URL-IMPORT, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY]
+upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, MAP-HOST, COLLECTOR-RESOURCE]

@@ -331,19 +331,42 @@ public class FileUtil
             File outputDir)
             throws IOException, RuntimeException
     {
-        String entryName = entry.getName();
+        String entryName = entry.getName().replace('\\', '/');
+        if (entryName.startsWith("/") || entryName.matches("^[A-Za-z]:/.*")) {
+            throw new IOException("Absolute archive entry is not allowed: " + entry.getName());
+        }
+        String[] rawParts = entryName.split("/");
+        for (String part : rawParts) {
+            if ("..".equals(part)) {
+                throw new IOException("Archive entry contains parent traversal: " + entry.getName());
+            }
+        }
         int pos = entryName.indexOf('/');
 
         //for backward capability where the zip has root directory named "mapnik"
         if (pos != Constants.NOT_FOUND) {
             String folderName = entryName.substring(0, pos);
-            if (!TextUtils.isDigitsOnly(folderName)) {
-                entryName = entryName.substring(pos);
+            if (!isDigitsOnly(folderName)) {
+                entryName = entryName.substring(pos + 1);
             }
         }
 
+        while (entryName.startsWith("/")) {
+            entryName = entryName.substring(1);
+        }
+        if (entryName.length() == 0) {
+            return;
+        }
+
+        File outputFile = new File(outputDir, entryName);
+        String outputRoot = outputDir.getCanonicalPath();
+        String outputPath = outputFile.getCanonicalPath();
+        if (!outputPath.startsWith(outputRoot + File.separator)) {
+            throw new IOException("Archive entry escapes destination: " + entry.getName());
+        }
+
         if (entry.isDirectory()) {
-            FileUtil.createDir(new File(outputDir, entryName));
+            FileUtil.createDir(outputFile);
             return;
         }
 
@@ -355,12 +378,29 @@ public class FileUtil
         if (entryName.toLowerCase().equals("mapnik.json"))
             entryName = "config.json";
 
-        File outputFile = new File(outputDir, entryName);
+        outputFile = new File(outputDir, entryName);
+        outputPath = outputFile.getCanonicalPath();
+        if (!outputPath.startsWith(outputRoot + File.separator)) {
+            throw new IOException("Archive entry escapes destination: " + entry.getName());
+        }
         if (!outputFile.getParentFile().exists()) {
             FileUtil.createDir(outputFile.getParentFile());
         }
-        FileOutputStream fout = new FileOutputStream(outputFile);
-        FileUtil.copyStream(zis, fout, buffer, Constants.IO_BUFFER_SIZE);
-        fout.close();
+        try (FileOutputStream fout = new FileOutputStream(outputFile)) {
+            FileUtil.copyStream(zis, fout, buffer,
+                    Math.min(buffer.length, Constants.IO_BUFFER_SIZE));
+        }
+    }
+
+    private static boolean isDigitsOnly(String value) {
+        if (value == null || value.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) < '0' || value.charAt(i) > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 }

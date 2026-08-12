@@ -61,10 +61,14 @@ public class NGWRasterLayer extends RemoteTMSLayer implements INGWLayer {
     protected String mCacheLogin;
     protected String mCachePassword;
     protected long mRemoteId;
+    protected long mExtentRemoteId;
+    protected LayerOriginMetadata mLayerOriginMetadata;
     protected boolean mExtentReceived = false;
 
     protected final static short MAX_THREAD_COUNT = 8;
     protected static final String JSON_ACCOUNT_KEY = "account";
+    protected static final String JSON_EXTENT_RESOURCE_ID_KEY = "extent_resource_id";
+    protected static final String JSON_LAYER_ORIGIN_KEY = "layer_origin";
 
     public NGWRasterLayer(Context context, File path) {
         super(context, path);
@@ -77,10 +81,18 @@ public class NGWRasterLayer extends RemoteTMSLayer implements INGWLayer {
         JSONObject rootConfig = super.toJSON();
         rootConfig.put(JSON_ID_KEY, mRemoteId);
         rootConfig.put(JSON_ACCOUNT_KEY, mAccountName);
-        rootConfig.put(Constants.JSON_BBOX_MAXX_KEY, mExtents.getMaxX());
-        rootConfig.put(Constants.JSON_BBOX_MINX_KEY, mExtents.getMinX());
-        rootConfig.put(Constants.JSON_BBOX_MAXY_KEY, mExtents.getMaxY());
-        rootConfig.put(Constants.JSON_BBOX_MINY_KEY, mExtents.getMinY());
+        if (mExtentRemoteId > 0L && mExtentRemoteId != mRemoteId) {
+            rootConfig.put(JSON_EXTENT_RESOURCE_ID_KEY, mExtentRemoteId);
+        }
+        if (mLayerOriginMetadata != null) {
+            rootConfig.put(JSON_LAYER_ORIGIN_KEY, mLayerOriginMetadata.toJSON());
+        }
+        if (mExtents.isInit()) {
+            rootConfig.put(Constants.JSON_BBOX_MAXX_KEY, mExtents.getMaxX());
+            rootConfig.put(Constants.JSON_BBOX_MINX_KEY, mExtents.getMinX());
+            rootConfig.put(Constants.JSON_BBOX_MAXY_KEY, mExtents.getMaxY());
+            rootConfig.put(Constants.JSON_BBOX_MINY_KEY, mExtents.getMinY());
+        }
 
         return rootConfig;
     }
@@ -89,7 +101,10 @@ public class NGWRasterLayer extends RemoteTMSLayer implements INGWLayer {
     public void fromJSON(JSONObject jsonObject) throws JSONException {
         super.fromJSON(jsonObject);
         setAccountName(jsonObject.getString(JSON_ACCOUNT_KEY));
-        mRemoteId = jsonObject.optInt(JSON_ID_KEY);
+        mRemoteId = jsonObject.optLong(JSON_ID_KEY);
+        mExtentRemoteId = jsonObject.optLong(JSON_EXTENT_RESOURCE_ID_KEY, mRemoteId);
+        mLayerOriginMetadata = LayerOriginMetadata.fromJSON(
+                jsonObject.optJSONObject(JSON_LAYER_ORIGIN_KEY));
         mExtents.setMaxX(jsonObject.optDouble(Constants.JSON_BBOX_MAXX_KEY, MERCATOR_MAX));
         mExtents.setMinX(jsonObject.optDouble(Constants.JSON_BBOX_MINX_KEY, -MERCATOR_MAX));
         mExtents.setMaxY(jsonObject.optDouble(Constants.JSON_BBOX_MAXY_KEY, MERCATOR_MAX));
@@ -135,6 +150,28 @@ public class NGWRasterLayer extends RemoteTMSLayer implements INGWLayer {
         mRemoteId = remoteId;
     }
 
+    /**
+     * Resource used for extent lookup. For an ordinary NGW raster this is the layer resource id;
+     * for a Collector-rendered style it is the parent data-layer id while {@link #getRemoteId()}
+     * remains the style id.
+     */
+    public long getExtentRemoteId() {
+        return mExtentRemoteId > 0L ? mExtentRemoteId : mRemoteId;
+    }
+
+    public void setExtentRemoteId(long extentRemoteId) {
+        mExtentRemoteId = extentRemoteId > 0L ? extentRemoteId : mRemoteId;
+        mExtentReceived = false;
+    }
+
+    public LayerOriginMetadata getLayerOriginMetadata() {
+        return mLayerOriginMetadata;
+    }
+
+    public void setLayerOriginMetadata(LayerOriginMetadata layerOriginMetadata) {
+        mLayerOriginMetadata = layerOriginMetadata;
+    }
+
     @Override
     public int getMaxThreadCount() {
         return MAX_THREAD_COUNT;
@@ -177,7 +214,11 @@ public class NGWRasterLayer extends RemoteTMSLayer implements INGWLayer {
             HttpResponse result = null;
             try {
                 AccountUtil.AccountData accountData = AccountUtil.getAccountData(mContext, getAccountName());
-                result = NetworkUtil.get(NGWUtil.getExtent(accountData.url, mRemoteId), getLogin(), getPassword(), false);
+                result = NetworkUtil.get(
+                        NGWUtil.getExtent(accountData.url, getExtentRemoteId()),
+                        getLogin(),
+                        getPassword(),
+                        false);
                 if (!result.isOk()) {
                     throw new IllegalStateException("");
                 }

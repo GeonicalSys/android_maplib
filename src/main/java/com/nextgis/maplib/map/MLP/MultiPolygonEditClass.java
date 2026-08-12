@@ -1,5 +1,7 @@
 package com.nextgis.maplib.map.MLP;
 
+import android.util.Log;
+
 import com.nextgis.maplib.map.MPLFeaturesUtils;
 import org.maplibre.android.geometry.LatLng;
 import org.maplibre.android.maps.Projection;
@@ -16,7 +18,13 @@ import java.util.Objects;
 
 public class MultiPolygonEditClass extends MLGeometryEditClass {
 
+    private static final String TAG = "MultiPolygonEdit";
+
     // Flat list of all vertices for all rings of all polygons
+
+    // use to start by fill by walking from zero
+    protected List<Point> zeroPointList  = new ArrayList<>(); // Inherited
+
     protected List<Point> editingVertices = new ArrayList<>(); // Inherited
 
     //List<org.maplibre.geojson.Feature> vertexFeatures = new ArrayList<>();
@@ -350,11 +358,28 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
     }
 
     @Override
-    public void addNewFlowPoint(LatLng newPoint) {
-        if (selectedPolygonIndex == -1 ||
+    public void addNewFlowPoint(LatLng newPoint, boolean addAfterSelected) {
+        if (newPoint == null)
+            return;
+
+//        boolean skipAdding = false;
+
+        if (selectedVertexIndex == -1 &&  editingVertices.isEmpty()){
+            Point geoPoint = Point.fromLngLat(newPoint.getLongitude(),newPoint.getLatitude());
+            zeroPointList.add(geoPoint);
+            if (zeroPointList.size() < 3)
+                return;
+
+            //there we have 3 points  -time to draw polygon
+
+            addNewPolygonFrom3Points(zeroPointList);
+            return;
+        }
+
+        if ((selectedPolygonIndex == -1 ||
                 selectedRingIndexInPolygon == -1 ||
                 selectedVertexIndex == -1 ||
-                selectedVertexIndex >= editingVertices.size()) {
+                selectedVertexIndex >= editingVertices.size())) {
             return;
         }
 
@@ -375,8 +400,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
         }
 
         // scope ring in common list
-        int ringStartGlobal =
-                (absoluteRingIndexInPRI == 0)
+        int ringStartGlobal =                (absoluteRingIndexInPRI == 0)
                         ? 0
                         : polygonRingEndIndices.get(absoluteRingIndexInPRI - 1);
 
@@ -405,9 +429,63 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
 
 
 
+    /**
+     * True when {@link #deleteCurrentPoint()} can run without throwing and will change geometry
+     * (same index guards as in delete, plus minimum points per ring).
+     */
+    public boolean canDeleteCurrentPoint() {
+        if (selectedVertexIndex == -1 || editingVertices.isEmpty()) {
+            return false;
+        }
+        if (!areSelectionIndicesConsistentForDelete()) {
+            return false;
+        }
+        int pIdx = selectedPolygonIndex;
+        int rIdxInP = selectedRingIndexInPolygon;
+        int startRingMarkerForSelectedPolygon = (pIdx == 0) ? 0 : multiPolygonRingEndIndicesMarker.get(pIdx - 1);
+        int currentRingAbsoluteIndexInPRI = startRingMarkerForSelectedPolygon + rIdxInP;
+        int ringStartGlobal = (currentRingAbsoluteIndexInPRI == 0) ? 0 : polygonRingEndIndices.get(currentRingAbsoluteIndexInPRI - 1);
+        int ringEndGlobal = polygonRingEndIndices.get(currentRingAbsoluteIndexInPRI);
+        int pointsInCurrentRing = ringEndGlobal - ringStartGlobal;
+        return pointsInCurrentRing >= 4;
+    }
+
+    /**
+     * Validates polygon / ring indices before any {@code List#get} used in {@link #deleteCurrentPoint()}.
+     */
+    private boolean areSelectionIndicesConsistentForDelete() {
+        if (selectedPolygonIndex < 0 || selectedRingIndexInPolygon < 0) {
+            return false;
+        }
+        final int pIdx = selectedPolygonIndex;
+        if (multiPolygonRingEndIndicesMarker.isEmpty() || pIdx >= multiPolygonRingEndIndicesMarker.size()) {
+            return false;
+        }
+        if (pIdx > 0 && (pIdx - 1) >= multiPolygonRingEndIndicesMarker.size()) {
+            return false;
+        }
+        int startRingMarkerForSelectedPolygon = (pIdx == 0) ? 0 : multiPolygonRingEndIndicesMarker.get(pIdx - 1);
+        int currentRingAbsoluteIndexInPRI = startRingMarkerForSelectedPolygon + selectedRingIndexInPolygon;
+        if (currentRingAbsoluteIndexInPRI < 0 || currentRingAbsoluteIndexInPRI >= polygonRingEndIndices.size()) {
+            return false;
+        }
+        if (currentRingAbsoluteIndexInPRI > 0 && (currentRingAbsoluteIndexInPRI - 1) >= polygonRingEndIndices.size()) {
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public void deleteCurrentPoint() {
         if (selectedVertexIndex == -1 || editingVertices.isEmpty()) return;
+
+        if (!areSelectionIndicesConsistentForDelete()) {
+            Log.w(TAG, "deleteCurrentPoint skipped: inconsistent selection (vertex=" + selectedVertexIndex
+                    + ", poly=" + selectedPolygonIndex + ", ringInPoly=" + selectedRingIndexInPolygon
+                    + ", markers=" + multiPolygonRingEndIndicesMarker.size()
+                    + ", ringEnds=" + polygonRingEndIndices.size() + ")");
+            return;
+        }
 
         int pIdx = selectedPolygonIndex;
         int rIdxInP = selectedRingIndexInPolygon;
@@ -473,12 +551,12 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
         updateEditingPolygonAndVertex();
     }
 
-    public void addNewPolygonAt(LatLng mapCenter, Projection projection) {
+
+    public void addNewPolygonFrom3Points(List<Point> points) {
         // Create a default square polygon
         List<List<Point>> newPolyRings = new ArrayList<>();
-        List<Point> outerRing = prepareNewPolyPoints(mapCenter, projection);
 
-        newPolyRings.add(outerRing);
+        newPolyRings.add(points);
 
         int newPolygonStartIndex = editingVertices.size();
         int newPolygonRingCount = 0;
@@ -488,7 +566,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
             polygonRingEndIndices.add(editingVertices.size());
             newPolygonRingCount++;
         }
-        
+
         if (newPolygonRingCount > 0) {
             if (multiPolygonRingEndIndicesMarker.isEmpty()) {
                 multiPolygonRingEndIndicesMarker.add(newPolygonRingCount);
@@ -502,6 +580,12 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
             updateDerivedSelectionIndices(selectedVertexIndex);
         }
         updateEditingPolygonAndVertex();
+    }
+
+    public void addNewPolygonAt(LatLng mapCenter, Projection projection) {
+        // Create a default square polygon
+        List<Point> outerRing = prepareNewPolyPoints(mapCenter, projection);
+        addNewPolygonFrom3Points(outerRing);
     }
 
     private void deleteRing(int pIdxToDeleteRingFrom, int rIdxInPToDelete) {

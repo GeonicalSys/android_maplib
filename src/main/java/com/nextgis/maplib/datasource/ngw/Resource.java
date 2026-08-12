@@ -111,6 +111,33 @@ public abstract class Resource
         }
     }
 
+    public boolean hasDataReadPermission()
+    {
+        return hasDataPermission("read");
+    }
+
+
+    public boolean hasDataPermissionInfo()
+    {
+        return mPermissions != null && mPermissions.optJSONObject("data") != null;
+    }
+
+
+    public boolean hasDataWritePermission()
+    {
+        return hasDataPermission("write");
+    }
+
+
+    private boolean hasDataPermission(String permission)
+    {
+        if (mPermissions == null) {
+            return false;
+        }
+        JSONObject data = mPermissions.optJSONObject("data");
+        return data != null && data.optBoolean(permission, false);
+    }
+
 
     @Override
     public String getName()
@@ -120,6 +147,11 @@ public abstract class Resource
 
     public String getDescription() {
         return mDescription;
+    }
+
+    /** For NGW resources when description is filled after a lazy full-resource fetch. */
+    public void setDescription(String description) {
+        mDescription = description;
     }
 
     @Override

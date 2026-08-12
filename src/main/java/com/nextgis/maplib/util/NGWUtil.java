@@ -190,7 +190,8 @@ public class NGWUtil
     }
 
     public static String appendix() {
-        return "?&dt_format=iso&source=" + NGUA + "&ngid=" + NGID + "&deviceid=" + UUID;
+        //return "?source=" + NGUA + "&ngid=" + NGID + "&deviceid=" + UUID;
+        return "?source=" + NGUA + "&ngid=" + NGID + "&deviceid=" + UUID + "&dt_format=iso";
     }
 
     public static String getServerUrl(String server) {
@@ -420,12 +421,10 @@ public class NGWUtil
             long remoteId,
             String where)
     {
-        if (TextUtils.isEmpty(where))
+        if (where == null || where.length() == 0) {
             return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment";
-        //return getFeaturesUrl(server, remoteId) + "?" + where + "&dt_format=iso&?extensions=";
-
-        return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment";
-        //  keeps attachment after sync  - but delete attach manualy  not work  on sync changes to  server - tryes to delete all
+        }
+        return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment&" + where;
     }
 
 
@@ -658,44 +657,23 @@ public class NGWUtil
             dateformat.setTimeZone(gmtTimeZone);
 
             try {
-//                Log.e("TTIIMMMEE", "readNGWDateOrTime qdateOrTime: " + dateOrTime);
-
                 Date date = dateformat.parse(dateOrTime);
-
                 Date targetTime = convertTime(date, TimeZone.getDefault(), gmtTimeZone);
-
                 Calendar calendarT = Calendar.getInstance(TimeZone.getDefault());
                 calendarT.setTimeInMillis(targetTime.getTime());
-
-
                 nHour = calendarT.get(Calendar.HOUR_OF_DAY);
                 nMinute = calendarT.get(Calendar.MINUTE);
                 nSecond = calendarT.get(Calendar.SECOND);
-
-//                nHour = date.getHours();
-//                nMinute = date.getMinutes();
-//                nSecond = date.getSeconds();
-
-//                Log.e("TTIIMMMEE", "readNGWDateOrTime qst result H:m:s: " + nHour + ":" + nMinute +":"+ nSecond);
-
-
-
             } catch (ParseException e) {
                 e.printStackTrace();
             }
         }
 
         TimeZone timeZone = TimeZone.getDefault();
-//        Log.e("TTIIMMMEE", "readNGWDateOrTime TimeZone ofset: " + timeZone.getRawOffset());
-
         timeZone.setRawOffset(0); // set to UTC
-//        Log.e("TTIIMMMEE", "readNGWDateOrTime TimeZone ofset after 0: " + timeZone.getRawOffset());
         Calendar calendar = Calendar.getInstance(timeZone);
         calendar.set(nYear, nMonth - 1, nDay, nHour, nMinute, nSecond);
         calendar.set(Calendar.MILLISECOND, 0); // we must to reset millis
-
-//        Log.e("TTIIMMMEE", "readNGWDateOrTime calendar.getTimeInMillis(): " + calendar.getTimeInMillis());
-
         feature.setFieldValue(fieldName, calendar.getTimeInMillis());
     }
 
@@ -914,10 +892,10 @@ public class NGWUtil
     public static boolean getResourceByKey(Context context, INGWResource resource, Map<String, Resource> keys) {
         if (resource instanceof Connection) {
             Connection connection = (Connection) resource;
-            connection.loadChildren();
+            connection.loadChildren(false);
         } else if (resource instanceof ResourceGroup) {
             ResourceGroup resourceGroup = (ResourceGroup) resource;
-            resourceGroup.loadChildren();
+            resourceGroup.loadChildren(false);
         }
 
         for (int i = 0; i < resource.getChildrenCount(); ++i) {

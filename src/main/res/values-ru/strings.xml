@@ -84,6 +84,8 @@
     <string name="sync_finished">Синхронизация завершена</string>
     <string name="text">Подпись</string>
     <string name="error_connect_failed">Соединение не установлено</string>
+    <string name="error_server_temporarily_unavailable">Сервер или внешняя база данных временно недоступны</string>
+    <string name="error_ngw_feature_count_mismatch">Данные слоя неполные: локально %1$d объектов, на сервере указано %2$d. Попробуйте загрузить слой снова.</string>
     <string name="error_403">Не хватает прав</string>
     <string name="error_404">Ресурс не найден</string>
     <string name="error_500">Ошибка сервера</string>
@@ -98,6 +100,7 @@
     <string name="sync_error_parse">Ошибка сервера NetGIS Web</string>
     <string name="self_intersection">Обнаружено самопересечение</string>
     <string name="ring_outside">Одна из дырок за границами полигона</string>
+    <string name="error_geojson_invalid_geometry">Некорректная геометрия в объекте GeoJSON</string>
     <string name="rings_intersection">Пересечение дырок</string>
     <string name="unit_mile">миль</string>
     <string name="unit_foot">фут</string>
@@ -110,4 +113,18 @@
     <string name="error_select_obj">Ошибка при выборе обьекта</string>
     <string name="outofmemory">Нехватка памяти при загрузке слоя: </string>
     <string name="process_layer_hint">Загрузка данных для слоя: </string>
+    <string name="map_loading_preparing">Подготовка карты…</string>
+    <string name="map_loading_cache_hit">Чтение кэша: </string>
+    <string name="ngw_schema_mismatch_title">Изменилась схема слоя</string>
+    <string name="ngw_schema_mismatch_has_local_changes">Структура слоя на сервере больше не совпадает с картой. На устройстве есть несинхронизированные правки. Синхронизируйте или удалите локальные изменения, затем удалите слой и добавьте его снова из NextGIS Web.</string>
+    <string name="ngw_schema_mismatch_backup_reload">Ошибка в слое %1$s. Он будет перезагружен. Чтобы не потерять данные, отправьте администратору ГИС резервную копию.</string>
+    <string name="ngw_schema_mismatch_backup_failed">Ошибка в слое %1$s. Его нужно перезагрузить, но приложению не удалось создать резервную копию, поэтому слой оставлен без изменений.</string>
+    <string name="collector_layer_removed_title">Изменился состав проекта Collector</string>
+    <string name="collector_layer_removed_from_project">Слой %1$s будет удален из проекта.</string>
+    <string name="collector_layer_backup_failed">Слой %1$s удален из проекта Collector, но приложению не удалось создать резервную копию, поэтому локальный слой оставлен без изменений.</string>
+    <string name="layer_data_backup_failed">Не удалось создать резервную копию слоя %1$s, поэтому разрушительная операция отменена.</string>
+    <string name="layer_feature_backup_failed">Не удалось создать резервную копию объектов слоя %1$s, поэтому удаление или перезапись отменены.</string>
+    <string name="layer_backup_delete_cancelled_title">Удаление отменено</string>
+    <string name="layer_backup_delete_cancelled_detail">Удаление отменено: не удалось сохранить резервную копию слоя %1$s.\nПричина: %2$s</string>
+    <string name="layer_backup_feature_delete_cancelled_detail">Удаление отменено: не удалось сохранить резервную копию объектов слоя %1$s.\nПричина: %2$s</string>
 </resources>

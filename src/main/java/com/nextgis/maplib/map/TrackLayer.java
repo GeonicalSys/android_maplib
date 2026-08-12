@@ -252,24 +252,32 @@ public class TrackLayer
     {
         Cursor track = getTrack(trackId);
 
-        if (track == null || !track.moveToFirst()) {
+        if (track == null) {
             return;
         }
 
-        float x0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LON)),
-                y0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LAT));
+        try {
+            if (!track.moveToFirst()) {
+                return;
+            }
 
-        GeoLineString trackLine = new GeoLineString();
-        trackLine.setCRS(GeoConstants.CRS_WEB_MERCATOR);
-        trackLine.add(new GeoPoint(x0, y0));
+            float x0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LON)),
+                    y0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LAT));
 
-        while (track.moveToNext()) {
-            x0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LON));
-            y0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LAT));
+            GeoLineString trackLine = new GeoLineString();
+            trackLine.setCRS(GeoConstants.CRS_WEB_MERCATOR);
             trackLine.add(new GeoPoint(x0, y0));
-        }
 
-        mTracks.put(trackId, trackLine);
+            while (track.moveToNext()) {
+                x0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LON));
+                y0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LAT));
+                trackLine.add(new GeoPoint(x0, y0));
+            }
+
+            mTracks.put(trackId, trackLine);
+        } finally {
+            track.close();
+        }
     }
 
 
@@ -303,15 +311,17 @@ public class TrackLayer
             return mColor;
         }
 
-        int color = mColor;
-        if (cursor.moveToFirst()) {
-            if (!cursor.isNull(0))
-                color = cursor.getInt(0);
+        try {
+            int color = mColor;
+            if (cursor.moveToFirst()) {
+                if (!cursor.isNull(0))
+                    color = cursor.getInt(0);
+            }
 
+            return color;
+        } finally {
             cursor.close();
         }
-
-        return color;
     }
 
 

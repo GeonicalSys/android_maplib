@@ -36,6 +36,7 @@ import android.content.SharedPreferences;
 import android.content.SyncResult;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -48,11 +49,18 @@ import com.nextgis.maplib.api.INGWLayer;
 import com.nextgis.maplib.map.LayerGroup;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
+import com.nextgis.maplib.map.NGWVectorLayer;
 import com.nextgis.maplib.map.TrackLayer;
+import com.nextgis.maplib.service.NGWSyncService;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.NGWUtil;
+import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.NgwSyncRetryPolicy;
 import com.nextgis.maplib.util.SettingsConstants;
+import com.nextgis.maplib.util.SyncResultUtil;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -95,6 +103,12 @@ public class SyncAdapter
 
     private HashMap<String, Pair<Integer, Integer>> mVersions;
 
+    private static final class DeferredVectorRetryBatch
+    {
+        final List<NGWVectorLayer> layers = new ArrayList<>();
+        long retryNotBefore;
+    }
+
     public SyncAdapter(
             Context context,
             boolean autoInitialize)
@@ -129,106 +143,244 @@ public class SyncAdapter
             ContentProviderClient contentProviderClient,
             SyncResult syncResult)
     {
-        
-        ((IGISApplication)getContext().getApplicationContext()).setError(
-                null,null,0);
+        IGISApplication gisApp = (IGISApplication) getContext().getApplicationContext();
+        Log.d("SSYNC", "super.onPerformSync for " + account.name);
+        gisApp.setError(null, null, 0);
 
-        ((IGISApplication)getContext().getApplicationContext()).stopHandler();
-        HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync for" + account.name + " ngw part start");
-        Log.d(TAG, "onPerformSync");
+        // completePerformSync emits SYNC_FINISH (or SYNC_CANCELED) in the normal/offline-manual paths.
+        // Track that so the finally below can broadcast a safety SYNC_FINISH on any early return or
+        // uncaught failure — otherwise a UI spinner waiting on finish could hang forever.
+        boolean finishBroadcast = false;
+        try {
+            if (gisApp.isLayerFillServiceBusy()) {
+                HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync skipped (layer fill in progress) for " + account.name);
+                Log.d(TAG, "onPerformSync skipped: LayerFillService busy");
+                return;
+            }
 
-        MapContentProviderHelper mapContentProviderHelper =(MapContentProviderHelper) MapBase.getInstance();
+            final boolean manualSync = isManualSync(bundle);
+            final NetworkUtil networkUtil = new NetworkUtil(getContext());
+            if (!networkUtil.isNetworkAvailable()) {
+                HyperLog.v(Constants.TAG, "SyncAdapter: aborted — network unavailable, manual=" + manualSync);
+                if (!manualSync) {
+                    return;
+                }
+                SyncResultUtil.beginSync();
+                try {
+                    gisApp.stopHandler();
+                    NGWSyncService.markSyncStarted();
+                    getContext().sendBroadcast(
+                            (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
+                    SyncResultUtil.markNetworkUnavailable(syncResult);
+                    completePerformSync(account, syncResult, (MapContentProviderHelper) MapBase.getInstance(), true);
+                    finishBroadcast = true;
+                } finally {
+                    SyncResultUtil.endSync();
+                }
+                return;
+            }
 
-        getContext().sendBroadcast(
-                (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
+            gisApp.stopHandler();
+            HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync for" + account.name + " ngw part start manual=" + manualSync);
+            Log.d(TAG, "onPerformSync");
 
-        mVersions = new HashMap<>();
-        HyperLog.v(Constants.TAG, "SyncAdapter: mapContentProviderHelper is " + mapContentProviderHelper);
-        if (null != mapContentProviderHelper) {
-            // FIXME Temporary fix till 3.0
-//            mapContentProviderHelper.load(); // reload map for deleted/added layers
+            SyncResultUtil.beginSync();
+            try {
+                MapContentProviderHelper mapContentProviderHelper = (MapContentProviderHelper) MapBase.getInstance();
 
-            sync(account, mapContentProviderHelper, authority, syncResult, bundle);
+                NGWSyncService.markSyncStarted();
+                getContext().sendBroadcast(
+                        (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
+
+                mVersions = new HashMap<>();
+                HyperLog.v(Constants.TAG, "SyncAdapter: mapContentProviderHelper is " + mapContentProviderHelper);
+                if (null != mapContentProviderHelper) {
+                    Log.d("SSYNC", "mapContentProviderHelper!=null start sync");
+
+                    sync(account, mapContentProviderHelper, authority, syncResult, bundle);
+                    if (!isCanceled()
+                            && (bundle == null || bundle.getString(ACTION_LPATH) == null)) {
+                        syncNgwConfigForSyncDisabledLayers(
+                                account, mapContentProviderHelper, authority, syncResult);
+                        CollectorProjectCompositionSync.runApplyForAccount(
+                                getContext(), account, mapContentProviderHelper);
+                    }
+                } else {
+                    Log.d("SSYNC", "mapContentProviderHelper=null");
+                }
+
+                completePerformSync(account, syncResult, mapContentProviderHelper, manualSync);
+                finishBroadcast = true;
+            } finally {
+                SyncResultUtil.endSync();
+            }
+        } catch (Throwable t) {
+            // Never let a sync crash silently: log with stack and mark an I/O error so the framework
+            // reschedules instead of treating this as a clean success.
+            HyperLog.w(Constants.TAG, "SyncAdapter.onPerformSync uncaught for " + account.name, t);
+            syncResult.stats.numIoExceptions++;
+        } finally {
+            NGWSyncService.markSyncFinished();
+            if (!finishBroadcast) {
+                Intent finish = new Intent(SYNC_FINISH).setPackage(getContext().getPackageName());
+                HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH (safety/early-exit) sent");
+                getContext().sendBroadcast(finish);
+            }
         }
+    }
 
+    protected static boolean isManualSync(Bundle bundle) {
+        return bundle != null && bundle.getBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, false);
+    }
+
+    private void buildSyncErrorMessage(SyncResult syncResult) {
+        mError = "";
+        if (syncResult.stats.numIoExceptions > 0) {
+            mError += SyncResultUtil.ioErrorMessage(getContext(), syncResult);
+        }
+        if (syncResult.stats.numParseExceptions > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_parse);
+        }
+        if (syncResult.stats.numAuthExceptions > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.error_auth_and_forbidden);
+        }
+        if (syncResult.stats.numConflictDetectedExceptions > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_conflict);
+        }
+        if (syncResult.stats.numInserts > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_insert);
+        }
+        if (syncResult.stats.numUpdates > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_change);
+        }
+        if (syncResult.stats.numDeletes > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_delete);
+        }
+        if (syncResult.stats.numEntries > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_server);
+        }
+        if (syncResult.stats.numSkippedEntries > 0) {
+            if (mError.length() > 0) {
+                mError += "\r\n";
+            }
+            mError += getContext().getString(R.string.sync_error_oom);
+        }
+    }
+
+    private void completePerformSync(
+            Account account,
+            SyncResult syncResult,
+            MapContentProviderHelper mapContentProviderHelper,
+            boolean manualSync)
+    {
         if (isCanceled()) {
             Log.d(Constants.TAG, "onPerformSync - SYNC_CANCELED is sent");
             HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_CANCELED is sent");
+            NGWSyncService.markSyncFinished();
             getContext().sendBroadcast(new Intent(SYNC_CANCELED).setPackage(getContext().getPackageName()));
             return;
         }
 
-        final String accountNameHash = "_" + account.name.hashCode();
-        SharedPreferences settings = getContext().getSharedPreferences(Constants.PREFERENCES, MODE_MULTI_PROCESS);
-        SharedPreferences.Editor editor = settings.edit();
-        editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP + accountNameHash, System.currentTimeMillis());
-        editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP, System.currentTimeMillis());
-        editor.apply();
+        if (manualSync) {
+            buildSyncErrorMessage(syncResult);
+        } else {
+            mError = "";
+            if (syncResult.hasError()) {
+                HyperLog.v(Constants.TAG, "SyncAdapter: auto sync finished with errors (silent) "
+                        + ProdLogUtil.formatSyncResultStats(syncResult));
+            }
+        }
 
-        mError = "";
-        if (syncResult.stats.numIoExceptions > 0)
-            mError += getContext().getString(R.string.sync_error_io);
-        if (syncResult.stats.numParseExceptions > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_parse);
+        if (!TextUtils.isEmpty(mError) || syncResult.hasError()) {
+            HyperLog.w(Constants.TAG, "SyncAdapter finish account=\""
+                    + ProdLogUtil.truncateForLog(account.name, 96) + "\" manual=" + manualSync
+                    + " userMsg=\"" + ProdLogUtil.truncateForLog(mError, 640) + "\" "
+                    + ProdLogUtil.formatSyncResultStats(syncResult));
         }
-        if (syncResult.stats.numAuthExceptions > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.error_auth_and_forbidden);
+
+        if (mapContentProviderHelper != null && !syncResult.hasError()) {
+            final String accountNameHash = "_" + account.name.hashCode();
+            SharedPreferences settings = getContext().getSharedPreferences(Constants.PREFERENCES, MODE_MULTI_PROCESS);
+            SharedPreferences.Editor editor = settings.edit();
+            long now = System.currentTimeMillis();
+            editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP + accountNameHash, now);
+            editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP, now);
+            editor.apply();
         }
-        if (syncResult.stats.numConflictDetectedExceptions > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_conflict);
-        }
-        if (syncResult.stats.numInserts > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_insert);
-        }
-        if (syncResult.stats.numUpdates > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_change);
-        }
-        if (syncResult.stats.numDeletes > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_delete);
-        }
-        if (syncResult.stats.numEntries > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_server);
-        }
-        if (syncResult.stats.numSkippedEntries > 0) {
-            if (mError.length() > 0)
-                mError += "\r\n";
-            mError += getContext().getString(R.string.sync_error_oom);
-        }
+
         Log.d("SSYNC", "onPerformSync END account - " + account.name);
         Log.d("SSYNC", "onPerformSync END error - " + mError);
 
         Intent finish = new Intent(SYNC_FINISH);
-        if (!TextUtils.isEmpty(mError))
+        if (!TextUtils.isEmpty(mError)) {
             finish.putExtra(EXCEPTION, mError);
-        HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH is sent / mError is " + (TextUtils.isEmpty(mError) ? null:mError));
+        }
+        HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH is sent / mError is "
+                + (TextUtils.isEmpty(mError) ? null : mError));
+        NGWSyncService.markSyncFinished();
         finish.setPackage(getContext().getPackageName());
         getContext().sendBroadcast(finish);
+    }
 
-//        Log.e("RRFRSH", "SyncAdapter ngw - onPerformSync end");
-}
 
+    /**
+     * @return true if the map contains an {@link NGWVectorLayer} for this account (any sync type);
+     *         used so onPerformSync can run to reconcile NGW description/config from the server
+     *         when data sync is disabled for all such layers.
+     */
+    private static boolean hasNgwVectorLayerForAccount(LayerGroup group, String accountName) {
+        for (int i = 0; i < group.getLayerCount(); i++) {
+            ILayer layer = group.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                if (hasNgwVectorLayerForAccount((LayerGroup) layer, accountName)) {
+                    return true;
+                }
+            } else if (layer instanceof NGWVectorLayer) {
+                if (accountName.equals(((INGWLayer) layer).getAccountName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     public boolean isSomeToSync(Account account){
+        Log.d("SSYNC", "isSomeToSync start for " + account.name);
 
         String name = getContext().getPackageName() + "_preferences";
         SharedPreferences mSharedPreferences = getContext().getSharedPreferences(name, MODE_MULTI_PROCESS);
         boolean trackSync = mSharedPreferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, false);
 
         MapContentProviderHelper layerGroup =(MapContentProviderHelper) MapBase.getInstance();
+        if (layerGroup == null) {
+            Log.d("SSYNC", "isSomeToSync: map is null, nothing to sync");
+            return false;
+        }
+        if (hasNgwVectorLayerForAccount(layerGroup, account.name)) {
+            Log.d("SSYNC", "isSomeToSync result  true (has NGW vector for account)");
+            return true;
+        }
         List<ILayer> layersToSync = new ArrayList<>();
         for (int i = 0; i < layerGroup.getLayerCount(); i++){
             ILayer layer = layerGroup.getLayer(i);
@@ -254,6 +406,9 @@ public class SyncAdapter
             if (!exists)
                 layersToSync.add(layer);
         }
+
+        Log.d("SSYNC", "isSomeToSync result  " + String.valueOf(layersToSync.size()>0));
+
         return layersToSync.size()>0;
     }
 
@@ -265,6 +420,24 @@ public class SyncAdapter
             SyncResult syncResult,
             Bundle bundle)
     {
+        DeferredVectorRetryBatch retryBatch = new DeferredVectorRetryBatch();
+        syncFirstPass(account, layerGroup, authority, syncResult, bundle, retryBatch);
+        retryDeferredVectorLayers(
+                retryBatch.layers,
+                retryBatch.retryNotBefore,
+                authority,
+                syncResult);
+    }
+
+    private void syncFirstPass(
+            Account account,
+            LayerGroup layerGroup,
+            String authority,
+            SyncResult syncResult,
+            Bundle bundle,
+            DeferredVectorRetryBatch retryBatch)
+    {
+        Log.e("SYNC2S", "sync syncAdapter account  " + account.name );
         Log.d("SSYNC", "sync syncAdapter account - " + account.name);
 
         HyperLog.v(Constants.TAG, "SyncAdapter: StartSynchronization");
@@ -276,19 +449,35 @@ public class SyncAdapter
         boolean trackSync = mSharedPreferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, false);
 
         List<ILayer> layersToSync = new ArrayList<>();
+        Log.d("SSYNC", "pre check bundle != null && bundle.getString(ACTION_LPATH) != null" );
 
         if (bundle != null && bundle.getString(ACTION_LPATH) != null){
+            Log.d("SSYNC", "bundle.getString(ACTION_LPATH) != null PASS" );
+
             String lpath = bundle.getString(ACTION_LPATH);
+            Log.d("SSYNC", "lpath = " + lpath );
+
             for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+
                 ILayer layer = layerGroup.getLayer(i);
-                if (layer instanceof INGWLayer && !account.name.equals(((INGWLayer)layer).getAccountName()))
+                Log.d("SSYNC", "check layer  " + layer.getName() );
+                if (layer instanceof INGWLayer && !account.name.equals(((INGWLayer)layer).getAccountName())) {
+                    Log.d("SSYNC", "continue" );
                     continue;
-                if (layer.getPath().equals(lpath)){
+                }
+
+                Log.d("SSYNC", "layer.getPath() : " + layer.getPath().toString() );
+
+                if (layer.getPath().toString().equals(lpath)){
+                    Log.d("SSYNC", "layer.getPath().equals(lpath)" );
                     layersToSync.add(layer);
                     break;
-                }
+                } else
+                    Log.d("SSYNC", "NOT layer.getPath().equals(lpath)" );
             }
         }else {
+            Log.d("SSYNC", "check bundle != null && bundle.getString(ACTION_LPATH) != null  ELSEEEE" );
+
 
             for (int i = 0; i < layerGroup.getLayerCount(); i++) {
                 ILayer layer = layerGroup.getLayer(i);
@@ -326,7 +515,13 @@ public class SyncAdapter
             }
             if (layer instanceof LayerGroup) {
                 HyperLog.v(Constants.TAG, "SyncAdapter: start sync " + layer.getName() + " is a layer group");
-                sync(account, (LayerGroup) layer, authority, syncResult, bundle);
+                syncFirstPass(
+                        account,
+                        (LayerGroup) layer,
+                        authority,
+                        syncResult,
+                        bundle,
+                        retryBatch);
             } else if (layer instanceof INGWLayer) {
                 HyperLog.v(Constants.TAG, "SyncAdapter: start sync " + layer.getName() + " is a NGW layer");
                 INGWLayer ngwLayer = (INGWLayer) layer;
@@ -335,14 +530,108 @@ public class SyncAdapter
                     mVersions.put(accountName, NGWUtil.getNgwVersion(getContext(), accountName));
 
                 Pair<Integer, Integer> ver = mVersions.get(accountName);
-                ngwLayer.sync(authority, ver, syncResult);
+                if (ngwLayer instanceof NGWVectorLayer) {
+                    NGWVectorLayer vectorLayer = (NGWVectorLayer) ngwLayer;
+                    if (vectorLayer.syncDeferringTransientPullFailure(
+                            authority, ver, syncResult)) {
+                        retryBatch.layers.add(vectorLayer);
+                        retryBatch.retryNotBefore = Math.max(
+                                retryBatch.retryNotBefore,
+                                NgwSyncRetryPolicy.retryNotBefore(
+                                        SystemClock.elapsedRealtime()));
+                        HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry layer=\""
+                                + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                                + "\" res=" + vectorLayer.getRemoteId());
+                    }
+                } else {
+                    ngwLayer.sync(authority, ver, syncResult);
+                }
             } else if (layer instanceof TrackLayer) {
                 HyperLog.v(Constants.TAG, "SyncAdapter: start sync" + layer.getName() + " is a tracking layer");
                 ((TrackLayer) layer).sync();
             }
             HyperLog.v(Constants.TAG, "SyncAdapter: Sync Ended for " + layer.getName() + " layer");
         }
+
         Log.d("SSYNC", "END sync syncAdapter account - " + account.name);
+    }
+
+    private void retryDeferredVectorLayers(
+            List<NGWVectorLayer> layers,
+            long retryNotBefore,
+            String authority,
+            SyncResult syncResult)
+    {
+        if (layers.isEmpty() || isCanceled()) {
+            return;
+        }
+
+        long waitMs = NgwSyncRetryPolicy.remainingDelay(
+                retryNotBefore,
+                SystemClock.elapsedRealtime());
+        HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry pass layers="
+                + layers.size() + " waitMs=" + waitMs);
+        while (waitMs > 0L && !isCanceled()) {
+            SystemClock.sleep(Math.min(waitMs, 1_000L));
+            waitMs = NgwSyncRetryPolicy.remainingDelay(
+                    retryNotBefore,
+                    SystemClock.elapsedRealtime());
+        }
+        if (isCanceled()) {
+            return;
+        }
+
+        for (NGWVectorLayer layer : layers) {
+            if (isCanceled()) {
+                return;
+            }
+
+            Pair<Integer, Integer> ver = mVersions.get(layer.getAccountName());
+            long ioBefore = syncResult.stats.numIoExceptions;
+            HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry start layer=\""
+                    + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                    + "\" res=" + layer.getRemoteId());
+            layer.sync(authority, ver, syncResult);
+
+            if (layer.didLastSyncHaveTransientPullFailure()) {
+                HyperLog.w(Constants.TAG, "SyncAdapter: deferred transient retry exhausted layer=\""
+                        + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                        + "\" res=" + layer.getRemoteId());
+            } else if (syncResult.stats.numIoExceptions > ioBefore) {
+                HyperLog.w(Constants.TAG, "SyncAdapter: deferred retry failed non-transient layer=\""
+                        + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                        + "\" res=" + layer.getRemoteId());
+            } else {
+                HyperLog.v(Constants.TAG, "SyncAdapter: deferred transient retry succeeded layer=\""
+                        + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                        + "\" res=" + layer.getRemoteId());
+            }
+        }
+    }
+
+    private void syncNgwConfigForSyncDisabledLayers(
+            Account account,
+            LayerGroup layerGroup,
+            String authority,
+            SyncResult syncResult) {
+        if (isCanceled()) {
+            return;
+        }
+        for (int i = 0; i < layerGroup.getLayerCount(); i++) {
+            if (isCanceled()) {
+                return;
+            }
+            ILayer layer = layerGroup.getLayer(i);
+            if (layer instanceof LayerGroup) {
+                syncNgwConfigForSyncDisabledLayers(
+                        account, (LayerGroup) layer, authority, syncResult);
+            } else if (layer instanceof NGWVectorLayer) {
+                INGWLayer ngw = (INGWLayer) layer;
+                if (account.name.equals(ngw.getAccountName()) && ngw.getSyncType() == SYNC_NONE) {
+                    ((NGWVectorLayer) layer).syncNgwResourceConfigOnly(authority, syncResult);
+                }
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")

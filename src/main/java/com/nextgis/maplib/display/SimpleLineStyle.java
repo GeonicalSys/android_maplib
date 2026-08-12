@@ -41,7 +41,18 @@ import org.json.JSONObject;
 import java.util.List;
 
 import static com.nextgis.maplib.util.Constants.JSON_DISPLAY_NAME;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_DASH_ARRAY_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_BLUR_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_CAP_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_DASH_PRESET_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_GAP_WIDTH_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_JOIN_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_MITER_LIMIT_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_OFFSET_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_LINE_OUTLINE_MULTIPLIER_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_NAME_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_TEXT_COLOR_KEY;
+import static com.nextgis.maplib.util.Constants.JSON_TEXT_SIZE_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_TYPE_KEY;
 import static com.nextgis.maplib.util.Constants.JSON_VALUE_KEY;
 import static com.nextgis.maplib.util.GeoConstants.GTLineString;
@@ -51,11 +62,32 @@ public class SimpleLineStyle extends Style implements ITextStyle {
     public final static int LineStyleSolid = 1;
     public final static int LineStyleDash = 2;
     public final static int LineStyleEdgingSolid = 3;
+    public final static int LineStyleEdgingDash = 4;
 
     protected int mType;
     protected Paint.Cap mStrokeCap;
+    protected int mLineCap = MplStyleMapper.LINE_CAP_ROUND;
+    protected int mLineJoin = MplStyleMapper.LINE_JOIN_ROUND;
+    protected float mLineMiterLimit = MplStyleMapper.DEFAULT_LINE_MITER_LIMIT;
+    protected float mLineBlur = MplStyleMapper.DEFAULT_LINE_BLUR;
+    protected int mDashPreset = MplStyleMapper.DASH_PRESET_SHORT;
+    protected String mDashArray;
+    protected float mLineOffset;
+    protected float mLineGapWidth;
+    protected float mLineOutlineMultiplier = 3f;
     protected String mField;
     protected String mText;
+    protected float mTextSize = 3f;
+    protected int mTextColor = Color.BLACK;
+    protected LabelAttributes mLabelAttributes = LabelAttributes.defaults();
+
+    public LabelAttributes getLabelAttributes() {
+        return mLabelAttributes;
+    }
+
+    public void setLabelAttributes(LabelAttributes labelAttributes) {
+        mLabelAttributes = labelAttributes != null ? labelAttributes : LabelAttributes.defaults();
+    }
 
     public SimpleLineStyle() {
         super();
@@ -66,6 +98,7 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         super(fillColor, outColor);
         mType = type;
         mStrokeCap = Paint.Cap.BUTT;
+        mTextColor = outColor;
     }
 
     @Override
@@ -73,8 +106,20 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         SimpleLineStyle obj = (SimpleLineStyle) super.clone();
         obj.mType = mType;
         obj.mStrokeCap = mStrokeCap;
+        obj.mLineCap = mLineCap;
+        obj.mLineJoin = mLineJoin;
+        obj.mLineMiterLimit = mLineMiterLimit;
+        obj.mLineBlur = mLineBlur;
+        obj.mDashPreset = mDashPreset;
+        obj.mDashArray = mDashArray;
+        obj.mLineOffset = mLineOffset;
+        obj.mLineGapWidth = mLineGapWidth;
+        obj.mLineOutlineMultiplier = mLineOutlineMultiplier;
         obj.mText = mText;
         obj.mField = mField;
+        obj.mTextSize = mTextSize;
+        obj.mTextColor = mTextColor;
+        obj.mLabelAttributes = mLabelAttributes.clone();
         return obj;
     }
 
@@ -97,6 +142,10 @@ public class SimpleLineStyle extends Style implements ITextStyle {
             case LineStyleEdgingSolid:
                 mainPath = drawSolidEdgingLine(scaledWidth, lineString, display);
                 break;
+
+            case LineStyleEdgingDash:
+                mainPath = drawDashEdgingLine(scaledWidth, lineString, display);
+                break;
         }
 
         drawText(scaledWidth, mainPath, display);
@@ -107,7 +156,7 @@ public class SimpleLineStyle extends Style implements ITextStyle {
             return;
 
         Paint textPaint = new Paint();
-        textPaint.setColor(mOutColor);
+        textPaint.setColor(mTextColor);
         textPaint.setAntiAlias(true);
         textPaint.setStyle(Paint.Style.FILL);
         textPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -299,6 +348,70 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         return path;
     }
 
+    protected Path drawDashEdgingLine(float scaledWidth, GeoLineString lineString, GISDisplay display) {
+        List<GeoPoint> points = lineString.getPoints();
+
+        Path mainPath = new Path();
+        mainPath.incReserve(points.size());
+        mainPath.moveTo((float) points.get(0).getX(), (float) points.get(0).getY());
+        for (int i = 1; i < points.size(); ++i) {
+            mainPath.lineTo((float) points.get(i).getX(), (float) points.get(i).getY());
+        }
+
+        Paint edgingPaint = new Paint();
+        edgingPaint.setColor(mOutColor);
+        edgingPaint.setAntiAlias(true);
+        edgingPaint.setStyle(Paint.Style.STROKE);
+        edgingPaint.setStrokeCap(Paint.Cap.BUTT);
+        edgingPaint.setStrokeWidth(scaledWidth * 3);
+        display.drawPath(mainPath, edgingPaint);
+
+        Paint dashPaint = new Paint();
+        dashPaint.setColor(mColor);
+        dashPaint.setAntiAlias(true);
+        dashPaint.setStyle(Paint.Style.STROKE);
+        dashPaint.setStrokeCap(Paint.Cap.BUTT);
+        dashPaint.setStrokeWidth(scaledWidth);
+
+        PathMeasure pm = new PathMeasure(mainPath, false);
+        float[] coordinates = new float[2];
+        float length = pm.getLength();
+        float dash = (float) (10 / display.getScale());
+        float gap = (float) (5 / display.getScale());
+        float distance = dash;
+        boolean isDash = true;
+
+        Path dashPath = new Path();
+        dashPath.incReserve((int) (2 * length / (dash + gap)));
+        dashPath.moveTo((float) points.get(0).getX(), (float) points.get(0).getY());
+
+        while (distance < length) {
+            pm.getPosTan(distance, coordinates, null);
+            if (isDash) {
+                dashPath.lineTo(coordinates[0], coordinates[1]);
+                distance += gap;
+            } else {
+                dashPath.moveTo(coordinates[0], coordinates[1]);
+                distance += dash;
+            }
+            isDash = !isDash;
+        }
+
+        if (isDash) {
+            distance = distance - dash;
+            float rest = length - distance;
+            if (rest > (float) (1 / display.getScale())) {
+                distance = length - 1;
+                pm.getPosTan(distance, coordinates, null);
+                dashPath.lineTo(coordinates[0], coordinates[1]);
+            }
+        }
+
+        display.drawPath(dashPath, dashPaint);
+
+        return mainPath;
+    }
+
     public int getType() {
         return mType;
     }
@@ -328,11 +441,131 @@ public class SimpleLineStyle extends Style implements ITextStyle {
             mText = null;
     }
 
+    public float getTextSize() {
+        return mTextSize;
+    }
+
+    public void setTextSize(float textSize) {
+        mTextSize = textSize;
+    }
+
+    public int getTextColor() {
+        return mTextColor;
+    }
+
+    public void setTextColor(int textColor) {
+        mTextColor = textColor;
+    }
+
+    public int getLineCap() {
+        return mLineCap;
+    }
+
+    public void setLineCap(int lineCap) {
+        mLineCap = lineCap;
+    }
+
+    public int getLineJoin() {
+        return mLineJoin;
+    }
+
+    public void setLineJoin(int lineJoin) {
+        mLineJoin = lineJoin;
+    }
+
+    public float getLineMiterLimit() {
+        return mLineMiterLimit;
+    }
+
+    public void setLineMiterLimit(float lineMiterLimit) {
+        mLineMiterLimit = lineMiterLimit;
+    }
+
+    public float getLineBlur() {
+        return mLineBlur;
+    }
+
+    public void setLineBlur(float lineBlur) {
+        mLineBlur = Math.max(0f, lineBlur);
+    }
+
+    public int getDashPreset() {
+        return mDashPreset;
+    }
+
+    public void setDashPreset(int dashPreset) {
+        mDashPreset = dashPreset;
+    }
+
+    public String getDashArray() {
+        return mDashArray;
+    }
+
+    public void setDashArray(String dashArray) {
+        mDashArray = dashArray != null && !dashArray.trim().isEmpty()
+                ? dashArray.trim()
+                : null;
+    }
+
+    public float getLineOffset() {
+        return mLineOffset;
+    }
+
+    public void setLineOffset(float lineOffset) {
+        mLineOffset = lineOffset;
+    }
+
+    public float getLineGapWidth() {
+        return mLineGapWidth;
+    }
+
+    public void setLineGapWidth(float lineGapWidth) {
+        mLineGapWidth = Math.max(0f, lineGapWidth);
+    }
+
+    public float getLineOutlineMultiplier() {
+        return mLineOutlineMultiplier > 0f ? mLineOutlineMultiplier : 3f;
+    }
+
+    public void setLineOutlineMultiplier(float lineOutlineMultiplier) {
+        mLineOutlineMultiplier = lineOutlineMultiplier > 0f ? lineOutlineMultiplier : 3f;
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject rootConfig = super.toJSON();
         rootConfig.put(JSON_NAME_KEY, "SimpleLineStyle");
         rootConfig.put(JSON_TYPE_KEY, mType);
+        rootConfig.put(JSON_TEXT_SIZE_KEY, mTextSize);
+        rootConfig.put(JSON_TEXT_COLOR_KEY, mTextColor);
+        if (mLineCap != MplStyleMapper.LINE_CAP_ROUND) {
+            rootConfig.put(JSON_LINE_CAP_KEY, mLineCap);
+        }
+        if (mLineJoin != MplStyleMapper.LINE_JOIN_ROUND) {
+            rootConfig.put(JSON_LINE_JOIN_KEY, mLineJoin);
+        }
+        if (mLineJoin == MplStyleMapper.LINE_JOIN_MITER
+                && mLineMiterLimit != MplStyleMapper.DEFAULT_LINE_MITER_LIMIT) {
+            rootConfig.put(JSON_LINE_MITER_LIMIT_KEY, mLineMiterLimit);
+        }
+        if (mDashPreset != MplStyleMapper.DASH_PRESET_SHORT) {
+            rootConfig.put(JSON_LINE_DASH_PRESET_KEY, mDashPreset);
+        }
+        if (mDashArray != null) {
+            rootConfig.put(JSON_LINE_DASH_ARRAY_KEY, mDashArray);
+        }
+        if (mLineOffset != 0f) {
+            rootConfig.put(JSON_LINE_OFFSET_KEY, mLineOffset);
+        }
+        if (mLineGapWidth > 0f) {
+            rootConfig.put(JSON_LINE_GAP_WIDTH_KEY, mLineGapWidth);
+        }
+        if (getLineOutlineMultiplier() != 3f) {
+            rootConfig.put(JSON_LINE_OUTLINE_MULTIPLIER_KEY, getLineOutlineMultiplier());
+        }
+        if (mLineBlur > MplStyleMapper.DEFAULT_LINE_BLUR) {
+            rootConfig.put(JSON_LINE_BLUR_KEY, mLineBlur);
+        }
 
         if (null != mText) {
             rootConfig.put(JSON_DISPLAY_NAME, mText);
@@ -340,6 +573,7 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         if (null != mField) {
             rootConfig.put(JSON_VALUE_KEY, mField);
         }
+        mLabelAttributes.mergeInto(rootConfig);
 
         return rootConfig;
     }
@@ -348,6 +582,24 @@ public class SimpleLineStyle extends Style implements ITextStyle {
     public void fromJSON(JSONObject jsonObject) throws JSONException {
         super.fromJSON(jsonObject);
         mType = jsonObject.getInt(JSON_TYPE_KEY);
+        mTextSize = (float) jsonObject.optDouble(JSON_TEXT_SIZE_KEY, 3);
+        if (jsonObject.has(JSON_TEXT_COLOR_KEY)) {
+            mTextColor = jsonObject.getInt(JSON_TEXT_COLOR_KEY);
+        } else {
+            mTextColor = mOutColor;
+        }
+        mLineCap = jsonObject.optInt(JSON_LINE_CAP_KEY, MplStyleMapper.LINE_CAP_ROUND);
+        mLineJoin = jsonObject.optInt(JSON_LINE_JOIN_KEY, MplStyleMapper.LINE_JOIN_ROUND);
+        mLineMiterLimit = (float) jsonObject.optDouble(
+                JSON_LINE_MITER_LIMIT_KEY, MplStyleMapper.DEFAULT_LINE_MITER_LIMIT);
+        mDashPreset = jsonObject.optInt(JSON_LINE_DASH_PRESET_KEY, MplStyleMapper.DASH_PRESET_SHORT);
+        setDashArray(jsonObject.optString(JSON_LINE_DASH_ARRAY_KEY, null));
+        mLineOffset = (float) jsonObject.optDouble(JSON_LINE_OFFSET_KEY, 0);
+        mLineGapWidth = (float) jsonObject.optDouble(JSON_LINE_GAP_WIDTH_KEY, 0);
+        setLineOutlineMultiplier((float) jsonObject.optDouble(
+                JSON_LINE_OUTLINE_MULTIPLIER_KEY, 3f));
+        mLineBlur = (float) jsonObject.optDouble(
+                JSON_LINE_BLUR_KEY, MplStyleMapper.DEFAULT_LINE_BLUR);
 
         if (jsonObject.has(JSON_DISPLAY_NAME)) {
             mText = jsonObject.getString(JSON_DISPLAY_NAME);
@@ -355,6 +607,7 @@ public class SimpleLineStyle extends Style implements ITextStyle {
         if (jsonObject.has(JSON_VALUE_KEY)) {
             mField = jsonObject.getString(JSON_VALUE_KEY);
         }
+        mLabelAttributes.readFrom(jsonObject);
     }
 
 }

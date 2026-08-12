@@ -52,6 +52,8 @@ public class LayerWithStyles
     private List<Long> mStyles;
     private List<Long> mForms;
     private GeoEnvelope mExtent;
+    /** Collector project item «Редактируемый»; default true when not from collector. */
+    private boolean mCollectorEditable = true;
 
     protected LayerWithStyles(Parcel in)
     {
@@ -64,6 +66,7 @@ public class LayerWithStyles
         count = in.readInt();
         for (int i = 0; i < count; i++)
             mForms.add(in.readLong());
+        mCollectorEditable = in.readInt() != 0;
     }
 
 
@@ -121,6 +124,7 @@ public class LayerWithStyles
                 parcel.writeLong(form);
             }
         }
+        parcel.writeInt(mCollectorEditable ? 1 : 0);
     }
 
 
@@ -268,5 +272,13 @@ public class LayerWithStyles
 
     public GeoEnvelope getExtent() {
         return mExtent;
+    }
+
+    public boolean isCollectorEditable() {
+        return mCollectorEditable;
+    }
+
+    public void setCollectorEditable(boolean collectorEditable) {
+        mCollectorEditable = collectorEditable;
     }
 }

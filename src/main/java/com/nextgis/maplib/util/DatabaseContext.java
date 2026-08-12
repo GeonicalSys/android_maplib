@@ -26,6 +26,7 @@ package com.nextgis.maplib.util;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.database.Cursor;
 import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
@@ -100,11 +101,16 @@ public class DatabaseContext
         MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
         SQLiteDatabase db = map.getDatabase(false);
         // speedup writing
-        db.rawQuery("PRAGMA synchronous=OFF", null);
+        Cursor c;
+        c = db.rawQuery("PRAGMA synchronous=OFF", null);
+        try { c.moveToFirst(); } finally { c.close(); }
         //db.rawQuery("PRAGMA locking_mode=EXCLUSIVE", null);
-        db.rawQuery("PRAGMA journal_mode=OFF", null);
-        db.rawQuery("PRAGMA count_changes=OFF", null);
-        db.rawQuery("PRAGMA cache_size=15000", null);
+        c = db.rawQuery("PRAGMA journal_mode=OFF", null);
+        try { c.moveToFirst(); } finally { c.close(); }
+        c = db.rawQuery("PRAGMA count_changes=OFF", null);
+        try { c.moveToFirst(); } finally { c.close(); }
+        c = db.rawQuery("PRAGMA cache_size=15000", null);
+        try { c.moveToFirst(); } finally { c.close(); }
 
         return db;
     }

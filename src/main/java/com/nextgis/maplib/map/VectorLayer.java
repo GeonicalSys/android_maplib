@@ -76,17 +76,22 @@ import com.nextgis.maplib.display.SimpleMarkerStyle;
 import com.nextgis.maplib.display.SimplePolygonStyle;
 import com.nextgis.maplib.display.Style;
 import com.nextgis.maplib.util.AttachItem;
+import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.DatabaseContext;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
+import com.nextgis.maplib.util.FeatureLabelUtil;
 import com.nextgis.maplib.util.FileUtil;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.GeoJSONUtil;
 import com.nextgis.maplib.util.LayerUtil;
+import com.nextgis.maplib.util.NgwLayerConfigAdapter;
 import com.nextgis.maplib.util.MapUtil;
 import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.SettingsConstants;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -107,6 +112,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -191,7 +197,10 @@ public class VectorLayer
 {
     protected static final String JSON_GEOMETRY_TYPE_KEY = "geometry_type";
     protected static final String JSON_FIELDS_KEY        = "fields";
-    protected static final String JSON_EDITABLE_KEY      = "is_editable";
+    public static final String JSON_FEATURE_LABEL_FIELD_KEY = "feature_label_field";
+    protected static final String JSON_EDITABLE_KEY           = "is_editable";
+    /** Collector project item policy (NGW «Редактируемый»); not the mobile edit-mode toggle. */
+    protected static final String JSON_COLLECTOR_EDITABLE_KEY = "collector_editable";
 
     protected static final String CONTENT_ATTACH_TYPE = "vnd.android.cursor.dir/*";
     protected static final String NO_SYNC             = "no_sync";
@@ -225,11 +234,16 @@ public class VectorLayer
     protected LinkedHashMap<String, Field> mFields;
 
     protected boolean mCacheLoaded, mIsCacheRebuilding;
+    private transient boolean mDeferredConfigSaveAfterLoad;
+    /** When true, bulk inserts skip insert broadcast and notifyInsert skips save/cache refresh (NGW/GeoJSON import). */
+    protected boolean mBulkImportMode;
     protected int     mGeometryType;
     protected long    mUniqId;
     protected boolean mIsLocked;
 
     protected boolean mIsEditable;
+    /** When false, layer is display-only per collector project (not overridable via {@link #JSON_EDITABLE_KEY}). */
+    protected boolean mCollectorEditable = true;
 
     static final boolean useNewLargeDataload = true;
     /**
@@ -281,6 +295,25 @@ public class VectorLayer
         mLayerType = LAYERTYPE_LOCAL_VECTOR;
 
         mUniqId = Constants.NOT_FOUND;
+    }
+
+
+    /**
+     * Start bulk feature import: suppress per-row notifications and defer writing R-tree in {@link #toJSON()}
+     * until {@link #endBulkImport()} and a final {@link #save()}.
+     */
+    public void beginBulkImport()
+    {
+        mBulkImportMode = true;
+        mIsCacheRebuilding = true;
+    }
+
+
+    /** End bulk import; call before final {@link #save()} so extents and R-tree are persisted. */
+    public void endBulkImport()
+    {
+        mBulkImportMode = false;
+        mIsCacheRebuilding = false;
     }
 
 
@@ -524,22 +557,28 @@ public class VectorLayer
         } else
             rowId = insertInternal(values);
 
-        if (rowId != Constants.NOT_FOUND) {
-            //update bbox
-            cacheGeometryEnvelope(rowId, feature.getGeometry());
-            // add attach info
+        if (rowId == Constants.NOT_FOUND) {
+            // A batch cannot be considered valid after even one failed SQL insert. Let the
+            // surrounding transaction/fill task roll back and delete the incomplete layer instead
+            // of logging the same schema mismatch once for every remaining server feature.
+            throw new SQLiteException("Bulk feature insert failed for layer \""
+                    + getName() + "\" table=" + getPath().getName());
+        }
 
-            if (feature.getAttachments().keySet().size() > 0) {
-                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        for ( String key :  feature.getAttachments().keySet()){
-                            final AttachItem item = feature.getAttachments().get(key);
-                            putOneAttachment(item, feature);
-                        }
+        //update bbox
+        cacheGeometryEnvelope(rowId, feature.getGeometry());
+        // add attach info
+
+        if (feature.getAttachments().keySet().size() > 0) {
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    for ( String key :  feature.getAttachments().keySet()){
+                        final AttachItem item = feature.getAttachments().get(key);
+                        putOneAttachment(item, feature);
                     }
-                }, 500);
-            }
+                }
+            }, 500);
         }
     }
 
@@ -774,6 +813,7 @@ public class VectorLayer
     public void setRenderer(JSONObject jsonObject)
             throws JSONException
     {
+        NgwLayerConfigAdapter.adaptRenderer(jsonObject);
         String renderName = "";
         if (jsonObject.has(JSON_NAME_KEY)) {
             renderName = jsonObject.getString(JSON_NAME_KEY);
@@ -792,12 +832,21 @@ public class VectorLayer
         jsonStore.fromJSON(jsonObject);
 
         if (mRenderer instanceof RuleFeatureRenderer) {
-            IStyleRule rule = getStyleRule();
-            if (null != rule) {
-                RuleFeatureRenderer renderer = (RuleFeatureRenderer) mRenderer;
-                renderer.setStyleRule(rule);
+            IStyleRule rule = null;
+            if (jsonObject.has(JSON_STYLE_RULE_KEY)) {
+                JSONObject ruleJson = jsonObject.getJSONObject(JSON_STYLE_RULE_KEY);
+                FieldStyleRule fieldRule = new FieldStyleRule(this);
+                fieldRule.fromJSON(ruleJson);
+                rule = fieldRule;
+            }
+            if (rule == null) {
+                rule = getStyleRule();
+            }
+            if (rule != null) {
+                ((RuleFeatureRenderer) mRenderer).setStyleRule(rule);
             }
         }
+        VectorLayerRenderCache.invalidateOnStyleChange(this);
     }
 
 
@@ -831,6 +880,8 @@ public class VectorLayer
         JSONObject rootConfig = super.toJSON();
         rootConfig.put(JSON_GEOMETRY_TYPE_KEY, mGeometryType);
         rootConfig.put(JSON_EDITABLE_KEY, mIsEditable);
+        rootConfig.put(JSON_COLLECTOR_EDITABLE_KEY, mCollectorEditable);
+        rootConfig.put(JSON_FEATURE_LABEL_FIELD_KEY, getFeatureLabelField());
 
         if (null != mFields) {
             JSONArray fields = new JSONArray();
@@ -869,9 +920,11 @@ public class VectorLayer
     public void fromJSON(JSONObject jsonObject)
             throws JSONException, SQLiteException
     {
+        NgwLayerConfigAdapter.adaptLayerConfig(jsonObject);
         super.fromJSON(jsonObject);
         mGeometryType = jsonObject.getInt(JSON_GEOMETRY_TYPE_KEY);
         mIsEditable = jsonObject.optBoolean(JSON_EDITABLE_KEY, true);
+        mCollectorEditable = jsonObject.optBoolean(JSON_COLLECTOR_EDITABLE_KEY, true);
 
         if (jsonObject.has(JSON_FIELDS_KEY)) {
             mFields = new LinkedHashMap<>();
@@ -881,6 +934,18 @@ public class VectorLayer
                 field.fromJSON(fields.getJSONObject(i));
                 mFields.put(field.getName(), field);
             }
+        }
+
+        if (jsonObject.has(JSON_FEATURE_LABEL_FIELD_KEY)) {
+            String fieldName = FeatureLabelUtil.normalizeFieldName(
+                    jsonObject.optString(JSON_FEATURE_LABEL_FIELD_KEY, FIELD_ID),
+                    getFields());
+            getPreferences().edit()
+                    .putString(SettingsConstants.KEY_PREF_LAYER_LABEL, fieldName)
+                    .apply();
+        } else if (getPreferences().contains(SettingsConstants.KEY_PREF_LAYER_LABEL)) {
+            // Migrate the old preference after the complete (possibly NGW-subclass) load returns.
+            mDeferredConfigSaveAfterLoad = true;
         }
 
         if (jsonObject.has(Constants.JSON_BBOX_MAXX_KEY)) {
@@ -896,17 +961,52 @@ public class VectorLayer
             mExtents.setMinY(jsonObject.getDouble(Constants.JSON_BBOX_MINY_KEY));
         }
 
-        reloadCache();
+        // fromJSON() is also called by NGWVectorLayer before the subclass restores account,
+        // remote id, sync flags and ownership metadata. A cache mismatch may rebuild the R-tree,
+        // but it must not save the partially initialized layer config at this point.
+        reloadCache(false);
 
         if (jsonObject.has(Constants.JSON_RENDERERPROPS_KEY)) {
-            setRenderer(jsonObject.getJSONObject(Constants.JSON_RENDERERPROPS_KEY));
+            try {
+                setRenderer(jsonObject.getJSONObject(Constants.JSON_RENDERERPROPS_KEY));
+            } catch (Throwable rendererEx) {
+                // A malformed / foreign / partially-unsupported renderer or style must not fail the
+                // whole layer load (which would silently drop the layer from the map). Fall back to the
+                // default renderer so old or unexpected configs stay visible, and log which layer failed.
+                HyperLog.w(Constants.TAG, "VectorLayer.fromJSON: renderer parse failed for layer=\""
+                        + getName() + "\" - using default renderer", rendererEx);
+                mRenderer = null;
+                setDefaultRenderer();
+            }
         } else {
             setDefaultRenderer();
         }
     }
 
+    @Override
+    public boolean load()
+    {
+        mDeferredConfigSaveAfterLoad = false;
+        boolean loaded = super.load();
+        if (loaded && mDeferredConfigSaveAfterLoad) {
+            mDeferredConfigSaveAfterLoad = false;
+            if (!save()) {
+                HyperLog.w(Constants.TAG, "VectorLayer: failed to persist complete config after"
+                        + " spatial cache rebuild layer=\"" + getName() + "\"");
+            }
+        }
+        return loaded;
+    }
+
 
     protected synchronized void reloadCache()
+            throws SQLiteException
+    {
+        reloadCache(true);
+    }
+
+
+    private synchronized void reloadCache(boolean persistLayerConfigAfterRebuild)
             throws SQLiteException
     {
         //load vector cache
@@ -914,6 +1014,16 @@ public class VectorLayer
 
 //        Log.e("CCACHH","reloadCache mCache.load");
         mCache.load(new File(mPath, RTREE));
+
+        int dbRows = getSqliteTableRowCount();
+        int cacheRows = mCache.size();
+        if (dbRows >= 0 && cacheRows != dbRows) {
+            HyperLog.w(Constants.TAG, "VectorLayer: " + getName()
+                    + " spatial cache count mismatch cache=" + cacheRows
+                    + " db=" + dbRows + " - rebuilding");
+            rebuildCache(null, persistLayerConfigAfterRebuild);
+            return;
+        }
 
         mCacheLoaded = true;
     }
@@ -1329,6 +1439,7 @@ public class VectorLayer
     protected long insert(ContentValues contentValues)
     {
         if (!contentValues.containsKey(Constants.FIELD_GEOM)) {
+            logFeatureInsertFailure("missing geom", contentValues, null);
             return NOT_FOUND;
         }
 
@@ -1342,7 +1453,8 @@ public class VectorLayer
             try {
                 prepareGeometry(contentValues);
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                logFeatureInsertFailure("prepareGeometry failed", contentValues, e);
+                return Constants.NOT_FOUND;
             }
         }
 
@@ -1356,11 +1468,20 @@ public class VectorLayer
 
 
         //long rowId = db.insert(mPath.getName(), null, contentValues);
-        long rowId = insertViaSql(db, contentValues, mPath.getName());
+        long rowId;
+        try {
+            rowId = insertViaSql(db, contentValues, mPath.getName());
+        } catch (RuntimeException e) {
+            logFeatureInsertFailure("SQL insert failed", contentValues, e);
+            return Constants.NOT_FOUND;
+        }
 
+        if (rowId == Constants.NOT_FOUND) {
+            logFeatureInsertFailure("SQL insert returned NOT_FOUND", contentValues, null);
+            return Constants.NOT_FOUND;
+        }
 
-
-        if (rowId != Constants.NOT_FOUND) {
+        if (rowId != Constants.NOT_FOUND && !mBulkImportMode) {
             Intent notify = new Intent(Constants.NOTIFY_INSERT);
             notify.putExtra(FIELD_ID, rowId);
             notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
@@ -1392,7 +1513,7 @@ public class VectorLayer
                 " (" + cols + ") VALUES (" + vals + ")";
 
         Log.d("SSQL", sql);
-        Log.d("SSQL","args" +  args.toArray());
+        Log.d("SSQL", "args " + summarizeBindArgs(args));
 
         db.execSQL(sql, args.toArray());
 
@@ -1404,6 +1525,63 @@ public class VectorLayer
         }
         c.close();
         return id;
+    }
+
+    private void logFeatureInsertFailure(String reason, ContentValues contentValues, Exception error) {
+        String message = "FeatureInsert " + reason
+                + " layer=\"" + getName() + "\" path=" + getPath().getName()
+                + " id=" + getId()
+                + " geomType=" + getGeometryType()
+                + " values=" + summarizeContentValues(contentValues);
+        if (error == null) {
+            Log.w(Constants.TAG, message);
+            HyperLog.w(Constants.TAG, message);
+        } else {
+            Log.e(Constants.TAG, message, error);
+            HyperLog.w(Constants.TAG, message + " error=" + error.getClass().getSimpleName()
+                    + ": " + error.getMessage(), error);
+        }
+    }
+
+    private static String summarizeContentValues(ContentValues values) {
+        if (values == null) {
+            return "<null>";
+        }
+        StringBuilder sb = new StringBuilder("{size=").append(values.size()).append(", keys=[");
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : values.valueSet()) {
+            if (!first) {
+                sb.append(", ");
+            }
+            first = false;
+            Object value = entry.getValue();
+            sb.append(entry.getKey()).append(":");
+            if (value instanceof byte[]) {
+                sb.append("byte[").append(((byte[]) value).length).append("]");
+            } else {
+                sb.append(value == null ? "null" : value.getClass().getSimpleName());
+            }
+        }
+        return sb.append("]}").toString();
+    }
+
+    private static String summarizeBindArgs(List<Object> args) {
+        if (args == null) {
+            return "<null>";
+        }
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < args.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            Object arg = args.get(i);
+            if (arg instanceof byte[]) {
+                sb.append("byte[").append(((byte[]) arg).length).append("]");
+            } else {
+                sb.append(arg == null ? "null" : arg.getClass().getSimpleName());
+            }
+        }
+        return sb.append("]").toString();
     }
 
     public static int updateViaSql(SQLiteDatabase db,
@@ -1564,7 +1742,7 @@ public class VectorLayer
                             addChange(rowID, CHANGE_OPERATION_NEW);
                         }
 
-                        getContext().getContentResolver().notifyChange(resultUri, null, true);
+                        getContext().getContentResolver().notifyChange(resultUri, null, false);
                     }
                     return resultUri;
                 }
@@ -1606,7 +1784,7 @@ public class VectorLayer
                             if (hasNotFlags) {
                                 addChange(featureIdL, attachIdL, CHANGE_OPERATION_NEW);
                             }
-                            getContext().getContentResolver().notifyChange(resultUri, null, true);
+                            getContext().getContentResolver().notifyChange(resultUri, null, false);
                         }
                         return resultUri;
                     }
@@ -1735,7 +1913,7 @@ public class VectorLayer
                         if (hasNotFlags) {
                             addChange(NOT_FOUND, CHANGE_OPERATION_DELETE);
                         }
-                        getContext().getContentResolver().notifyChange(uri, null, true);
+                        getContext().getContentResolver().notifyChange(uri, null, false);
                     }
                 }
                 return result;
@@ -1771,7 +1949,7 @@ public class VectorLayer
                             addChange(featureIdL, CHANGE_OPERATION_DELETE);
                         }
 
-                        getContext().getContentResolver().notifyChange(uri, null, true);
+                        getContext().getContentResolver().notifyChange(uri, null, false);
                     }
                 }
                 return result;
@@ -2243,6 +2421,27 @@ public class VectorLayer
         mIsEditable = isEditable;
     }
 
+    /** Collector project «Редактируемый» policy (default true for non-collector layers). */
+    public boolean isCollectorEditable() {
+        return mCollectorEditable;
+    }
+
+    public void setCollectorEditable(boolean collectorEditable) {
+        mCollectorEditable = collectorEditable;
+    }
+
+    /**
+     * Whether this layer may be edited outside a managed Collector project.
+     *
+     * <p>{@link NGWVectorLayer} overrides this for project-managed layers, whose user-facing
+     * policy comes from the Collector item rather than the generic mobile {@code is_editable}
+     * flag.</p>
+     */
+    public boolean isEditingAllowed() {
+        return LayerEditingPolicy.isEditingAllowed(
+                mIsEditable, mCollectorEditable, false, true);
+    }
+
     public boolean isFieldsInitialized() {
         return mFields != null;
     }
@@ -2257,9 +2456,283 @@ public class VectorLayer
     }
 
 
+    /**
+     * Field used for feature titles and identify candidate names. This is independent from the
+     * renderer's text-label field.
+     */
+    public String getFeatureLabelField()
+    {
+        String fieldName = getPreferences().getString(
+                SettingsConstants.KEY_PREF_LAYER_LABEL,
+                FIELD_ID);
+        return FeatureLabelUtil.normalizeFieldName(fieldName, getFields());
+    }
+
+
+    /**
+     * Persist the feature-title field both in the legacy per-layer preference and layer config.
+     */
+    public boolean setFeatureLabelField(String fieldName)
+    {
+        String normalized = FeatureLabelUtil.normalizeFieldName(fieldName, getFields());
+        String previous = getPreferences().getString(
+                SettingsConstants.KEY_PREF_LAYER_LABEL,
+                FIELD_ID);
+
+        if (!getPreferences().edit()
+                .putString(SettingsConstants.KEY_PREF_LAYER_LABEL, normalized)
+                .commit()) {
+            return false;
+        }
+
+        if (save()) {
+            return true;
+        }
+
+        getPreferences().edit()
+                .putString(SettingsConstants.KEY_PREF_LAYER_LABEL, previous)
+                .apply();
+        return false;
+    }
+
+
+    public String getFeatureLabel(Feature feature)
+    {
+        return FeatureLabelUtil.resolve(feature, getFeatureLabelField());
+    }
+
+
     public Field getFieldByName(String name)
     {
         return mFields.get(name);
+    }
+
+    /**
+     * Verify that the SQLite table actually contains columns for every field in {@link #mFields}.
+     * Detects cases where the table was created with a stale/incomplete schema (e.g. interrupted
+     * initial fill or server-side field additions that didn't make it into CREATE TABLE).
+     *
+     * @return list of field names present in mFields but missing from the SQLite table;
+     *         empty list means the schema is consistent.
+     */
+    /**
+     * Apply "soft" config updates from server description without re-downloading data.
+     * Handles: new fields (ALTER TABLE), alias changes, renderer, visibility, zoom, name,
+     * sync settings, editable flag.
+     * Does NOT touch geometry_type or field type changes (those require rebuild).
+     *
+     * @param diff result from {@link com.nextgis.maplib.util.LayerConfigDiff#compare}
+     * @return true if any changes were applied
+     */
+    /** Set by {@link #applySoftConfigUpdate} when an ALTER TABLE (added column) failed to apply. */
+    private boolean mLastSoftConfigAlterFailed = false;
+
+    /**
+     * @return true if the most recent {@link #applySoftConfigUpdate} left a schema change unapplied
+     *         (e.g. ALTER TABLE failed). Callers should not advance the persisted config hash so the
+     *         update is retried on the next sync.
+     */
+    public boolean wasLastSoftConfigUpdateIncomplete() {
+        return mLastSoftConfigAlterFailed;
+    }
+
+    public boolean applySoftConfigUpdate(com.nextgis.maplib.util.LayerConfigDiff diff) {
+        mLastSoftConfigAlterFailed = false;
+        if (diff == null || diff.isMatch() || diff.isHard()) {
+            return false;
+        }
+        boolean changed = false;
+        JSONObject cfg = diff.getServerConfig();
+
+        for (Field newField : diff.getAddedFields()) {
+            try {
+                String sqlType = fieldTypeToSql(newField.getType());
+                MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+                if (map != null) {
+                    SQLiteDatabase db = map.getDatabase(false);
+                    db.execSQL("ALTER TABLE '" + mPath.getName() + "' ADD COLUMN '"
+                            + newField.getName() + "' " + sqlType);
+                    if (mFields == null) mFields = new LinkedHashMap<>();
+                    mFields.put(newField.getName(), newField);
+                    changed = true;
+                    Log.i(TAG, "applySoftConfigUpdate: added column " + newField.getName());
+                }
+            } catch (Exception e) {
+                // Keep schema drift visible in the exported log and signal the caller not to advance
+                // the config hash, so this ALTER is retried on the next sync.
+                mLastSoftConfigAlterFailed = true;
+                HyperLog.w(Constants.TAG, "applySoftConfigUpdate: ALTER TABLE failed for "
+                        + newField.getName() + " layer=\"" + getName() + "\"", e);
+            }
+        }
+
+        for (Map.Entry<String, String> e : diff.getAliasChanges().entrySet()) {
+            Field f = mFields != null ? mFields.get(e.getKey()) : null;
+            if (f != null) {
+                f.setAlias(e.getValue());
+                changed = true;
+            }
+        }
+
+        if (diff.isRendererChanged() && cfg.has(Constants.JSON_RENDERERPROPS_KEY)) {
+            try {
+                JSONObject renderer = cfg.getJSONObject(Constants.JSON_RENDERERPROPS_KEY);
+                NgwLayerConfigAdapter.adaptRenderer(renderer);
+                setRenderer(renderer);
+                changed = true;
+                Log.i(TAG, "applySoftConfigUpdate: renderer updated");
+            } catch (JSONException e) {
+                Log.w(TAG, "applySoftConfigUpdate: renderer update failed", e);
+            }
+        }
+
+        if (diff.isLayerOpacityChanged() && cfg.has(Constants.JSON_LAYER_OPACITY_KEY)) {
+            setLayerOpacity(cfg.optInt(Constants.JSON_LAYER_OPACITY_KEY, 255));
+            changed = true;
+            Log.i(TAG, "applySoftConfigUpdate: layer_opacity updated");
+        }
+
+        if (diff.isEditableChanged() && cfg.has(JSON_EDITABLE_KEY)) {
+            setIsEditable(cfg.optBoolean(JSON_EDITABLE_KEY, true));
+            changed = true;
+            Log.i(TAG, "applySoftConfigUpdate: is_editable updated");
+        }
+
+        if (diff.isVisibilityChanged() && cfg.has(Constants.JSON_VISIBILITY_KEY)) {
+            setVisible(cfg.optBoolean(Constants.JSON_VISIBILITY_KEY, isVisible()));
+            changed = true;
+        }
+
+        if (diff.isZoomChanged()) {
+            if (cfg.has(Constants.JSON_MAXLEVEL_KEY))
+                setMaxZoom((float) cfg.optDouble(Constants.JSON_MAXLEVEL_KEY, getMaxZoom()));
+            if (cfg.has(Constants.JSON_MINLEVEL_KEY))
+                setMinZoom((float) cfg.optDouble(Constants.JSON_MINLEVEL_KEY, getMinZoom()));
+            changed = true;
+        }
+
+        if (diff.isNameChanged() && cfg.has(Constants.JSON_NAME_KEY)) {
+            String newName = cfg.optString(Constants.JSON_NAME_KEY, "");
+            if (!newName.isEmpty()) {
+                setName(newName);
+                changed = true;
+            }
+        }
+
+        if (diff.isRenderModeChanged() && this instanceof NGWVectorLayer) {
+            String renderMode = LayerOriginMetadata.normalizeRenderMode(diff.getServerRenderMode());
+            NGWVectorLayer ngwLayer = (NGWVectorLayer) this;
+            LayerOriginMetadata origin = ngwLayer.getLayerOriginMetadata();
+            if (origin == null) {
+                // Foundation for future local-vector-tiles: legacy NGW layers may not have origin
+                // metadata yet, but render mode still needs a stable place to live.
+                origin = LayerOriginMetadata.manualNgwLayer(0L, renderMode);
+            } else {
+                origin.setRenderMode(renderMode);
+            }
+            ngwLayer.setLayerOriginMetadata(origin);
+            changed = true;
+            Log.i(TAG, "applySoftConfigUpdate: render_mode updated to " + renderMode);
+        }
+
+        if (changed) {
+            save();
+            if (diff.isRendererChanged() || diff.isZoomChanged() || diff.isVisibilityChanged()
+                    || diff.isLayerOpacityChanged() || diff.isEditableChanged()
+                    || diff.isRenderModeChanged()) {
+                notifyLayerChanged();
+            }
+        }
+        return changed;
+    }
+
+    private static String fieldTypeToSql(int type) {
+        switch (type) {
+            case GeoConstants.FTString:  return "TEXT";
+            case GeoConstants.FTInteger:
+            case GeoConstants.FTLong:    return "INTEGER";
+            case GeoConstants.FTReal:    return "REAL";
+            case GeoConstants.FTDateTime:
+            case GeoConstants.FTDate:
+            case GeoConstants.FTTime:    return "TIMESTAMP";
+            default:                     return "TEXT";
+        }
+    }
+
+    public List<String> validateSqliteSchemaAgainstFields() {
+        List<String> missing = new ArrayList<>();
+        if (mFields == null || mFields.isEmpty()) {
+            return missing;
+        }
+        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        if (map == null) {
+            return missing;
+        }
+        SQLiteDatabase db = map.getDatabase(true);
+        Set<String> sqliteColumns = new HashSet<>();
+        try (Cursor c = db.rawQuery("PRAGMA table_info('" + mPath.getName() + "')", null)) {
+            int nameIdx = c.getColumnIndex("name");
+            while (c.moveToNext()) {
+                sqliteColumns.add(c.getString(nameIdx).toLowerCase(java.util.Locale.ROOT));
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "validateSqliteSchemaAgainstFields: PRAGMA failed", e);
+            return missing;
+        }
+        if (sqliteColumns.isEmpty()) {
+            return missing;
+        }
+        for (Field f : mFields.values()) {
+            if (!sqliteColumns.contains(f.getName().toLowerCase(java.util.Locale.ROOT))) {
+                missing.add(f.getName());
+            }
+        }
+        return missing;
+    }
+
+    /**
+     * True if a SQLite user table named like this layer's storage folder exists.
+     */
+    public boolean hasLocalDataTable() {
+        try {
+            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+            if (map == null) {
+                return false;
+            }
+            DatabaseContext.getDbForLayer(this);
+            SQLiteDatabase db = map.getDatabase(true);
+            try (Cursor c = db.rawQuery(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+                    new String[] { mPath.getName() })) {
+                return c.moveToFirst();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "hasLocalDataTable: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Number of rows in the layer data table, or -1 if the table is missing or the query fails.
+     */
+    public int getSqliteTableRowCount() {
+        if (!hasLocalDataTable()) {
+            return -1;
+        }
+        try {
+            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+            if (map == null) {
+                return -1;
+            }
+            DatabaseContext.getDbForLayer(this);
+            SQLiteDatabase db = map.getDatabase(true);
+            try (Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + mPath.getName(), null)) {
+                return c.moveToFirst() ? c.getInt(0) : 0;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "getSqliteTableRowCount: " + e.getMessage());
+            return -1;
+        }
     }
 
 
@@ -2414,6 +2887,13 @@ public class VectorLayer
         saveAttach(featureId, attaches);
     }
 
+    /** NGW layers bump cache generation from sync/import paths; avoid double-invalidate per feature. */
+    private void invalidateLocalRenderCache() {
+        if (!(this instanceof NGWVectorLayer)) {
+            VectorLayerRenderCache.invalidateOnDataChange(this);
+        }
+    }
+
 
     @Override
     public void notifyDelete(long rowId)
@@ -2424,6 +2904,7 @@ public class VectorLayer
         if (mCache.removeItem(rowId) != null) {
 //            Log.e("CCACHH","mCache.removeItem");
             save();
+            invalidateLocalRenderCache();
             notifyLayerChanged();
         }
 //        Log.e("CCACHH","mCache.save");
@@ -2504,6 +2985,7 @@ public class VectorLayer
 
         mCache.clear();
         save();
+        invalidateLocalRenderCache();
         notifyLayerChanged();
     }
 
@@ -2511,6 +2993,9 @@ public class VectorLayer
     @Override
     public void notifyInsert(long rowId)
     {
+        if (mBulkImportMode) {
+            return;
+        }
 
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "notifyInsert id: " + rowId);
@@ -2520,6 +3005,7 @@ public class VectorLayer
         if (null != geom) {
             cacheGeometryEnvelope(rowId, geom);
             save();
+            invalidateLocalRenderCache();
             notifyLayerChanged();
         }
     }
@@ -2571,6 +3057,10 @@ public class VectorLayer
             save();
         }
 
+        if (!mBulkImportMode) {
+            invalidateLocalRenderCache();
+        }
+
         notifyLayerChanged();
 
         if (rowId != -1 && oldRowId != -1 )
@@ -2582,6 +3072,7 @@ public class VectorLayer
     public void notifyUpdateAll()
     {
         reloadCache();
+        invalidateLocalRenderCache();
         notifyLayerChanged();
     }
 
@@ -2595,6 +3086,9 @@ public class VectorLayer
 
         Cursor cursor = db.query(mPath.getName(), columns, selection, null, null, null, null);
 
+        if (cursor != null) {
+            cursor.close();
+        }
 
         return null;
 
@@ -2744,6 +3238,29 @@ public class VectorLayer
     }
 
 
+    /**
+     * All {@link #FIELD_ID} values in this layer's SQLite table.
+     * Prefer this over {@link #query(GeoEnvelope)} with {@code null} for sync and bulk operations:
+     * the spatial cache may omit or stale-list features relative to the table.
+     */
+    public List<Long> queryAllFeatureIdsFromDb() {
+        List<Long> result = new ArrayList<>();
+        Cursor cursor = query(new String[] { FIELD_ID }, null, null, FIELD_ID, null);
+        if (cursor == null) {
+            return result;
+        }
+        try {
+            int col = cursor.getColumnIndexOrThrow(FIELD_ID);
+            while (cursor.moveToNext()) {
+                result.add(cursor.getLong(col));
+            }
+        } finally {
+            cursor.close();
+        }
+        return result;
+    }
+
+
     public void hideFeature(long featureId)
     {
         if (featureId != NOT_FOUND) {
@@ -2795,55 +3312,81 @@ public class VectorLayer
 
     public void rebuildCache(IProgressor progressor)
     {
+        rebuildCache(progressor, true);
+    }
+
+
+    private void rebuildCache(
+            IProgressor progressor,
+            boolean persistLayerConfigAfterRebuild)
+    {
         if (null != progressor) {
             progressor.setMessage(mContext.getString(R.string.rebuild_cache));
         }
 
         String columns[] = {FIELD_ID, FIELD_GEOM};
-        Cursor cursor = query(columns, null, null, null, null);
-        if (null != cursor) {
-            if (cursor.moveToFirst()) {
-                if (null != progressor) {
-                    progressor.setMax(cursor.getCount());
+        Cursor cursor = null;
+        int counter = 0;
+        int cached = 0;
+        try {
+            mIsCacheRebuilding = true;
+            mCache = createNewCache();
+            mExtents.unInit();
+
+            cursor = query(columns, null, null, null, null);
+            if (null == cursor) {
+                return;
+            }
+            if (null != progressor) {
+                progressor.setMax(cursor.getCount());
+            }
+
+            while (cursor.moveToNext()) {
+                GeoGeometry geometry = null;
+                try {
+                    geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(1));
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
 
-                mIsCacheRebuilding = true;
-                mCache = createNewCache();
-                int counter = 0;
-                do {
-                    GeoGeometry geometry = null;
-                    try {
-                        geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(1));
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    if (null != geometry) {
-                        long rowId = cursor.getLong(0);
-                        try { // fail on debugapp
+                if (null != geometry) {
+                    long rowId = cursor.getLong(0);
+                    try { // fail on debugapp
 //                            Log.e("CCACHH","mCache.addItem: geometry.getEnvelope" );
-                            mCache.addItem(rowId, geometry.getEnvelope());
-                        } catch ( Exception ex){
-                            Log.e("rebuild cache envelope fail", ex != null ? ex.getMessage() : "null message");
-                        }
+                        cacheGeometryEnvelope(rowId, geometry);
+                        cached++;
+                    } catch ( Exception ex){
+                        Log.e("rebuild cache envelope fail", ex != null ? ex.getMessage() : "null message");
                     }
+                }
 
-                    if (null != progressor) {
-                        if (progressor.isCanceled()) {
-                            break;
-                        }
-                        progressor.setValue(++counter);
-                        progressor.setMessage(
-                                mContext.getString(R.string.process_features) + ": " + counter);
+                if (null != progressor) {
+                    if (progressor.isCanceled()) {
+                        break;
                     }
-
-                } while (cursor.moveToNext());
-
-                mIsCacheRebuilding = false;
+                    progressor.setValue(++counter);
+                    progressor.setMessage(
+                            mContext.getString(R.string.process_features) + ": " + counter);
+                }
             }
-            cursor.close();
-            save();
+
+            mCacheLoaded = true;
+        } finally {
+            if (null != cursor) {
+                cursor.close();
+            }
+            mIsCacheRebuilding = false;
         }
+        if (persistLayerConfigAfterRebuild) {
+            save();
+        } else {
+            // The enclosing fromJSON() still has subclass fields to restore. Persist only the
+            // rebuilt index; a normal save after the complete load may persist updated extents.
+            mCache.save(new File(mPath, RTREE));
+            mDeferredConfigSaveAfterLoad = true;
+        }
+        HyperLog.d(Constants.TAG, "VectorLayer: " + getName()
+                + " spatial cache rebuilt features=" + cached);
     }
 
 
@@ -3378,7 +3921,7 @@ public class VectorLayer
     public void deleteAllFeatures(IProgressor progressor)
     {
         String layerPathName = mPath.getName();
-        List<Long> ids = query(null);
+        List<Long> ids = queryAllFeatureIdsFromDb();
         if (progressor != null)
             progressor.setMax(ids.size());
         int c = 0;
@@ -3633,7 +4176,9 @@ public class VectorLayer
                 ((MapDrawable)map).loadMarkersTopPart();
                 map.load();
                 new Sync().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-            } catch (IOException | JSONException ignored) { }
+            } catch (IOException | JSONException ignored) {
+                HyperLog.w(Constants.TAG, "VectorLayer.toNGWLayer: " + ignored.getMessage(), ignored);
+            }
         }
     }
 
@@ -3650,7 +4195,9 @@ public class VectorLayer
                 MapBase map = MapDrawable.getInstance();
                 map.load();
                 //new Sync().execute();
-            } catch (IOException | JSONException ignored) { }
+            } catch (IOException | JSONException ignored) {
+                HyperLog.w(Constants.TAG, "VectorLayer.toVectorLayer: " + ignored.getMessage(), ignored);
+            }
         }
     }
 
@@ -3660,7 +4207,7 @@ public class VectorLayer
                 NGWVectorLayer layer = (NGWVectorLayer) MapDrawable.getInstance().getLayerByPathName(getPath().getName());
                 FeatureChanges.initialize(layer.getChangeTableName());
                 FeatureAttachments.initialize(layer.getAttachmentsTableName());
-                List<Long> ids = query(null);
+                List<Long> ids = queryAllFeatureIdsFromDb();
                 Collections.sort(ids);
                 for (Long id : ids) {
                     Feature feature = getFeatureWithAttaches(id);

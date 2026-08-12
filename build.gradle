@@ -23,25 +23,30 @@
 
 apply plugin: 'com.android.library'
 
+def productionVersionName = '3.1.2.7'
+def debugVersionName = '3.1.2.7'
+
 android {
     defaultConfig {
         minSdkVersion 26
         compileSdk 36
-        targetSdkVersion 36
-        versionName '3.0.2'
-        buildConfigField "String", "VERSION_NAME", "\"$versionName\""
+        versionName productionVersionName
+        buildConfigField "String", "VERSION_NAME", "\"${productionVersionName}\""
     }
     productFlavors {
     }
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             minifyEnabled false
             shrinkResources false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Library build types do not own application version metadata. This field is the
+            // maplib diagnostic/protocol version coupled to the consuming debug app.
+            buildConfigField "String", "VERSION_NAME", "\"${debugVersionName}\""
         }
     }
     dataBinding {
@@ -60,14 +65,22 @@ android {
         targetCompatibility JavaVersion.VERSION_21
     }
     namespace 'com.nextgis.maplib'
+    lint {
+        targetSdk 36
+    }
+    testOptions {
+        targetSdk 36
+    }
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
-    implementation 'org.maplibre.gl:android-sdk:12.1.3'
+    implementation 'org.maplibre.gl:android-sdk:13.0.2'
 
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'org.locationtech.jts:jts-core:1.20.0'
+
+    implementation 'com.squareup.okhttp3:okhttp:5.3.2'
 
 //    implementation 'org.maplibre.gl:android-sdk-turf:6.0.1'
 
@@ -77,9 +90,11 @@ dependencies {
     implementation 'com.android.volley:volley:1.2.1'
 
 
-    implementation 'com.google.code.gson:gson:2.13.1'
+    implementation 'com.google.code.gson:gson:2.13.2'
 
     implementation 'io.tus.java.client:tus-java-client:0.5.1'
     implementation 'io.tus.android.client:tus-android-client:0.1.12'
 
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 }

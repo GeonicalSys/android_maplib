@@ -26,6 +26,18 @@ public interface MaplibreMapInteraction {
 
     public  void loadLayersLite();
 
+    /**
+     * Full MapLibre style + layer sources refresh after a deferred layer-fill batch (e.g. collector).
+     *
+     * @return true if a full reload was applied; false if the map was not ready yet (caller may keep a pending flag)
+     */
+    boolean reloadMapStyleAndLayersAfterLayerFillBatch();
+
+    /**
+     * Refresh MapLibre style layers and feature props for one vector layer (after style/settings change).
+     */
+    void reloadLayerStyle(int layerId);
+
     public  boolean getLongLongClickProcesses();
 
     public  void setLongLongClickProcesses(boolean longLongCLickPrecesses);
@@ -37,6 +49,13 @@ public interface MaplibreMapInteraction {
     public void onAreaChanged(Double length);
 
     public void changeProgress(boolean show);
+
+    // only for collector - check after map get - need create new feature or not
+    public void checkCreateIfNeed();
+
+    // called after map layers loaded
+    public void setMapLayersLoaded();
+
 
 
 }

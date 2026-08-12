@@ -36,6 +36,39 @@ public interface Constants
     int     NOT_FOUND          = -1;
     boolean DEBUG_MODE         = BuildConfig.DEBUG;
 
+    /**
+     * Disk render cache for vector layers ({@link com.nextgis.maplib.map.VectorLayerRenderCache}).
+     * Enabled on the sequential {@code loadLayersToMaplibreMap} path first; parallel prep is separate.
+     */
+    boolean VECTOR_RENDER_DISK_CACHE_ENABLED = false;
+
+    /**
+     * Parallel {@code prepareVectorLayerForMaplibre} in a thread pool during startup.
+     * Keep {@code false} until disk cache passes the on-device regression documented in
+     * {@code docs/architecture/map-performance.md} in the root repository.
+     */
+    boolean MAP_STARTUP_PARALLEL_VECTOR_PREP = false;
+
+    /**
+     * Cold-start UX extras: timing logs in {@code MapDrawable.loadLayersToMaplibreMap}, default progress
+     * caption in {@code MapFragment}, placeholder {@code HyperLog.setURL} in app/GISApplication.
+     */
+    boolean MAP_STARTUP_UX_EXTRAS_ENABLED = VECTOR_RENDER_DISK_CACHE_ENABLED
+            || MAP_STARTUP_PARALLEL_VECTOR_PREP;
+
+    /**
+     * Foundation flag for Collector layers with {@code layer_origin.render_mode=local_vector_tiles}.
+     * Keep disabled until the local MVT/PMTiles provider is implemented and tested; while disabled,
+     * MapLibre falls back to the classic GeoJSON source path.
+     */
+    boolean LOCAL_VECTOR_TILES_ENABLED = true;
+
+    /**
+     * @deprecated Use {@link #VECTOR_RENDER_DISK_CACHE_ENABLED} and {@link #MAP_STARTUP_PARALLEL_VECTOR_PREP}.
+     */
+    @Deprecated
+    boolean MAP_STARTUP_OPTIMIZATIONS_ENABLED = MAP_STARTUP_UX_EXTRAS_ENABLED;
+
     int NGW_v3 = 3;
 
     /**
@@ -106,6 +139,7 @@ public interface Constants
     String NOTIFY_LAYER_NAME = "layer_name";
 
     String MESSAGE_INTENT_STYLING = "com.nextgis.malibui.MESSAGE.STYLING";
+    String MESSAGE_INTENT_RELOAD = "com.nextgis.malibui.MESSAGE.RELOAD";
 
     // future change prop raster
 //    String MESSAGE_INTENT_STYLING_RASTER = "com.nextgis.malibui.MESSAGE.STYLING.RASTER";
@@ -141,6 +175,55 @@ public interface Constants
     String JSON_TEXT_SIZE_KEY     = "text_size";
     String JSON_TEXT_ALIGN_KEY    = "text_alignment";
     String JSON_TEXT_COLOR_KEY    = "text_color";
+    String JSON_TEXT_MAX_WIDTH_KEY = "text_max_width";
+    String JSON_LABEL_HALO_COLOR_KEY = "text_halo_color";
+    String JSON_LABEL_HALO_WIDTH_KEY = "text_halo_width";
+    String JSON_LABEL_HALO_BLUR_KEY = "text_halo_blur";
+    String JSON_LABEL_SCALE_WITH_ZOOM_KEY = "text_scale_with_zoom";
+    String JSON_LABEL_ALLOW_OVERLAP_KEY = "text_allow_overlap";
+    String JSON_LABEL_OPTIONAL_KEY = "text_optional";
+    String JSON_LABEL_SPACING_KEY = "symbol_spacing";
+    String JSON_LABEL_TEMPLATE_KEY = "label_template";
+    String JSON_LABEL_MIN_ZOOM_KEY = "label_min_zoom";
+    String JSON_LABEL_MAX_ZOOM_KEY = "label_max_zoom";
+    String JSON_LABEL_FONT_KEY = "text_font";
+    String JSON_LABEL_JUSTIFY_KEY = "text_justify";
+    String JSON_LABEL_TRANSFORM_KEY = "text_transform";
+    String JSON_LABEL_LETTER_SPACING_KEY = "text_letter_spacing";
+    String JSON_LABEL_LINE_HEIGHT_KEY = "text_line_height";
+    String JSON_LABEL_PADDING_KEY = "text_padding";
+    String JSON_LABEL_KEEP_UPRIGHT_KEY = "text_keep_upright";
+    String JSON_LABEL_MAX_ANGLE_KEY = "text_max_angle";
+    String JSON_LABEL_ZOOM_STOPS_KEY = "text_zoom_scale_stops";
+    String JSON_LINE_LABEL_REPEAT_KEY = "line_label_repeat";
+    String JSON_LINE_LABEL_HORIZONTAL_KEY = "line_label_horizontal";
+    String JSON_LINE_CAP_KEY = "line_cap";
+    String JSON_LINE_JOIN_KEY = "line_join";
+    String JSON_LINE_DASH_PRESET_KEY = "dash_preset";
+    String JSON_LINE_DASH_ARRAY_KEY = "dash_array";
+    String JSON_LINE_OFFSET_KEY = "line_offset";
+    String JSON_LINE_GAP_WIDTH_KEY = "line_gap_width";
+    String JSON_LINE_OUTLINE_MULTIPLIER_KEY = "line_outline_multiplier";
+    String JSON_FILL_PATTERN_KEY = "fill_pattern";
+    String JSON_FILL_PATTERN_IMAGE_KEY = "fill_pattern_image";
+    String JSON_FILL_TRANSLATE_X_KEY = "fill_translate_x";
+    String JSON_FILL_TRANSLATE_Y_KEY = "fill_translate_y";
+    String JSON_LAYER_OPACITY_KEY = "layer_opacity";
+    String JSON_LABEL_TEXT_OPACITY_KEY = "text_opacity";
+    String JSON_LINE_MITER_LIMIT_KEY = "line_miter_limit";
+    String JSON_CIRCLE_BLUR_KEY = "circle_blur";
+    String JSON_LINE_BLUR_KEY = "line_blur";
+    String JSON_RULE_KEY_IGNORE_CASE_KEY = "key_ignore_case";
+    String JSON_SCALE_SIZE_WITH_ZOOM_KEY = "scale_size_with_zoom";
+    String JSON_SIZE_ZOOM_STOPS_KEY = "size_zoom_scale_stops";
+    String JSON_MARKER_ICON_IMAGE_KEY = "marker_icon_image";
+    String JSON_MARKER_ICON_SIZE_KEY = "marker_icon_size";
+    String JSON_MARKER_ICON_ROTATE_KEY = "marker_icon_rotate";
+    String JSON_MARKER_ICON_OFFSET_X_KEY = "marker_icon_offset_x";
+    String JSON_MARKER_ICON_OFFSET_Y_KEY = "marker_icon_offset_y";
+    String JSON_MARKER_ICON_ANCHOR_KEY = "marker_icon_anchor";
+    String JSON_MARKER_ICON_ALLOW_OVERLAP_KEY = "marker_icon_allow_overlap";
+    String JSON_MARKER_ICON_IGNORE_PLACEMENT_KEY = "marker_icon_ignore_placement";
     String JSON_DISPLAY_NAME      = "display_name";
     String JSON_RESOURCE_KEY      = "resource";
     String JSON_MESSAGE_KEY       = "message";

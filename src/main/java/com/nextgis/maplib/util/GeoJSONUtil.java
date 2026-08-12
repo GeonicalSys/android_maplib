@@ -26,16 +26,22 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
+import android.os.SystemClock;
 import android.util.JsonReader;
 import android.util.JsonToken;
+import android.util.Log;
 
 import com.nextgis.maplib.R;
 import com.nextgis.maplib.api.IProgressor;
+import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.datasource.Feature;
 import com.nextgis.maplib.datasource.Field;
 import com.nextgis.maplib.datasource.GeoGeometry;
 import com.nextgis.maplib.datasource.GeoGeometryFactory;
+import com.nextgis.maplib.map.MapBase;
+import com.nextgis.maplib.map.MapContentProviderHelper;
 import com.nextgis.maplib.map.VectorLayer;
+import com.nextgis.maplib.map.VectorLayerRenderCache;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -55,6 +61,10 @@ import static com.nextgis.maplib.util.GeoConstants.FTTime;
  * Class to store features to Vector layer
  */
 public class GeoJSONUtil {
+
+    private static final int GEOJSON_FILL_PROGRESS_FEATURE_STEP = 50;
+    private static final long GEOJSON_FILL_PROGRESS_MIN_INTERVAL_MS = 250L;
+    private static final int GEOJSON_FILL_SQL_TX_BATCH = 250;
 
     /**
      * Check if provided name support and throw NGWException if not. Now support EPSG 3857 and 4326 only.
@@ -159,49 +169,91 @@ public class GeoJSONUtil {
         }
 
         JsonReader reader = new JsonReader(new InputStreamReader(in, "UTF-8"));
-        boolean isWGS84 = srs == GeoConstants.CRS_WGS84;
-        long counter = 0;
-        reader.beginObject();
-        while (reader.hasNext()) {
-            String name = reader.nextName();
-            if(name.equals(GeoConstants.GEOJSON_TYPE_FEATURES)){
-                reader.beginArray();
-                while (reader.hasNext()) {
-                    Feature feature = readGeoJSONFeature(reader, layer, isWGS84);
-                    if (null != feature) {
-                        if(layer.getFields() != null && !layer.getFields().isEmpty()){
-                            if (feature.getGeometry() != null)
-                                layer.create(feature.getGeometry().getType(), feature.getFields());
+        try {
+            boolean isWGS84 = srs == GeoConstants.CRS_WGS84;
+            long counter = 0;
+            reader.beginObject();
+            while (reader.hasNext()) {
+                String name = reader.nextName();
+                if(name.equals(GeoConstants.GEOJSON_TYPE_FEATURES)){
+                    reader.beginArray();
 
-                            db = DatabaseContext.getDbForLayer(layer);
-                        }
+                    MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+                    if (map == null) {
+                        throw new NGException(layer.getContext().getString(R.string.error_download_data));
+                    }
+                    DatabaseContext.getDbForLayer(layer);
+                    SQLiteDatabase dbTx = map.getDatabase(false);
 
-                        if(feature.getGeometry() != null) {
-                            layer.createFeatureBatch(feature, db, true);
-                            if(null != progressor){
-                                if (progressor.isCanceled()) {
-                                    layer.save();
-                                    return;
+                    final long fillStartMs = Constants.DEBUG_MODE ? SystemClock.elapsedRealtime() : 0L;
+                    layer.beginBulkImport();
+                    dbTx.beginTransaction();
+                    try {
+                        long lastProgressElapsedMs = 0L;
+                        int sqlTxFeatureCount = 0;
+                        while (reader.hasNext()) {
+                            Feature feature = readGeoJSONFeature(reader, layer, isWGS84);
+                            if (null != feature) {
+                                if(layer.getFields() != null && !layer.getFields().isEmpty()){
+                                    if (feature.getGeometry() != null)
+                                        layer.create(feature.getGeometry().getType(), feature.getFields());
+
+                                    db = DatabaseContext.getDbForLayer(layer);
                                 }
-                                progressor.setValue(streamSize - in.available());
-                                progressor.setMessage(layer.getContext().getString(R.string.process_features) + ": " + counter++);
+
+                                if(feature.getGeometry() != null) {
+                                    layer.createFeatureBatch(feature, db, true);
+                                    sqlTxFeatureCount++;
+                                    if (sqlTxFeatureCount >= GEOJSON_FILL_SQL_TX_BATCH) {
+                                        dbTx.setTransactionSuccessful();
+                                        dbTx.endTransaction();
+                                        dbTx.beginTransaction();
+                                        sqlTxFeatureCount = 0;
+                                    }
+                                    if(null != progressor){
+                                        if (progressor.isCanceled()) {
+                                            break;
+                                        }
+                                        final long elapsed = SystemClock.elapsedRealtime();
+                                        final boolean reportProgress =
+                                                (counter % GEOJSON_FILL_PROGRESS_FEATURE_STEP == 0)
+                                                        || (elapsed - lastProgressElapsedMs
+                                                        >= GEOJSON_FILL_PROGRESS_MIN_INTERVAL_MS);
+                                        if (reportProgress) {
+                                            lastProgressElapsedMs = elapsed;
+                                            progressor.setValue(streamSize - in.available());
+                                            progressor.setMessage(layer.getContext().getString(R.string.process_features)
+                                                    + ": " + counter);
+                                        }
+                                        counter++;
+                                    }
+                                }
                             }
                         }
+                        dbTx.setTransactionSuccessful();
+                    } finally {
+                        if (dbTx.inTransaction()) {
+                            dbTx.endTransaction();
+                        }
+                        layer.endBulkImport();
+                    }
+                    reader.endArray();
+                    if (Constants.DEBUG_MODE) {
+                        Log.d(Constants.TAG, "fillLayerFromGeoJSONStream features wall ms: " + (SystemClock.elapsedRealtime() - fillStartMs));
                     }
                 }
-                reader.endArray();
+                else {
+                    reader.skipValue();
+                }
             }
-            else {
-                reader.skipValue();
-            }
+            reader.endObject();
+        } finally {
+            reader.close();
         }
-        reader.endObject();
-        reader.close();
-
-        //if(null != db)
-        //    db.close(); // return pragma to init
 
         layer.save();
+        VectorLayerRenderCache.invalidateOnDataChange(layer);
+        layer.notifyLayerChanged();
     }
 
     // TODO refactor it and fillLayerFromGeoJsonStream
@@ -219,49 +271,92 @@ public class GeoJSONUtil {
         }
 
         JsonReader reader = new JsonReader(new InputStreamReader(in, "UTF-8"));
-        long counter = 0;
-        reader.beginObject();
-        while (reader.hasNext()) {
-            String name = reader.nextName();
-            if (name.equals(GeoConstants.GEOJSON_TYPE_FEATURES)) {
-                reader.beginArray();
-                while (reader.hasNext()) {
-                    Feature feature = readGeoJSONFeature(reader, layer, isWGS84);
-                    if (null != feature) {
-                        if (layer.getFields() == null || layer.getFields().isEmpty()) {
-                            if (feature.getGeometry() != null)
-                                layer.create(feature.getGeometry().getType(), feature.getFields());
+        try {
+            long counter = 0;
+            reader.beginObject();
+            while (reader.hasNext()) {
+                String name = reader.nextName();
+                if (name.equals(GeoConstants.GEOJSON_TYPE_FEATURES)) {
+                    reader.beginArray();
 
-                            db = DatabaseContext.getDbForLayer(layer);
-                        }
+                    MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+                    if (map == null) {
+                        throw new NGException(layer.getContext().getString(R.string.error_download_data));
+                    }
+                    DatabaseContext.getDbForLayer(layer);
+                    SQLiteDatabase dbTx = map.getDatabase(false);
 
-                        if (feature.getGeometry() != null) {
-                            layer.createFeatureBatch(feature, db, true);
-                            if(null != progressor){
-                                if (progressor.isCanceled()) {
-                                    layer.save();
-                                    return;
+                    final long fillStartMs = Constants.DEBUG_MODE ? SystemClock.elapsedRealtime() : 0L;
+                    layer.beginBulkImport();
+                    dbTx.beginTransaction();
+                    try {
+                        long lastProgressElapsedMs = 0L;
+                        int sqlTxFeatureCount = 0;
+                        while (reader.hasNext()) {
+                            Feature feature = readGeoJSONFeature(reader, layer, isWGS84);
+                            if (null != feature) {
+                                if (layer.getFields() == null || layer.getFields().isEmpty()) {
+                                    if (feature.getGeometry() != null)
+                                        layer.create(feature.getGeometry().getType(), feature.getFields());
+
+                                    db = DatabaseContext.getDbForLayer(layer);
                                 }
-                                progressor.setValue(streamSize - in.available());
-                                progressor.setMessage(layer.getContext().getString(R.string.process_features) + ": " + counter++);
+
+                                if (feature.getGeometry() != null) {
+                                    layer.createFeatureBatch(feature, db, true);
+                                    sqlTxFeatureCount++;
+                                    if (sqlTxFeatureCount >= GEOJSON_FILL_SQL_TX_BATCH) {
+                                        dbTx.setTransactionSuccessful();
+                                        dbTx.endTransaction();
+                                        dbTx.beginTransaction();
+                                        sqlTxFeatureCount = 0;
+                                    }
+                                    if(null != progressor){
+                                        if (progressor.isCanceled()) {
+                                            break;
+                                        }
+                                        final long elapsed = SystemClock.elapsedRealtime();
+                                        final boolean reportProgress =
+                                                (counter % GEOJSON_FILL_PROGRESS_FEATURE_STEP == 0)
+                                                        || (elapsed - lastProgressElapsedMs
+                                                        >= GEOJSON_FILL_PROGRESS_MIN_INTERVAL_MS);
+                                        if (reportProgress) {
+                                            lastProgressElapsedMs = elapsed;
+                                            progressor.setValue(streamSize - in.available());
+                                            progressor.setMessage(layer.getContext().getString(R.string.process_features)
+                                                    + ": " + counter);
+                                        }
+                                        counter++;
+                                    }
+                                }
                             }
                         }
+                        dbTx.setTransactionSuccessful();
+                    } finally {
+                        if (dbTx.inTransaction()) {
+                            dbTx.endTransaction();
+                        }
+                        layer.endBulkImport();
                     }
+                    reader.endArray();
+                    if (Constants.DEBUG_MODE) {
+                        Log.d(Constants.TAG, "createLayerFromGeoJSONStream features wall ms: " + (SystemClock.elapsedRealtime() - fillStartMs));
+                    }
+                } else {
+                    reader.skipValue();
                 }
-                reader.endArray();
-            } else {
-                reader.skipValue();
             }
+            reader.endObject();
+        } finally {
+            reader.close();
         }
-        reader.endObject();
-        reader.close();
 
-        //if(null != db)
-        //   db.close(); // return pragma to init
         layer.save();
+        VectorLayerRenderCache.invalidateOnDataChange(layer);
+        layer.notifyLayerChanged();
     }
 
-    private static Feature readGeoJSONFeature(JsonReader reader, VectorLayer layer, boolean isWGS84) throws IOException {
+    private static Feature readGeoJSONFeature(JsonReader reader, VectorLayer layer, boolean isWGS84) throws IOException, NGException {
         Feature feature;
         if(layer.getFields() != null && !layer.getFields().isEmpty())
             feature = new Feature(Constants.NOT_FOUND, layer.getFields());
@@ -277,6 +372,7 @@ public class GeoJSONUtil {
             } else if (name.equals(GeoConstants.GEOJSON_GEOMETRY)) {
                 GeoGeometry geometry = GeoGeometryFactory.fromJsonStream(reader, crs);
                 if (null != geometry) {
+                    validateImportedGeometry(layer, geometry);
                     if (isWGS84) {
                         geometry.setCRS(GeoConstants.CRS_WGS84);
                         geometry.project(GeoConstants.CRS_WEB_MERCATOR);
@@ -290,6 +386,16 @@ public class GeoJSONUtil {
         }
         reader.endObject();
         return feature;
+    }
+
+    private static void validateImportedGeometry(VectorLayer layer, GeoGeometry geometry) throws NGException {
+        Integer error = MapUtil.polygonGeometryValidationError(geometry);
+        if (error != null) {
+            throw new NGException(layer.getContext().getString(error));
+        }
+        if (!geometry.isValid()) {
+            throw new NGException(layer.getContext().getString(R.string.error_geojson_invalid_geometry));
+        }
     }
 
 
