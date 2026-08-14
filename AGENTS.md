@@ -26,3 +26,12 @@ vector/PostGIS и `qgis_vector_style`/`qgis_raster_style`. Style resource име
 собственный remote id для tile URL/identity, parent id только для extent и
 никогда не становится редактируемым. Не добавляй в `Connection.java` новые
 resource classes ради Collector без отдельного продуктового решения.
+
+## Git-доставка
+
+Запрос изменить/исправить/добавить содержимое репозитория разрешает агенту
+создать `codex/*` ветку, выполнить проверки, scoped commits, push и открыть
+Draft PR без отдельных подтверждений каждого шага. Read-only запросы этого не
+разрешают. Direct push в `master`, force push, tag/release и merge запрещены без
+явного намерения пользователя завершить выпуск. PR библиотеки сливается через
+Merge Commit; связанный root PR обновляет submodule pointer после merge.
