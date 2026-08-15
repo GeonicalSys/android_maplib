@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-07-30
+last_verified: 2026-08-15
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -44,6 +44,15 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   вместе с исходящим направлением sync; обычные слои сохраняют общий
   `is_editable` gate; managed HTTP 404 не меняет тип слоя, а полная NGW identity
   сохраняется отдельно для восстановления частичной конфигурации;
+- новый обычный `VectorLayer` из ручного создания или локального файла по
+  умолчанию редактируем; `GeoJSONUtil` принимает WGS 84 без `crs`, `CRS84`,
+  распространённые URN/OGC URL для EPSG:4326 и поддерживаемые записи EPSG:3857;
+  bulk-write PRAGMA настраиваются до начала SQLite-транзакции и внутри неё не
+  повторяются, что обязательно для Android 16;
+- `CoordinatePointParser` потоково читает KML `coordinates` и GPX
+  `wpt`/`rtept`/`trkpt`; `CoordinatePointLayerImporter` создаёт из них один
+  редактируемый точечный слой WGS 84 с порядком, источником и доступными
+  name/time/elevation, используя SQLite-транзакции не более 250 точек;
 - `VectorLayer.fromJSON()` может восстановить R-tree без сохранения
   недочитанного конфига подкласса;
 - `VectorLayer.feature_label_field` хранит поле отображаемого имени объекта
@@ -57,6 +66,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   одиночных выбросов;
 - `LocationProviderArbiter` оставляет Network резервным источником, но не смешивает
   его точки со свежим пригодным GPS-потоком: fallback возвращается через 12 секунд;
+- `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
+  точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
+  эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает
+  дистанционную звуковую зону с гистерезисом для GPS/mock precision fix;
+- `GpsEventSource` даёт owner-based high-frequency lease для foreground-выноса,
+  не меняя сохранённые пользовательские параметры обычного местоположения;
 - `LayerGroup.createLayerStorage()` атомарно резервирует UUID-каталог; параллельные
   задачи одной Collector-партии не могут разделить SQLite-таблицу. Первый
   неуспешный batch insert аварийно завершает и откатывает неполный слой;
@@ -79,12 +94,20 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   Разрыв более 30 секунд обязан выгрузить валидный буфер до сброса состояния.
 - При включённых GPS и Network пригодный GPS имеет приоритет; Network остаётся
   стартовым резервом и снова принимается через 12 секунд без пригодного GPS.
+- Вынос поддерживает только Point/MultiPoint, LineString/MultiLineString и
+  Polygon/MultiPolygon в EPSG:4326/3857. Для полигона расстояние всегда идёт до
+  ближайшей внешней или внутренней границы, даже если fix находится внутри.
 - Collector resource type не удаляется без продуктового решения.
 - Collector style support ограничена уже известными `Connection` классами
   `qgis_vector_style` и `qgis_raster_style`; новые resource classes не
   добавляются в `Connection.java` без отдельного решения.
 - URL ресурса принимает только HTTP(S), не содержит credentials/fragment и
   заканчивается на `/resource/<positive-id>`; server path до `/resource` сохраняется.
+- Локальный GeoJSON поддерживает только WGS 84/EPSG:4326 и Web Mercator/EPSG:3857;
+  другие системы координат отклоняются без попытки угадать преобразование.
+- Упрощённый импорт KML/GPX считает координаты WGS 84 и не сохраняет исходные
+  линии, полигоны, route/track topology, стили, ExtendedData, вложения, KMZ или
+  KML `gx:Track`: каждый найденный поддерживаемый tuple становится точкой.
 - Изменение public interface требует compile/manifest updates consumers.
 - Debug `BuildConfig.VERSION_NAME` должен совпадать с Lisa Debug, release — с
   Lisa/Belka Release. На AGP 9.x library `buildTypes.versionName` не
@@ -122,6 +145,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   `provider`, затем итоговые `filterPassed/filterDropped/filterChordDropped/filterGaps`
   и `networkSuppressed`.
   Для валидного движения до 160 км/ч не должно быть каскада `drop:speed_dist`.
+- Неверное расстояние выноса: проверить CRS исходной геометрии и ближайшую точку
+  `StakeoutGeometryTarget`; пользователю нельзя выдавать плоское расстояние 3857.
 - NGW config/data issue: отделить config parsing от feature sync decision.
 - `ExternalDatabaseError`/HTTP 5xx на feature pull: проверить журнал
   `deferred transient retry`; один успешный второй проход является ожидаемым
@@ -129,6 +154,14 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   недоступности сервера или внешней БД.
 - Импорт по URL: сначала проверить parser/server/account, затем response code,
   тип ресурса и `data.read`/`data.write` permissions.
+- Локальный GeoJSON ошибочно отклонён как неподдерживаемый: проверить значение
+  `crs.properties.name`; WGS 84 может быть без `crs`, как `CRS84`, `EPSG:4326`,
+  EPSG URN или OGC definition URL. Другой EPSG-код действительно не поддержан.
+- Импорт дошёл до SQLite, но сообщил `Safety level may not be changed inside a
+  transaction`: проверить, что `DatabaseContext.getDbForLayer()` вызван до
+  `beginTransaction()`, а внутри цикла используется уже полученный `dbTx`.
+- Созданный вручную слой нельзя редактировать: проверить сохранённый
+  `is_editable`; новый обычный `VectorLayer` должен записывать `true`.
 - Collector composition: проверить stable remote IDs/project metadata,
   `localPhysicalLayers`, `repairOrigin` и `identityConflict` до UI; при
   неоднозначной паре `account + remoteId` apply должен быть пропущен.

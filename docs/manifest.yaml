@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-07-30
+last_verified: 2026-08-15
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -27,7 +27,15 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
     responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
-    responsibility: Load vector configuration, fail a bulk fill on the first rejected SQL insert, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
+    responsibility: Create ordinary local vector layers as editable, load vector configuration, fail a bulk fill on the first rejected SQL insert, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/GeoJSONUtil.java
+    responsibility: Import local GeoJSON in implicit WGS84, CRS84, common EPSG:4326 aliases or the supported EPSG:3857 path while rejecting other coordinate systems.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/DatabaseContext.java
+    responsibility: Configure bulk-write SQLite PRAGMAs only outside active transactions and return the current map database to layer importers.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointParser.java
+    responsibility: Securely stream standard KML coordinates and GPX waypoint, route-point and track-point coordinates in source order without retaining source topology.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointLayerImporter.java
+    responsibility: Convert streamed WGS84 KML/GPX coordinates and available metadata into one editable local point layer using bounded SQLite transactions.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
     responsibility: Encode and validate the last fully initialized NGW vector-layer identity for partial-config recovery.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
@@ -60,6 +68,12 @@ key_components:
     responsibility: Adapt Android providers to GPS-first recording while retaining timed network fallback.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiterCore.java
     responsibility: Suppress network fixes for 12 seconds after usable GPS and restore network fallback without Android test dependencies.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
+    responsibility: Index an immutable target and return the nearest boundary point plus WGS84 distance and bearing for repeated stakeout fixes.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
+    responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
+  - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
+    responsibility: Ordinary location dispatch plus owner-based temporary high-frequency request leases for foreground tools.
 public_contracts:
   - id: map-host
     symbol: MaplibreMapInteraction
@@ -77,6 +91,10 @@ public_contracts:
     symbol: NGWResourceUrl and ResourceGroup.loadTargetResource
     path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
     consumers: [app, maplibui]
+  - id: stakeout-geometry
+    symbol: StakeoutGeometryTarget and StakeoutGuidancePolicy
+    path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
+    consumers: [app]
 settings_refs: [feature_label_field, mobile_render_mode, render_mode, layer_origin, mobile, ngw_identity_backup]
 storage_contracts:
   - id: layer-json
@@ -85,13 +103,14 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
   - id: ngw-vector-identity-backup
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GPS-TRACK-FILTER]
+invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS]
 global_docs:
   - docs/architecture/map-rendering.md
   - docs/architecture/collector-projects.md
   - docs/architecture/ngw-sync-and-storage.md
   - docs/architecture/crash-recovery.md
+  - docs/architecture/stakeout.md
   - docs/reference/build-matrix.md
   - docs/reference/flavors-and-versioning.md
-smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-LOCATION-CURSOR-TOP, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-URL-IMPORT, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY]
+smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT]
 upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, MAP-HOST, COLLECTOR-RESOURCE]

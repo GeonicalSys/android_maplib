@@ -127,4 +127,14 @@
     <string name="layer_backup_delete_cancelled_title">Удаление отменено</string>
     <string name="layer_backup_delete_cancelled_detail">Удаление отменено: не удалось сохранить резервную копию слоя %1$s.\nПричина: %2$s</string>
     <string name="layer_backup_feature_delete_cancelled_detail">Удаление отменено: не удалось сохранить резервную копию объектов слоя %1$s.\nПричина: %2$s</string>
+    <string name="coordinate_field_sequence">Порядковый номер</string>
+    <string name="coordinate_field_source_type">Источник координаты</string>
+    <string name="coordinate_field_name">Название</string>
+    <string name="coordinate_field_time">Время</string>
+    <string name="coordinate_field_elevation">Высота</string>
+    <string name="error_coordinate_file_open">Не удалось открыть файл с координатами</string>
+    <string name="error_coordinate_file_invalid">Файл KML или GPX повреждён либо имеет неверный формат</string>
+    <string name="error_coordinate_file_empty">В файле не найдено координат</string>
+    <string name="error_coordinate_file_cancelled">Импорт координат отменён</string>
+    <string name="error_coordinate_file_import">Не удалось загрузить файл KML или GPX</string>
 </resources>

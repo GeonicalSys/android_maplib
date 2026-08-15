@@ -100,6 +100,10 @@ public class DatabaseContext
     public static SQLiteDatabase getDbForLayer(final VectorLayer layer){
         MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
         SQLiteDatabase db = map.getDatabase(false);
+        if (db.inTransaction()) {
+            return db;
+        }
+
         // speedup writing
         Cursor c;
         c = db.rawQuery("PRAGMA synchronous=OFF", null);

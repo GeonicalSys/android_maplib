@@ -130,4 +130,14 @@
     <string name="process_layer_hint">Load data on layer: </string>
     <string name="map_loading_preparing">Preparing map…</string>
     <string name="map_loading_cache_hit">Reading cache: </string>
+    <string name="coordinate_field_sequence">Sequence</string>
+    <string name="coordinate_field_source_type">Coordinate source</string>
+    <string name="coordinate_field_name">Name</string>
+    <string name="coordinate_field_time">Time</string>
+    <string name="coordinate_field_elevation">Elevation</string>
+    <string name="error_coordinate_file_open">Could not open the coordinate file</string>
+    <string name="error_coordinate_file_invalid">The KML or GPX file is invalid</string>
+    <string name="error_coordinate_file_empty">No coordinates were found in the file</string>
+    <string name="error_coordinate_file_cancelled">Coordinate import cancelled</string>
+    <string name="error_coordinate_file_import">Could not import the KML or GPX file</string>
 </resources>

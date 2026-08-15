@@ -241,7 +241,7 @@ public class VectorLayer
     protected long    mUniqId;
     protected boolean mIsLocked;
 
-    protected boolean mIsEditable;
+    protected boolean mIsEditable = true;
     /** When false, layer is display-only per collector project (not overridable via {@link #JSON_EDITABLE_KEY}). */
     protected boolean mCollectorEditable = true;
 

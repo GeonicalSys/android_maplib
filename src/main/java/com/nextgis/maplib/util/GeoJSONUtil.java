@@ -74,20 +74,51 @@ public class GeoJSONUtil {
      * @throws NGException
      */
     public static boolean checkCRSSupportAndWGS(String crsName, Context context) throws NGException {
-        boolean isWGS84;
-        switch (crsName) {
-            case GeoConstants.GEOJSON_CRS_WGS84:  // WGS84
-            case GeoConstants.GEOJSON_CRS_EPSG_4326:  // WGS84
-                isWGS84 = true;
-                break;
-            case GeoConstants.GEOJSON_CRS_EPSG_3857:
-            case GeoConstants.GEOJSON_CRS_WEB_MERCATOR:  //Web Mercator
-                isWGS84 = false;
-                break;
-            default:
-                throw new NGException(context.getString(R.string.error_crs_unsupported));
+        String normalizedCrsName = crsName == null
+                ? ""
+                : crsName.trim().toUpperCase(Locale.ROOT);
+
+        if (normalizedCrsName.equals("CRS84")
+                || normalizedCrsName.endsWith(":CRS84")
+                || normalizedCrsName.endsWith("/CRS84")) {
+            return true;
         }
-        return isWGS84;
+
+        Integer epsgCode = getEpsgCode(normalizedCrsName);
+        if (epsgCode != null) {
+            if (epsgCode == GeoConstants.CRS_WGS84) {
+                return true;
+            }
+            if (epsgCode == GeoConstants.CRS_WEB_MERCATOR) {
+                return false;
+            }
+        }
+
+        throw new NGException(context.getString(R.string.error_crs_unsupported));
+    }
+
+    private static Integer getEpsgCode(String normalizedCrsName) {
+        int epsgIndex = normalizedCrsName.indexOf("EPSG");
+        if (epsgIndex < 0) {
+            return null;
+        }
+
+        Integer lastNumber = null;
+        int currentNumber = -1;
+        for (int i = epsgIndex + 4; i < normalizedCrsName.length(); i++) {
+            char symbol = normalizedCrsName.charAt(i);
+            if (Character.isDigit(symbol)) {
+                if (currentNumber < 0) {
+                    currentNumber = 0;
+                }
+                currentNumber = currentNumber * 10 + Character.digit(symbol, 10);
+            } else if (currentNumber >= 0) {
+                lastNumber = currentNumber;
+                currentNumber = -1;
+            }
+        }
+
+        return currentNumber >= 0 ? currentNumber : lastNumber;
     }
 
     protected static Object parseNumber(String value) {
@@ -184,6 +215,7 @@ public class GeoJSONUtil {
                     }
                     DatabaseContext.getDbForLayer(layer);
                     SQLiteDatabase dbTx = map.getDatabase(false);
+                    db = dbTx;
 
                     final long fillStartMs = Constants.DEBUG_MODE ? SystemClock.elapsedRealtime() : 0L;
                     layer.beginBulkImport();
@@ -198,7 +230,6 @@ public class GeoJSONUtil {
                                     if (feature.getGeometry() != null)
                                         layer.create(feature.getGeometry().getType(), feature.getFields());
 
-                                    db = DatabaseContext.getDbForLayer(layer);
                                 }
 
                                 if(feature.getGeometry() != null) {
@@ -285,6 +316,7 @@ public class GeoJSONUtil {
                     }
                     DatabaseContext.getDbForLayer(layer);
                     SQLiteDatabase dbTx = map.getDatabase(false);
+                    db = dbTx;
 
                     final long fillStartMs = Constants.DEBUG_MODE ? SystemClock.elapsedRealtime() : 0L;
                     layer.beginBulkImport();
@@ -299,7 +331,6 @@ public class GeoJSONUtil {
                                     if (feature.getGeometry() != null)
                                         layer.create(feature.getGeometry().getType(), feature.getFields());
 
-                                    db = DatabaseContext.getDbForLayer(layer);
                                 }
 
                                 if (feature.getGeometry() != null) {
