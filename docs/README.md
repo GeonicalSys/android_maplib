@@ -10,6 +10,8 @@ last_verified: 2026-08-15
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
+Для выпуска `3.1.2.9` диагностический `BuildConfig.VERSION_NAME` равен
+`3.1.2.9` в debug и release и проверяется вместе с APK consuming app.
 
 ## Критичные области
 
