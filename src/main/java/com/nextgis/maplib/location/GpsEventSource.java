@@ -42,6 +42,9 @@ import com.nextgis.maplib.util.PermissionUtil;
 import com.nextgis.maplib.util.SettingsConstants;
 
 import java.util.Queue;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 
@@ -60,6 +63,7 @@ public class GpsEventSource {
     protected Context             mContext;
     protected long                mUpdateMinTime;
     protected float               mUpdateMinDistance;
+    protected final Set<Object>   mHighFrequencyClients;
 
     public static final    int GPS_PROVIDER     = 1 << 0;
     public static final    int NETWORK_PROVIDER = 1 << 1;
@@ -69,6 +73,7 @@ public class GpsEventSource {
     public GpsEventSource(Context context) {
         mContext = context;
         mListeners = new ConcurrentLinkedQueue<>();
+        mHighFrequencyClients = Collections.newSetFromMap(new IdentityHashMap<>());
 
         mLocationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         mGpsLocationListener = new GpsLocationListener();
@@ -267,12 +272,49 @@ public class GpsEventSource {
     }
 
 
+    /**
+     * Temporarily removes the ordinary distance filter and requests frequent fixes. Calls are
+     * owner-based and idempotent so independent foreground tools cannot release each other's
+     * request. The user's normal location settings are restored when the final owner releases.
+     */
+    public synchronized void acquireHighFrequencyUpdates(Object owner) {
+        if (owner == null || !mHighFrequencyClients.add(owner)) {
+            return;
+        }
+        refreshLocationRequests();
+    }
+
+
+    public synchronized void releaseHighFrequencyUpdates(Object owner) {
+        if (owner == null || !mHighFrequencyClients.remove(owner)) {
+            return;
+        }
+        refreshLocationRequests();
+    }
+
+
+    protected synchronized boolean hasHighFrequencyClients() {
+        return !mHighFrequencyClients.isEmpty();
+    }
+
+
+    private void refreshLocationRequests() {
+        if (!PermissionUtil.hasLocationPermissions(mContext) || mListeners.isEmpty()) {
+            return;
+        }
+        mLocationManager.removeUpdates(mGpsLocationListener);
+        requestUpdates();
+    }
+
+
     private void requestUpdates() {
+        long effectiveMinTime = hasHighFrequencyClients() ? 250L : mUpdateMinTime;
+        float effectiveMinDistance = hasHighFrequencyClients() ? 0.0f : mUpdateMinDistance;
         if (0 != (mListenProviders & GPS_PROVIDER) &&
                 mLocationManager.getAllProviders().contains(LocationManager.GPS_PROVIDER)) {
 
             mLocationManager.requestLocationUpdates(
-                    LocationManager.GPS_PROVIDER, mUpdateMinTime, mUpdateMinDistance,
+                    LocationManager.GPS_PROVIDER, effectiveMinTime, effectiveMinDistance,
                     mGpsLocationListener);
 
             if(Constants.DEBUG_MODE)
@@ -283,7 +325,7 @@ public class GpsEventSource {
                 mLocationManager.getAllProviders().contains(LocationManager.NETWORK_PROVIDER)) {
 
             mLocationManager.requestLocationUpdates(
-                    LocationManager.NETWORK_PROVIDER, mUpdateMinTime, mUpdateMinDistance,
+                    LocationManager.NETWORK_PROVIDER, effectiveMinTime, effectiveMinDistance,
                     mGpsLocationListener);
 
             if(Constants.DEBUG_MODE)
