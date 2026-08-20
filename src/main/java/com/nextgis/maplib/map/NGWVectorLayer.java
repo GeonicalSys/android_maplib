@@ -1148,6 +1148,20 @@ public class NGWVectorLayer
         return mSyncDirection;
     }
 
+    /**
+     * Whether the user may change this layer's synchronization direction.
+     *
+     * <p>Collector-managed layers use the Collector item's edit policy. Their generic mobile
+     * {@code is_editable} flag may legitimately be false and must not lock the direction control
+     * or silently replace a persisted two-way direction.</p>
+     */
+    public boolean isSyncDirectionConfigurable() {
+        boolean collectorManaged = mLayerOriginMetadata != null
+                && mLayerOriginMetadata.isManagedByProject();
+        return LayerEditingPolicy.isSyncDirectionConfigurable(
+                mIsEditable, mCollectorEditable, collectorManaged);
+    }
+
     public void setSyncDirection(int direction) {
         mSyncDirection = direction;
     }

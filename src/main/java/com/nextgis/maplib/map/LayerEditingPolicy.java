@@ -21,4 +21,14 @@ final class LayerEditingPolicy {
         }
         return layerEditable && collectorEditable;
     }
+
+    static boolean isSyncDirectionConfigurable(
+            boolean layerEditable,
+            boolean collectorEditable,
+            boolean collectorManaged) {
+        if (collectorManaged) {
+            return collectorEditable;
+        }
+        return layerEditable && collectorEditable;
+    }
 }

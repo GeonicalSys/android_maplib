@@ -50,8 +50,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   project-origin metadata для server-rendered Collector styles;
 - `NGWVectorLayer` применяет для managed Collector-слоя проектный editable-флаг
   вместе с исходящим направлением sync; обычные слои сохраняют общий
-  `is_editable` gate; managed HTTP 404 не меняет тип слоя, а полная NGW identity
-  сохраняется отдельно для восстановления частичной конфигурации;
+  `is_editable` gate; возможность изменить направление sync использует тот же
+  owning policy и не зависит от текущего направления, чтобы слой можно было
+  вернуть из server-only в двусторонний режим; managed HTTP 404 не меняет тип
+  слоя, а полная NGW identity сохраняется отдельно для восстановления частичной
+  конфигурации;
 - при schema/config/SQLite mismatch `NGWVectorLayer` передаёт через
   `IGISApplication.scheduleNgwLayerRebuildAfterSchemaMismatch()` устойчивый
   fingerprint причины, чтобы UI-orchestrator мог ограничить повтор тяжёлого
@@ -191,6 +194,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   edit pipeline.
 - «Нет редактируемых слоёв» в Collector: сверить item `editable`,
   `managed_by_project` и исходящее направление sync.
+- Направление самопроизвольно стало server-only после просмотра свойств слоя:
+  проверить, что UI игнорирует начальный callback выбора и использует
+  `isSyncDirectionConfigurable()`, а не общий `isEditable()`.
 
 ## Проверки
 
