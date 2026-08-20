@@ -1882,7 +1882,7 @@ public class NGWVectorLayer
                     + " — SQLite data table missing, scheduling full refill from server");
             try {
                 ((IGISApplication) mContext.getApplicationContext())
-                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this, "missing_table");
             } catch (Exception rebuildEx) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: refill scheduling failed", rebuildEx);
             }
@@ -1905,7 +1905,12 @@ public class NGWVectorLayer
                     HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
                             + " server schema mismatch — scheduling layer rebuild");
                     ((IGISApplication) mContext.getApplicationContext())
-                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                            .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                    this,
+                                    "server_meta:" + NGWLayerSchemaCompat.schemaFingerprint(
+                                            resourceMeta,
+                                            mNgwVersionMajor,
+                                            getRequiredCls()));
                     return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
                 }
 
@@ -1933,7 +1938,8 @@ public class NGWVectorLayer
                                             + " config hard mismatch: " + configDiff.getHardReason()
                                             + " — scheduling rebuild");
                                     ((IGISApplication) mContext.getApplicationContext())
-                                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                                            .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                                    this, "config:" + descHash);
                                     return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
                                 }
                                 boolean softUpdateIncomplete = false;
@@ -2156,7 +2162,10 @@ public class NGWVectorLayer
                                     + " — SQLite storage error (" + innerMsg + "), scheduling rebuild");
                             try {
                                 ((IGISApplication) mContext.getApplicationContext())
-                                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                                        .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                                this,
+                                                "sqlite:" + LayerConfigUtil.md5(
+                                                        innerMsg != null ? innerMsg : "unknown"));
                             } catch (Exception rebuildEx) {
                                 HyperLog.w(Constants.TAG, "rebuild scheduling failed", rebuildEx);
                             }
@@ -2253,7 +2262,10 @@ public class NGWVectorLayer
                         + " — SQLite storage error, scheduling rebuild: " + errMsg);
                 try {
                     ((IGISApplication) mContext.getApplicationContext())
-                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                            .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                    this,
+                                    "sqlite:" + LayerConfigUtil.md5(
+                                            errMsg != null ? errMsg : "unknown"));
                 } catch (Exception rebuildEx) {
                     HyperLog.w(Constants.TAG, "NGWVectorLayer: rebuild scheduling failed", rebuildEx);
                 }

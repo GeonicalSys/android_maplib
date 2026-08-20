@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-08-15
+last_verified: 2026-08-20
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -23,7 +23,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
     responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
-    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, and expose transient pull failures for a deferred retry pass.
+    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose transient pull failures for a deferred retry pass, and fingerprint schema/config/SQLite mismatch rebuild requests.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
     responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
@@ -103,7 +103,7 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
   - id: ngw-vector-identity-backup
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS]
+invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS]
 global_docs:
   - docs/architecture/map-rendering.md
   - docs/architecture/collector-projects.md
@@ -112,5 +112,5 @@ global_docs:
   - docs/architecture/stakeout.md
   - docs/reference/build-matrix.md
   - docs/reference/flavors-and-versioning.md
-smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT]
+smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT]
 upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, MAP-HOST, COLLECTOR-RESOURCE]

@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static com.nextgis.maplib.util.LayerUtil.unwrapQuotation;
 
@@ -122,6 +123,46 @@ public final class NGWLayerSchemaCompat {
             return true;
         } catch (JSONException e) {
             return true;
+        }
+    }
+
+    /**
+     * Stable fingerprint of only the server geometry/field schema. Resource timestamps, display
+     * name, description ordering and other unrelated metadata must not reset a rebuild circuit.
+     */
+    public static String schemaFingerprint(
+            JSONObject geoJSONObject,
+            int ngwVersionMajor,
+            String vectorLayerClsKey) {
+        if (geoJSONObject == null) {
+            return LayerConfigUtil.md5("schema:null");
+        }
+        try {
+            JSONObject featureLayer = geoJSONObject.getJSONObject("feature_layer");
+            List<Field> fields = NGWUtil.getFieldsFromJson(
+                    featureLayer.getJSONArray(NGWUtil.NGWKEY_FIELDS));
+            JSONObject vectorLayer = null;
+            if (geoJSONObject.has(vectorLayerClsKey)) {
+                vectorLayer = geoJSONObject.getJSONObject(vectorLayerClsKey);
+            } else if (ngwVersionMajor >= Constants.NGW_v3
+                    && geoJSONObject.has("postgis_layer")) {
+                vectorLayer = geoJSONObject.getJSONObject("postgis_layer");
+            }
+            String geometry = vectorLayer != null
+                    ? vectorLayer.optString(NGWUtil.NGWKEY_GEOMETRY_TYPE, "") : "";
+            TreeMap<String, Integer> canonicalFields = new TreeMap<>();
+            for (Field field : fields) {
+                canonicalFields.put(
+                        LayerUtil.normalizeFieldName(unwrapQuotation(field.getName())),
+                        field.getType());
+            }
+            StringBuilder canonical = new StringBuilder("geom=").append(geometry);
+            for (Map.Entry<String, Integer> entry : canonicalFields.entrySet()) {
+                canonical.append('|').append(entry.getKey()).append(':').append(entry.getValue());
+            }
+            return LayerConfigUtil.md5(canonical.toString());
+        } catch (JSONException | RuntimeException e) {
+            return LayerConfigUtil.md5("schema:unparsed");
         }
     }
 }

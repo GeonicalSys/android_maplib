@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-15
+last_verified: 2026-08-20
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -46,6 +46,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   вместе с исходящим направлением sync; обычные слои сохраняют общий
   `is_editable` gate; managed HTTP 404 не меняет тип слоя, а полная NGW identity
   сохраняется отдельно для восстановления частичной конфигурации;
+- при schema/config/SQLite mismatch `NGWVectorLayer` передаёт через
+  `IGISApplication.scheduleNgwLayerRebuildAfterSchemaMismatch()` устойчивый
+  fingerprint причины, чтобы UI-orchestrator мог ограничить повтор тяжёлого
+  rebuild без смешивания разных причин;
 - новый обычный `VectorLayer` из ручного создания или локального файла по
   умолчанию редактируем; `GeoJSONUtil` принимает WGS 84 без `crs`, `CRS84`,
   распространённые URN/OGC URL для EPSG:4326 и поддерживаемые записи EPSG:3857;
