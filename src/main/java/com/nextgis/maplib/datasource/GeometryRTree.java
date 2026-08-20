@@ -40,7 +40,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.ConcurrentModificationException;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -50,7 +49,8 @@ import java.util.Set;
  * Implementation of an arbitrary-dimension RTree. Based on R-Trees: A Dynamic
  * Index Structure for Spatial Searching (Antonn Guttmann, 1984)
  *
- * This class is not thread-safe.
+ * Public cache operations are synchronized because feature notifications and synchronization
+ * workers can access the same layer index from different threads.
  */
 public class GeometryRTree implements IGeometryCache {
 
@@ -119,7 +119,7 @@ public class GeometryRTree implements IGeometryCache {
     }
 
     @Override
-    public boolean isItemExist(long featureId) {
+    public synchronized boolean isItemExist(long featureId) {
         return isItemExist(featureId, root);
     }
 
@@ -148,18 +148,18 @@ public class GeometryRTree implements IGeometryCache {
     }
 
     @Override
-    public IGeometryCacheItem addItem(long id, GeoEnvelope envelope) {
+    public synchronized IGeometryCacheItem addItem(long id, GeoEnvelope envelope) {
         mHasEdits = true;
         return insert(id, envelope);
     }
 
     @Override
-    public List<IGeometryCacheItem> getItem(long featureId) {
+    public synchronized List<IGeometryCacheItem> getItem(long featureId) {
         return getItem(featureId, root);
     }
 
     @Override
-    public boolean changeId(long oldFeatureId, long newFeatureId) {
+    public synchronized boolean changeId(long oldFeatureId, long newFeatureId) {
         List<IGeometryCacheItem> items = getItem(oldFeatureId);
         if(null != items) {
 //            Log.e("CCACHH","changeId items num " + items.size());
@@ -201,7 +201,7 @@ public class GeometryRTree implements IGeometryCache {
     }
 
     @Override
-    public void load(File path) {
+    public synchronized void load(File path) {
         clear();
 
         if (!path.exists()) {
@@ -230,11 +230,11 @@ public class GeometryRTree implements IGeometryCache {
     }
 
     @Override
-    public Node getRoot() {
+    public synchronized Node getRoot() {
         return root;
     }
 
-    public List<IGeometryCacheItem> getItem(long featureId, Node n) {
+    public synchronized List<IGeometryCacheItem> getItem(long featureId, Node n) {
         List<IGeometryCacheItem> result = new ArrayList<>();
         if (n.mLeaf){
             for (Node e : n.mChildren){
@@ -260,7 +260,7 @@ public class GeometryRTree implements IGeometryCache {
     }
 
     @Override
-    public void changeIdForAll(long from, long to, Node n) {
+    public synchronized void changeIdForAll(long from, long to, Node n) {
             for (Node e : n.mChildren){
                 if (e instanceof  Entry){
                     Entry entry = (Entry) e;
@@ -300,7 +300,7 @@ public class GeometryRTree implements IGeometryCache {
     /**
      * @return the number of items in this tree.
      */
-    public int size(){
+    public synchronized int size(){
         return size;
     }
 
@@ -374,7 +374,7 @@ public class GeometryRTree implements IGeometryCache {
      * @return true if the entry was deleted from the RTree.
      */
     @Override
-    public IGeometryCacheItem removeItem(long featureId){
+    public synchronized IGeometryCacheItem removeItem(long featureId){
         Node l = findLeaf(root, featureId);
         if ( l == null ) {
             return null;
@@ -465,7 +465,7 @@ public class GeometryRTree implements IGeometryCache {
     /**
      * Empties the RTree
      */
-    public void clear(){
+    public synchronized void clear(){
         root = buildRoot(true);
         mHasEdits = false;
         // let the GC take care of the rest.
@@ -480,7 +480,7 @@ public class GeometryRTree implements IGeometryCache {
      * @param envelope
      *          an envelope
      */
-    public IGeometryCacheItem insert(long featureId, GeoEnvelope envelope){
+    public synchronized IGeometryCacheItem insert(long featureId, GeoEnvelope envelope){
         Entry e = new Entry(featureId, envelope);
         Node l = chooseLeaf(root, e);
         if(l == null)
@@ -757,17 +757,14 @@ public class GeometryRTree implements IGeometryCache {
         for (Node n: nodes) {
             if (n.mChildren.size() <= 0) throw new AssertionError("tighten() called on empty node!");
             n.mCoords.unInit();
+            for (Node c : n.mChildren) {
+                // we may have bulk-added a bunch of children to a node (eg. in
+                // splitNode)
+                // so here we just enforce the child->parent relationship.
+                //c.mParent = n;
 
-            try {
-                for (Node c : n.mChildren) {
-                    // we may have bulk-added a bunch of children to a node (eg. in
-                    // splitNode)
-                    // so here we just enforce the child->parent relationship.
-                    //c.mParent = n;
-
-                    n.mCoords.merge(c.mCoords);
-                }
-            } catch (ConcurrentModificationException ignored) {}
+                n.mCoords.merge(c.mCoords);
+            }
         }
     }
 
@@ -810,6 +807,12 @@ public class GeometryRTree implements IGeometryCache {
      */
     private double getRequiredExpansion(GeoEnvelope envelope, Node e)
     {
+        if (e == null || e.mCoords == null || !e.mCoords.isInit()) {
+            return 0.0;
+        }
+        if (envelope == null || !envelope.isInit()) {
+            return e.mCoords.getArea();
+        }
         double area = envelope.getArea();
         double deltaX = 0.0, deltaY = 0.0;
         if (envelope.mMaxX < e.mCoords.mMaxX){
@@ -964,7 +967,7 @@ public class GeometryRTree implements IGeometryCache {
         }
     }
 
-    public  void setHasEdits(boolean edits){
+    public synchronized void setHasEdits(boolean edits){
         mHasEdits = edits;
     }
 }

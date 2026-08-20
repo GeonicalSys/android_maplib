@@ -2013,6 +2013,7 @@ public class NGWVectorLayer
 
         List<Feature> features, added = new ArrayList<>(), deleted =  new ArrayList<>(), changed =  new ArrayList<>();
         List<Long> deleteItems = new ArrayList<>();
+        boolean bulkPullStarted = false;
 
         ExistFeatureResult result =  getFeatures(syncResult, mTracked);
         switch (NgwPullDecision.decide(result)) {
@@ -2077,6 +2078,11 @@ public class NGWVectorLayer
             if (!mCacheLoaded) {
                 reloadCache();
             }
+            // Incremental pulls can replace most of a layer. Per-row insert/update/delete
+            // broadcasts would make the main thread mutate the same R-tree that is rebuilt at
+            // the end of this method. Suppress those events and publish one final reload instead.
+            beginBulkImport();
+            bulkPullStarted = true;
 
             String changeTableName = getChangeTableName();
             HashSet<Long> remoteIdSet = null;
@@ -2271,6 +2277,10 @@ public class NGWVectorLayer
                 }
             }
             return true;
+        } finally {
+            if (bulkPullStarted) {
+                endBulkImport();
+            }
         }
 
         int trackedAddedCount = added == null ? 0 : added.size();

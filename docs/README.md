@@ -16,6 +16,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 ## Критичные области
 
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
+- горячее обновление style применяет вычисляемые свойства только к независимому
+  snapshot из `VectorLayerRenderCache` в общей последовательной очереди; worker
+  не изменяет опубликованные в MapLibre `Feature.properties`;
 - после batch fill `MapDrawable` проверяет, что для каждого видимого vector layer
   в новом MapLibre style существуют source и style layer; при неполном apply
   выполняется один полный повтор, а completion callback до этого не публикуется;
@@ -36,6 +39,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `Connection`, `SyncAdapter`, `NGWSyncService` — NGW; временно упавшие pull
   векторных слоёв повторяются отдельным проходом после остальных слоёв, а
   process-wide sync state обновляется адаптером напрямую, не только broadcast;
+- инкрементальный NGW pull работает как bulk-операция: построчные
+  insert/update/delete broadcast подавлены, после всех SQLite-изменений R-tree
+  перестраивается и карта перезагружается один раз;
 - `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное
   получение NGW-ресурса без загрузки всего дерева;
 - `CollectorProjectItem`, `CollectorProjectMetadata`,
@@ -61,6 +67,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   name/time/elevation, используя SQLite-транзакции не более 250 точек;
 - `VectorLayer.fromJSON()` может восстановить R-tree без сохранения
   недочитанного конфига подкласса;
+- `GeometryRTree` сериализует публичные операции чтения/изменения, а
+  `VectorLayer` не принимает feature-notify во время bulk/rebuild. Ошибка
+  отдельного receiver логируется и не завершает главный Android-поток;
 - `VectorLayer.feature_label_field` хранит поле отображаемого имени объекта
   отдельно от renderer label и единообразно обслуживает identify/UI;
 - `MultiPolygonGeometryRepair` проверяет и исправляет невалидную топологию
@@ -154,6 +163,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Неверное расстояние выноса: проверить CRS исходной геометрии и ближайшую точку
   `StakeoutGeometryTarget`; пользователю нельзя выдавать плоское расстояние 3857.
 - NGW config/data issue: отделить config parsing от feature sync decision.
+- Crash `notify_insert → GeometryRTree.chooseLeaf → GeoEnvelope.width`: проверить,
+  что incremental pull вошёл в bulk-режим, в журнале нет построчных notify, а
+  после pull есть ровно одна строка `spatial cache rebuilt` с числом строк SQLite.
+- `LinkedTreeMap` из `reloadVectorLayerStyleProps`: style worker не должен брать
+  live `sourceFeaturesHashMap`; допустим только независимый render-cache snapshot
+  либо полный data reload при cache miss.
 - `ExternalDatabaseError`/HTTP 5xx на feature pull: проверить журнал
   `deferred transient retry`; один успешный второй проход является ожидаемым
   восстановлением, а исчерпание очереди даёт сообщение о временной

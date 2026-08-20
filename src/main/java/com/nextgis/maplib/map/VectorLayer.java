@@ -233,10 +233,11 @@ public class VectorLayer
 
     protected LinkedHashMap<String, Field> mFields;
 
-    protected boolean mCacheLoaded, mIsCacheRebuilding;
+    protected volatile boolean mCacheLoaded, mIsCacheRebuilding;
     private transient boolean mDeferredConfigSaveAfterLoad;
     /** When true, bulk inserts skip insert broadcast and notifyInsert skips save/cache refresh (NGW/GeoJSON import). */
-    protected boolean mBulkImportMode;
+    protected volatile boolean mBulkImportMode;
+    private final Object mSpatialCacheLock = new Object();
     protected int     mGeometryType;
     protected long    mUniqId;
     protected boolean mIsLocked;
@@ -304,16 +305,20 @@ public class VectorLayer
      */
     public void beginBulkImport()
     {
-        mBulkImportMode = true;
-        mIsCacheRebuilding = true;
+        synchronized (mSpatialCacheLock) {
+            mBulkImportMode = true;
+            mIsCacheRebuilding = true;
+        }
     }
 
 
     /** End bulk import; call before final {@link #save()} so extents and R-tree are persisted. */
     public void endBulkImport()
     {
-        mBulkImportMode = false;
-        mIsCacheRebuilding = false;
+        synchronized (mSpatialCacheLock) {
+            mBulkImportMode = false;
+            mIsCacheRebuilding = false;
+        }
     }
 
 
@@ -684,9 +689,11 @@ public class VectorLayer
         } else {
             envelope = geoGeometry.getEnvelope();
         }
-        mExtents.merge(envelope);
-//        Log.e("CCACHH","addItem");
-        mCache.addItem(rowId, envelope);
+        synchronized (mSpatialCacheLock) {
+            mExtents.merge(envelope);
+//            Log.e("CCACHH","addItem");
+            mCache.addItem(rowId, envelope);
+        }
     }
 
 
@@ -1838,26 +1845,28 @@ public class VectorLayer
         SQLiteDatabase db = map.getDatabase(false);
         int result = db.delete(mPath.getName(), selection, selectionArgs);
         if (result > 0) {
-
-            /* fill from notify if (rowId == Constants.NOT_FOUND) {
-                mCache.clear();
-            } else {
-                mCache.removeItem(rowId);
-            }*/
-
-            Intent notify;
-            if (rowId == Constants.NOT_FOUND) {
-                notify = new Intent(Constants.NOTIFY_DELETE_ALL);
-            } else {
-                notify = new Intent(Constants.NOTIFY_DELETE);
-                notify.putExtra(FIELD_ID, rowId);
-
+            if (rowId != Constants.NOT_FOUND) {
                 File attachFolder = new File(mPath, String.valueOf(rowId));
                 FileUtil.deleteRecursive(attachFolder);
             }
-            notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
-            notify.setPackage(getContext().getPackageName());
-            getContext().sendBroadcast(notify);
+
+            if (!mBulkImportMode) {
+                /* fill from notify if (rowId == Constants.NOT_FOUND) {
+                    mCache.clear();
+                } else {
+                    mCache.removeItem(rowId);
+                }*/
+                Intent notify;
+                if (rowId == Constants.NOT_FOUND) {
+                    notify = new Intent(Constants.NOTIFY_DELETE_ALL);
+                } else {
+                    notify = new Intent(Constants.NOTIFY_DELETE);
+                    notify.putExtra(FIELD_ID, rowId);
+                }
+                notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
+                notify.setPackage(getContext().getPackageName());
+                getContext().sendBroadcast(notify);
+            }
         }
         return result;
     }
@@ -2087,50 +2096,52 @@ public class VectorLayer
         //int result = db.update(mPath.getName(), values, selection, selectionArgs);
         int result = updateViaSql(db, mPath.getName(), values, selection, selectionArgs);
         if (result > 0) {
-            Intent notify;
-            if (rowId == Constants.NOT_FOUND) {
-                if (values.containsKey(Constants.FIELD_GEOM)) {
-                    notify = new Intent(Constants.NOTIFY_UPDATE_ALL);
-                    notify.putExtra(
-                            Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
-                    notify.setPackage(getContext().getPackageName());
-                    getContext().sendBroadcast(notify);
-                }
-            } else if (values.containsKey(Constants.FIELD_GEOM) || values.containsKey(
-                    Constants.FIELD_ID)) {
-                notify = new Intent(Constants.NOTIFY_UPDATE);
-                boolean bNotify = false;
-                if (values.containsKey(Constants.FIELD_GEOM)) {
-                    notify.putExtra(Constants.FIELD_ID, rowId);
-                    bNotify = true;
-                }
-
-                if (values.containsKey(Constants.FIELD_ID)) {
-                    updateUniqId(values.getAsLong(Constants.FIELD_ID));
-
-                    notify.putExtra(Constants.FIELD_OLD_ID, rowId);
-                    notify.putExtra(Constants.FIELD_ID, values.getAsLong(Constants.FIELD_ID));
-                    bNotify = true;
-                }
-
-                if (bNotify) {
-                    notify.putExtra(Constants.ATTRIBUTES_ONLY, false);
-                    notify.putExtra(
-                            Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
-                    notify.setPackage(getContext().getPackageName());
-                    getContext().sendBroadcast(notify);
-                }
-
-            } else {
-                notify = new Intent(Constants.NOTIFY_UPDATE_FIELDS);
-                notify.putExtra(Constants.FIELD_ID, rowId);
-                notify.putExtra(Constants.ATTRIBUTES_ONLY, true);
-                notify.putExtra(
-                        Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
-                notify.setPackage(getContext().getPackageName());
-                getContext().sendBroadcast(notify);
+            if (values.containsKey(Constants.FIELD_ID)) {
+                updateUniqId(values.getAsLong(Constants.FIELD_ID));
             }
+            if (!mBulkImportMode) {
+                Intent notify;
+                if (rowId == Constants.NOT_FOUND) {
+                    if (values.containsKey(Constants.FIELD_GEOM)) {
+                        notify = new Intent(Constants.NOTIFY_UPDATE_ALL);
+                        notify.putExtra(
+                                Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
+                        notify.setPackage(getContext().getPackageName());
+                        getContext().sendBroadcast(notify);
+                    }
+                } else if (values.containsKey(Constants.FIELD_GEOM) || values.containsKey(
+                        Constants.FIELD_ID)) {
+                    notify = new Intent(Constants.NOTIFY_UPDATE);
+                    boolean bNotify = false;
+                    if (values.containsKey(Constants.FIELD_GEOM)) {
+                        notify.putExtra(Constants.FIELD_ID, rowId);
+                        bNotify = true;
+                    }
 
+                    if (values.containsKey(Constants.FIELD_ID)) {
+                        notify.putExtra(Constants.FIELD_OLD_ID, rowId);
+                        notify.putExtra(Constants.FIELD_ID, values.getAsLong(Constants.FIELD_ID));
+                        bNotify = true;
+                    }
+
+                    if (bNotify) {
+                        notify.putExtra(Constants.ATTRIBUTES_ONLY, false);
+                        notify.putExtra(
+                                Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
+                        notify.setPackage(getContext().getPackageName());
+                        getContext().sendBroadcast(notify);
+                    }
+
+                } else {
+                    notify = new Intent(Constants.NOTIFY_UPDATE_FIELDS);
+                    notify.putExtra(Constants.FIELD_ID, rowId);
+                    notify.putExtra(Constants.ATTRIBUTES_ONLY, true);
+                    notify.putExtra(
+                            Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
+                    notify.setPackage(getContext().getPackageName());
+                    getContext().sendBroadcast(notify);
+                }
+            }
         }
         return result;
     }
@@ -2898,17 +2909,24 @@ public class VectorLayer
     @Override
     public void notifyDelete(long rowId)
     {
+        if (mBulkImportMode || mIsCacheRebuilding) {
+            return;
+        }
         //remove cached item
 //        Log.e("CCACHH","pre mCache.removeItem");
-
-        if (mCache.removeItem(rowId) != null) {
+        synchronized (mSpatialCacheLock) {
+            if (mBulkImportMode || mIsCacheRebuilding) {
+                return;
+            }
+            if (mCache.removeItem(rowId) != null) {
 //            Log.e("CCACHH","mCache.removeItem");
-            save();
-            invalidateLocalRenderCache();
-            notifyLayerChanged();
-        }
+                save();
+                invalidateLocalRenderCache();
+                notifyLayerChanged();
+            }
 //        Log.e("CCACHH","mCache.save");
-        mCache.save(new File(mPath, RTREE));
+            mCache.save(new File(mPath, RTREE));
+        }
 
     }
 
@@ -2980,20 +2998,27 @@ public class VectorLayer
     @Override
     public void notifyDeleteAll()
     {
+        if (mBulkImportMode || mIsCacheRebuilding) {
+            return;
+        }
         //clear cache
 //        Log.e("/**/CCACHH","mCache.clear");
-
-        mCache.clear();
-        save();
-        invalidateLocalRenderCache();
-        notifyLayerChanged();
+        synchronized (mSpatialCacheLock) {
+            if (mBulkImportMode || mIsCacheRebuilding) {
+                return;
+            }
+            mCache.clear();
+            save();
+            invalidateLocalRenderCache();
+            notifyLayerChanged();
+        }
     }
 
 
     @Override
     public void notifyInsert(long rowId)
     {
-        if (mBulkImportMode) {
+        if (mBulkImportMode || mIsCacheRebuilding) {
             return;
         }
 
@@ -3001,12 +3026,17 @@ public class VectorLayer
             Log.d(Constants.TAG, "notifyInsert id: " + rowId);
         }
 
-        GeoGeometry geom = getGeometryForId(rowId);
-        if (null != geom) {
-            cacheGeometryEnvelope(rowId, geom);
-            save();
-            invalidateLocalRenderCache();
-            notifyLayerChanged();
+        synchronized (mSpatialCacheLock) {
+            if (mBulkImportMode || mIsCacheRebuilding) {
+                return;
+            }
+            GeoGeometry geom = getGeometryForId(rowId);
+            if (null != geom) {
+                cacheGeometryEnvelope(rowId, geom);
+                save();
+                invalidateLocalRenderCache();
+                notifyLayerChanged();
+            }
         }
     }
 
@@ -3017,6 +3047,13 @@ public class VectorLayer
             long oldRowId,
             boolean attributesOnly)
     {
+        if (mBulkImportMode || mIsCacheRebuilding) {
+            return;
+        }
+        synchronized (mSpatialCacheLock) {
+            if (mBulkImportMode || mIsCacheRebuilding) {
+                return;
+            }
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "notifyUpdate id: " + rowId + ", old_id: " + oldRowId);
         }
@@ -3065,6 +3102,7 @@ public class VectorLayer
 
         if (rowId != -1 && oldRowId != -1 )
             notifyLayerChangedFeature(oldRowId, rowId, getId());
+        }
     }
 
 
@@ -3320,6 +3358,7 @@ public class VectorLayer
             IProgressor progressor,
             boolean persistLayerConfigAfterRebuild)
     {
+        synchronized (mSpatialCacheLock) {
         if (null != progressor) {
             progressor.setMessage(mContext.getString(R.string.rebuild_cache));
         }
@@ -3387,6 +3426,7 @@ public class VectorLayer
         }
         HyperLog.d(Constants.TAG, "VectorLayer: " + getName()
                 + " spatial cache rebuilt features=" + cached);
+        }
     }
 
 

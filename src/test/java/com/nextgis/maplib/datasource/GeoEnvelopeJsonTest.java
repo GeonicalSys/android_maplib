@@ -27,4 +27,13 @@ public class GeoEnvelopeJsonTest {
         assertEquals(5.5, json.getDouble(Constants.JSON_BBOX_MAXX_KEY), 0.0);
         assertEquals(8.75, json.getDouble(Constants.JSON_BBOX_MAXY_KEY), 0.0);
     }
+
+    @Test
+    public void uninitializedEnvelope_hasZeroDimensionsAndArea() {
+        GeoEnvelope envelope = new GeoEnvelope();
+
+        assertEquals(0.0, envelope.width(), 0.0);
+        assertEquals(0.0, envelope.height(), 0.0);
+        assertEquals(0.0, envelope.getArea(), 0.0);
+    }
 }
