@@ -78,6 +78,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `MultiPolygonGeometryRepair` проверяет и исправляет невалидную топологию
   `GeoMultiPolygon` через JTS, сохраняя один feature, CRS и полигональные части;
   при отсутствии CRS контейнера восстанавливает его из дочерней геометрии;
+- новый Polygon/MultiPolygon скетч получает один квадратный внешний контур;
+  редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
+  существующие многосоставные геометрии и отверстия при их загрузке;
 - `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`
   обслуживают трек и обход одним accuracy-aware pipeline: движение до 160 км/ч,
   проверка качества/возраста/дистанции/ускорения и буфер из трёх точек для

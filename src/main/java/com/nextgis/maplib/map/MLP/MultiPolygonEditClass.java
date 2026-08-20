@@ -372,7 +372,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
 
             //there we have 3 points  -time to draw polygon
 
-            addNewPolygonFrom3Points(zeroPointList);
+            addNewPolygonFromPoints(zeroPointList);
             return;
         }
 
@@ -552,7 +552,14 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
     }
 
 
-    public void addNewPolygonFrom3Points(List<Point> points) {
+    public static boolean canAddPolygonPart(int existingPolygonCount) {
+        return existingPolygonCount == 0;
+    }
+
+    public void addNewPolygonFromPoints(List<Point> points) {
+        if (!canAddPolygonPart(multiPolygonRingEndIndicesMarker.size())) {
+            return;
+        }
         // Create a default square polygon
         List<List<Point>> newPolyRings = new ArrayList<>();
 
@@ -583,9 +590,12 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
     }
 
     public void addNewPolygonAt(LatLng mapCenter, Projection projection) {
+        if (!canAddPolygonPart(multiPolygonRingEndIndicesMarker.size())) {
+            return;
+        }
         // Create a default square polygon
         List<Point> outerRing = prepareNewPolyPoints(mapCenter, projection);
-        addNewPolygonFrom3Points(outerRing);
+        addNewPolygonFromPoints(outerRing);
     }
 
     private void deleteRing(int pIdxToDeleteRingFrom, int rIdxInPToDelete) {
