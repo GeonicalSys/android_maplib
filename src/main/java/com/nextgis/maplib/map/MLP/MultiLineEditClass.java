@@ -243,6 +243,33 @@ public class MultiLineEditClass extends MLGeometryEditClass {
         selectedVertexIndex = editingVertices.size() -1 ;
     }
 
+    @Override
+    public int getSelectedGeometryIndex() {
+        int cumulativeSize = 0;
+        for (int i = 0; i < lineSizes.size(); i++) {
+            int lineSize = lineSizes.get(i);
+            if (selectedVertexIndex >= cumulativeSize
+                    && selectedVertexIndex < cumulativeSize + lineSize) {
+                return i;
+            }
+            cumulativeSize += lineSize;
+        }
+        return 0;
+    }
+
+    @Override
+    public int getSelectedVertexIndexInPart() {
+        int cumulativeSize = 0;
+        for (Integer lineSize : lineSizes) {
+            if (selectedVertexIndex >= cumulativeSize
+                    && selectedVertexIndex < cumulativeSize + lineSize) {
+                return selectedVertexIndex - cumulativeSize;
+            }
+            cumulativeSize += lineSize;
+        }
+        return selectedVertexIndex;
+    }
+
 
     @Override
     public void displayMiddlePoints(boolean isInit, boolean changeGeoJsonSource) {

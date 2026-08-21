@@ -200,9 +200,12 @@ public class PolygonEditClass extends MLGeometryEditClass {
                 vertexFeatures.add(vertexFeature);
             }
 
-            // Generate middle point features for the current ring (if it has enough points to form segments)
-            if (currentRingPoints.size() >= 1) { // Need at least 1 point to show middle point if it's a line, 2 for polygon segment
-                 for (int j = 0; j < currentRingPoints.size(); j++) {
+            // With two sketch nodes there is one visible segment; close-ring midpoint starts at three.
+            if (currentRingPoints.size() >= 2) {
+                int middlePointCount = currentRingPoints.size() >= 3
+                        ? currentRingPoints.size()
+                        : currentRingPoints.size() - 1;
+                 for (int j = 0; j < middlePointCount; j++) {
                     Point pt1 = currentRingPoints.get(j);
                     // For a closed ring, the last point connects to the first
                     Point pt2 = currentRingPoints.get((j + 1) % currentRingPoints.size());
@@ -263,33 +266,24 @@ public class PolygonEditClass extends MLGeometryEditClass {
         if (newPoint == null)
             return;
 
-        if (selectedVertexIndex == -1  ){
-            Point geoPoint = Point.fromLngLat(newPoint.getLongitude(),newPoint.getLatitude());
-            editingVertices.add( geoPoint);
-            selectedVertexIndex = 0;
-            selectedRingIndex = 0;
-            return;
-        }
-
-        if (editingVertices.size() < 2){
-            Point geoPoint = Point.fromLngLat(
-                    newPoint.getLongitude(),
-                    newPoint.getLatitude());
-            editingVertices.add( geoPoint);
-            selectedVertexIndex = editingVertices.size() -1;
-            selectedRingIndex = 0;
-            polygonRingEndIndices.add(editingVertices.size());
-            return;
-        }
-
-        if ( selectedVertexIndex < 0 ||
-                selectedRingIndex < 0 ||
-                selectedRingIndex >= polygonRingEndIndices.size()) {
-        }
-
         Point geoPoint = Point.fromLngLat(
                 newPoint.getLongitude(),
                 newPoint.getLatitude());
+
+        if (editingVertices.isEmpty() || polygonRingEndIndices.isEmpty()) {
+            editingVertices.clear();
+            polygonRingEndIndices.clear();
+            editingVertices.add(geoPoint);
+            polygonRingEndIndices.add(1);
+            updateSelectedRingAndVertexInRingIndices(0);
+            updateEditingPolygonAndVertex();
+            return;
+        }
+
+        if (selectedVertexIndex < 0 || selectedRingIndex < 0
+                || selectedRingIndex >= polygonRingEndIndices.size()) {
+            return;
+        }
 
         // start of ring at commmon list
         int ringStartIndex = (selectedRingIndex == 0)
@@ -320,6 +314,16 @@ public class PolygonEditClass extends MLGeometryEditClass {
 
         updateEditingPolygonAndVertex();
         //setMarker(getSelectedPoint());
+    }
+
+    @Override
+    public int getSelectedRingIndexForWalk() {
+        return selectedRingIndex;
+    }
+
+    @Override
+    public int getSelectedVertexIndexInPart() {
+        return selectedVertexIndexInRing;
     }
 
 

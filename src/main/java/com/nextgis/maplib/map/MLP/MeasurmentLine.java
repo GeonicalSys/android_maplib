@@ -110,11 +110,27 @@ public class MeasurmentLine extends MLGeometryEditClass {
 
             org.maplibre.geojson.Feature vertexFeature = org.maplibre.geojson.Feature.fromGeometry(middlePoint);
             vertexFeature.addNumberProperty("previndex", index);
+            vertexFeature.addNumberProperty("middleIndex", index);
             vertexFeature.addNumberProperty("radius", MPLFeaturesUtils.middleRaduis);
             vertexFeature.addStringProperty("color", MPLFeaturesUtils.colorLightBlue);
             vertexFeature.addBooleanProperty("middle", true);
             vertexFeatures.add(vertexFeature);
         }
+    }
+
+    @Override
+    public void updateSelectionMiddlePoint(Feature point) {
+        if (point == null || !(point.geometry() instanceof Point)
+                || !point.hasNonNullValueForProperty("previndex")) {
+            return;
+        }
+        int previousIndex = point.getNumberProperty("previndex").intValue();
+        if (previousIndex < 0 || previousIndex >= editingVertices.size() - 1) {
+            return;
+        }
+        editingVertices.add(previousIndex + 1, (Point) point.geometry());
+        selectedVertexIndex = previousIndex + 1;
+        updateEditingPolygonAndVertex();
     }
 
     @Override
@@ -141,24 +157,12 @@ public class MeasurmentLine extends MLGeometryEditClass {
 
     @Override
     public void displayMiddlePoints(boolean isInit, boolean changeGeoJsonSource) {
-//        generateMiddlePointsAddAndDisplay();
-//
-//        if (isInit) {
-//            if (!vertexFeatures.isEmpty() && !editingVertices.isEmpty()) {
-//                for (org.maplibre.geojson.Feature f : vertexFeatures) {
-//                    if (!f.hasNonNullValueForProperty("middle")) {
-//                        Number indexNum = f.getNumberProperty("index");
-//                        if (indexNum != null && indexNum.intValue() == 0) {
-//                            f.addStringProperty("color", MPLFeaturesUtils.colorRED);
-//                            break; // findFirst() return first exit after first coincided
-//                        }
-//                    }
-//                }
-//                this.selectedVertexIndex = 0;
-//            }
-//        }
-//        if (changeGeoJsonSource && !vertextHided)
-//            vertexSource.setGeoJson(FeatureCollection.fromFeatures(vertexFeatures));
+        generateMiddlePointsAddAndDisplay();
+        if (isInit && !editingVertices.isEmpty()) {
+            selectedVertexIndex = 0;
+        }
+        if (changeGeoJsonSource && !vertextHided)
+            vertexSource.setGeoJson(FeatureCollection.fromFeatures(vertexFeatures));
     }
 
     @Override

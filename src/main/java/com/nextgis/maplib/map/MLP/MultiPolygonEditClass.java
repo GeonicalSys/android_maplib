@@ -12,6 +12,7 @@ import org.maplibre.geojson.MultiPolygon;
 import org.maplibre.geojson.Point;
 import org.maplibre.geojson.Polygon;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -21,9 +22,6 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
     private static final String TAG = "MultiPolygonEdit";
 
     // Flat list of all vertices for all rings of all polygons
-
-    // use to start by fill by walking from zero
-    protected List<Point> zeroPointList  = new ArrayList<>(); // Inherited
 
     protected List<Point> editingVertices = new ArrayList<>(); // Inherited
 
@@ -119,12 +117,16 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
             List<List<Point>> rings = polygon.coordinates(); // Rings for current polygon
             if (rings.isEmpty()) continue;
 
-            for (List<Point> ring : rings) {
-                if (ring.size() < 3 && rings.indexOf(ring) == 0) continue; // Invalid outer ring
-                if (ring.size() < 3 && rings.indexOf(ring) > 0) continue; // Invalid inner ring
+            for (int ringIndex = 0; ringIndex < rings.size(); ringIndex++) {
+                List<Point> ring = rings.get(ringIndex);
+                if (ring.isEmpty()) continue;
 
-                // GeoJSON spec: first point must be same as last to close ring. We store n-1 points.
-                List<Point> uniquePoints = ring.subList(0, ring.size() -1);
+                boolean closed = ring.size() > 1 && ring.get(0).equals(ring.get(ring.size() - 1));
+                int uniqueEnd = closed ? ring.size() - 1 : ring.size();
+                if (uniqueEnd < 1 || (ringIndex > 0 && uniqueEnd < 3)) continue;
+
+                // During a new sketch the outer ring may intentionally contain one or two vertices.
+                List<Point> uniquePoints = ring.subList(0, uniqueEnd);
                 editingVertices.addAll(uniquePoints);
                 currentVertexCount += uniquePoints.size();
                 polygonRingEndIndices.add(currentVertexCount);
@@ -282,9 +284,13 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
                     vertexFeatures.add(vertexFeature);
                 }
 
-                // Middle points for the current ring
+                // Middle points for the current ring. A two-node draft has one visible segment;
+                // the closing edge appears once the ring has three nodes.
                 List<Point> currentRingMiddlePointsList = middleVerticesPerPolygonPerRing.get(pIdx).get(currentRingNumberInPolygon);
-                for (int vIdxInRing = 0; vIdxInRing < currentRingMainPoints.size(); vIdxInRing++) {
+                int middlePointCount = currentRingMainPoints.size() >= 3
+                        ? currentRingMainPoints.size()
+                        : Math.max(0, currentRingMainPoints.size() - 1);
+                for (int vIdxInRing = 0; vIdxInRing < middlePointCount; vIdxInRing++) {
                     Point pt1 = currentRingMainPoints.get(vIdxInRing);
                     Point pt2 = currentRingMainPoints.get((vIdxInRing + 1) % currentRingMainPoints.size());
 
@@ -364,15 +370,9 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
 
 //        boolean skipAdding = false;
 
-        if (selectedVertexIndex == -1 &&  editingVertices.isEmpty()){
-            Point geoPoint = Point.fromLngLat(newPoint.getLongitude(),newPoint.getLatitude());
-            zeroPointList.add(geoPoint);
-            if (zeroPointList.size() < 3)
-                return;
-
-            //there we have 3 points  -time to draw polygon
-
-            addNewPolygonFromPoints(zeroPointList);
+        if (selectedVertexIndex == -1 && editingVertices.isEmpty()){
+            Point geoPoint = Point.fromLngLat(newPoint.getLongitude(), newPoint.getLatitude());
+            addNewPolygonFromPoints(Collections.singletonList(geoPoint));
             return;
         }
 
@@ -414,7 +414,11 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
             insertIndex = ringEndGlobal;
         }
 
-        // insert ppoint before selected
+        // Insert between the selected vertex and the following vertex in the ring.
+        insertIndex++;
+        if (insertIndex > ringEndGlobal) {
+            insertIndex = ringEndGlobal;
+        }
         editingVertices.add(insertIndex, point);
 
         // refresh polygonRingEndIndices
@@ -560,7 +564,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
         if (!canAddPolygonPart(multiPolygonRingEndIndicesMarker.size())) {
             return;
         }
-        // Create a default square polygon
+        // Create the only polygon part allowed in the current sketch.
         List<List<Point>> newPolyRings = new ArrayList<>();
 
         newPolyRings.add(points);
@@ -593,7 +597,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
         if (!canAddPolygonPart(multiPolygonRingEndIndicesMarker.size())) {
             return;
         }
-        // Create a default square polygon
+        // Legacy programmatic entry point; interactive creation now starts from one centre node.
         List<Point> outerRing = prepareNewPolyPoints(mapCenter, projection);
         addNewPolygonFromPoints(outerRing);
     }
@@ -899,5 +903,20 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
 
     public int getSelectedPolygonIndex(){
         return selectedPolygonIndex;
+    }
+
+    @Override
+    public int getSelectedGeometryIndex() {
+        return selectedPolygonIndex;
+    }
+
+    @Override
+    public int getSelectedRingIndexForWalk() {
+        return selectedRingIndexInPolygon;
+    }
+
+    @Override
+    public int getSelectedVertexIndexInPart() {
+        return selectedVertexIndexInRing;
     }
 }

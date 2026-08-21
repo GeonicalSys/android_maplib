@@ -72,6 +72,7 @@ import com.nextgis.maplib.display.GISDisplay;
 import com.nextgis.maplib.display.RuleFeatureRenderer;
 import com.nextgis.maplib.map.MLP.MLGeometryEditClass;
 import com.nextgis.maplib.map.MLP.MeasurmentLine;
+import com.nextgis.maplib.map.MLP.LineEditClass;
 import com.nextgis.maplib.map.MLP.MultiLineEditClass;
 import com.nextgis.maplib.map.MLP.MultiPointEditClass;
 import com.nextgis.maplib.map.MLP.MultiPolygonEditClass;
@@ -217,7 +218,6 @@ public class MapDrawable
     public final static int MODE_EDIT = 2;
     public final static int MODE_CHANGE = 3;
     public final static int MODE_EDIT_BY_WALK = 4;
-    public final static int MODE_EDIT_BY_TOUCH = 5;
 
     static int testColor = 0;
 
@@ -302,7 +302,6 @@ public class MapDrawable
     private boolean hasEditeometry = false; // was edit
 
     private boolean isDragging = false;
-    private boolean isDraggingByTouchGPS = false;
     private boolean isSwitchVertex = false;
     private MotionEvent startEvent = null;
     private PointF deltaPoint = null;
@@ -1009,7 +1008,7 @@ public class MapDrawable
             return true;
         }
         int mode = frag.getMode();
-        return mode != MODE_EDIT && mode != MODE_EDIT_BY_WALK && mode != MODE_EDIT_BY_TOUCH;
+        return mode != MODE_EDIT && mode != MODE_EDIT_BY_WALK;
     }
 
     /**
@@ -2508,15 +2507,6 @@ public class MapDrawable
                 android.graphics.RectF rect = new android.graphics.RectF(event.getX() - 20,event.getY() - 20,event.getX() + 20,event.getY() + 20);
                 List<org.maplibre.geojson.Feature> featuresMarker = maplibreMap.get().queryRenderedFeatures(rect, "marker-layer");
 
-                if (mapContext.get().getMode() == MODE_EDIT_BY_TOUCH ){
-                    isDraggingByTouchGPS = true;
-                    startEvent = event;
-
-                    if (editingObject != null)
-                        editingObject.hideVertext();
-                    return true;
-                }
-
                 if (!featuresMarker.isEmpty()){
                     // press marker - lock for future move
                     isDragging = true;
@@ -2567,6 +2557,7 @@ public class MapDrawable
                             editingObject.displayMiddlePoints(false, true);
                             mapContext.get().updateActions(editingObject);
                         }
+                        isSwitchVertex = true;
                         Point point = ((Point)clickedFeature.geometry());
                         setMarker(new LatLng(point.latitude(), point.longitude()));
                         return true;
@@ -2581,16 +2572,6 @@ public class MapDrawable
                 int selectedVertexIndex = -1;
                 if (editingObject != null )
                     selectedVertexIndex = editingObject.getSelectedVertexIndex();
-
-                if (isDraggingByTouchGPS && editingObject!= null){
-                    if (mapContext.get().getMode() == MODE_EDIT_BY_TOUCH){
-                        PointF  newPoint = new PointF(screenPoint.x,screenPoint.y);
-                        LatLng latLng = maplibreMap.get().getProjection().fromScreenLocation(newPoint);
-                        editingObject.addNewFlowPoint(latLng, false);
-                        editingObject.updateEditingPolygonAndVertex();
-                        return true;
-                    }
-                }
 
                 if (isDragging && selectedVertexIndex != -1) {
                     if (!hasEditeometry) {
@@ -2637,19 +2618,8 @@ public class MapDrawable
                 float deltaY = clickPoint.y - event.getY();
                 float distance = (float) Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-                if (isDraggingByTouchGPS){
-                    mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
-                    isDraggingByTouchGPS = false;
-                    isDragging = false;
-                    isDraggingByTouchGPS = false;
-                    isSwitchVertex = false;
-                    deltaPoint = null;
-                    startEvent = null;
-                    return false;
-                } else {
-
-
-                    if (!isDragging)
+                {
+                    if (!isDragging && !isSwitchVertex)
                         if (distance < 5) {
                             if (editingObject != null && editingObject instanceof MeasurmentLine){
                                 if (!isMeasurmentChangeVertex) {
@@ -2686,7 +2656,6 @@ public class MapDrawable
                     }
                 }
                 isDragging = false;
-                isDraggingByTouchGPS = false;
                 isSwitchVertex = false;
                 deltaPoint = null;
                 startEvent = null;
@@ -2902,7 +2871,10 @@ public class MapDrawable
             }
 
         if (createNew) {
-            org.maplibre.geojson.Feature feature = null;
+            org.maplibre.geojson.Feature feature = originalSelectedFeature != null
+                    && originalSelectedFeature.getGeometry() != null
+                    ? MPLFeaturesUtils.getFeatureFromNGFeature(originalSelectedFeature.getGeometry())
+                    : null;
             int type = ((VectorLayer)ilayer).getGeometryType();
 
             LatLng center = null;
@@ -2916,7 +2888,7 @@ public class MapDrawable
             Projection projection = maplibreMap.get().getProjection();
             Point point = Point.fromLngLat(center.getLongitude(), center.getLatitude());
 
-            if (!isFillByWalking)
+            if (feature == null && !isFillByWalking)
                 switch (type){
                     case GTPoint :
                         feature = org.maplibre.geojson.Feature.fromGeometry(point);
@@ -2954,7 +2926,7 @@ public class MapDrawable
                         MultiLineString multiLineString = MultiLineString.fromLngLats(multiline);
                         feature = org.maplibre.geojson.Feature.fromGeometry(multiLineString);
                         break;
-                }else {
+                }else if (feature == null) {
                 // need create with 0 point - first point will be from gps on walking
                     switch (type){
                         case GTPoint :
@@ -4310,6 +4282,30 @@ public class MapDrawable
             editingObject.addNewFlowPoint(latLng, true);
             editingObject.updateEditingPolygonAndVertex();
         }
+    }
+
+    /**
+     * Add one tap-created vertex after the currently selected vertex. The same edit-object
+     * insertion path is used by lines, polygon rings and the ruler.
+     */
+    public boolean addSketchPoint(float screenX, float screenY) {
+        if (editingObject == null || maplibreMap.get() == null || mapContext.get() == null) {
+            return false;
+        }
+        if (!(editingObject instanceof LineEditClass)
+                && !(editingObject instanceof MultiLineEditClass)
+                && !(editingObject instanceof PolygonEditClass)
+                && !(editingObject instanceof MultiPolygonEditClass)) {
+            return false;
+        }
+        LatLng latLng = maplibreMap.get().getProjection()
+                .fromScreenLocation(new PointF(screenX, screenY));
+        editingObject.addNewFlowPoint(latLng, true);
+        editingObject.updateEditingPolygonAndVertex();
+        setMarker(latLng);
+        mapContext.get().updateGeometryFromMaplibre(
+                editingObject.editingFeature, originalSelectedFeature, editingObject);
+        return true;
     }
 
     public void reloadCurrentTrackToMap(){

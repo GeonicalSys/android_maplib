@@ -13,9 +13,9 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    responsibility: MapLibre style, sources, layers, hot add/reload coordination, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+    responsibility: MapLibre style, sources, layers, hot add/reload coordination, tap-node and midpoint edit dispatch, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
-    responsibility: MapLibre style utilities, rule-style apply/merge hooks, label zoom gate and raster sibling anchor resolution.
+    responsibility: MapLibre style utilities, explicit polygon-ring closure for editable/draft GeoJSON, rule-style apply/merge hooks, label zoom gate and raster sibling anchor resolution.
   - path: maplib/src/main/java/com/nextgis/maplib/display/FieldStyleRule.java
     responsibility: Rule categories plus other/default style; merge unset optional fields into the effective style at render time.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerGroup.java
@@ -69,9 +69,9 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
     responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, recovering an unset collection CRS from nested geometry while rejecting empty or non-polygonal results.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PolygonEditClass.java
-    responsibility: Create one square starter ring for polygon sketches and retain vertex editing for existing rings.
+    responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, and retain existing ring structure.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPolygonEditClass.java
-    responsibility: Limit new MultiPolygon sketches to one polygon part without flattening existing multipart or holed geometry.
+    responsibility: Build one-node tap sketches and limit new MultiPolygon geometry to one polygon part without flattening existing multipart or holed geometry.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
     responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter and expose safe provider-qualified diagnostics plus aggregate counters.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java

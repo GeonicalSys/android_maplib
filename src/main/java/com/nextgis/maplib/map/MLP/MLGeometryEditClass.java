@@ -85,6 +85,21 @@ public abstract class MLGeometryEditClass {
         return selectedVertexIndex;
     }
 
+    /** Geometry component selected for inserting a walk segment. */
+    public int getSelectedGeometryIndex() {
+        return 0;
+    }
+
+    /** Ring selected for inserting a walk segment (outer ring is {@code 0}). */
+    public int getSelectedRingIndexForWalk() {
+        return 0;
+    }
+
+    /** Vertex index relative to the selected line or ring. */
+    public int getSelectedVertexIndexInPart() {
+        return selectedVertexIndex;
+    }
+
     public void setSelectedVertexIndex(int i) {
         selectedVertexIndex = i;
     }
