@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -26,6 +26,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   отсутствии source/layer загружает данные независимо от старого process-кэша;
 - `LocalVectorTileProvider` / `LocalVectorTileEncoder` — ленивые MVT для
   read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;
+- `LayerIdentifyPolicy` оставляет выключенные классические слои вне identify,
+  но разрешает просмотр локальных атрибутов выключенного слоя, настроенного на
+  `local_vector_tiles`, не включая его отрисовку;
 - `MapDrawable.finishCreateNewFeature` допускает отсутствие временной edit-сессии
   после cold form recovery; если новый id отсутствует в process-local GeoJSON,
   `reloadFeatureToMaplibre` перечитывает данные слоя, а не только стили;
@@ -160,6 +163,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Слой был невидим при import и не появился после локального включения: проверить
   `MapLibre visibility enable requires data reload`; наличие записи в
   `sourceFeaturesHashMap` не заменяет source/layer в текущем live style.
+- Выключенный `local_vector_tiles` не попал в identify: проверить сохранённый
+  `layer_origin.render_mode` и `LayerIdentifyPolicy`; видимость слоя не должна
+  включаться ради чтения атрибутов.
 - Пустой список треков после project switch: проверить строку
   `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;
 - Трек/обход замер на скорости: проверить `LocationTrackFilter` причины вместе с
