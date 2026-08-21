@@ -9,7 +9,7 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
   - path: maplib/build.gradle
-    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.10 and debug VERSION_NAME 3.1.2.9 coupled to their consuming application variants, and provide the shared JTS topology runtime without unsupported library build-type version DSL.
+    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.11 and debug VERSION_NAME 3.1.2.9 coupled to their consuming application variants, and provide the shared JTS topology runtime without unsupported library build-type version DSL.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
