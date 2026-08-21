@@ -68,14 +68,52 @@ public class MPLFeaturesUtilsPolygonTest {
                 source.toWKT(true), GeoConstants.CRS_WEB_MERCATOR);
 
         assertTrue(restored instanceof GeoPolygon);
-        GeoLinearRing restoredRing = ((GeoPolygon) restored).getOuterRing();
+        GeoPolygon restoredPolygon = (GeoPolygon) restored;
+        GeoLinearRing restoredRing = restoredPolygon.getOuterRing();
         assertEquals(2, restoredRing.getPointCount());
         assertEquals(restoredRing.getPoint(0), restoredRing.getPoint(1));
+        assertEquals(0, restoredPolygon.getInnerRingCount());
 
         Feature feature = MPLFeaturesUtils.getFeatureFromNGFeature(restored);
         List<Point> mapLibreRing = ((Polygon) feature.geometry()).coordinates().get(0);
         assertEquals(2, mapLibreRing.size());
         assertEquals(mapLibreRing.get(0), mapLibreRing.get(1));
+    }
+
+    @Test
+    public void polygonDraftWktRoundTripDoesNotDuplicateOuterRingAsHole() {
+        GeoPolygon source = polygon(true);
+
+        GeoGeometry restored = GeoGeometryFactory.fromWKT(
+                source.toWKT(true), GeoConstants.CRS_WEB_MERCATOR);
+
+        assertTrue(restored instanceof GeoPolygon);
+        GeoPolygon restoredPolygon = (GeoPolygon) restored;
+        assertEquals(4, restoredPolygon.getOuterRing().getPointCount());
+        assertEquals(0, restoredPolygon.getInnerRingCount());
+        assertEquals(source.toWKT(true), restoredPolygon.toWKT(true));
+    }
+
+    @Test
+    public void polygonDraftWktRoundTripPreservesRealHoleOnce() {
+        GeoPolygon source = polygon(true);
+        GeoLinearRing hole = new GeoLinearRing();
+        hole.setCRS(GeoConstants.CRS_WEB_MERCATOR);
+        GeoPoint first = point(2, 2);
+        hole.add(first);
+        hole.add(point(3, 2));
+        hole.add(point(2, 3));
+        hole.add((GeoPoint) first.copy());
+        source.addInnerRing(hole);
+
+        GeoGeometry restored = GeoGeometryFactory.fromWKT(
+                source.toWKT(true), GeoConstants.CRS_WEB_MERCATOR);
+
+        assertTrue(restored instanceof GeoPolygon);
+        GeoPolygon restoredPolygon = (GeoPolygon) restored;
+        assertEquals(1, restoredPolygon.getInnerRingCount());
+        assertEquals(4, restoredPolygon.getInnerRing(0).getPointCount());
+        assertEquals(source.toWKT(true), restoredPolygon.toWKT(true));
     }
 
     private static GeoPolygon polygon(boolean close) {

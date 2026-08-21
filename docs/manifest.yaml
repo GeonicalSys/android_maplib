@@ -68,6 +68,8 @@ key_components:
     responsibility: Parse mobile render mode and layer origin configuration.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
     responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, recovering an unset collection CRS from nested geometry while rejecting empty or non-polygonal results.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoGeometryFactory.java
+    responsibility: Parse WKT geometry, including Polygon ring boundaries without inventing a duplicate hole during crash-draft recovery.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PolygonEditClass.java
     responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, and retain existing ring structure.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPolygonEditClass.java
