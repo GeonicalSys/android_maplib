@@ -58,7 +58,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   owning policy и не зависит от текущего направления, чтобы слой можно было
   вернуть из server-only в двусторонний режим; managed HTTP 404 не меняет тип
   слоя, а полная NGW identity сохраняется отдельно для восстановления частичной
-  конфигурации;
+  конфигурации; первый сбой чтения или записи объекта при полном fill сохраняет
+  в HyperLog имя слоя, remote id, нулевой индекс объекта в исходном массиве,
+  класс/сообщение ошибки и ограниченный стек без координат и значений полей;
 - при schema/config/SQLite mismatch `NGWVectorLayer` передаёт через
   `IGISApplication.scheduleNgwLayerRebuildAfterSchemaMismatch()` устойчивый
   fingerprint причины, чтобы UI-orchestrator мог ограничить повтор тяжёлого
@@ -86,8 +88,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - LineString/Polygon и их Multi-варианты принимают один стартовый узел и
   последующие tap-вставки после выбранной вершины; midpoint-вставка доступна и
   линейке. GeoJSON-конвертер явно замыкает кольца при восстановлении скетча;
-- WKT round-trip `GeoPolygon` разбирает внешнее кольцо и реальные отверстия по
-  уровню скобок, не превращая внешнее кольцо в дублирующую внутреннюю дырку;
+- WKT round-trip `GeoPolygon` и `GeoMultiPolygon` разбирают кольца и отдельные
+  polygon members по уровню скобок, не превращая внешнее кольцо в дублирующую
+  внутреннюю дырку и не теряя следующие части мультиполигона;
 - холодное продолжение обхода не заменяет MapLibre edit feature геометрией без
   служебных свойств: заливка и красный контур восстанавливаются из одного source,
   а скрытый vertex cache после Stop снова публикует редактируемые вершины;
@@ -169,6 +172,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   редакторе, а координаты в журнал не записываются. Причина
   `converted repair is empty or invalid` после ручного MapLibre-редактирования
   является регрессией CRS.
+- Импорт NGW-слоя остановился на объекте: найти `NGW feature fill failed` и
+  сопоставить `layer`, `res` и нулевой `featureIndex`; журнал содержит класс,
+  сообщение и ограниченный стек, но не геометрию и не значения полей.
 - «После restart стало правильно»: проверить hot-add/deferred reload contract.
 - Объекты выбираются, но видимый слой пуст после batch fill: найти
   `MapLibre post-load verification`; отсутствие source/style layer должно

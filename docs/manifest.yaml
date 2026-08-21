@@ -25,7 +25,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
     responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
-    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose the owning policy for direction configuration and recovery from server-only mode, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, and fingerprint schema/config/SQLite mismatch rebuild requests.
+    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose the owning policy for direction configuration and recovery from server-only mode, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, fingerprint schema/config/SQLite mismatch rebuild requests, and persist bounded full-fill failure diagnostics with layer/resource/source-index/error/stack but no feature payload.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
     responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
@@ -71,7 +71,9 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
     responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, report insufficient ring positions separately, recover an unset collection CRS from nested geometry, and reject empty or non-polygonal repair results.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoGeometryFactory.java
-    responsibility: Parse WKT geometry, including Polygon ring boundaries without inventing a duplicate hole during crash-draft recovery.
+    responsibility: Dispatch WKT geometry to the matching parser, including Polygon and MultiPolygon recovery paths.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoMultiPolygon.java
+    responsibility: Split WKT polygon members by parenthesis depth so multipart geometry, outer rings and real holes survive import and draft recovery.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PolygonEditClass.java
     responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, and retain existing ring structure.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPolygonEditClass.java
