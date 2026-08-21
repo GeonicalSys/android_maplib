@@ -3153,6 +3153,8 @@ public class MapDrawable
         if  (newGeometry == null)
             return;
 
+        syncPolygonEditFillLayer(newGeometry.getType());
+
         if (newGeometry instanceof GeoLineString){
             org.maplibre.geojson.Feature featureML = getFeatureFromNGFeatureLine((GeoLineString)newGeometry);
 
@@ -3186,7 +3188,6 @@ public class MapDrawable
 
             editingObject.extractVertices(featureML,  false);
             editingObject.editingFeature = featureML;
-            ensurePolygonEditFillLayer();
         } else  if (newGeometry instanceof GeoMultiPolygon){
 
             org.maplibre.geojson.Feature featureML = getFeatureFromNGFeatureMultiPolygon((GeoMultiPolygon)newGeometry);
@@ -3198,7 +3199,6 @@ public class MapDrawable
 
             editingObject.extractVertices(featureML,  false);
             editingObject.editingFeature = featureML;
-            ensurePolygonEditFillLayer();
 
         }  else if (newGeometry instanceof  GeoPoint){
 
@@ -4267,12 +4267,20 @@ public class MapDrawable
         }
     }
 
-    private void ensurePolygonEditFillLayer() {
+    private void syncPolygonEditFillLayer(int geometryType) {
         MapLibreMap map = maplibreMap.get();
         Style style = map != null ? map.getStyle() : null;
-        if (style != null && fillPolyEditLayer != null
-                && style.getLayer("selected-polygon-fill") == null) {
-            style.addLayer(fillPolyEditLayer);
+        if (style == null || fillPolyEditLayer == null) {
+            return;
+        }
+
+        Layer currentFill = style.getLayer("selected-polygon-fill");
+        if (GeometryEditFillPolicy.shouldShow(geometryType)) {
+            if (currentFill == null) {
+                style.addLayer(fillPolyEditLayer);
+            }
+        } else if (currentFill != null) {
+            style.removeLayer(currentFill);
         }
     }
 
@@ -4298,6 +4306,8 @@ public class MapDrawable
         }
 
         replaceGeometryFromHistoryChanges(feature.getGeometry());
+        // The layer contract is authoritative if a malformed/stale draft carries another type.
+        syncPolygonEditFillLayer(vectorLayer.getGeometryType());
         editingObject.hideVertext();
         editingObject.selectLastPoint();
         return true;

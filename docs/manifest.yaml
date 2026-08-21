@@ -13,7 +13,9 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    responsibility: MapLibre style, sources, layers, hot add/reload coordination, tap-node and midpoint edit dispatch, atomic cold-walk overlay recovery preserving edit properties, polygon fill/outline and hidden vertex cache, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+    responsibility: MapLibre style, sources, layers, hot add/reload coordination, tap-node and midpoint edit dispatch, atomic cold-walk overlay recovery preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryEditFillPolicy.java
+    responsibility: Allow the shared edit fill only for Polygon and MultiPolygon so recovered line sketches cannot inherit polygon rendering state.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
     responsibility: MapLibre style utilities, explicit polygon-ring closure for editable/draft GeoJSON, rule-style apply/merge hooks, label zoom gate and raster sibling anchor resolution.
   - path: maplib/src/main/java/com/nextgis/maplib/display/FieldStyleRule.java

@@ -91,6 +91,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - холодное продолжение обхода не заменяет MapLibre edit feature геометрией без
   служебных свойств: заливка и красный контур восстанавливаются из одного source,
   а скрытый vertex cache после Stop снова публикует редактируемые вершины;
+  общий edit fill включается только для Polygon/MultiPolygon и явно снимается при
+  восстановлении LineString/MultiLineString;
 - `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
   метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
