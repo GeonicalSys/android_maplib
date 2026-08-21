@@ -85,6 +85,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - LineString/Polygon и их Multi-варианты принимают один стартовый узел и
   последующие tap-вставки после выбранной вершины; midpoint-вставка доступна и
   линейке. GeoJSON-конвертер явно замыкает кольца при восстановлении скетча;
+- `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
+  метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
 - `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`

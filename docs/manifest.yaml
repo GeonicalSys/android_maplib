@@ -74,6 +74,8 @@ key_components:
     responsibility: Build one-node tap sketches and limit new MultiPolygon geometry to one polygon part without flattening existing multipart or holed geometry.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
     responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter and expose safe provider-qualified diagnostics plus aggregate counters.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java
+    responsibility: Format map measurements, including explicit square-metre to hectare conversion for ruler area labels.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
     responsibility: Retain valid movement through 160 km/h, reject corrupt fixes and material isolated spikes, and preserve delayed fixes across long sampling gaps without Android test dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiter.java
