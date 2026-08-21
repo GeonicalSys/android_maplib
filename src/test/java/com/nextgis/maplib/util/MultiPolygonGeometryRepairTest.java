@@ -122,16 +122,17 @@ public class MultiPolygonGeometryRepairTest {
     }
 
     @Test
-    public void failsWithoutInventingAreaForTooShortRing() {
+    public void reportsInsufficientPointsWithoutInventingAreaForOneNodeRing() {
         GeoMultiPolygon input = multiPolygon(polygon(new double[][]{
-                {0, 0},
-                {1, 1}
+                {0, 0}
         }));
 
         MultiPolygonGeometryRepair.Result result =
                 MultiPolygonGeometryRepair.repairIfNeeded(input);
 
-        assertEquals(MultiPolygonGeometryRepair.Status.FAILED, result.getStatus());
+        assertEquals(
+                MultiPolygonGeometryRepair.Status.INSUFFICIENT_POINTS,
+                result.getStatus());
         assertSame(input, result.getGeometry());
         assertTrue(result.getDiagnostic().contains("fewer than three"));
     }
