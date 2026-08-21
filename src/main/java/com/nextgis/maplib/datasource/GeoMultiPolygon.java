@@ -27,7 +27,6 @@ import android.os.Build;
 import android.util.JsonReader;
 import android.util.Log;
 
-import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.GeoConstants;
 
 import org.json.JSONArray;
@@ -136,23 +135,30 @@ public class GeoMultiPolygon
             return;
         }
 
-        if (wkt.startsWith("(")) {
-            wkt = wkt.substring(1, wkt.length() - 1);
+        String coordinates = wkt.trim();
+        if (coordinates.startsWith("(") && coordinates.endsWith(")")) {
+            coordinates = coordinates.substring(1, coordinates.length() - 1).trim();
         }
 
-        int pos = wkt.indexOf("((");
-        while (pos != Constants.NOT_FOUND) {
-            wkt = wkt.substring(pos + 1, wkt.length());
-            pos = wkt.indexOf("))") - 1;
-            if (pos < 1) {
-                return;
+        int depth = 0;
+        int polygonStart = -1;
+        for (int i = 0; i < coordinates.length(); i++) {
+            char character = coordinates.charAt(i);
+            if (character == '(') {
+                if (depth == 0) {
+                    polygonStart = i;
+                }
+                depth++;
+            } else if (character == ')' && depth > 0) {
+                depth--;
+                if (depth == 0 && polygonStart >= 0) {
+                    GeoPolygon polygon = new GeoPolygon();
+                    polygon.setCoordinatesFromWKT(
+                            coordinates.substring(polygonStart, i + 1).trim(), crs);
+                    add(polygon);
+                    polygonStart = -1;
+                }
             }
-
-            GeoPolygon polygon = new GeoPolygon();
-            polygon.setCoordinatesFromWKT(wkt.substring(0, pos+2).trim(), crs);
-            add(polygon);
-
-            pos = wkt.indexOf("((");
         }
     }
 

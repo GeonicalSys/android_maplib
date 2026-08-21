@@ -748,6 +748,7 @@ public class NGWVectorLayer
             }
 
             int featureCount = 0;
+            int featureIndex = 0;
             boolean jsonTruncated = false;
             try {
                 beginBulkImport();
@@ -755,6 +756,7 @@ public class NGWVectorLayer
                 try {
                     long lastProgressElapsedMs = 0L;
                     while (reader.hasNext()) {
+                        final int currentFeatureIndex = featureIndex++;
                         try {
                             final Feature feature = NGWUtil.readNGWFeature(reader, fields, mCRS);
                             if (feature.getGeometry() == null || !feature.getGeometry().isValid())
@@ -763,11 +765,22 @@ public class NGWVectorLayer
                             createFeatureBatch(feature, dbTx, false);
                         } catch (OutOfMemoryError | IllegalStateException | IOException | NumberFormatException |
                                  NGException e) {
-                            e.printStackTrace();
+                            final String errorMessage = e.getMessage();
+                            final String failureLog = "NGW feature fill failed layer=\""
+                                    + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
+                                    + " featureIndex=" + currentFeatureIndex
+                                    + " error=" + e.getClass().getName()
+                                    + (TextUtils.isEmpty(errorMessage) ? "" : " message=\""
+                                    + ProdLogUtil.truncateForLog(errorMessage, 240) + "\"");
+                            HyperLog.w(Constants.TAG, ProdLogUtil.withStack(failureLog, e));
+                            if (Constants.DEBUG_MODE) {
+                                Log.w(Constants.TAG, failureLog, e);
+                            }
                             if (e instanceof NGException && ((NGException) e).getMessage() != null)
-                                throw new NGException(((NGException) e).getMessage());
+                                throw new NGException(((NGException) e).getMessage(), e);
                             if (null != progressor)
-                                throw new NGException(getContext().getString(R.string.error_download_data));
+                                throw new NGException(
+                                        getContext().getString(R.string.error_download_data), e);
 
                             jsonTruncated = true;
                             break;
