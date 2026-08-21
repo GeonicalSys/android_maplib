@@ -169,6 +169,19 @@ public class LocationUtil
     }
 
 
+    public static String formatAreaHectares(Context context, double squareMeters) {
+        double hectares = squareMetersToHectares(squareMeters);
+        String format = Math.abs(hectares) < 1.0 ? "%.4f %s" : "%.3f %s";
+        return String.format(Locale.getDefault(), format, hectares,
+                context.getString(R.string.unit_hectare));
+    }
+
+
+    public static double squareMetersToHectares(double squareMeters) {
+        return squareMeters / 10000.0;
+    }
+
+
     public static void writeLocationToExif(
             File imgFile,
             Location location)

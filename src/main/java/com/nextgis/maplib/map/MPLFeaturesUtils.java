@@ -844,6 +844,7 @@ public class MPLFeaturesUtils {
             double[] lonLat = convert3857To4326(item.getX(), item.getY());
             outerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
         }
+        closeGeoJsonRing(outerRing);
         points.add(outerRing);
         for (GeoLinearRing innerRing : geoPolygonGeometry.getInnerRings()) {
             List<Point> newInnerRing = new ArrayList<>();
@@ -851,6 +852,7 @@ public class MPLFeaturesUtils {
                 double[] lonLat = convert3857To4326(itemPoint.getX(), itemPoint.getY());
                 newInnerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
             }
+            closeGeoJsonRing(newInnerRing);
             points.add(newInnerRing);
         }
         return org.maplibre.geojson.Feature.fromGeometry(org.maplibre.geojson.Polygon.fromLngLats(points));
@@ -892,6 +894,7 @@ public class MPLFeaturesUtils {
             double[] lonLat = convert3857To4326(item.getX(), item.getY());
             outerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
         }
+        closeGeoJsonRing(outerRing);
         points.add(outerRing);
         for (GeoLinearRing innerRing : geoPolygonGeometry.getInnerRings()) {
             List<Point> newInnerRing = new ArrayList<>();
@@ -899,6 +902,7 @@ public class MPLFeaturesUtils {
                 double[] lonLat = convert3857To4326(itemPoint.getX(), itemPoint.getY());
                 newInnerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
             }
+            closeGeoJsonRing(newInnerRing);
             points.add(newInnerRing);
         }
         return org.maplibre.geojson.Feature.fromGeometry(org.maplibre.geojson.Polygon.fromLngLats(points));
@@ -911,6 +915,7 @@ public class MPLFeaturesUtils {
             double[] lonLat = convert3857To4326(item.getX(), item.getY());
             outerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
         }
+        closeGeoJsonRing(outerRing);
         points.add(outerRing);
         for (GeoLinearRing innerRing : geoPolygonGeometry.getInnerRings()) {
             List<Point> newInnerRing = new ArrayList<>();
@@ -918,9 +923,22 @@ public class MPLFeaturesUtils {
                 double[] lonLat = convert3857To4326(itemPoint.getX(), itemPoint.getY());
                 newInnerRing.add(Point.fromLngLat(lonLat[0], lonLat[1]));
             }
+            closeGeoJsonRing(newInnerRing);
             points.add(newInnerRing);
         }
         return org.maplibre.geojson.Polygon.fromLngLats(points);
+    }
+
+    /** MapLibre/GeoJSON polygons require an explicit closing coordinate. */
+    static void closeGeoJsonRing(List<Point> ring) {
+        if (ring == null || ring.isEmpty()) {
+            return;
+        }
+        Point first = ring.get(0);
+        Point last = ring.get(ring.size() - 1);
+        if (!first.equals(last)) {
+            ring.add(first);
+        }
     }
 
     public static org.maplibre.geojson.Feature getFeatureFromNGFeature(GeoGeometry ngGeometry) {

@@ -35,6 +35,7 @@
     <string name="unit_square_meter">m²</string>
     <string name="unit_kilometer">km</string>
     <string name="unit_square_kilometer">km²</string>
+    <string name="unit_hectare">ha</string>
     <string name="unit_second">s</string>
     <string name="unit_min">min</string>
     <string name="unit_hour">h</string>

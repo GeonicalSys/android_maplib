@@ -31,6 +31,7 @@ public final class MultiPolygonGeometryRepair {
     public enum Status {
         UNCHANGED,
         REPAIRED,
+        INSUFFICIENT_POINTS,
         FAILED
     }
 
@@ -114,7 +115,9 @@ public final class MultiPolygonGeometryRepair {
                     repaired,
                     validationDiagnostic("invalid multi-polygon", inputValidity));
         } catch (GeometryInputException exception) {
-            return failed(input, exception.getMessage());
+            return exception.isInsufficientPoints()
+                    ? new Result(Status.INSUFFICIENT_POINTS, input, exception.getMessage())
+                    : failed(input, exception.getMessage());
         } catch (RuntimeException exception) {
             // JTS exception messages can contain coordinates. Keep production diagnostics spatially
             // anonymous; the exception class plus the bounded test corpus is sufficient here.
@@ -153,12 +156,12 @@ public final class MultiPolygonGeometryRepair {
 
     private static LinearRing toJtsRing(GeoLinearRing input, GeometryFactory factory) {
         if (input == null) {
-            throw new GeometryInputException("ring is null");
+            throw new GeometryInputException("ring is null", false);
         }
 
         List<GeoPoint> source = input.getPoints();
         if (source.size() < 3) {
-            throw new GeometryInputException("ring has fewer than three positions");
+            throw new GeometryInputException("ring has fewer than three positions", true);
         }
 
         List<Coordinate> coordinates = new ArrayList<>(source.size() + 1);
@@ -166,7 +169,7 @@ public final class MultiPolygonGeometryRepair {
             if (point == null
                     || !isFinite(point.getX())
                     || !isFinite(point.getY())) {
-                throw new GeometryInputException("ring contains an invalid coordinate");
+                throw new GeometryInputException("ring contains an invalid coordinate", false);
             }
             Coordinate coordinate = new Coordinate(point.getX(), point.getY());
             if (coordinates.isEmpty()
@@ -177,13 +180,13 @@ public final class MultiPolygonGeometryRepair {
 
         if (coordinates.size() < 3) {
             throw new GeometryInputException(
-                    "ring collapses below three distinct positions");
+                    "ring collapses below three distinct positions", true);
         }
         if (!coordinates.get(0).equals2D(coordinates.get(coordinates.size() - 1))) {
             coordinates.add(new Coordinate(coordinates.get(0)));
         }
         if (coordinates.size() < 4) {
-            throw new GeometryInputException("closed ring has fewer than four positions");
+            throw new GeometryInputException("closed ring has fewer than four positions", true);
         }
 
         return factory.createLinearRing(coordinates.toArray(new Coordinate[0]));
@@ -266,8 +269,15 @@ public final class MultiPolygonGeometryRepair {
     }
 
     private static final class GeometryInputException extends IllegalArgumentException {
-        GeometryInputException(String message) {
+        private final boolean mInsufficientPoints;
+
+        GeometryInputException(String message, boolean insufficientPoints) {
             super(message);
+            mInsufficientPoints = insufficientPoints;
+        }
+
+        boolean isInsufficientPoints() {
+            return mInsufficientPoints;
         }
     }
 }

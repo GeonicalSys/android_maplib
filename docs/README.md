@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -81,8 +81,20 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   отдельно от renderer label и единообразно обслуживает identify/UI;
 - `MultiPolygonGeometryRepair` проверяет и исправляет невалидную топологию
   `GeoMultiPolygon` через JTS, сохраняя один feature, CRS и полигональные части;
-  при отсутствии CRS контейнера восстанавливает его из дочерней геометрии;
-- новый Polygon/MultiPolygon скетч получает один квадратный внешний контур;
+  при отсутствии CRS контейнера восстанавливает его из дочерней геометрии, а
+  контур короче трёх различных точек возвращает отдельным результатом до repair;
+- LineString/Polygon и их Multi-варианты принимают один стартовый узел и
+  последующие tap-вставки после выбранной вершины; midpoint-вставка доступна и
+  линейке. GeoJSON-конвертер явно замыкает кольца при восстановлении скетча;
+- WKT round-trip `GeoPolygon` разбирает внешнее кольцо и реальные отверстия по
+  уровню скобок, не превращая внешнее кольцо в дублирующую внутреннюю дырку;
+- холодное продолжение обхода не заменяет MapLibre edit feature геометрией без
+  служебных свойств: заливка и красный контур восстанавливаются из одного source,
+  а скрытый vertex cache после Stop снова публикует редактируемые вершины;
+  общий edit fill включается только для Polygon/MultiPolygon и явно снимается при
+  восстановлении LineString/MultiLineString;
+- `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
+  метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
 - `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`

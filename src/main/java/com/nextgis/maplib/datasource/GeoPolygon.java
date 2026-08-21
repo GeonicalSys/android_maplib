@@ -221,37 +221,43 @@ public class GeoPolygon
             return;
         }
 
-        if (wkt.startsWith("(")) {
-            wkt = wkt.substring(1, wkt.length() - 1);
-        }
-        //get outer ring
-        int pos = wkt.indexOf(")");
-        if (pos == Constants.NOT_FOUND) // no inner rings
-        {
-            mOuterRing.setCoordinatesFromWKT(wkt, crs);
-        } else {
-            mOuterRing.setCoordinatesFromWKT(wkt.substring(0, pos), crs);
-        }
-        pos = wkt.indexOf("(");
-        while (pos != Constants.NOT_FOUND) {
-            wkt = wkt.substring(pos + 1, wkt.length());
-            pos = wkt.indexOf(")") ;
+        mOuterRing = new GeoLinearRing();
+        mOuterRing.setCRS(crs);
+        mInnerRings.clear();
 
+        String coordinates = wkt.trim();
+        if (coordinates.startsWith("(") && coordinates.endsWith(")")) {
+            coordinates = coordinates.substring(1, coordinates.length() - 1).trim();
+        }
 
+        List<String> rings = new ArrayList<>();
+        int depth = 0;
+        int ringStart = Constants.NOT_FOUND;
+        for (int i = 0; i < coordinates.length(); i++) {
+            char character = coordinates.charAt(i);
+            if (character == '(') {
+                if (depth == 0) {
+                    ringStart = i + 1;
+                }
+                depth++;
+            } else if (character == ')' && depth > 0) {
+                depth--;
+                if (depth == 0 && ringStart != Constants.NOT_FOUND) {
+                    rings.add(coordinates.substring(ringStart, i).trim());
+                    ringStart = Constants.NOT_FOUND;
+                }
+            }
+        }
+
+        if (rings.isEmpty()) {
+            rings.add(coordinates);
+        }
+
+        mOuterRing.setCoordinatesFromWKT(rings.get(0), crs);
+        for (int i = 1; i < rings.size(); i++) {
             GeoLinearRing innerRing = new GeoLinearRing();
-            if (pos == Constants.NOT_FOUND) // no inner rings
-            {
-                innerRing.setCoordinatesFromWKT(wkt, crs);
-            } else {
-                innerRing.setCoordinatesFromWKT(wkt.substring(0, pos  ), crs);
-            }
-
+            innerRing.setCoordinatesFromWKT(rings.get(i), crs);
             mInnerRings.add(innerRing);
-
-            pos = wkt.indexOf("(");
-            if (pos < 1) {
-                return;
-            }
         }
     }
 

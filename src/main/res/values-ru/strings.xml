@@ -34,6 +34,7 @@
     <string name="unit_square_meter">м²</string>
     <string name="unit_kilometer">км</string>
     <string name="unit_square_kilometer">км²</string>
+    <string name="unit_hectare">га</string>
     <string name="unit_second">с</string>
     <string name="unit_min">мин</string>
     <string name="unit_hour">ч</string>
