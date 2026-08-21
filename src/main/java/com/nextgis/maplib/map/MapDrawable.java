@@ -2139,28 +2139,13 @@ public class MapDrawable
                         /* Upstream: restore active walk-by-geometry edit after process kill / map reload. */
                         if (layerForWalkRestore != null && featureToRestore != null) {
                             try {
-                                editingObject = null;
-                                editingFeature = null;
-
-                                startFeatureSelectionForEdit(layerForWalkRestore,
-                                        layerForWalkRestore.getGeometryType(),
-                                        featureToRestore,
-                                        true,
-                                        layerForWalkRestore.getDefaultStyleNoExcept(),
-                                        true);
-
-                                editingFeature = MPLFeaturesUtils.getFeatureFromNGFeature(featureToRestore.getGeometry());
-                                if (editingObject != null) {
-                                    editingObject.editingFeature = editingFeature;
-                                    editingObject.extractVertices(editingFeature, false);
-                                    editingObject.hideVertext();
-                                    editingObject.selectLastPoint();
+                                if (restoreWalkFeatureOnCurrentStyle(
+                                        layerForWalkRestore, featureToRestore)) {
+                                    layerForWalkRestore = null;
+                                    featureToRestore = null;
                                 }
                             } catch (Throwable wt) {
                                 Log.e(TAG, "loadLayersToMaplibreMap: walk-restore", wt);
-                            } finally {
-                                layerForWalkRestore = null;
-                                featureToRestore = null;
                             }
                         }
 
@@ -2230,17 +2215,13 @@ public class MapDrawable
     }
 
     public void updateWalkingFeature(Feature featureToUpdate){
-        if (featureToUpdate == null) {
+        if (featureToUpdate == null || featureToUpdate.getGeometry() == null
+                || editingObject == null) {
             return;
         }
-
-        editingFeature = MPLFeaturesUtils.getFeatureFromNGFeature(featureToUpdate.getGeometry());
-        if (editingObject != null) {
-            editingObject.editingFeature = editingFeature;
-            editingObject.extractVertices(editingFeature,  false);
-            editingObject.hideVertext();
-            editingObject.selectLastPoint();
-        }
+        replaceGeometryFromHistoryChanges(featureToUpdate.getGeometry());
+        editingObject.hideVertext();
+        editingObject.selectLastPoint();
     }
 
     public void loadLayersToMaplibreMapLite(final  List<ILayer> allLayers, boolean skipUserLayers){
@@ -3205,6 +3186,7 @@ public class MapDrawable
 
             editingObject.extractVertices(featureML,  false);
             editingObject.editingFeature = featureML;
+            ensurePolygonEditFillLayer();
         } else  if (newGeometry instanceof GeoMultiPolygon){
 
             org.maplibre.geojson.Feature featureML = getFeatureFromNGFeatureMultiPolygon((GeoMultiPolygon)newGeometry);
@@ -3216,6 +3198,7 @@ public class MapDrawable
 
             editingObject.extractVertices(featureML,  false);
             editingObject.editingFeature = featureML;
+            ensurePolygonEditFillLayer();
 
         }  else if (newGeometry instanceof  GeoPoint){
 
@@ -4282,6 +4265,42 @@ public class MapDrawable
             editingObject.addNewFlowPoint(latLng, true);
             editingObject.updateEditingPolygonAndVertex();
         }
+    }
+
+    private void ensurePolygonEditFillLayer() {
+        MapLibreMap map = maplibreMap.get();
+        Style style = map != null ? map.getStyle() : null;
+        if (style != null && fillPolyEditLayer != null
+                && style.getLayer("selected-polygon-fill") == null) {
+            style.addLayer(fillPolyEditLayer);
+        }
+    }
+
+    private boolean restoreWalkFeatureOnCurrentStyle(
+            VectorLayer vectorLayer, Feature feature) {
+        if (vectorLayer == null || feature == null || feature.getGeometry() == null
+                || maplibreMap.get() == null || maplibreMap.get().getStyle() == null
+                || selectedPolySource == null || vertexSource == null) {
+            return false;
+        }
+
+        editingObject = null;
+        editingFeature = null;
+        startFeatureSelectionForEdit(
+                vectorLayer,
+                vectorLayer.getGeometryType(),
+                feature,
+                true,
+                vectorLayer.getDefaultStyleNoExcept(),
+                true);
+        if (editingObject == null) {
+            return false;
+        }
+
+        replaceGeometryFromHistoryChanges(feature.getGeometry());
+        editingObject.hideVertext();
+        editingObject.selectLastPoint();
+        return true;
     }
 
     /**

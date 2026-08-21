@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -88,6 +88,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   линейке. GeoJSON-конвертер явно замыкает кольца при восстановлении скетча;
 - WKT round-trip `GeoPolygon` разбирает внешнее кольцо и реальные отверстия по
   уровню скобок, не превращая внешнее кольцо в дублирующую внутреннюю дырку;
+- холодное продолжение обхода не заменяет MapLibre edit feature геометрией без
+  служебных свойств: заливка и красный контур восстанавливаются из одного source,
+  а скрытый vertex cache после Stop снова публикует редактируемые вершины;
 - `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
   метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
