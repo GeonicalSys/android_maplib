@@ -23,6 +23,8 @@
 
 package com.nextgis.maplib.map;
 
+import com.hypertrack.hyperlog.HyperLog;
+
 import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -234,31 +236,36 @@ public class MapContentProviderHelper
             if(null == layer)
                 return;
 
-            switch (intent.getAction()) {
+            try {
+                switch (intent.getAction()) {
 
-                case Constants.NOTIFY_DELETE:
-                    layer.notifyDelete(intent.getLongExtra(FIELD_ID, NOT_FOUND));
-                    break;
+                    case Constants.NOTIFY_DELETE:
+                        layer.notifyDelete(intent.getLongExtra(FIELD_ID, NOT_FOUND));
+                        break;
 
-                case Constants.NOTIFY_DELETE_ALL:
-                    layer.notifyDeleteAll();
-                    break;
+                    case Constants.NOTIFY_DELETE_ALL:
+                        layer.notifyDeleteAll();
+                        break;
 
-                case Constants.NOTIFY_UPDATE:
-                case Constants.NOTIFY_UPDATE_FIELDS:
-                    layer.notifyUpdate(
-                            intent.getLongExtra(FIELD_ID, NOT_FOUND),
-                            intent.getLongExtra(FIELD_OLD_ID, NOT_FOUND),
-                            intent.getBooleanExtra(Constants.ATTRIBUTES_ONLY, true));
-                    break;
+                    case Constants.NOTIFY_UPDATE:
+                    case Constants.NOTIFY_UPDATE_FIELDS:
+                        layer.notifyUpdate(
+                                intent.getLongExtra(FIELD_ID, NOT_FOUND),
+                                intent.getLongExtra(FIELD_OLD_ID, NOT_FOUND),
+                                intent.getBooleanExtra(Constants.ATTRIBUTES_ONLY, true));
+                        break;
 
-                case Constants.NOTIFY_UPDATE_ALL:
-                    layer.notifyUpdateAll();
-                    break;
+                    case Constants.NOTIFY_UPDATE_ALL:
+                        layer.notifyUpdateAll();
+                        break;
 
-                case Constants.NOTIFY_INSERT:
-                    layer.notifyInsert(intent.getLongExtra(FIELD_ID, NOT_FOUND));
-                    break;
+                    case Constants.NOTIFY_INSERT:
+                        layer.notifyInsert(intent.getLongExtra(FIELD_ID, NOT_FOUND));
+                        break;
+                }
+            } catch (RuntimeException e) {
+                HyperLog.w(Constants.TAG, "Vector layer notification failed action="
+                        + intent.getAction() + " layer=" + layer.getName(), e);
             }
         }
     }

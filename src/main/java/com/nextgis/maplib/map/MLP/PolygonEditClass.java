@@ -573,17 +573,12 @@ public class PolygonEditClass extends MLGeometryEditClass {
         if (projection == null || center == null) {
             // Fallback to a small fixed degree offset if projection or center is not available
             double offsetDegrees = 0.001;
-            Point point1Geo = Point.fromLngLat(center != null ? center.getLongitude() - offsetDegrees : -offsetDegrees,
-                    center != null ? center.getLatitude() + offsetDegrees : offsetDegrees);
-            Point point2Geo = Point.fromLngLat(center != null ? center.getLongitude() + offsetDegrees : offsetDegrees,
-                    center != null ? center.getLatitude() - offsetDegrees : -offsetDegrees);
-
-            Point point3Geo = Point.fromLngLat(center != null ? center.getLongitude()  : 0,
-                    center != null ? center.getLatitude() : 0);
-
-            result.add(point1Geo);
-            result.add(point2Geo);
-            result.add(point3Geo);
+            double longitude = center != null ? center.getLongitude() : 0;
+            double latitude = center != null ? center.getLatitude() : 0;
+            result.add(Point.fromLngLat(longitude - offsetDegrees, latitude + offsetDegrees));
+            result.add(Point.fromLngLat(longitude + offsetDegrees, latitude + offsetDegrees));
+            result.add(Point.fromLngLat(longitude + offsetDegrees, latitude - offsetDegrees));
+            result.add(Point.fromLngLat(longitude - offsetDegrees, latitude - offsetDegrees));
         } else {
             org.maplibre.android.geometry.VisibleRegion visibleRegion = projection.getVisibleRegion();
             PointF screenNearLeft = projection.toScreenLocation(visibleRegion.nearLeft);
@@ -594,25 +589,20 @@ public class PolygonEditClass extends MLGeometryEditClass {
 
             PointF centerScreenCoords = projection.toScreenLocation(center);
 
-            PointF screenPoint1 = new PointF(centerScreenCoords.x - pixelOffset, centerScreenCoords.y - pixelOffset);
-            PointF screenPoint2 = new PointF(centerScreenCoords.x + pixelOffset, centerScreenCoords.y + pixelOffset);
-            PointF screenPoint3 = new PointF(centerScreenCoords.x - pixelOffset, centerScreenCoords.y +  pixelOffset);
-
-            LatLng latLng1 = projection.fromScreenLocation(screenPoint1);
-            LatLng latLng2 = projection.fromScreenLocation(screenPoint2);
-            LatLng latLng3 = projection.fromScreenLocation(screenPoint3);
-
-            Point point1 = Point.fromLngLat(latLng1.getLongitude(), latLng1.getLatitude());
-            Point point2 = Point.fromLngLat(latLng2.getLongitude(), latLng2.getLatitude());
-            Point point3 = Point.fromLngLat(latLng3.getLongitude(), latLng3.getLatitude());
-
-            result.add(point1);
-            result.add(point2);
-            result.add(point3);
-            if (closeRing)
-                result.add(point1);
-
+            PointF[] screenCorners = new PointF[] {
+                    new PointF(centerScreenCoords.x - pixelOffset, centerScreenCoords.y - pixelOffset),
+                    new PointF(centerScreenCoords.x + pixelOffset, centerScreenCoords.y - pixelOffset),
+                    new PointF(centerScreenCoords.x + pixelOffset, centerScreenCoords.y + pixelOffset),
+                    new PointF(centerScreenCoords.x - pixelOffset, centerScreenCoords.y + pixelOffset)
+            };
+            for (PointF screenCorner : screenCorners) {
+                LatLng corner = projection.fromScreenLocation(screenCorner);
+                result.add(Point.fromLngLat(corner.getLongitude(), corner.getLatitude()));
+            }
         }
+
+        if (closeRing && !result.isEmpty())
+            result.add(result.get(0));
 
         return result;
     }

@@ -359,10 +359,14 @@ public interface IGISApplication
 
     /**
      * Local NGW vector layer schema no longer matches server metadata during sync.
-     * Implementation should remove the layer and enqueue {@code LayerFillService} refill on the main thread,
-     * after trying to send local edits and creating a data backup if unsent edits remain.
+     * Implementation should enqueue a staged refill on the main thread and remove the old layer
+     * only after the replacement is saved, after trying to send local edits and creating a data
+     * backup if unsent edits remain. {@code mismatchSignature} identifies an unchanged failure for
+     * retry circuit breaking.
      */
-    void scheduleNgwLayerRebuildAfterSchemaMismatch(NGWVectorLayer layer);
+    void scheduleNgwLayerRebuildAfterSchemaMismatch(
+            NGWVectorLayer layer,
+            String mismatchSignature);
 
     /**
      * Collector composition sync apply path.

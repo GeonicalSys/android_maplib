@@ -1148,6 +1148,20 @@ public class NGWVectorLayer
         return mSyncDirection;
     }
 
+    /**
+     * Whether the user may change this layer's synchronization direction.
+     *
+     * <p>Collector-managed layers use the Collector item's edit policy. Their generic mobile
+     * {@code is_editable} flag may legitimately be false and must not lock the direction control
+     * or silently replace a persisted two-way direction.</p>
+     */
+    public boolean isSyncDirectionConfigurable() {
+        boolean collectorManaged = mLayerOriginMetadata != null
+                && mLayerOriginMetadata.isManagedByProject();
+        return LayerEditingPolicy.isSyncDirectionConfigurable(
+                mIsEditable, mCollectorEditable, collectorManaged);
+    }
+
     public void setSyncDirection(int direction) {
         mSyncDirection = direction;
     }
@@ -1882,7 +1896,7 @@ public class NGWVectorLayer
                     + " — SQLite data table missing, scheduling full refill from server");
             try {
                 ((IGISApplication) mContext.getApplicationContext())
-                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this, "missing_table");
             } catch (Exception rebuildEx) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: refill scheduling failed", rebuildEx);
             }
@@ -1905,7 +1919,12 @@ public class NGWVectorLayer
                     HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
                             + " server schema mismatch — scheduling layer rebuild");
                     ((IGISApplication) mContext.getApplicationContext())
-                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                            .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                    this,
+                                    "server_meta:" + NGWLayerSchemaCompat.schemaFingerprint(
+                                            resourceMeta,
+                                            mNgwVersionMajor,
+                                            getRequiredCls()));
                     return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
                 }
 
@@ -1933,7 +1952,8 @@ public class NGWVectorLayer
                                             + " config hard mismatch: " + configDiff.getHardReason()
                                             + " — scheduling rebuild");
                                     ((IGISApplication) mContext.getApplicationContext())
-                                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                                            .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                                    this, "config:" + descHash);
                                     return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
                                 }
                                 boolean softUpdateIncomplete = false;
@@ -2007,6 +2027,7 @@ public class NGWVectorLayer
 
         List<Feature> features, added = new ArrayList<>(), deleted =  new ArrayList<>(), changed =  new ArrayList<>();
         List<Long> deleteItems = new ArrayList<>();
+        boolean bulkPullStarted = false;
 
         ExistFeatureResult result =  getFeatures(syncResult, mTracked);
         switch (NgwPullDecision.decide(result)) {
@@ -2071,6 +2092,11 @@ public class NGWVectorLayer
             if (!mCacheLoaded) {
                 reloadCache();
             }
+            // Incremental pulls can replace most of a layer. Per-row insert/update/delete
+            // broadcasts would make the main thread mutate the same R-tree that is rebuilt at
+            // the end of this method. Suppress those events and publish one final reload instead.
+            beginBulkImport();
+            bulkPullStarted = true;
 
             String changeTableName = getChangeTableName();
             HashSet<Long> remoteIdSet = null;
@@ -2156,7 +2182,10 @@ public class NGWVectorLayer
                                     + " — SQLite storage error (" + innerMsg + "), scheduling rebuild");
                             try {
                                 ((IGISApplication) mContext.getApplicationContext())
-                                        .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                                        .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                                this,
+                                                "sqlite:" + LayerConfigUtil.md5(
+                                                        innerMsg != null ? innerMsg : "unknown"));
                             } catch (Exception rebuildEx) {
                                 HyperLog.w(Constants.TAG, "rebuild scheduling failed", rebuildEx);
                             }
@@ -2253,12 +2282,19 @@ public class NGWVectorLayer
                         + " — SQLite storage error, scheduling rebuild: " + errMsg);
                 try {
                     ((IGISApplication) mContext.getApplicationContext())
-                            .scheduleNgwLayerRebuildAfterSchemaMismatch(this);
+                            .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                    this,
+                                    "sqlite:" + LayerConfigUtil.md5(
+                                            errMsg != null ? errMsg : "unknown"));
                 } catch (Exception rebuildEx) {
                     HyperLog.w(Constants.TAG, "NGWVectorLayer: rebuild scheduling failed", rebuildEx);
                 }
             }
             return true;
+        } finally {
+            if (bulkPullStarted) {
+                endBulkImport();
+            }
         }
 
         int trackedAddedCount = added == null ? 0 : added.size();

@@ -28,4 +28,20 @@ public class LayerEditingPolicyTest {
         assertTrue(LayerEditingPolicy.isEditingAllowed(
                 true, true, false, true));
     }
+
+    @Test
+    public void collectorManaged_canRepairDirectionEvenWhenGenericEditableIsFalse() {
+        assertTrue(LayerEditingPolicy.isSyncDirectionConfigurable(
+                false, true, true));
+    }
+
+    @Test
+    public void syncDirectionConfiguration_respectsOwningEditPolicy() {
+        assertFalse(LayerEditingPolicy.isSyncDirectionConfigurable(
+                true, false, true));
+        assertFalse(LayerEditingPolicy.isSyncDirectionConfigurable(
+                false, true, false));
+        assertTrue(LayerEditingPolicy.isSyncDirectionConfigurable(
+                true, true, false));
+    }
 }

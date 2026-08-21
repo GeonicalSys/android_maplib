@@ -1037,38 +1037,34 @@ public class MapDrawable
             return;
         }
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
         Handler mainHandler = new Handler(Looper.getMainLooper());
-        executor.execute(() -> {
+        mMaplibreVectorReloadExecutor.execute(() -> {
             try {
-                List<org.maplibre.geojson.Feature> features = sourceFeaturesHashMap.get(layer.getId());
-                boolean fromMemory = features != null && !features.isEmpty();
-                if (fromMemory) {
-                    long t0 = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
-                    refreshMaplibreStyleOnFeatures(layer, features);
-                    if (Constants.DEBUG_MODE) {
-                        Log.d(TAG, "reloadVectorLayerStyleProps memory layer=" + layer.getName()
-                                + " n=" + features.size()
-                                + " ms=" + ((System.nanoTime() - t0) / 1_000_000));
-                    }
-                } else {
-                    features = VectorLayerRenderCache.tryLoadFeatures(layer);
-                    if (features == null) {
-                        Log.d(TAG, "reloadVectorLayerStyleProps: no cache, full data reload "
-                                + layer.getName());
-                        mainHandler.post(() -> reloadVectorLayerDataToMaplibre(ilayer));
-                        return;
-                    }
+                // Never mutate the live Feature list here. MapLibre Feature.properties() is a
+                // Gson LinkedTreeMap and is not safe when the main thread edits/selects the same
+                // feature while a style worker writes derived properties. The render cache loads
+                // independent Feature instances; a missing/stale cache takes the full reload path.
+                List<org.maplibre.geojson.Feature> features =
+                        VectorLayerRenderCache.tryLoadFeatures(layer);
+                if (features == null) {
+                    Log.d(TAG, "reloadVectorLayerStyleProps: no cache, full data reload "
+                            + layer.getName());
+                    mainHandler.post(() -> reloadVectorLayerDataToMaplibre(ilayer));
+                    return;
                 }
-                sourceFeaturesHashMap.put(layer.getId(), features);
+                if (Constants.DEBUG_MODE) {
+                    Log.d(TAG, "reloadVectorLayerStyleProps snapshot layer=" + layer.getName()
+                            + " n=" + features.size());
+                }
                 final List<org.maplibre.geojson.Feature> result = features;
                 postMainGuarded("reloadVectorLayerStyleProps update layer=" + layer.getName(),
-                        () -> updateVectorLayerGeoJsonSources(layer, result));
+                        () -> {
+                            sourceFeaturesHashMap.put(layer.getId(), result);
+                            updateVectorLayerGeoJsonSources(layer, result);
+                        });
             } catch (Exception ex) {
                 logErr("reloadVectorLayerStyleProps: " + layer.getName(), ex);
                 mainHandler.post(() -> reloadVectorLayerDataToMaplibre(ilayer));
-            } finally {
-                executor.shutdown();
             }
         });
     }

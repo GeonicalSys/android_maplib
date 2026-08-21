@@ -109,18 +109,27 @@ public class GeoEnvelope
     }
 
     public final double getArea(){
+        if (!isInit()) {
+            return 0.0;
+        }
         return width() * height();
     }
 
 
     public final double width()
     {
+        if (!isInit()) {
+            return 0.0;
+        }
         return mMaxX - mMinX;
     }
 
 
     public final double height()
     {
+        if (!isInit()) {
+            return 0.0;
+        }
         return mMaxY - mMinY;
     }
 

@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-15
+last_verified: 2026-08-21
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -16,6 +16,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 ## Критичные области
 
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
+- горячее обновление style применяет вычисляемые свойства только к независимому
+  snapshot из `VectorLayerRenderCache` в общей последовательной очереди; worker
+  не изменяет опубликованные в MapLibre `Feature.properties`;
 - после batch fill `MapDrawable` проверяет, что для каждого видимого vector layer
   в новом MapLibre style существуют source и style layer; при неполном apply
   выполняется один полный повтор, а completion callback до этого не публикуется;
@@ -23,6 +26,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   отсутствии source/layer загружает данные независимо от старого process-кэша;
 - `LocalVectorTileProvider` / `LocalVectorTileEncoder` — ленивые MVT для
   read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;
+- `LayerIdentifyPolicy` оставляет выключенные классические слои вне identify,
+  но разрешает просмотр локальных атрибутов выключенного слоя, настроенного на
+  `local_vector_tiles`, не включая его отрисовку;
 - `MapDrawable.finishCreateNewFeature` допускает отсутствие временной edit-сессии
   после cold form recovery; если новый id отсутствует в process-local GeoJSON,
   `reloadFeatureToMaplibre` перечитывает данные слоя, а не только стили;
@@ -36,6 +42,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `Connection`, `SyncAdapter`, `NGWSyncService` — NGW; временно упавшие pull
   векторных слоёв повторяются отдельным проходом после остальных слоёв, а
   process-wide sync state обновляется адаптером напрямую, не только broadcast;
+- инкрементальный NGW pull работает как bulk-операция: построчные
+  insert/update/delete broadcast подавлены, после всех SQLite-изменений R-tree
+  перестраивается и карта перезагружается один раз;
 - `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное
   получение NGW-ресурса без загрузки всего дерева;
 - `CollectorProjectItem`, `CollectorProjectMetadata`,
@@ -44,8 +53,15 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   project-origin metadata для server-rendered Collector styles;
 - `NGWVectorLayer` применяет для managed Collector-слоя проектный editable-флаг
   вместе с исходящим направлением sync; обычные слои сохраняют общий
-  `is_editable` gate; managed HTTP 404 не меняет тип слоя, а полная NGW identity
-  сохраняется отдельно для восстановления частичной конфигурации;
+  `is_editable` gate; возможность изменить направление sync использует тот же
+  owning policy и не зависит от текущего направления, чтобы слой можно было
+  вернуть из server-only в двусторонний режим; managed HTTP 404 не меняет тип
+  слоя, а полная NGW identity сохраняется отдельно для восстановления частичной
+  конфигурации;
+- при schema/config/SQLite mismatch `NGWVectorLayer` передаёт через
+  `IGISApplication.scheduleNgwLayerRebuildAfterSchemaMismatch()` устойчивый
+  fingerprint причины, чтобы UI-orchestrator мог ограничить повтор тяжёлого
+  rebuild без смешивания разных причин;
 - новый обычный `VectorLayer` из ручного создания или локального файла по
   умолчанию редактируем; `GeoJSONUtil` принимает WGS 84 без `crs`, `CRS84`,
   распространённые URN/OGC URL для EPSG:4326 и поддерживаемые записи EPSG:3857;
@@ -57,11 +73,17 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   name/time/elevation, используя SQLite-транзакции не более 250 точек;
 - `VectorLayer.fromJSON()` может восстановить R-tree без сохранения
   недочитанного конфига подкласса;
+- `GeometryRTree` сериализует публичные операции чтения/изменения, а
+  `VectorLayer` не принимает feature-notify во время bulk/rebuild. Ошибка
+  отдельного receiver логируется и не завершает главный Android-поток;
 - `VectorLayer.feature_label_field` хранит поле отображаемого имени объекта
   отдельно от renderer label и единообразно обслуживает identify/UI;
 - `MultiPolygonGeometryRepair` проверяет и исправляет невалидную топологию
   `GeoMultiPolygon` через JTS, сохраняя один feature, CRS и полигональные части;
   при отсутствии CRS контейнера восстанавливает его из дочерней геометрии;
+- новый Polygon/MultiPolygon скетч получает один квадратный внешний контур;
+  редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
+  существующие многосоставные геометрии и отверстия при их загрузке;
 - `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`
   обслуживают трек и обход одним accuracy-aware pipeline: движение до 160 км/ч,
   проверка качества/возраста/дистанции/ускорения и буфер из трёх точек для
@@ -141,6 +163,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Слой был невидим при import и не появился после локального включения: проверить
   `MapLibre visibility enable requires data reload`; наличие записи в
   `sourceFeaturesHashMap` не заменяет source/layer в текущем live style.
+- Выключенный `local_vector_tiles` не попал в identify: проверить сохранённый
+  `layer_origin.render_mode` и `LayerIdentifyPolicy`; видимость слоя не должна
+  включаться ради чтения атрибутов.
 - Пустой список треков после project switch: проверить строку
   `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;
 - Трек/обход замер на скорости: проверить `LocationTrackFilter` причины вместе с
@@ -150,6 +175,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Неверное расстояние выноса: проверить CRS исходной геометрии и ближайшую точку
   `StakeoutGeometryTarget`; пользователю нельзя выдавать плоское расстояние 3857.
 - NGW config/data issue: отделить config parsing от feature sync decision.
+- Crash `notify_insert → GeometryRTree.chooseLeaf → GeoEnvelope.width`: проверить,
+  что incremental pull вошёл в bulk-режим, в журнале нет построчных notify, а
+  после pull есть ровно одна строка `spatial cache rebuilt` с числом строк SQLite.
+- `LinkedTreeMap` из `reloadVectorLayerStyleProps`: style worker не должен брать
+  live `sourceFeaturesHashMap`; допустим только независимый render-cache snapshot
+  либо полный data reload при cache miss.
 - `ExternalDatabaseError`/HTTP 5xx на feature pull: проверить журнал
   `deferred transient retry`; один успешный второй проход является ожидаемым
   восстановлением, а исчерпание очереди даёт сообщение о временной
@@ -172,6 +203,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   edit pipeline.
 - «Нет редактируемых слоёв» в Collector: сверить item `editable`,
   `managed_by_project` и исходящее направление sync.
+- Направление самопроизвольно стало server-only после просмотра свойств слоя:
+  проверить, что UI игнорирует начальный callback выбора и использует
+  `isSyncDirectionConfigurable()`, а не общий `isEditable()`.
 
 ## Проверки
 
