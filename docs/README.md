@@ -106,8 +106,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   отсутствующие или оставшиеся от заменённого style source;
 - `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
   метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
-  app/maplibui-панель линейки применяет общую историю Undo/Redo к добавлению и
-  переносу её точек, не меняя геометрический контракт измерения в `maplib`;
+  `MapDrawable` публикует и восстанавливает геометрию активного MapLibre
+  `MeasurmentLine`, чтобы app/maplibui-панель Undo/Redo работала с реально
+  отображаемыми точками, а не с legacy overlay;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
 - `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`

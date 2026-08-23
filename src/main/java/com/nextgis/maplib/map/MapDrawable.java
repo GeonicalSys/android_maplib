@@ -4592,28 +4592,54 @@ public class MapDrawable
             originalSelectedFeature = null;
 
 
-        org.maplibre.geojson.Feature feature = null;
+        LatLng center = maplibreMap.get().getCameraPosition().target;
+        List<org.maplibre.geojson.Point> lineList = new ArrayList<>();
+        lineList.add(Point.fromLngLat(center.getLongitude(), center.getLatitude()));
+        setMeasurementPoints(lineList);
+    }
 
-        LatLng center = null;
-        if (originalSelectedFeature != null && originalSelectedFeature.getGeometry() != null
-                && originalSelectedFeature.getGeometry() instanceof  GeoPoint){
-            center = latLngPointFromGeoPoint((GeoPoint) originalSelectedFeature.getGeometry());
-        } else {
-            center = maplibreMap.get().getCameraPosition().target;
+    public GeoLineString getMeasurementGeometry() {
+        if (!(editingObject instanceof MeasurmentLine) || mapContext.get() == null)
+            return null;
+
+        GeoGeometry geometry = mapContext.get().getGeometryFromMaplibreGeometry(
+                editingObject.editingFeature);
+        if (!(geometry instanceof GeoLineString))
+            return null;
+
+        return (GeoLineString) geometry.copy();
+    }
+
+    public boolean restoreMeasurementGeometry(GeoLineString geometry) {
+        if (geometry == null || geometry.getPointCount() == 0)
+            return false;
+
+        List<org.maplibre.geojson.Point> points = new ArrayList<>();
+        for (GeoPoint point : geometry.getPoints()) {
+            LatLng latLng = latLngPointFromGeoPoint(point);
+            points.add(Point.fromLngLat(latLng.getLongitude(), latLng.getLatitude()));
         }
 
-        Projection projection = maplibreMap.get().getProjection();
-        Point point = Point.fromLngLat(center.getLongitude(), center.getLatitude());
+        if (editingObject instanceof MeasurmentLine) {
+            if (!((MeasurmentLine) editingObject).replacePoints(points))
+                return false;
+            editingFeature = editingObject.editingFeature;
+            LatLng selectedPoint = editingObject.getSelectedPoint();
+            if (selectedPoint != null)
+                setMarker(selectedPoint);
+        } else {
+            setMeasurementPoints(points);
+        }
+        updateMeasurmentCaptions(editingObject);
+        return true;
+    }
 
-
-
-        Point point1Geo = Point.fromLngLat(center.getLongitude(),center.getLatitude());
-        List<org.maplibre.geojson.Point> lineList = new ArrayList<>(); //  getNewLinePoints(center, projection);
-        //lineList.remove(1);
-        lineList.add(point1Geo);
+    private void setMeasurementPoints(List<org.maplibre.geojson.Point> lineList) {
+        if (lineList == null || lineList.isEmpty())
+            return;
 
         LineString line = LineString.fromLngLats(lineList);
-        feature = org.maplibre.geojson.Feature.fromGeometry(line);
+        org.maplibre.geojson.Feature feature = org.maplibre.geojson.Feature.fromGeometry(line);
         editingFeature = feature;
 
         GeoJsonSource choosed = selectedPolySource;
@@ -4637,8 +4663,9 @@ public class MapDrawable
             maplibreMap.get().getStyle().removeLayer(fillPolyEditLayer);
 
 
-        editingObject.setSelectedVertexIndex(0); // firsr point always selected
+        editingObject.setSelectedVertexIndex(lineList.size() - 1);
         editingObject.extractVertices(editingFeature,  true);
+        editingObject.setSelectedVertexIndex(lineList.size() - 1);
 
         LatLng selectedPoint = editingObject.getSelectedPoint();
         setMarker(selectedPoint);
@@ -4654,14 +4681,15 @@ public class MapDrawable
                 mapContext.get().onLengthChanged(length);
             }
 
+            double area = 0;
             Polygon polygon = Polygon.fromLngLats(((MeasurmentLine)editingObject).getPoints());
             org.maplibre.geojson.Feature featurePoly =  org.maplibre.geojson.Feature.fromGeometry(polygon);
             GeoGeometry geometryPoly = mapContext.get().getGeometryFromMaplibreGeometry(featurePoly);
 
             if (geometryPoly instanceof GeoPolygon){
-                double area = ((GeoPolygon) (geometryPoly)).getArea();
-                mapContext.get().onAreaChanged(area);
+                area = ((GeoPolygon) (geometryPoly)).getArea();
             }
+            mapContext.get().onAreaChanged(area);
         }
     }
 
