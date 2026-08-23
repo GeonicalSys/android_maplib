@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -106,6 +106,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   отсутствующие или оставшиеся от заменённого style source;
 - `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
   метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
+  app/maplibui-панель линейки применяет общую историю Undo/Redo к добавлению и
+  переносу её точек, не меняя геометрический контракт измерения в `maplib`;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
 - `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`
@@ -117,7 +119,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - выход `LocationTrackFilter` остаётся только набором принятых координат: звуковой
   контроль фоновой записи в `maplibui` разрешает success pulse лишь после
   последующего успешного insert/commit, поэтому отфильтрованный fix не может
-  ошибочно звучать как сохранённый;
+  ошибочно звучать как сохранённый; отзыв Android location permission обрабатывает
+  владелец foreground-service в `maplibui`, не изменяя состояние фильтра;
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
   эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает
