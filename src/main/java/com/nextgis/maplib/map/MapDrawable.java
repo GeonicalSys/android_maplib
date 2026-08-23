@@ -2141,6 +2141,8 @@ public class MapDrawable
                             try {
                                 if (restoreWalkFeatureOnCurrentStyle(
                                         layerForWalkRestore, featureToRestore)) {
+                                    HyperLog.v(TAG, "WalkDraft renderer attached after style load"
+                                            + " layer=" + layerForWalkRestore.getId());
                                     layerForWalkRestore = null;
                                     featureToRestore = null;
                                 }
@@ -2803,6 +2805,12 @@ public class MapDrawable
                                              Feature originalSelectedFeature, boolean createNew,
                                              com.nextgis.maplib.display.Style ngstyle,
                                              boolean isFillByWalking){
+
+        if (!areEditSourcesReadyForCurrentStyle()) {
+            HyperLog.w(TAG, "MapLibre edit attach deferred: current style sources are not ready"
+                    + " layer=" + (ilayer != null ? ilayer.getId() : Constants.NOT_FOUND));
+            return;
+        }
 
         Long selectedFeatureId = originalSelectedFeature.getId();
 
@@ -4284,11 +4292,32 @@ public class MapDrawable
         }
     }
 
+    /**
+     * An edit source field can still point to an object owned by a replaced style. Callers that
+     * recover an editor asynchronously must wait until all three source objects belong to the
+     * currently active style, not merely until MapLibreMap#getStyle() becomes non-null.
+     */
+    public boolean areEditSourcesReadyForCurrentStyle() {
+        MapLibreMap map = maplibreMap.get();
+        Style style = map != null ? map.getStyle() : null;
+        if (style == null || selectedPolySource == null
+                || selectedDotSource == null || vertexSource == null) {
+            return false;
+        }
+        try {
+            return style.getSource("selected-poly-source") == selectedPolySource
+                    && style.getSource("selected-dot-source") == selectedDotSource
+                    && style.getSource("vertex-source") == vertexSource;
+        } catch (Throwable ignored) {
+            // Style#getSource rejects access while a replacement style is not fully loaded yet.
+            return false;
+        }
+    }
+
     private boolean restoreWalkFeatureOnCurrentStyle(
             VectorLayer vectorLayer, Feature feature) {
         if (vectorLayer == null || feature == null || feature.getGeometry() == null
-                || maplibreMap.get() == null || maplibreMap.get().getStyle() == null
-                || selectedPolySource == null || vertexSource == null) {
+                || !areEditSourcesReadyForCurrentStyle()) {
             return false;
         }
 
@@ -4684,10 +4713,23 @@ public class MapDrawable
     public void startEditByWalkFromRestore(
             final VectorLayer  vectorLayer,
                 Feature originalSelectedFeature){
-        Log.e("WWALK", "MapDrawable startEditByWalkFromRestore featureid = "
-                +  (originalSelectedFeature ==null ? "null" : originalSelectedFeature.getId()) );
         featureToRestore = originalSelectedFeature;
         layerForWalkRestore = vectorLayer;
+        try {
+            if (restoreWalkFeatureOnCurrentStyle(vectorLayer, originalSelectedFeature)) {
+                featureToRestore = null;
+                layerForWalkRestore = null;
+                HyperLog.v(TAG, "WalkDraft renderer attached to current style"
+                        + " layer=" + (vectorLayer != null
+                        ? vectorLayer.getId() : Constants.NOT_FOUND));
+            } else {
+                HyperLog.v(TAG, "WalkDraft renderer attach deferred until style sources are ready"
+                        + " layer=" + (vectorLayer != null
+                        ? vectorLayer.getId() : Constants.NOT_FOUND));
+            }
+        } catch (Throwable throwable) {
+            logErr("startEditByWalkFromRestore", throwable);
+        }
     }
 
     // use from collector

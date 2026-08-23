@@ -10,8 +10,8 @@ last_verified: 2026-08-23
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.13` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.13`; отдельный Lisa Debug остаётся `3.1.2.9`. Оба значения проверяются
+Для выпуска `3.1.2.14` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.14`; отдельный Lisa Debug остаётся `3.1.2.9`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
@@ -98,7 +98,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   служебных свойств: заливка и красный контур восстанавливаются из одного source,
   а скрытый vertex cache после Stop снова публикует редактируемые вершины;
   общий edit fill включается только для Polygon/MultiPolygon и явно снимается при
-  восстановлении LineString/MultiLineString;
+  восстановлении LineString/MultiLineString; привязка ждёт, пока все edit sources
+  принадлежат текущему style, а общий entrypoint редактирования не разыменовывает
+  отсутствующие или оставшиеся от заменённого style source;
 - `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
   метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
