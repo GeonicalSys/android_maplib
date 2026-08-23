@@ -114,6 +114,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   одиночных выбросов;
 - `LocationProviderArbiter` оставляет Network резервным источником, но не смешивает
   его точки со свежим пригодным GPS-потоком: fallback возвращается через 12 секунд;
+- выход `LocationTrackFilter` остаётся только набором принятых координат: звуковой
+  контроль фоновой записи в `maplibui` разрешает success pulse лишь после
+  последующего успешного insert/commit, поэтому отфильтрованный fix не может
+  ошибочно звучать как сохранённый;
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
   эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает
