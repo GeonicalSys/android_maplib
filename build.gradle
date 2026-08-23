@@ -23,7 +23,7 @@
 
 apply plugin: 'com.android.library'
 
-def productionVersionName = '3.1.2.11'
+def productionVersionName = '3.1.2.12'
 def debugVersionName = '3.1.2.9'
 
 android {
@@ -76,7 +76,9 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
 
-    implementation 'org.maplibre.gl:android-sdk:13.0.2'
+    // MapLibre 13's generic android-sdk artifact uses Vulkan. Keep OpenGL explicit so
+    // devices without a compatible Vulkan implementation can open the map.
+    implementation 'org.maplibre.gl:android-sdk-opengl:13.0.2'
 
     implementation 'org.locationtech.jts:jts-core:1.20.0'
 

@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -10,13 +10,16 @@ last_verified: 2026-08-22
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.11` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.11`; отдельный Lisa Debug остаётся `3.1.2.9`. Оба значения проверяются
+Для выпуска `3.1.2.12` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.12`; отдельный Lisa Debug остаётся `3.1.2.9`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
 
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
+- MapLibre Android `13.0.2` подключён через явный OpenGL-артефакт
+  `android-sdk-opengl`; generic `android-sdk` этой версии использует Vulkan и
+  не совместим с частью устройств без рабочего Vulkan-драйвера;
 - горячее обновление style применяет вычисляемые свойства только к независимому
   snapshot из `VectorLayerRenderCache` в общей последовательной очереди; worker
   не изменяет опубликованные в MapLibre `Feature.properties`;
@@ -122,6 +125,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 ## Ограничения
 
 - Нет imports из `maplibui`/`app`.
+- MapLibre backend должен оставаться согласованным с `maplibui` и `app`:
+  `org.maplibre.gl:android-sdk-opengl:13.0.2` во всех трёх модулях.
 - LayerGroup index `0` — bottom.
 - Точечный `local_vector_tiles` поддерживает только простой круговой marker и
   подпись из одного поля/фиксированного текста; rule/icon/template/editable
@@ -158,6 +163,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 - Неверный style order: проверить model order, sibling anchor и момент создания
   MapLibre style.
+- Crash `No Vulkan compatible GPU found` означает возврат generic
+  `org.maplibre.gl:android-sdk` либо Vulkan-артефакта; production использует
+  `android-sdk-opengl` и не должен инициализировать Vulkan surface.
 - Rule-based подписи игнорируют зум/opacity/scale: проверить, что слойные
   дефолты взяты из «прочих», props после merge, и SymbolLayer min/max сброшены;
   пустой зум/scale=false/opacity=255 в категории наследуются из other.
