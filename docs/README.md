@@ -117,11 +117,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   одиночных выбросов;
 - `LocationProviderArbiter` оставляет Network резервным источником, но не смешивает
   его точки со свежим пригодным GPS-потоком: fallback возвращается через 12 секунд;
-- выход `LocationTrackFilter` остаётся только набором принятых координат: звуковой
-  контроль фоновой записи в `maplibui` разрешает success pulse лишь после
-  последующего успешного insert/commit, поэтому отфильтрованный fix не может
-  ошибочно звучать как сохранённый; отзыв Android location permission обрабатывает
-  владелец foreground-service в `maplibui`, не изменяя состояние фильтра;
+- выход `LocationTrackFilter` остаётся только набором принятых координат; звуковой
+  health-контроль в `maplibui` использует отдельный поток пригодных фиксов без
+  порога перемещения и не зависит от выдачи фильтра или insert/commit. Поэтому
+  неподвижное устройство продолжает сигнализировать об активной записи, а
+  прекращение свежих координат гасит сигнал; отзыв Android location permission
+  обрабатывает владелец foreground-service в `maplibui`;
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
   эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает
