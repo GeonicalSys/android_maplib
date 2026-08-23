@@ -13,7 +13,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    responsibility: MapLibre style, sources, layers, hot add/reload coordination, tap-node and midpoint edit dispatch, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+    responsibility: MapLibre style, sources, layers, hot add/reload coordination, tap-node and midpoint edit dispatch, thicker insertion-direction segment rendering, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
   - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryEditFillPolicy.java
     responsibility: Allow the shared edit fill only for Polygon and MultiPolygon so recovered line sketches cannot inherit polygon rendering state.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
@@ -77,7 +77,9 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PolygonEditClass.java
     responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, and retain existing ring structure.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPolygonEditClass.java
-    responsibility: Build one-node tap sketches and limit new MultiPolygon geometry to one polygon part without flattening existing multipart or holed geometry.
+    responsibility: Build one-node tap sketches, display insertion direction inside the selected ring, and limit new MultiPolygon geometry to one polygon part without flattening existing multipart or holed geometry.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
+    responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed polygon ring to its own first vertex.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
     responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter and expose safe provider-qualified diagnostics plus aggregate counters.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java

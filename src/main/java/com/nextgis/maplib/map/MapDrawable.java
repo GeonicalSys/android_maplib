@@ -280,6 +280,15 @@ public class MapDrawable
     FeatureCollection markerFeatureCollection = FeatureCollection.fromFeatures(new ArrayList<>());
     GeoJsonSource markerSource = null; // marker source - select point
 
+    private static Expression editDirectionLineWidth() {
+        return Expression.switchCase(
+                Expression.eq(
+                        Expression.get("edit_direction"),
+                        Expression.literal(true)),
+                Expression.literal(6.0f),
+                Expression.literal(2.0f));
+    }
+
     private static final String USER_LOCATION_SOURCE_ID = "user-location-source";
     private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
     private static final String USER_LOCATION_STANDING_ICON_ID = "user-marker-location-stand";
@@ -1960,7 +1969,7 @@ public class MapDrawable
                         LineLayer lineLayer = new LineLayer("selected-polygon-line", "selected-poly-source")
                                 .withProperties(
                                         PropertyFactory.lineColor(Expression.get("color")),
-                                        PropertyFactory.lineWidth(2.0f) );
+                                        PropertyFactory.lineWidth(editDirectionLineWidth()) );
                         style.addLayer(lineLayer);
 
                         fillPolyEditLayer = new FillLayer("selected-polygon-fill" ,"selected-poly-source" )
@@ -2257,7 +2266,7 @@ public class MapDrawable
         LineLayer lineLayer = new LineLayer("selected-polygon-line", "selected-poly-source")
                 .withProperties(
                         PropertyFactory.lineColor(Expression.get("color")),
-                        PropertyFactory.lineWidth(2.0f) );
+                        PropertyFactory.lineWidth(editDirectionLineWidth()) );
         style.addLayer(lineLayer);
 
         fillPolyEditLayer = new FillLayer("selected-polygon-fill" ,"selected-poly-source" )

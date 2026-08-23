@@ -225,7 +225,8 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
         editingFeature = newFeature;
 
         if (selectedPolySource != null) {
-            selectedPolySource.setGeoJson(editingFeature);
+            publishEditingFeatureWithDirection(
+                    editingFeature, editingVertices, getNextVertexIndex());
         }
         displayMiddlePoints(false, true); // Refresh vertices and middle points
 
@@ -244,6 +245,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
             return;
         }
 
+        int nextVertexIndex = getNextVertexIndex();
         int currentVertexGlobalOffset = 0;
         for (int pIdx = 0; pIdx < multiPolygonRingEndIndicesMarker.size(); pIdx++) {
             middleVerticesPerPolygonPerRing.add(new ArrayList<>()); // List of rings for this polygon
@@ -268,19 +270,15 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
                 for (int vIdxInRing = 0; vIdxInRing < currentRingMainPoints.size(); vIdxInRing++) {
                     Point pt = currentRingMainPoints.get(vIdxInRing);
                     Feature vertexFeature = Feature.fromGeometry(pt);
-                    vertexFeature.addNumberProperty("radius", MPLFeaturesUtils.pointRaduis);
+                    int globalIndex = ringStartIndex + vIdxInRing;
+                    vertexFeature.addNumberProperty(
+                            "radius", getEditVertexRadius(globalIndex, nextVertexIndex));
                     vertexFeature.addNumberProperty("polygonIndex", pIdx);
                     vertexFeature.addNumberProperty("ringIndexInPolygon", currentRingNumberInPolygon);
                     vertexFeature.addNumberProperty("vertexIndexInRing", vIdxInRing);
-                    vertexFeature.addNumberProperty("index", ringStartIndex + vIdxInRing); // Global index
-
-                    boolean isSelected = (pIdx == selectedPolygonIndex && 
-                                          currentRingNumberInPolygon == selectedRingIndexInPolygon &&
-                                          vIdxInRing == selectedVertexIndexInRing);
-                    // Highlight selected polygon's selected ring
-                     String color = (pIdx == selectedPolygonIndex && currentRingNumberInPolygon == selectedRingIndexInPolygon) ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue;
-                    if (isSelected) color = MPLFeaturesUtils.colorRED; // ensure selected vertex is red
-                    vertexFeature.addStringProperty("color", color);
+                    vertexFeature.addNumberProperty("index", globalIndex);
+                    vertexFeature.addStringProperty(
+                            "color", getEditVertexColor(globalIndex, nextVertexIndex));
                     vertexFeatures.add(vertexFeature);
                 }
 
@@ -304,8 +302,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
                     // prevVertexIndexInRing is the index of the vertex this middle point *follows*
                     middleFeature.addNumberProperty("prevVertexIndexInRing", vIdxInRing); 
                     middleFeature.addNumberProperty("radius", MPLFeaturesUtils.middleRaduis);
-                    String color = (pIdx == selectedPolygonIndex && currentRingNumberInPolygon == selectedRingIndexInPolygon) ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue;
-                    middleFeature.addStringProperty("color", color);
+                    middleFeature.addStringProperty("color", MPLFeaturesUtils.colorLightBlue);
                     vertexFeatures.add(middleFeature);
                 }
                 currentVertexGlobalOffset = ringEndIndex;
@@ -903,6 +900,26 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
 
     public int getSelectedPolygonIndex(){
         return selectedPolygonIndex;
+    }
+
+    private int getNextVertexIndex() {
+        if (selectedPolygonIndex < 0
+                || selectedPolygonIndex >= multiPolygonRingEndIndicesMarker.size()
+                || selectedRingIndexInPolygon < 0) {
+            return -1;
+        }
+        int polygonRingStart = selectedPolygonIndex == 0
+                ? 0
+                : multiPolygonRingEndIndicesMarker.get(selectedPolygonIndex - 1);
+        int absoluteRingIndex = polygonRingStart + selectedRingIndexInPolygon;
+        if (absoluteRingIndex < 0 || absoluteRingIndex >= polygonRingEndIndices.size()) {
+            return -1;
+        }
+        int ringStartIndex = absoluteRingIndex == 0
+                ? 0
+                : polygonRingEndIndices.get(absoluteRingIndex - 1);
+        int ringEndIndex = polygonRingEndIndices.get(absoluteRingIndex);
+        return getNextClosedVertexIndex(ringStartIndex, ringEndIndex);
     }
 
     @Override
