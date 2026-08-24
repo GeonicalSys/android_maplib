@@ -77,12 +77,13 @@ public class MultiLineEditClass extends MLGeometryEditClass {
     public void regenerateVertexFeatures() {
 
         List<org.maplibre.geojson.Feature> vertexFeaturesTmp = new ArrayList<>();
+        int nextVertexIndex = getNextVertexIndex();
         for (int index = 0; index < editingVertices.size(); index++) {
             Point pt = editingVertices.get(index);
             org.maplibre.geojson.Feature f = org.maplibre.geojson.Feature.fromGeometry(pt);
             f.addNumberProperty("index", index);
-            f.addNumberProperty("radius", MPLFeaturesUtils.pointRaduis);
-            f.addStringProperty("color", index == selectedVertexIndex ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue);
+            f.addNumberProperty("radius", getEditVertexRadius(index, nextVertexIndex));
+            f.addStringProperty("color", getEditVertexColor(index, nextVertexIndex));
             vertexFeaturesTmp.add(f);
         }
 
@@ -278,28 +279,16 @@ public class MultiLineEditClass extends MLGeometryEditClass {
         if (isInit) {
             if (!editingVertices.isEmpty()) {
                 selectedVertexIndex = 0;
-                // Apply color to the initially selected main vertex (if any)
-
-                for (org.maplibre.geojson.Feature f : vertexFeatures) {
-                    if (!f.hasNonNullValueForProperty("middle")) {
-                        Number indexNum = f.getNumberProperty("index");
-                        if (indexNum != null && indexNum.intValue() == selectedVertexIndex) {
-                            f.addStringProperty("color", MPLFeaturesUtils.colorRED);
-                            break;
-                        }
-                    }
-                }
             } else {
                 selectedVertexIndex = -1;
             }
-        } else {
-            // Ensure correct coloring for the currently selected main vertex
-            Iterator<Feature> it = vertexFeatures.iterator();
-            while (it.hasNext()) {
-                Feature feature = it.next();
-                if (!feature.hasNonNullValueForProperty("middle")) {
-                    feature.addStringProperty("color", feature.getNumberProperty("index").intValue() == selectedVertexIndex ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue);
-                }
+        }
+        int nextVertexIndex = getNextVertexIndex();
+        for (Feature feature : vertexFeatures) {
+            if (!feature.hasNonNullValueForProperty("middle")) {
+                int index = feature.getNumberProperty("index").intValue();
+                feature.addStringProperty("color", getEditVertexColor(index, nextVertexIndex));
+                feature.addNumberProperty("radius", getEditVertexRadius(index, nextVertexIndex));
             }
         }
 
@@ -370,7 +359,9 @@ public class MultiLineEditClass extends MLGeometryEditClass {
             }
             displayLineFeatures.add(lineFeature);
         }
-        selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(displayLineFeatures));
+        int nextVertexIndex = getNextVertexIndex();
+        publishEditingFeatureWithDirection(
+                displayLineFeatures, editingVertices, nextVertexIndex);
 
         // Regenerate main vertex features (middle points are handled by displayMiddlePoints)
         List<org.maplibre.geojson.Feature> mainVertexFeatures = new ArrayList<>();
@@ -378,8 +369,8 @@ public class MultiLineEditClass extends MLGeometryEditClass {
             Point pt = editingVertices.get(index);
             org.maplibre.geojson.Feature f = org.maplibre.geojson.Feature.fromGeometry(pt);
             f.addNumberProperty("index", index);
-            f.addNumberProperty("radius", MPLFeaturesUtils.pointRaduis);
-            f.addStringProperty("color", index == selectedVertexIndex ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue);
+            f.addNumberProperty("radius", getEditVertexRadius(index, nextVertexIndex));
+            f.addStringProperty("color", getEditVertexColor(index, nextVertexIndex));
             mainVertexFeatures.add(f);
         }
 
@@ -399,6 +390,18 @@ public class MultiLineEditClass extends MLGeometryEditClass {
             return new LatLng(point.latitude(), point.longitude());
         }
         return null;
+    }
+
+    private int getNextVertexIndex() {
+        int lineStart = 0;
+        for (Integer lineSize : lineSizes) {
+            int lineEnd = lineStart + lineSize;
+            if (selectedVertexIndex >= lineStart && selectedVertexIndex < lineEnd) {
+                return getNextOpenVertexIndex(lineStart, lineEnd);
+            }
+            lineStart = lineEnd;
+        }
+        return -1;
     }
 
     @Override

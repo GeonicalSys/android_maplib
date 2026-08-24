@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -10,8 +10,8 @@ last_verified: 2026-08-23
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.13` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.13`; отдельный Lisa Debug остаётся `3.1.2.9`. Оба значения проверяются
+Для выпуска `3.1.2.14` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.14`; отдельный Lisa Debug остаётся `3.1.2.9`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
@@ -90,7 +90,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   контур короче трёх различных точек возвращает отдельным результатом до repair;
 - LineString/Polygon и их Multi-варианты принимают один стартовый узел и
   последующие tap-вставки после выбранной вершины; midpoint-вставка доступна и
-  линейке. GeoJSON-конвертер явно замыкает кольца при восстановлении скетча;
+  линейке. Выбранная вершина красная, следующая внутри той же части/кольца и
+  соединяющий сегмент оранжевые; у открытого конца линии направления нет, а
+  замкнутое кольцо указывает с последней вершины на первую. GeoJSON-конвертер
+  явно замыкает кольца при восстановлении скетча;
 - WKT round-trip `GeoPolygon` и `GeoMultiPolygon` разбирают кольца и отдельные
   polygon members по уровню скобок, не превращая внешнее кольцо в дублирующую
   внутреннюю дырку и не теряя следующие части мультиполигона;
@@ -98,9 +101,14 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   служебных свойств: заливка и красный контур восстанавливаются из одного source,
   а скрытый vertex cache после Stop снова публикует редактируемые вершины;
   общий edit fill включается только для Polygon/MultiPolygon и явно снимается при
-  восстановлении LineString/MultiLineString;
+  восстановлении LineString/MultiLineString; привязка ждёт, пока все edit sources
+  принадлежат текущему style, а общий entrypoint редактирования не разыменовывает
+  отсутствующие или оставшиеся от заменённого style source;
 - `LocationUtil.formatAreaHectares()` переводит площадь линейки из квадратных
   метров в гектары и сохраняет читаемую точность для площадей меньше гектара;
+  `MapDrawable` публикует и восстанавливает геометрию активного MapLibre
+  `MeasurmentLine`, чтобы app/maplibui-панель Undo/Redo работала с реально
+  отображаемыми точками, а не с legacy overlay;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
 - `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`
@@ -109,6 +117,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   одиночных выбросов;
 - `LocationProviderArbiter` оставляет Network резервным источником, но не смешивает
   его точки со свежим пригодным GPS-потоком: fallback возвращается через 12 секунд;
+- выход `LocationTrackFilter` остаётся только набором принятых координат; звуковой
+  health-контроль в `maplibui` использует отдельный поток пригодных фиксов без
+  порога перемещения и не зависит от выдачи фильтра или insert/commit. Поэтому
+  неподвижное устройство продолжает сигнализировать об активной записи, а
+  прекращение свежих координат гасит сигнал; отзыв Android location permission
+  обрабатывает владелец foreground-service в `maplibui`;
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
   эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает

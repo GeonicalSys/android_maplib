@@ -84,14 +84,13 @@ public class LineEditClass extends MLGeometryEditClass {
     @Override
     public void regenerateVertexFeatures() {
         List<org.maplibre.geojson.Feature> vertexFeaturesTmp = new ArrayList<>();
+        int nextVertexIndex = getNextVertexIndex();
         for (int index = 0; index < editingVertices.size(); index++) {
             Point pt = editingVertices.get(index);
             org.maplibre.geojson.Feature f = org.maplibre.geojson.Feature.fromGeometry(pt);
             f.addNumberProperty("index", index);
-            f.addNumberProperty("radius", MPLFeaturesUtils.pointRaduis);
-            f.addStringProperty("color",
-                    index == selectedVertexIndex ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue
-            );
+            f.addNumberProperty("radius", getEditVertexRadius(index, nextVertexIndex));
+            f.addStringProperty("color", getEditVertexColor(index, nextVertexIndex));
             vertexFeaturesTmp.add(f);
         }
 
@@ -205,16 +204,18 @@ public class LineEditClass extends MLGeometryEditClass {
 
         if (isInit) {
             if (!vertexFeatures.isEmpty() && !editingVertices.isEmpty()) {
-                for (org.maplibre.geojson.Feature f : vertexFeatures) {
-                    if (!f.hasNonNullValueForProperty("middle")) {
-                        Number indexNum = f.getNumberProperty("index");
-                        if (indexNum != null && indexNum.intValue() == 0) {
-                            f.addStringProperty("color", MPLFeaturesUtils.colorRED);
-                            break; // findFirst() return first exit after first coincided
-                        }
-                    }
-                }
                  this.selectedVertexIndex = 0;
+            }
+        }
+        int nextVertexIndex = getNextVertexIndex();
+        for (org.maplibre.geojson.Feature f : vertexFeatures) {
+            if (!f.hasNonNullValueForProperty("middle")) {
+                Number indexNum = f.getNumberProperty("index");
+                if (indexNum != null) {
+                    int index = indexNum.intValue();
+                    f.addStringProperty("color", getEditVertexColor(index, nextVertexIndex));
+                    f.addNumberProperty("radius", getEditVertexRadius(index, nextVertexIndex));
+                }
             }
         }
         if (changeGeoJsonSource && !vertextHided)
@@ -253,14 +254,15 @@ public class LineEditClass extends MLGeometryEditClass {
         }
         editingFeature = feature;
         feature.addStringProperty("color", MPLFeaturesUtils.colorRED);
-        selectedPolySource.setGeoJson(feature);
+        int nextVertexIndex = getNextVertexIndex();
+        publishEditingFeatureWithDirection(feature, editingVertices, nextVertexIndex);
         vertexFeatures.clear();
         for (int index = 0; index < editingVertices.size(); index++) {
             Point pt = editingVertices.get(index);
             org.maplibre.geojson.Feature f = org.maplibre.geojson.Feature.fromGeometry(pt);
             f.addNumberProperty("index", index);
-            f.addNumberProperty("radius", MPLFeaturesUtils.pointRaduis);
-            f.addStringProperty("color", index == selectedVertexIndex ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue);
+            f.addNumberProperty("radius", getEditVertexRadius(index, nextVertexIndex));
+            f.addStringProperty("color", getEditVertexColor(index, nextVertexIndex));
             vertexFeatures.add(f);
         }
 
@@ -350,5 +352,9 @@ public class LineEditClass extends MLGeometryEditClass {
     @Override
     public void selectLastPoint(){
         selectedVertexIndex = editingVertices.size() -1 ;
+    }
+
+    private int getNextVertexIndex() {
+        return getNextOpenVertexIndex(0, editingVertices.size());
     }
 }

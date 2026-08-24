@@ -280,6 +280,15 @@ public class MapDrawable
     FeatureCollection markerFeatureCollection = FeatureCollection.fromFeatures(new ArrayList<>());
     GeoJsonSource markerSource = null; // marker source - select point
 
+    private static Expression editDirectionLineWidth() {
+        return Expression.switchCase(
+                Expression.eq(
+                        Expression.get("edit_direction"),
+                        Expression.literal(true)),
+                Expression.literal(6.0f),
+                Expression.literal(2.0f));
+    }
+
     private static final String USER_LOCATION_SOURCE_ID = "user-location-source";
     private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
     private static final String USER_LOCATION_STANDING_ICON_ID = "user-marker-location-stand";
@@ -1960,7 +1969,7 @@ public class MapDrawable
                         LineLayer lineLayer = new LineLayer("selected-polygon-line", "selected-poly-source")
                                 .withProperties(
                                         PropertyFactory.lineColor(Expression.get("color")),
-                                        PropertyFactory.lineWidth(2.0f) );
+                                        PropertyFactory.lineWidth(editDirectionLineWidth()) );
                         style.addLayer(lineLayer);
 
                         fillPolyEditLayer = new FillLayer("selected-polygon-fill" ,"selected-poly-source" )
@@ -2141,6 +2150,8 @@ public class MapDrawable
                             try {
                                 if (restoreWalkFeatureOnCurrentStyle(
                                         layerForWalkRestore, featureToRestore)) {
+                                    HyperLog.v(TAG, "WalkDraft renderer attached after style load"
+                                            + " layer=" + layerForWalkRestore.getId());
                                     layerForWalkRestore = null;
                                     featureToRestore = null;
                                 }
@@ -2255,7 +2266,7 @@ public class MapDrawable
         LineLayer lineLayer = new LineLayer("selected-polygon-line", "selected-poly-source")
                 .withProperties(
                         PropertyFactory.lineColor(Expression.get("color")),
-                        PropertyFactory.lineWidth(2.0f) );
+                        PropertyFactory.lineWidth(editDirectionLineWidth()) );
         style.addLayer(lineLayer);
 
         fillPolyEditLayer = new FillLayer("selected-polygon-fill" ,"selected-poly-source" )
@@ -2803,6 +2814,12 @@ public class MapDrawable
                                              Feature originalSelectedFeature, boolean createNew,
                                              com.nextgis.maplib.display.Style ngstyle,
                                              boolean isFillByWalking){
+
+        if (!areEditSourcesReadyForCurrentStyle()) {
+            HyperLog.w(TAG, "MapLibre edit attach deferred: current style sources are not ready"
+                    + " layer=" + (ilayer != null ? ilayer.getId() : Constants.NOT_FOUND));
+            return;
+        }
 
         Long selectedFeatureId = originalSelectedFeature.getId();
 
@@ -4284,11 +4301,32 @@ public class MapDrawable
         }
     }
 
+    /**
+     * An edit source field can still point to an object owned by a replaced style. Callers that
+     * recover an editor asynchronously must wait until all three source objects belong to the
+     * currently active style, not merely until MapLibreMap#getStyle() becomes non-null.
+     */
+    public boolean areEditSourcesReadyForCurrentStyle() {
+        MapLibreMap map = maplibreMap.get();
+        Style style = map != null ? map.getStyle() : null;
+        if (style == null || selectedPolySource == null
+                || selectedDotSource == null || vertexSource == null) {
+            return false;
+        }
+        try {
+            return style.getSource("selected-poly-source") == selectedPolySource
+                    && style.getSource("selected-dot-source") == selectedDotSource
+                    && style.getSource("vertex-source") == vertexSource;
+        } catch (Throwable ignored) {
+            // Style#getSource rejects access while a replacement style is not fully loaded yet.
+            return false;
+        }
+    }
+
     private boolean restoreWalkFeatureOnCurrentStyle(
             VectorLayer vectorLayer, Feature feature) {
         if (vectorLayer == null || feature == null || feature.getGeometry() == null
-                || maplibreMap.get() == null || maplibreMap.get().getStyle() == null
-                || selectedPolySource == null || vertexSource == null) {
+                || !areEditSourcesReadyForCurrentStyle()) {
             return false;
         }
 
@@ -4554,28 +4592,54 @@ public class MapDrawable
             originalSelectedFeature = null;
 
 
-        org.maplibre.geojson.Feature feature = null;
+        LatLng center = maplibreMap.get().getCameraPosition().target;
+        List<org.maplibre.geojson.Point> lineList = new ArrayList<>();
+        lineList.add(Point.fromLngLat(center.getLongitude(), center.getLatitude()));
+        setMeasurementPoints(lineList);
+    }
 
-        LatLng center = null;
-        if (originalSelectedFeature != null && originalSelectedFeature.getGeometry() != null
-                && originalSelectedFeature.getGeometry() instanceof  GeoPoint){
-            center = latLngPointFromGeoPoint((GeoPoint) originalSelectedFeature.getGeometry());
-        } else {
-            center = maplibreMap.get().getCameraPosition().target;
+    public GeoLineString getMeasurementGeometry() {
+        if (!(editingObject instanceof MeasurmentLine) || mapContext.get() == null)
+            return null;
+
+        GeoGeometry geometry = mapContext.get().getGeometryFromMaplibreGeometry(
+                editingObject.editingFeature);
+        if (!(geometry instanceof GeoLineString))
+            return null;
+
+        return (GeoLineString) geometry.copy();
+    }
+
+    public boolean restoreMeasurementGeometry(GeoLineString geometry) {
+        if (geometry == null || geometry.getPointCount() == 0)
+            return false;
+
+        List<org.maplibre.geojson.Point> points = new ArrayList<>();
+        for (GeoPoint point : geometry.getPoints()) {
+            LatLng latLng = latLngPointFromGeoPoint(point);
+            points.add(Point.fromLngLat(latLng.getLongitude(), latLng.getLatitude()));
         }
 
-        Projection projection = maplibreMap.get().getProjection();
-        Point point = Point.fromLngLat(center.getLongitude(), center.getLatitude());
+        if (editingObject instanceof MeasurmentLine) {
+            if (!((MeasurmentLine) editingObject).replacePoints(points))
+                return false;
+            editingFeature = editingObject.editingFeature;
+            LatLng selectedPoint = editingObject.getSelectedPoint();
+            if (selectedPoint != null)
+                setMarker(selectedPoint);
+        } else {
+            setMeasurementPoints(points);
+        }
+        updateMeasurmentCaptions(editingObject);
+        return true;
+    }
 
-
-
-        Point point1Geo = Point.fromLngLat(center.getLongitude(),center.getLatitude());
-        List<org.maplibre.geojson.Point> lineList = new ArrayList<>(); //  getNewLinePoints(center, projection);
-        //lineList.remove(1);
-        lineList.add(point1Geo);
+    private void setMeasurementPoints(List<org.maplibre.geojson.Point> lineList) {
+        if (lineList == null || lineList.isEmpty())
+            return;
 
         LineString line = LineString.fromLngLats(lineList);
-        feature = org.maplibre.geojson.Feature.fromGeometry(line);
+        org.maplibre.geojson.Feature feature = org.maplibre.geojson.Feature.fromGeometry(line);
         editingFeature = feature;
 
         GeoJsonSource choosed = selectedPolySource;
@@ -4599,8 +4663,9 @@ public class MapDrawable
             maplibreMap.get().getStyle().removeLayer(fillPolyEditLayer);
 
 
-        editingObject.setSelectedVertexIndex(0); // firsr point always selected
+        editingObject.setSelectedVertexIndex(lineList.size() - 1);
         editingObject.extractVertices(editingFeature,  true);
+        editingObject.setSelectedVertexIndex(lineList.size() - 1);
 
         LatLng selectedPoint = editingObject.getSelectedPoint();
         setMarker(selectedPoint);
@@ -4616,14 +4681,15 @@ public class MapDrawable
                 mapContext.get().onLengthChanged(length);
             }
 
+            double area = 0;
             Polygon polygon = Polygon.fromLngLats(((MeasurmentLine)editingObject).getPoints());
             org.maplibre.geojson.Feature featurePoly =  org.maplibre.geojson.Feature.fromGeometry(polygon);
             GeoGeometry geometryPoly = mapContext.get().getGeometryFromMaplibreGeometry(featurePoly);
 
             if (geometryPoly instanceof GeoPolygon){
-                double area = ((GeoPolygon) (geometryPoly)).getArea();
-                mapContext.get().onAreaChanged(area);
+                area = ((GeoPolygon) (geometryPoly)).getArea();
             }
+            mapContext.get().onAreaChanged(area);
         }
     }
 
@@ -4684,10 +4750,23 @@ public class MapDrawable
     public void startEditByWalkFromRestore(
             final VectorLayer  vectorLayer,
                 Feature originalSelectedFeature){
-        Log.e("WWALK", "MapDrawable startEditByWalkFromRestore featureid = "
-                +  (originalSelectedFeature ==null ? "null" : originalSelectedFeature.getId()) );
         featureToRestore = originalSelectedFeature;
         layerForWalkRestore = vectorLayer;
+        try {
+            if (restoreWalkFeatureOnCurrentStyle(vectorLayer, originalSelectedFeature)) {
+                featureToRestore = null;
+                layerForWalkRestore = null;
+                HyperLog.v(TAG, "WalkDraft renderer attached to current style"
+                        + " layer=" + (vectorLayer != null
+                        ? vectorLayer.getId() : Constants.NOT_FOUND));
+            } else {
+                HyperLog.v(TAG, "WalkDraft renderer attach deferred until style sources are ready"
+                        + " layer=" + (vectorLayer != null
+                        ? vectorLayer.getId() : Constants.NOT_FOUND));
+            }
+        } catch (Throwable throwable) {
+            logErr("startEditByWalkFromRestore", throwable);
+        }
     }
 
     // use from collector
