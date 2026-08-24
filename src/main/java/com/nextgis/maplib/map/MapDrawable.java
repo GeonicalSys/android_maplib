@@ -81,6 +81,7 @@ import com.nextgis.maplib.map.MLP.PolygonEditClass;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.MapUtil;
+import com.nextgis.maplib.util.MbTilesInfo;
 import com.nextgis.maplib.util.ProdLogUtil;
 
 import java.io.File;
@@ -157,6 +158,8 @@ import static com.nextgis.maplib.util.GeoConstants.GTPolygon;
 import static com.nextgis.maplib.util.GeoConstants.GT_MEASURMENT;
 import static com.nextgis.maplib.util.GeoConstants.GT_RASTER_WA;
 import static com.nextgis.maplib.util.GeoConstants.GT_TRACK_WA;
+import static com.nextgis.maplib.util.GeoConstants.TMSTYPE_MBTILES_RASTER;
+import static com.nextgis.maplib.util.MbTilesInfo.MBTILES_FILENAME;
 import static com.nextgis.maplib.util.NetworkUtil.extractResourceValue;
 import static com.nextgis.maplib.util.NetworkUtil.fillConnections;
 import static com.nextgis.maplib.util.NetworkUtil.getBaseUrlpart;
@@ -220,6 +223,20 @@ public class MapDrawable
     public final static int MODE_EDIT_BY_WALK = 4;
 
     static int testColor = 0;
+
+    private static String getLocalTmsRasterUrl(LocalTMSLayer layer) {
+        if (layer.getTMSType() != TMSTYPE_MBTILES_RASTER) {
+            return "file://" + layer.getPath() + "/{z}/{x}/{y}.tile";
+        }
+
+        File database = new File(layer.getPath(), MBTILES_FILENAME);
+        if (!MbTilesInfo.isReadyForMapLibre(database)) {
+            HyperLog.w(TAG, "Skipping unreadable MBTiles layer id=" + layer.getId()
+                    + " name=\"" + ProdLogUtil.truncateForLog(layer.getName(), 100) + "\"");
+            return null;
+        }
+        return "mbtiles://" + database.getAbsolutePath();
+    }
 
 
     // map  layerID : list of added features for layer
@@ -803,7 +820,11 @@ public class MapDrawable
                     } else if (iLayer instanceof LocalTMSLayer) {
                         geoType = GT_RASTER_WA;
                         LocalTMSLayer layer = (LocalTMSLayer) iLayer;
-                        rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                        String rasterUrl = getLocalTmsRasterUrl(layer);
+                        if (rasterUrl == null) {
+                            return;
+                        }
+                        rasterLayersURLMap.put(layer.getId(), rasterUrl);
                         rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                     }
 
@@ -1681,11 +1702,15 @@ public class MapDrawable
                         sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                         sourcesOrder.put(layer.getId(), new ArrayList<>());
                     } else if (iLayer instanceof LocalTMSLayer) {
-                        TMSLayer layer = (TMSLayer) iLayer;
+                        LocalTMSLayer layer = (LocalTMSLayer) iLayer;
                         layersType.put(layer.getId(), GT_RASTER_WA);
                         layersPath.put(layer.getId(), layer.getPath().toString());
 
-                        rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                        String rasterUrl = getLocalTmsRasterUrl(layer);
+                        if (rasterUrl == null) {
+                            continue;
+                        }
+                        rasterLayersURLMap.put(layer.getId(), rasterUrl);
                         rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                         sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                         sourcesOrder.put(layer.getId(), new ArrayList<>());
@@ -1852,11 +1877,15 @@ public class MapDrawable
                             sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                             sourcesOrder.put(layer.getId(), new ArrayList<>());
                         } else if (iLayer instanceof LocalTMSLayer) {
-                            TMSLayer layer = (TMSLayer) iLayer;
+                            LocalTMSLayer layer = (LocalTMSLayer) iLayer;
                             layersType.put(layer.getId(), GT_RASTER_WA);
                             layersPath.put(layer.getId(), layer.getPath().toString());
 
-                            rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                            String rasterUrl = getLocalTmsRasterUrl(layer);
+                            if (rasterUrl == null) {
+                                continue;
+                            }
+                            rasterLayersURLMap.put(layer.getId(), rasterUrl);
                             rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                             sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                             sourcesOrder.put(layer.getId(), new ArrayList<>());
@@ -2424,9 +2453,13 @@ public class MapDrawable
                     sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                     sourcesOrder.put(layer.getId(), new ArrayList<>());
                 } else if (iLayer instanceof LocalTMSLayer) {
-                    TMSLayer layer = (TMSLayer) iLayer;
+                    LocalTMSLayer layer = (LocalTMSLayer) iLayer;
                     layersType.put(layer.getId(), GT_RASTER_WA);
-                    rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                    String rasterUrl = getLocalTmsRasterUrl(layer);
+                    if (rasterUrl == null) {
+                        continue;
+                    }
+                    rasterLayersURLMap.put(layer.getId(), rasterUrl);
                     rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                     sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                     sourcesOrder.put(layer.getId(), new ArrayList<>());
@@ -2504,14 +2537,25 @@ public class MapDrawable
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
+        MapLibreMap activeMap = maplibreMap.get();
+        MaplibreMapInteraction activeMapContext = mapContext.get();
+        MapView activeMapView = maplibreMapView.get();
+        if (activeMap == null || activeMapContext == null || activeMapView == null) {
+            isDragging = false;
+            isSwitchVertex = false;
+            deltaPoint = null;
+            startEvent = null;
+            clickPoint = null;
+            return false;
+        }
+
         android.graphics.PointF screenPoint = new android.graphics.PointF(event.getX(), event.getY());
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN: {
-                if (mapContext.get()!= null)
-                    mapContext.get().setLongLongClickProcesses(false);
+                activeMapContext.setLongLongClickProcesses(false);
                 clickPoint = new PointF(event.getX(), event.getY());
                 android.graphics.RectF rect = new android.graphics.RectF(event.getX() - 20,event.getY() - 20,event.getX() + 20,event.getY() + 20);
-                List<org.maplibre.geojson.Feature> featuresMarker = maplibreMap.get().queryRenderedFeatures(rect, "marker-layer");
+                List<org.maplibre.geojson.Feature> featuresMarker = activeMap.queryRenderedFeatures(rect, "marker-layer");
 
                 if (!featuresMarker.isEmpty()){
                     // press marker - lock for future move
@@ -2521,7 +2565,7 @@ public class MapDrawable
                 }
                 // no marker  - check vertex press
                 android.graphics.RectF rectVertex = new android.graphics.RectF(event.getX() - 30,event.getY() - 30,event.getX() + 30,event.getY() + 30);
-                List<org.maplibre.geojson.Feature> features = maplibreMap.get().queryRenderedFeatures(rectVertex, "vertex-layer");
+                List<org.maplibre.geojson.Feature> features = activeMap.queryRenderedFeatures(rectVertex, "vertex-layer");
 
                 if (!features.isEmpty()) {
                     org.maplibre.geojson.Feature clickedFeature = null;
@@ -2540,7 +2584,7 @@ public class MapDrawable
                             editingObject.updateSelectionMiddlePoint(features.get(0));
                             //editingObject.updateSelectionVerticeIndex(index);
                             editingObject.updateEditingPolygonAndVertex();
-                            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+                            activeMapContext.updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
 
                         }
                         Point point = ((Point)clickedFeature.geometry());
@@ -2561,7 +2605,7 @@ public class MapDrawable
                             editingObject.updateSelectionVerticeIndex(index);
                             editingObject.updateEditingPolygonAndVertex();
                             editingObject.displayMiddlePoints(false, true);
-                            mapContext.get().updateActions(editingObject);
+                            activeMapContext.updateActions(editingObject);
                         }
                         isSwitchVertex = true;
                         Point point = ((Point)clickedFeature.geometry());
@@ -2588,7 +2632,7 @@ public class MapDrawable
                             LatLng latLng = editingObject.getSelectedPoint();
                             if (latLng != null) {
 
-                                PointF vertex = maplibreMap.get().getProjection().toScreenLocation(latLng);
+                                PointF vertex = activeMap.getProjection().toScreenLocation(latLng);
                                 float dx = startEvent.getX() - vertex.x;
                                 float dy = startEvent.getY() - vertex.y;
                                 deltaPoint = new PointF(dx, dy);
@@ -2599,7 +2643,7 @@ public class MapDrawable
                         return true;
                     }
                     PointF  newShiftedPoint = new PointF(screenPoint.x -deltaPoint.x,screenPoint.y - deltaPoint.y );
-                    LatLng latLng = maplibreMap.get().getProjection().fromScreenLocation(newShiftedPoint);
+                    LatLng latLng = activeMap.getProjection().fromScreenLocation(newShiftedPoint);
                     Point newPoint = Point.fromLngLat(latLng.getLongitude(), latLng.getLatitude());
 
                     if (editingObject != null) {
@@ -2615,8 +2659,8 @@ public class MapDrawable
             }
 
             case MotionEvent.ACTION_UP: {
-                if (mapContext.get()!=null && mapContext.get().getLongLongClickProcesses()){
-                    mapContext.get().setLongLongClickProcesses(false);
+                if (activeMapContext.getLongLongClickProcesses()){
+                    activeMapContext.setLongLongClickProcesses(false);
                     return false;
                 }
 
@@ -2630,7 +2674,7 @@ public class MapDrawable
                             if (editingObject != null && editingObject instanceof MeasurmentLine){
                                 if (!isMeasurmentChangeVertex) {
                                     android.graphics.PointF touchscreenPoint = new android.graphics.PointF(event.getX(), event.getY());
-                                    LatLng latLng = maplibreMap.get().getProjection().fromScreenLocation(touchscreenPoint); // todo add tolerance and rect
+                                    LatLng latLng = activeMap.getProjection().fromScreenLocation(touchscreenPoint); // todo add tolerance and rect
                                     editingObject.addNewFlowPoint(latLng, false);
                                     setMarker(latLng);
                                     editingObject.updateEditingPolygonAndVertex();
@@ -2641,13 +2685,13 @@ public class MapDrawable
                                 return false;
 
                             } else
-                                mapContext.get().processMapClick(screenPoint.x, screenPoint.y);
+                                activeMapContext.processMapClick(screenPoint.x, screenPoint.y);
                         }
                     clickPoint = null;
 
                     if (isDragging || isSwitchVertex) {
                         if (editingObject != null) {
-                            mapContext.get().updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
+                            activeMapContext.updateGeometryFromMaplibre(editingObject.editingFeature, originalSelectedFeature, editingObject);
                             editingObject.regenerateVertexFeatures();
                             editingObject.displayMiddlePoints(false, true);
                             LatLng pointReleased = editingObject.getSelectedPoint();
@@ -2657,8 +2701,10 @@ public class MapDrawable
 
                             if (editingObject  instanceof  MeasurmentLine)
                                 updateMeasurmentCaptions(editingObject);
-                        } else
-                            setMarker(event);
+                        } else {
+                            LatLng releasedPoint = activeMap.getProjection().fromScreenLocation(screenPoint);
+                            setMarker(releasedPoint);
+                        }
                     }
                 }
                 isDragging = false;

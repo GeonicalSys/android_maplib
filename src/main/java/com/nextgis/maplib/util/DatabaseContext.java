@@ -35,6 +35,7 @@ import android.os.Build;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
 import com.nextgis.maplib.map.VectorLayer;
+import com.nextgis.maplib.api.ILayer;
 
 import java.io.File;
 
@@ -97,9 +98,36 @@ public class DatabaseContext
         return result;
     }
 
+    /**
+     * Resolves the map that actually owns a layer instead of assuming that the process-wide
+     * {@link MapBase} singleton still points at the same project. Background imports can outlive
+     * an Activity and must never follow a later project switch into another {@code layers.db}.
+     */
+    public static MapContentProviderHelper getMapForLayer(final ILayer layer)
+    {
+        ILayer current = layer;
+        while (current != null) {
+            if (current instanceof MapContentProviderHelper) {
+                return (MapContentProviderHelper) current;
+            }
+            current = current.getParent();
+        }
+
+        MapBase activeMap = MapBase.getInstance();
+        if (activeMap instanceof MapContentProviderHelper) {
+            return (MapContentProviderHelper) activeMap;
+        }
+        throw new IllegalArgumentException(
+                "The layer must belong to a MapContentProviderHelper");
+    }
+
+    public static SQLiteDatabase getDatabaseForLayer(final ILayer layer, boolean readOnly)
+    {
+        return getMapForLayer(layer).getDatabase(readOnly);
+    }
+
     public static SQLiteDatabase getDbForLayer(final VectorLayer layer){
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(false);
+        SQLiteDatabase db = getDatabaseForLayer(layer, false);
         if (db.inTransaction()) {
             return db;
         }

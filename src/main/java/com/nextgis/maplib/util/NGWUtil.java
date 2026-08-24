@@ -786,7 +786,7 @@ public class NGWUtil
             geom.setCRS(nSRS);
             if (nSRS != GeoConstants.CRS_WEB_MERCATOR)
                 geom.project(GeoConstants.CRS_WEB_MERCATOR);
-            if (!geom.isValid())
+            if (!NgwFeatureGeometryValidator.isValid(geom))
                 continue;
 
             feature.setGeometry(geom);

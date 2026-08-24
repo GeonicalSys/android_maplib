@@ -13,7 +13,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    responsibility: MapLibre style, sources, layers, bounded full-reload feature/style-object cache lifetime, hot add/reload coordination, tap-node and midpoint edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, thicker insertion-direction segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+    responsibility: MapLibre style, sources, layers and raster MBTiles URLs, bounded full-reload feature/style-object cache lifetime, hot add/reload coordination, lifecycle-safe touch dispatch that rejects events after map/view/host teardown, tap-node and midpoint edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, thicker insertion-direction segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
   - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryEditFillPolicy.java
     responsibility: Allow the shared edit fill only for Polygon and MultiPolygon so recovered line sketches cannot inherit polygon rendering state.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
@@ -25,21 +25,21 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
     responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
-    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose the owning policy for direction configuration and recovery from server-only mode, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, fingerprint schema/config/SQLite mismatch rebuild requests, and persist bounded full-fill failure diagnostics with layer/resource/source-index/error/stack but no feature payload.
+    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose the owning policy for direction configuration and recovery from server-only mode, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, bind full fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint schema/config/SQLite mismatch rebuild requests, and persist bounded full-fill failure diagnostics with layer/resource/source-index/error/stack but no feature payload.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
     responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
-    responsibility: Create ordinary local vector layers as editable, load vector configuration, suppress per-row cache notifications during bulk/rebuild, fail a bulk fill on the first rejected SQL insert, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
+    responsibility: Create ordinary local vector layers as editable, load vector configuration, route create/insert/schema/delete operations through the layer-owning workspace database, suppress per-row cache notifications during bulk/rebuild, fail a bulk fill on the first rejected SQL insert, persist server attachment metadata inside the same fill transaction, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeometryRTree.java
     responsibility: Serialize spatial-index reads and mutations so broadcast receivers, sync workers and cache rebuilds cannot expose partially tightened nodes.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoEnvelope.java
     responsibility: Keep uninitialized spatial bounds safe for defensive area/dimension calculations.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapContentProviderHelper.java
-    responsibility: Route vector data notifications to the owning layer without allowing one cache callback failure to terminate the Android main thread.
+    responsibility: Open layers.db beside this map object's own map file and route vector data notifications to the owning layer without allowing one cache callback failure to terminate the Android main thread.
   - path: maplib/src/main/java/com/nextgis/maplib/util/GeoJSONUtil.java
     responsibility: Import local GeoJSON in implicit WGS84, CRS84, common EPSG:4326 aliases or the supported EPSG:3857 path while rejecting other coordinate systems.
   - path: maplib/src/main/java/com/nextgis/maplib/util/DatabaseContext.java
-    responsibility: Configure bulk-write SQLite PRAGMAs only outside active transactions and return the current map database to layer importers.
+    responsibility: Resolve a layer's owning map through its parent chain, configure bulk-write SQLite PRAGMAs only outside active transactions and return that workspace database to layer importers.
   - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointParser.java
     responsibility: Securely stream standard KML coordinates and GPX waypoint, route-point and track-point coordinates in source order without retaining source topology.
   - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointLayerImporter.java
@@ -50,6 +50,10 @@ key_components:
     responsibility: Cache prepared vector rendering payload for map startup.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileProvider.java
     responsibility: Query and clip local SQLite features into lazy MVT tiles for polygon/multipolygon and read-only simple circle Point layers.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileServer.java
+    responsibility: Serve loopback MVT requests through a bounded two-worker/sixteen-item queue, serialize heavy builds per layer, cancel queued sockets from obsolete map generations and return a retryable overload response instead of exhausting the Android heap.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileRequestPolicy.java
+    responsibility: Define and unit-test local MVT concurrency, queue and minimum 64 MiB heap-headroom limits independently of Android runtime classes.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileEncoder.java
     responsibility: Encode Point and Polygon MVT command streams plus feature identity and simple label properties.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java
@@ -61,7 +65,11 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorResource.java
     responsibility: Resolve a complete Collector project snapshot containing vectors and already-supported QGIS styles, and reject incomplete referenced resources.
   - path: maplib/src/main/java/com/nextgis/maplib/map/TMSLayer.java
-    responsibility: Safely unpack local tile archives and retain immutable NGRc provenance.
+    responsibility: Safely unpack local tile archives, atomically import one validated raster MBTiles database, and retain immutable NGRc plus duplicate-safe Debug migration provenance.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/MbTilesInfo.java
+    responsibility: Validate raster MBTiles SQLite structure, integrity, format, zoom range and optional bounds before publication or rendering.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LegacyTileMbtilesMath.java
+    responsibility: Convert legacy TMS/OSM rows to standard MBTiles rows and derive deterministic raster format and Web Mercator bounds without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
     responsibility: Parse and normalize a direct NGW resource URL without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
@@ -70,6 +78,8 @@ key_components:
     responsibility: Parse mobile render mode and layer origin configuration.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
     responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, report insufficient ring positions separately, recover an unset collection CRS from nested geometry, and reject empty or non-polygonal repair results.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureGeometryValidator.java
+    responsibility: Validate streamed NGW Polygon and MultiPolygon members with JTS instead of the legacy quadratic segment-pair scan while preserving the previous member-by-member collection semantics.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoGeometryFactory.java
     responsibility: Dispatch WKT geometry to the matching parser, including Polygon and MultiPolygon recovery paths.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoMultiPolygon.java
@@ -81,7 +91,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
     responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed polygon ring to its own first vertex.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
-    responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter, expose basic integrity checks plus safe provider-qualified diagnostics and aggregate counters, and return accepted fixes without claiming persistence, background-health heartbeat or foreground-service ownership.
+    responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter, expose basic integrity checks plus safe provider-qualified diagnostics and aggregate counters, make zero input explicitly distinguishable from filtered input, and return accepted fixes without claiming persistence, background-health heartbeat or foreground-service ownership.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java
     responsibility: Format map measurements, including explicit square-metre to hectare conversion for ruler area labels.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
@@ -117,7 +127,7 @@ public_contracts:
     symbol: StakeoutGeometryTarget and StakeoutGuidancePolicy
     path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
     consumers: [app]
-settings_refs: [feature_label_field, mobile_render_mode, render_mode, layer_origin, mobile, ngw_identity_backup]
+settings_refs: [feature_label_field, mobile_render_mode, render_mode, layer_origin, mobile, ngw_identity_backup, ngrc_provenance, legacy_underlay_migration]
 storage_contracts:
   - id: layer-json
     path: maplib/src/main/java/com/nextgis/maplib/map/Layer.java
@@ -125,7 +135,7 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
   - id: ngw-vector-identity-backup
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS]
+invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS]
 global_docs:
   - docs/architecture/map-rendering.md
   - docs/architecture/collector-projects.md
@@ -134,5 +144,5 @@ global_docs:
   - docs/architecture/stakeout.md
   - docs/reference/build-matrix.md
   - docs/reference/flavors-and-versioning.md
-smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT]
-upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, MAP-HOST, MAPLIBRE-BACKEND, COLLECTOR-RESOURCE]
+smoke_tests: [AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-MAP-SURFACE-LIFECYCLE, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCAL-VECTOR-TILE-STRESS, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-DEBUG-UNDERLAY-MIGRATION, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT]
+upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, RASTER-MBTILES, MAP-HOST, MAPLIBRE-BACKEND, COLLECTOR-RESOURCE]

@@ -141,4 +141,6 @@
     <string name="error_coordinate_file_empty">No coordinates were found in the file</string>
     <string name="error_coordinate_file_cancelled">Coordinate import cancelled</string>
     <string name="error_coordinate_file_import">Could not import the KML or GPX file</string>
+    <string name="mbtiles_problem_vector">Only raster MBTiles underlays are supported.</string>
+    <string name="mbtiles_problem_filecorrupted">The MBTiles underlay could not be read.</string>
 </resources>

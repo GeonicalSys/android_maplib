@@ -34,12 +34,18 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   сохраняет данные удалённых слоёв между reload;
 - `LocalVectorTileProvider` / `LocalVectorTileEncoder` — ленивые MVT для
   read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;
+  loopback-сервер допускает не более двух одновременных сборок и 16 ожидающих
+  запросов, сериализует тяжёлые тайлы одного слоя, отменяет очередь предыдущего
+  поколения карты и отвечает `503` при перегрузке либо остатке heap менее 64 МБ;
 - `LayerIdentifyPolicy` оставляет выключенные классические слои вне identify,
   но разрешает просмотр локальных атрибутов выключенного слоя, настроенного на
   `local_vector_tiles`, не включая его отрисовку;
 - `MapDrawable.finishCreateNewFeature` допускает отсутствие временной edit-сессии
   после cold form recovery; если новый id отсутствует в process-local GeoJSON,
   `reloadFeatureToMaplibre` перечитывает данные слоя, а не только стили;
+- `MapDrawable.onTouch` фиксирует живые `MapLibreMap`, `MapView` и host context в
+  начале события и отбрасывает поздний gesture после `onDestroyView`, не вызывая
+  identify/edit API уничтоженного native renderer;
 - `FieldStyleRule` / `MplFeatureStyleProps` — rule-based стили: layer defaults и
   merge unset ← «прочие (по умолчанию)» (зум подписей, stops, scale flags,
   opacity); per-feature `labelminzoom`/`labelmaxzoom` через text-opacity gate;
@@ -125,7 +131,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   health-контроль в `maplibui` использует отдельный поток пригодных фиксов без
   порога перемещения и не зависит от выдачи фильтра или insert/commit. Поэтому
   неподвижное устройство продолжает сигнализировать об активной записи, а
-  прекращение свежих координат гасит сигнал; отзыв Android location permission
+  прекращение свежих координат гасит сигнал; сам `maplib` не выбирает audio
+  stream, alarm-stream/vibration fallback принадлежит владельцу service в
+  `maplibui`; отзыв Android location permission
   обрабатывает владелец foreground-service в `maplibui`;
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
@@ -136,9 +144,23 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `LayerGroup.createLayerStorage()` атомарно резервирует UUID-каталог; параллельные
   задачи одной Collector-партии не могут разделить SQLite-таблицу. Первый
   неуспешный batch insert аварийно завершает и откатывает неполный слой;
+- `DatabaseContext` разрешает `layers.db` по родительской цепочке самого слоя,
+  а `MapContentProviderHelper` открывает БД рядом со своим map-файлом. Фоновый
+  fill, переживший смену активного проекта или процесса, не может продолжить
+  транзакцию в БД другого workspace;
+- `NgwFeatureGeometryValidator` проверяет полученные от NGW Polygon и каждый
+  member MultiPolygon через JTS `IsValidOp`. Это сохраняет прежнюю семантику
+  коллекции, но убирает квадратичный перебор пар сегментов на контурах с
+  десятками тысяч координат;
 - Collector insertion сохраняет «Мои треки» последним во внутреннем
   `LayerGroup`, то есть наверху UI-списка;
 - `LayerConfigUtil` — server/local render and origin config.
+- raster MBTiles validation/storage: `MbTilesInfo` проверяет SQLite schema,
+  metadata, image format и integrity, `TMSLayer` публикует файл только после
+  sync + atomic rename, а `MapDrawable` подключает его через `mbtiles:///`;
+- legacy tile conversion math: OSM row переводится в TMS/MBTiles, bounds
+  вычисляются в Web Mercator tile matrix, raster format определяется по magic
+  bytes без декодирования каждого изображения.
 
 ## Ограничения
 
@@ -146,6 +168,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - MapLibre backend должен оставаться согласованным с `maplibui` и `app`:
   `org.maplibre.gl:android-sdk-opengl:13.0.2` во всех трёх модулях.
 - LayerGroup index `0` — bottom.
+- MBTiles local TMS path принимает только raster PNG/JPEG/WEBP с обязательными
+  `tiles`/`metadata`; vector MBTiles и повреждённая SQLite отклоняются.
 - Точечный `local_vector_tiles` поддерживает только простой круговой marker и
   подпись из одного поля/фиксированного текста; rule/icon/template/editable
   варианты используют classic fallback.
@@ -196,6 +220,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - После успешного Save объект остаётся выбранным или видны edit sources: app host
   обязан сначала завершить `cancelFeatureEdit(false)`, затем перейти в normal mode
   и вызвать view unselect; `MapDrawable` не владеет политикой нижних панелей.
+- Crash из `MapDrawable.onTouch` после `MapLibreMapView.onDestroy`: проверить, что
+  host очистил map/view ссылки, а touch guard завершил событие до
+  `queryRenderedFeatures`.
 - Мультиполигон не сохранился: проверить безопасный HyperLog-код
   `MultiPolygon geometry repair failed`; исходная геометрия должна остаться в
   редакторе, а координаты в журнал не записываются. Причина
@@ -214,12 +241,19 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Выключенный `local_vector_tiles` не попал в identify: проверить сохранённый
   `layer_origin.render_mode` и `LayerIdentifyPolicy`; видимость слоя не должна
   включаться ради чтения атрибутов.
+- После панорамирования/перезагрузок карты растут тормоза или возникает OOM в
+  `LocalVectorTileProvider.buildTile`: worker должен называться только
+  `LocalVectorTileWorker-1/2`; трёхзначный номер `pool-*-thread-*` означает
+  возврат неограниченного пула. Проверить также throttled-счётчик и heap headroom.
 - Пустой список треков после project switch: проверить строку
   `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;
 - Трек/обход замер на скорости: проверить `LocationTrackFilter` причины вместе с
   `provider`, затем итоговые `filterPassed/filterDropped/filterChordDropped/filterGaps`
   и `networkSuppressed`.
   Для валидного движения до 160 км/ч не должно быть каскада `drop:speed_dist`.
+- Курсор карты движется, но у завершённого трека `raw=0` и `filterInput=0`:
+  фильтр вообще не получил координат; проверять фактический запуск
+  `TrackerService`, а не ослаблять accuracy/speed ограничения.
 - Неверное расстояние выноса: проверить CRS исходной геометрии и ближайшую точку
   `StakeoutGeometryTarget`; пользователю нельзя выдавать плоское расстояние 3857.
 - NGW config/data issue: отделить config parsing от feature sync decision.
@@ -241,6 +275,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Импорт дошёл до SQLite, но сообщил `Safety level may not be changed inside a
   transaction`: проверить, что `DatabaseContext.getDbForLayer()` вызван до
   `beginTransaction()`, а внутри цикла используется уже полученный `dbTx`.
+- NGW показывает небольшое число объектов, но полный fill зависает на
+  MultiPolygon: считать координаты/части, а не только features; проверка серверной
+  геометрии должна идти через `NgwFeatureGeometryValidator`, без legacy
+  `GeoLinearRing.intersects()`.
 - Созданный вручную слой нельзя редактировать: проверить сохранённый
   `is_editable`; новый обычный `VectorLayer` должен записывать `true`.
 - Collector composition: проверить stable remote IDs/project metadata,
