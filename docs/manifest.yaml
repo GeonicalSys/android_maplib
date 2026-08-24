@@ -87,7 +87,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
     responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed polygon ring to its own first vertex.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
-    responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter, expose basic integrity checks plus safe provider-qualified diagnostics and aggregate counters, and return accepted fixes without claiming persistence, background-health heartbeat or foreground-service ownership.
+    responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter, expose basic integrity checks plus safe provider-qualified diagnostics and aggregate counters, make zero input explicitly distinguishable from filtered input, and return accepted fixes without claiming persistence, background-health heartbeat or foreground-service ownership.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java
     responsibility: Format map measurements, including explicit square-metre to hectare conversion for ruler area labels.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
