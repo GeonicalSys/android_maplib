@@ -1489,6 +1489,17 @@ public class MapDrawable
         mPendingReload = false;
         mDeferReloadOnceAllowed = true;
 
+        // A full style load builds a fresh immutable feature snapshot. Retaining the previous
+        // snapshot until the worker has produced its replacement doubles the Java/native memory
+        // peak for large Collector projects and can make old OpenGL drivers lose their EGL
+        // context. Clear preparation-only state before the new snapshot is allocated; the active
+        // MapLibre style already owns its native copy and stays visible until setStyle below.
+        sourceFeaturesHashMap.clear();
+        sourcesOrder.clear();
+        sourceNativeUriMap.clear();
+        localVectorTileUrlMap.clear();
+        LocalVectorTileServer.getInstance().clearLayers();
+
         mapFrag.changeProgress(true);
 
         mapViewRef.setOnTouchListener(this);
@@ -1525,12 +1536,6 @@ public class MapDrawable
 
             final AccountManager accountManager = AccountManager.get(getContext());
             final Connections connections = fillConnections(getContext(), accountManager);
-
-            //sourceFeaturesHashMap.clear();
-            //sourceHashMap.clear();
-            sourcesOrder.clear();
-            localVectorTileUrlMap.clear();
-            LocalVectorTileServer.getInstance().clearLayers();
 
             if (Constants.MAP_STARTUP_PARALLEL_VECTOR_PREP) {
             final long tWorkerWallStart = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
@@ -1929,6 +1934,15 @@ public class MapDrawable
                         try {
                         Style style = maplibreMap.get().getStyle();
                         updateMapBackground();
+
+                        // setStyle detached every source/layer wrapper cached from the previous
+                        // Style. Drop those Java references before constructing replacements so
+                        // old native peers and their GeoJSON payload can be reclaimed promptly.
+                        sourceHashMap.clear();
+                        layersHashMap.clear();
+                        layersHashMap2.clear();
+                        layersHashMapLineDash.clear();
+                        symbolsLayerHashMap.clear();
 
                         for (Layer layer :maplibreMap.get().getStyle().getLayers()){
                             if (!layer.getId().equals("background"))
