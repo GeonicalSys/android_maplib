@@ -174,6 +174,7 @@ public class PolygonEditClass extends MLGeometryEditClass {
             return;
         }
 
+        int nextVertexIndex = getNextVertexIndex();
         int currentRingStartIndex = 0;
         for (int i = 0; i < polygonRingEndIndices.size(); i++) { // Loop through each ring
             int ringEndIndex = polygonRingEndIndices.get(i);
@@ -188,15 +189,14 @@ public class PolygonEditClass extends MLGeometryEditClass {
             for (int j = 0; j < currentRingPoints.size(); j++) {
                 Point pt = currentRingPoints.get(j);
                 Feature vertexFeature = Feature.fromGeometry(pt);
-                vertexFeature.addNumberProperty("radius", MPLFeaturesUtils.pointRaduis);
+                int globalIndex = currentRingStartIndex + j;
+                vertexFeature.addNumberProperty(
+                        "radius", getEditVertexRadius(globalIndex, nextVertexIndex));
                 vertexFeature.addNumberProperty("ringIndex", i);
                 vertexFeature.addNumberProperty("vertexIndexInRing", j);
-                vertexFeature.addNumberProperty("index", currentRingStartIndex + j); // Global index
-
-                boolean isSelectedVertex = (selectedVertexIndex == currentRingStartIndex + j);
-                String color = (i == selectedRingIndex) ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue;
-                if (isSelectedVertex) color = MPLFeaturesUtils.colorRED; // Ensure selected is always red
-                vertexFeature.addStringProperty("color", color);
+                vertexFeature.addNumberProperty("index", globalIndex);
+                vertexFeature.addStringProperty(
+                        "color", getEditVertexColor(globalIndex, nextVertexIndex));
                 vertexFeatures.add(vertexFeature);
             }
 
@@ -217,8 +217,7 @@ public class PolygonEditClass extends MLGeometryEditClass {
                     // This middle point is after vertex 'j' in its ring
                     middleFeature.addNumberProperty("prevVertexIndexInRing", j);
                     middleFeature.addNumberProperty("radius", MPLFeaturesUtils.middleRaduis);
-                    String color = (i == selectedRingIndex) ? MPLFeaturesUtils.colorRED : MPLFeaturesUtils.colorLightBlue;
-                    middleFeature.addStringProperty("color", color);
+                    middleFeature.addStringProperty("color", MPLFeaturesUtils.colorLightBlue);
                     vertexFeatures.add(middleFeature);
                 }
             }
@@ -414,9 +413,21 @@ public class PolygonEditClass extends MLGeometryEditClass {
         editingFeature = newFeature;
 
         if (selectedPolySource != null) {
-            selectedPolySource.setGeoJson(editingFeature);
+            publishEditingFeatureWithDirection(
+                    editingFeature, editingVertices, getNextVertexIndex());
         }
         displayMiddlePoints(false, true); // Refresh vertices and middle points
+    }
+
+    private int getNextVertexIndex() {
+        if (selectedRingIndex < 0 || selectedRingIndex >= polygonRingEndIndices.size()) {
+            return -1;
+        }
+        int ringStartIndex = selectedRingIndex == 0
+                ? 0
+                : polygonRingEndIndices.get(selectedRingIndex - 1);
+        int ringEndIndex = polygonRingEndIndices.get(selectedRingIndex);
+        return getNextClosedVertexIndex(ringStartIndex, ringEndIndex);
     }
 
     @Override

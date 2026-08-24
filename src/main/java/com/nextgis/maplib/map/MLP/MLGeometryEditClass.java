@@ -3,11 +3,14 @@ package com.nextgis.maplib.map.MLP;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.prop_featureid;
 import static com.nextgis.maplib.map.MPLFeaturesUtils.prop_layerid;
 
+import com.nextgis.maplib.map.MPLFeaturesUtils;
+
 import org.maplibre.android.geometry.LatLng;
 import org.maplibre.android.maps.Projection;
 import org.maplibre.android.style.sources.GeoJsonSource;
 import org.maplibre.geojson.Feature;
 import org.maplibre.geojson.FeatureCollection;
+import org.maplibre.geojson.LineString;
 import org.maplibre.geojson.Point;
 
 import java.util.ArrayList;
@@ -102,6 +105,67 @@ public abstract class MLGeometryEditClass {
 
     public void setSelectedVertexIndex(int i) {
         selectedVertexIndex = i;
+    }
+
+    protected int getNextOpenVertexIndex(int partStart, int partEndExclusive) {
+        return EditDirectionPolicy.nextOpenVertex(
+                selectedVertexIndex, partStart, partEndExclusive);
+    }
+
+    protected int getNextClosedVertexIndex(int ringStart, int ringEndExclusive) {
+        return EditDirectionPolicy.nextClosedVertex(
+                selectedVertexIndex, ringStart, ringEndExclusive);
+    }
+
+    protected String getEditVertexColor(int vertexIndex, int nextVertexIndex) {
+        if (vertexIndex == selectedVertexIndex) {
+            return MPLFeaturesUtils.colorRED;
+        }
+        if (vertexIndex == nextVertexIndex) {
+            return MPLFeaturesUtils.colorEditDirection;
+        }
+        return MPLFeaturesUtils.colorLightBlue;
+    }
+
+    protected Number getEditVertexRadius(int vertexIndex, int nextVertexIndex) {
+        return vertexIndex == nextVertexIndex
+                ? MPLFeaturesUtils.nextPointRadius
+                : MPLFeaturesUtils.pointRaduis;
+    }
+
+    protected void publishEditingFeatureWithDirection(
+            List<Feature> displayFeatures,
+            List<Point> vertices,
+            int nextVertexIndex) {
+        List<Feature> features = new ArrayList<>(displayFeatures);
+        if (selectedVertexIndex >= 0 && selectedVertexIndex < vertices.size()
+                && nextVertexIndex >= 0 && nextVertexIndex < vertices.size()) {
+            Point selected = vertices.get(selectedVertexIndex);
+            Point next = vertices.get(nextVertexIndex);
+            if (selected != null && next != null && !selected.equals(next)) {
+                List<Point> segmentPoints = new ArrayList<>(2);
+                segmentPoints.add(selected);
+                segmentPoints.add(next);
+                Feature directionSegment = Feature.fromGeometry(
+                        LineString.fromLngLats(segmentPoints));
+                directionSegment.addStringProperty(
+                        "color", MPLFeaturesUtils.colorEditDirection);
+                directionSegment.addBooleanProperty("edit_direction", true);
+                features.add(directionSegment);
+            }
+        }
+        selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(features));
+    }
+
+    protected void publishEditingFeatureWithDirection(
+            Feature displayFeature,
+            List<Point> vertices,
+            int nextVertexIndex) {
+        List<Feature> features = new ArrayList<>(1);
+        if (displayFeature != null) {
+            features.add(displayFeature);
+        }
+        publishEditingFeatureWithDirection(features, vertices, nextVertexIndex);
     }
 
     public void displayMiddlePoints(boolean isInit, boolean displayMiddlePoints) {

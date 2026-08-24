@@ -127,11 +127,13 @@ import java.util.Map;
 public class MPLFeaturesUtils {
 
     static public Number pointRaduis = 8;
+    static public Number nextPointRadius = 10;
     static public Number middleRaduis = 4;
     static public String colorLightBlue = "#03a9f4";
     static public String colorVeryLightBlue = "#A2BCF8";
     static public String colorBlue = "#0000FF";
     static public String colorRED = "#FF0000";
+    static public String colorEditDirection = "#FF9800";
 
     static public String prop_color_fill_rule = MplFeatureStyleProps.COLOR_FILL_RULE;
     static public String prop_text_color = MplFeatureStyleProps.TEXT_COLOR;

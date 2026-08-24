@@ -155,6 +155,16 @@ public class MeasurmentLine extends MLGeometryEditClass {
 
     }
 
+    public boolean replacePoints(List<Point> points) {
+        if (points == null || points.isEmpty())
+            return false;
+
+        editingVertices = new ArrayList<>(points);
+        selectedVertexIndex = editingVertices.size() - 1;
+        updateEditingPolygonAndVertex();
+        return true;
+    }
+
     @Override
     public void displayMiddlePoints(boolean isInit, boolean changeGeoJsonSource) {
         generateMiddlePointsAddAndDisplay();
