@@ -31,11 +31,13 @@ import android.util.Log;
 import com.nextgis.maplib.R;
 import com.nextgis.maplib.api.IJSONStore;
 import com.nextgis.maplib.api.IProgressor;
+import com.nextgis.maplib.datasource.Geo;
 import com.nextgis.maplib.datasource.TileItem;
 import com.nextgis.maplib.display.TMSRenderer;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.FileUtil;
 import com.nextgis.maplib.util.GeoConstants;
+import com.nextgis.maplib.util.MbTilesInfo;
 import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NetworkUtil;
 
@@ -43,6 +45,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -56,6 +59,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.nextgis.maplib.util.Constants.JSON_RENDERERPROPS_KEY;
+import static com.nextgis.maplib.util.MbTilesInfo.MBTILES_FILENAME;
 
 
 public abstract class TMSLayer
@@ -68,6 +72,10 @@ public abstract class TMSLayer
     private static final String JSON_NGRC_ARCHIVE_SHA256 = "archive_sha256";
     private static final String JSON_NGRC_IMPORTED_AT = "imported_at";
     private static final String JSON_NGRC_UPDATE_POLICY = "update_policy";
+    private static final String JSON_LEGACY_MIGRATION = "legacy_underlay_migration";
+    private static final String JSON_LEGACY_SOURCE_PACKAGE = "source_package";
+    private static final String JSON_LEGACY_SOURCE_KEY = "source_key";
+    private static final String JSON_LEGACY_MIGRATED_AT = "migrated_at";
     public static final String NGRC_UPDATE_POLICY_IMMUTABLE_LOCAL = "immutable_local";
     public static final String TILE_EXT = ".tile";
 
@@ -81,6 +89,9 @@ public abstract class TMSLayer
     private String mNgrcArchiveSha256;
     private long mNgrcImportedAt;
     private String mLastArchiveSha256;
+    private String mLegacyMigrationSourcePackage;
+    private String mLegacyMigrationSourceKey;
+    private long mLegacyMigratedAt;
 
 
     protected TMSLayer(
@@ -152,6 +163,12 @@ public abstract class TMSLayer
             rootConfig.put(JSON_RENDERERPROPS_KEY, jsonStore.toJSON());
         }
 
+        if (mExtents.isInit()) {
+            rootConfig.put(Constants.JSON_BBOX_MAXX_KEY, mExtents.getMaxX());
+            rootConfig.put(Constants.JSON_BBOX_MINX_KEY, mExtents.getMinX());
+            rootConfig.put(Constants.JSON_BBOX_MAXY_KEY, mExtents.getMaxY());
+            rootConfig.put(Constants.JSON_BBOX_MINY_KEY, mExtents.getMinY());
+        }
 
         rootConfig.put(JSON_CACHE_SIZE_MULT, mCacheSizeMult);
         if (mNgrcArchiveSha256 != null && !mNgrcArchiveSha256.isEmpty()) {
@@ -161,6 +178,13 @@ public abstract class TMSLayer
             provenance.put(JSON_NGRC_IMPORTED_AT, mNgrcImportedAt);
             provenance.put(JSON_NGRC_UPDATE_POLICY, NGRC_UPDATE_POLICY_IMMUTABLE_LOCAL);
             rootConfig.put(JSON_NGRC_PROVENANCE, provenance);
+        }
+        if (mLegacyMigrationSourcePackage != null && mLegacyMigrationSourceKey != null) {
+            JSONObject migration = new JSONObject();
+            migration.put(JSON_LEGACY_SOURCE_PACKAGE, mLegacyMigrationSourcePackage);
+            migration.put(JSON_LEGACY_SOURCE_KEY, mLegacyMigrationSourceKey);
+            migration.put(JSON_LEGACY_MIGRATED_AT, mLegacyMigratedAt);
+            rootConfig.put(JSON_LEGACY_MIGRATION, migration);
         }
         return rootConfig;
     }
@@ -182,11 +206,29 @@ public abstract class TMSLayer
         if (jsonObject.has(JSON_CACHE_SIZE_MULT)) {
             mCacheSizeMult = jsonObject.getInt(JSON_CACHE_SIZE_MULT);
         }
+        if (jsonObject.has(Constants.JSON_BBOX_MAXX_KEY)
+                && jsonObject.has(Constants.JSON_BBOX_MINX_KEY)
+                && jsonObject.has(Constants.JSON_BBOX_MAXY_KEY)
+                && jsonObject.has(Constants.JSON_BBOX_MINY_KEY)) {
+            mExtents.setMin(
+                    jsonObject.getDouble(Constants.JSON_BBOX_MINX_KEY),
+                    jsonObject.getDouble(Constants.JSON_BBOX_MINY_KEY));
+            mExtents.setMax(
+                    jsonObject.getDouble(Constants.JSON_BBOX_MAXX_KEY),
+                    jsonObject.getDouble(Constants.JSON_BBOX_MAXY_KEY));
+        }
         JSONObject provenance = jsonObject.optJSONObject(JSON_NGRC_PROVENANCE);
         if (provenance != null) {
             mNgrcSourceName = provenance.optString(JSON_NGRC_SOURCE_NAME, null);
             mNgrcArchiveSha256 = provenance.optString(JSON_NGRC_ARCHIVE_SHA256, null);
             mNgrcImportedAt = provenance.optLong(JSON_NGRC_IMPORTED_AT, 0L);
+        }
+        JSONObject migration = jsonObject.optJSONObject(JSON_LEGACY_MIGRATION);
+        if (migration != null) {
+            mLegacyMigrationSourcePackage = migration.optString(
+                    JSON_LEGACY_SOURCE_PACKAGE, null);
+            mLegacyMigrationSourceKey = migration.optString(JSON_LEGACY_SOURCE_KEY, null);
+            mLegacyMigratedAt = migration.optLong(JSON_LEGACY_MIGRATED_AT, 0L);
         }
 
         if(Constants.DEBUG_MODE) {
@@ -340,6 +382,114 @@ public abstract class TMSLayer
         if (!save()) {
             throw new IOException("Cannot save imported NGRC configuration");
         }
+    }
+
+    /**
+     * Imports one raster MBTiles database into this layer without expanding its tile rows into
+     * individual files. The copied database is validated under a temporary name and published by
+     * a same-directory rename only after the complete stream has reached durable storage.
+     */
+    public void fillFromMBTiles(Uri uri, IProgressor progressor)
+            throws IOException, SecurityException, NGException {
+        if (!mPath.exists()) {
+            FileUtil.createDir(mPath);
+        }
+
+        File partialFile = new File(mPath, MBTILES_FILENAME + ".partial");
+        File finalFile = new File(mPath, MBTILES_FILENAME);
+        if (partialFile.exists() && !partialFile.delete()) {
+            throw new IOException("Cannot replace incomplete MBTiles import");
+        }
+
+        try {
+            InputStream opened = mContext.getContentResolver().openInputStream(uri);
+            if (opened == null) {
+                throw new NGException(mContext.getString(R.string.error_download_data));
+            }
+
+            try (InputStream input = opened;
+                 FileOutputStream output = new FileOutputStream(partialFile)) {
+                int available = input.available();
+                if (progressor != null && available > 0) {
+                    progressor.setMax(available);
+                }
+                byte[] buffer = new byte[Constants.IO_BUFFER_SIZE];
+                long copied = 0L;
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    if (progressor != null && progressor.isCanceled()) {
+                        throw new InterruptedIOException("MBTiles import cancelled");
+                    }
+                    output.write(buffer, 0, count);
+                    copied += count;
+                    if (progressor != null) {
+                        progressor.setValue((int) Math.min(Integer.MAX_VALUE, copied));
+                    }
+                }
+                output.flush();
+                output.getFD().sync();
+            }
+
+            MbTilesInfo info = MbTilesInfo.inspect(partialFile);
+            if (!info.valid) {
+                Log.w(Constants.TAG, "MBTiles import validation failed: " + info.diagnostic);
+                int message = info.vector
+                        ? R.string.mbtiles_problem_vector
+                        : R.string.mbtiles_problem_filecorrupted;
+                throw new NGException(mContext.getString(message));
+            }
+
+            if (finalFile.exists() && !finalFile.delete()) {
+                throw new IOException("Cannot replace MBTiles layer database");
+            }
+            if (!partialFile.renameTo(finalFile)) {
+                throw new IOException("Cannot publish imported MBTiles database");
+            }
+
+            configureAsRasterMbTiles(info);
+            if (!save()) {
+                throw new IOException("Cannot save imported MBTiles layer configuration");
+            }
+        } catch (IOException | RuntimeException | NGException e) {
+            if (partialFile.exists() && !partialFile.delete()) {
+                Log.w(Constants.TAG, "Cannot delete incomplete MBTiles import: "
+                        + partialFile.getAbsolutePath());
+            }
+            throw e;
+        }
+    }
+
+    public void configureAsRasterMbTiles(MbTilesInfo info) throws NGException {
+        if (info == null || !info.valid || !info.raster) {
+            throw new NGException(mContext.getString(R.string.mbtiles_problem_filecorrupted));
+        }
+        setTMSType(GeoConstants.TMSTYPE_MBTILES_RASTER);
+        if (info.minZoom >= 0) {
+            setMinZoom(info.minZoom);
+        }
+        if (info.maxZoom >= 0) {
+            setMaxZoom(info.maxZoom);
+        }
+        if (info.boundsValid) {
+            mExtents.setMin(
+                    Geo.wgs84ToMercatorSphereX(info.west),
+                    Geo.wgs84ToMercatorSphereY(info.south));
+            mExtents.setMax(
+                    Geo.wgs84ToMercatorSphereX(info.east),
+                    Geo.wgs84ToMercatorSphereY(info.north));
+        }
+    }
+
+    public void setLegacyUnderlayMigrationProvenance(String sourcePackage, String sourceKey) {
+        mLegacyMigrationSourcePackage = sourcePackage;
+        mLegacyMigrationSourceKey = sourceKey;
+        mLegacyMigratedAt = System.currentTimeMillis();
+    }
+
+    public boolean hasLegacyUnderlayMigrationProvenance(
+            String sourcePackage, String sourceKey) {
+        return sourcePackage != null && sourcePackage.equals(mLegacyMigrationSourcePackage)
+                && sourceKey != null && sourceKey.equals(mLegacyMigrationSourceKey);
     }
 
     public void setNgrcImportProvenance(String sourceName, String archiveSha256) {

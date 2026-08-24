@@ -49,6 +49,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicReference;
@@ -233,8 +234,12 @@ public class MapUtil {
     }
 
     public static boolean isZippedGeoJSON(Context context, AtomicReference<Uri> uri) {
-        try {
-            InputStream inputStream = context.getContentResolver().openInputStream(uri.get());
+        return isZippedWithExtension(context, uri, ".geojson");
+    }
+
+    public static boolean isZippedWithExtension(
+            Context context, AtomicReference<Uri> uri, String targetExtension) {
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri.get())) {
             if (inputStream == null)
                 return false;
 
@@ -243,11 +248,14 @@ public class MapUtil {
             ZipEntry ze;
 
             while ((ze = zis.getNextEntry()) != null) {
-                if (ze.getName().toLowerCase().endsWith(".geojson")) {
+                if (ze.getName().toLowerCase(Locale.ROOT).endsWith(targetExtension)) {
                     File temp = prepareTempDir(context, null, false);
                     FileUtil.unzipEntry(zis, ze, buffer, temp);
-                    temp = new File(temp, ze.getName());
-                    uri.set(Uri.fromFile(temp));
+                    File extracted = findFileWithExtension(temp, targetExtension);
+                    if (extracted == null) {
+                        return false;
+                    }
+                    uri.set(Uri.fromFile(extracted));
                     zis.closeEntry();
                     return true;
                 }
@@ -257,6 +265,27 @@ public class MapUtil {
         }
 
         return false;
+    }
+
+    private static File findFileWithExtension(File root, String targetExtension) {
+        if (root == null) {
+            return null;
+        }
+        if (root.isFile()) {
+            return root.getName().toLowerCase(Locale.ROOT).endsWith(targetExtension)
+                    ? root : null;
+        }
+        File[] children = root.listFiles();
+        if (children == null) {
+            return null;
+        }
+        for (File child : children) {
+            File found = findFileWithExtension(child, targetExtension);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     public static boolean isParsable(String string) {
