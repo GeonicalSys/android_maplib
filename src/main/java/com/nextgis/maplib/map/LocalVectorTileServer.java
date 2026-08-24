@@ -18,11 +18,14 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,13 +41,17 @@ public final class LocalVectorTileServer {
     private static final LocalVectorTileServer INSTANCE = new LocalVectorTileServer();
     private static final Pattern TILE_PATH = Pattern.compile(
             "^/tiles/(\\d+)/(\\d+)/(\\d+)/(\\d+)\\.pbf$");
+    private static final long RESOURCE_WARNING_INTERVAL_MS = 10_000L;
 
     private final Map<Integer, VectorLayer> mLayers = new ConcurrentHashMap<>();
-    private final ExecutorService mExecutor = Executors.newCachedThreadPool();
+    private final Map<Integer, Object> mLayerBuildLocks = new ConcurrentHashMap<>();
+    private final ThreadPoolExecutor mExecutor = LocalVectorTileRequestPolicy.newExecutor();
+    private final AtomicLong mLayerGeneration = new AtomicLong();
 
     private volatile ServerSocket mServerSocket;
     private volatile int mPort = -1;
     private volatile boolean mRunning;
+    private volatile long mLastResourceWarningMs;
 
     private LocalVectorTileServer() {
     }
@@ -61,15 +68,20 @@ public final class LocalVectorTileServer {
             return null;
         }
         mLayers.put(layer.getId(), layer);
+        mLayerBuildLocks.computeIfAbsent(layer.getId(), ignored -> new Object());
         return getTileUrl(layer.getId());
     }
 
     public void unregisterLayer(int layerId) {
         mLayers.remove(layerId);
+        mLayerBuildLocks.remove(layerId);
     }
 
     public void clearLayers() {
+        mLayerGeneration.incrementAndGet();
         mLayers.clear();
+        mLayerBuildLocks.clear();
+        closeQueuedRequests();
     }
 
     public boolean ensureStarted() {
@@ -113,7 +125,14 @@ public final class LocalVectorTileServer {
         while (mRunning && mServerSocket != null && !mServerSocket.isClosed()) {
             try {
                 Socket socket = mServerSocket.accept();
-                mExecutor.execute(() -> handle(socket));
+                RequestTask request = new RequestTask(socket, mLayerGeneration.get());
+                try {
+                    mExecutor.execute(request);
+                } catch (RejectedExecutionException rejected) {
+                    request.rejectOverload();
+                    logResourceWarning("queue full active=" + mExecutor.getActiveCount()
+                            + " queued=" + mExecutor.getQueue().size());
+                }
             } catch (IOException e) {
                 if (mRunning) {
                     Log.w(TAG, "accept failed", e);
@@ -122,8 +141,11 @@ public final class LocalVectorTileServer {
         }
     }
 
-    private void handle(Socket socket) {
+    private void handle(Socket socket, long generation) {
         try (Socket s = socket) {
+            if (generation != mLayerGeneration.get()) {
+                return;
+            }
             s.setSoTimeout(15000);
             BufferedReader reader = new BufferedReader(new InputStreamReader(
                     s.getInputStream(), StandardCharsets.US_ASCII));
@@ -135,14 +157,14 @@ public final class LocalVectorTileServer {
             while ((line = reader.readLine()) != null && line.length() > 0) {
                 // Drain headers; keep-alive is deliberately ignored.
             }
-            Response response = route(requestLine);
+            Response response = route(requestLine, generation);
             writeResponse(s.getOutputStream(), response);
         } catch (Exception e) {
             Log.w(TAG, "request failed", e);
         }
     }
 
-    private Response route(String requestLine) {
+    private Response route(String requestLine, long generation) {
         try {
             String[] parts = requestLine.split(" ");
             if (parts.length < 2 || !"GET".equals(parts[0].toUpperCase(Locale.ROOT))) {
@@ -165,12 +187,77 @@ public final class LocalVectorTileServer {
             if (layer == null) {
                 return Response.text(404, "Layer Not Registered");
             }
-            byte[] tile = LocalVectorTileProvider.buildTile(layer, z, x, y);
+            Runtime runtime = Runtime.getRuntime();
+            if (!LocalVectorTileRequestPolicy.hasHeapHeadroom(
+                    runtime.maxMemory(), runtime.totalMemory(), runtime.freeMemory())) {
+                logResourceWarning("heap headroom below "
+                        + (LocalVectorTileRequestPolicy.MIN_HEAP_HEADROOM_BYTES / 1024L / 1024L)
+                        + " MiB");
+                return Response.text(503, "Tile Server Busy");
+            }
+            Object buildLock = mLayerBuildLocks.computeIfAbsent(layerId, ignored -> new Object());
+            byte[] tile;
+            synchronized (buildLock) {
+                if (generation != mLayerGeneration.get() || mLayers.get(layerId) != layer) {
+                    return Response.text(404, "Layer Not Registered");
+                }
+                tile = LocalVectorTileProvider.buildTile(layer, z, x, y);
+            }
             return new Response(200, "application/x-protobuf", tile);
         } catch (Exception e) {
             HyperLog.w(Constants.TAG, "Local vector tile request failed: "
                     + e.getMessage(), e);
             return Response.text(500, "Tile Error");
+        }
+    }
+
+    private void closeQueuedRequests() {
+        List<Runnable> queued = new ArrayList<>();
+        mExecutor.getQueue().drainTo(queued);
+        for (Runnable runnable : queued) {
+            if (runnable instanceof RequestTask) {
+                ((RequestTask) runnable).closeQuietly();
+            }
+        }
+    }
+
+    private void logResourceWarning(String detail) {
+        long now = System.currentTimeMillis();
+        if (now - mLastResourceWarningMs < RESOURCE_WARNING_INTERVAL_MS) {
+            return;
+        }
+        mLastResourceWarningMs = now;
+        HyperLog.w(Constants.TAG, "Local vector tile request throttled: " + detail);
+    }
+
+    private final class RequestTask implements Runnable {
+        private final Socket mSocket;
+        private final long mGeneration;
+
+        RequestTask(Socket socket, long generation) {
+            mSocket = socket;
+            mGeneration = generation;
+        }
+
+        @Override
+        public void run() {
+            handle(mSocket, mGeneration);
+        }
+
+        void rejectOverload() {
+            try (Socket socket = mSocket) {
+                writeResponse(socket.getOutputStream(), Response.text(503, "Tile Server Busy"));
+            } catch (IOException ignored) {
+                // The MapLibre client may already have abandoned this request.
+            }
+        }
+
+        void closeQuietly() {
+            try {
+                mSocket.close();
+            } catch (IOException ignored) {
+                // Best-effort cancellation of requests for the previous map generation.
+            }
         }
     }
 
@@ -215,6 +302,8 @@ public final class LocalVectorTileServer {
                     return "Method Not Allowed";
                 case 500:
                     return "Internal Server Error";
+                case 503:
+                    return "Service Unavailable";
                 default:
                     return "OK";
             }

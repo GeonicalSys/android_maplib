@@ -34,6 +34,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   сохраняет данные удалённых слоёв между reload;
 - `LocalVectorTileProvider` / `LocalVectorTileEncoder` — ленивые MVT для
   read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;
+  loopback-сервер допускает не более двух одновременных сборок и 16 ожидающих
+  запросов, сериализует тяжёлые тайлы одного слоя, отменяет очередь предыдущего
+  поколения карты и отвечает `503` при перегрузке либо остатке heap менее 64 МБ;
 - `LayerIdentifyPolicy` оставляет выключенные классические слои вне identify,
   но разрешает просмотр локальных атрибутов выключенного слоя, настроенного на
   `local_vector_tiles`, не включая его отрисовку;
@@ -238,6 +241,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Выключенный `local_vector_tiles` не попал в identify: проверить сохранённый
   `layer_origin.render_mode` и `LayerIdentifyPolicy`; видимость слоя не должна
   включаться ради чтения атрибутов.
+- После панорамирования/перезагрузок карты растут тормоза или возникает OOM в
+  `LocalVectorTileProvider.buildTile`: worker должен называться только
+  `LocalVectorTileWorker-1/2`; трёхзначный номер `pool-*-thread-*` означает
+  возврат неограниченного пула. Проверить также throttled-счётчик и heap headroom.
 - Пустой список треков после project switch: проверить строку
   `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;
 - Трек/обход замер на скорости: проверить `LocationTrackFilter` причины вместе с
