@@ -189,6 +189,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   последний в live style после cold/lite/hot reload.
 - Объект после cold form recovery выбирается, но не виден до restart: проверить
   `MapLibre feature missing after form Save` и следующий полный data reload слоя.
+- После успешного Save объект остаётся выбранным или видны edit sources: app host
+  обязан сначала завершить `cancelFeatureEdit(false)`, затем перейти в normal mode
+  и вызвать view unselect; `MapDrawable` не владеет политикой нижних панелей.
 - Мультиполигон не сохранился: проверить безопасный HyperLog-код
   `MultiPolygon geometry repair failed`; исходная геометрия должна остаться в
   редакторе, а координаты в журнал не записываются. Причина
