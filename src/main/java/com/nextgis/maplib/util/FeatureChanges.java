@@ -42,6 +42,12 @@ public class FeatureChanges
 {
     public static void initialize(String tableName)
     {
+        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        initialize(map.getDatabase(false), tableName);
+    }
+
+    public static void initialize(SQLiteDatabase db, String tableName)
+    {
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "init the change log for the layer " + tableName);
 
@@ -56,9 +62,6 @@ public class FeatureChanges
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "create the layer change table: " + sqlCreateTable);
 
-        // create table
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(true);
         db.execSQL(sqlCreateTable);
     }
 
@@ -175,9 +178,13 @@ public class FeatureChanges
 
     public static void delete(String tableName)
     {
+        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        delete(map.getDatabase(false), tableName);
+    }
+
+    public static void delete(SQLiteDatabase db, String tableName)
+    {
         try {
-            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-            SQLiteDatabase db = map.getDatabase(true);
             String tableDrop = "DROP TABLE IF EXISTS " + tableName;
             db.execSQL(tableDrop);
         } catch (SQLiteFullException | SQLiteReadOnlyDatabaseException e) {

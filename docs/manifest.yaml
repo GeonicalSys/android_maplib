@@ -25,21 +25,21 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
     responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
-    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose the owning policy for direction configuration and recovery from server-only mode, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, fingerprint schema/config/SQLite mismatch rebuild requests, and persist bounded full-fill failure diagnostics with layer/resource/source-index/error/stack but no feature payload.
+    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose the owning policy for direction configuration and recovery from server-only mode, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, bind full fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint schema/config/SQLite mismatch rebuild requests, and persist bounded full-fill failure diagnostics with layer/resource/source-index/error/stack but no feature payload.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
     responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
-    responsibility: Create ordinary local vector layers as editable, load vector configuration, suppress per-row cache notifications during bulk/rebuild, fail a bulk fill on the first rejected SQL insert, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
+    responsibility: Create ordinary local vector layers as editable, load vector configuration, route create/insert/schema/delete operations through the layer-owning workspace database, suppress per-row cache notifications during bulk/rebuild, fail a bulk fill on the first rejected SQL insert, persist server attachment metadata inside the same fill transaction, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeometryRTree.java
     responsibility: Serialize spatial-index reads and mutations so broadcast receivers, sync workers and cache rebuilds cannot expose partially tightened nodes.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoEnvelope.java
     responsibility: Keep uninitialized spatial bounds safe for defensive area/dimension calculations.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapContentProviderHelper.java
-    responsibility: Route vector data notifications to the owning layer without allowing one cache callback failure to terminate the Android main thread.
+    responsibility: Open layers.db beside this map object's own map file and route vector data notifications to the owning layer without allowing one cache callback failure to terminate the Android main thread.
   - path: maplib/src/main/java/com/nextgis/maplib/util/GeoJSONUtil.java
     responsibility: Import local GeoJSON in implicit WGS84, CRS84, common EPSG:4326 aliases or the supported EPSG:3857 path while rejecting other coordinate systems.
   - path: maplib/src/main/java/com/nextgis/maplib/util/DatabaseContext.java
-    responsibility: Configure bulk-write SQLite PRAGMAs only outside active transactions and return the current map database to layer importers.
+    responsibility: Resolve a layer's owning map through its parent chain, configure bulk-write SQLite PRAGMAs only outside active transactions and return that workspace database to layer importers.
   - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointParser.java
     responsibility: Securely stream standard KML coordinates and GPX waypoint, route-point and track-point coordinates in source order without retaining source topology.
   - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointLayerImporter.java
@@ -74,6 +74,8 @@ key_components:
     responsibility: Parse mobile render mode and layer origin configuration.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
     responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, report insufficient ring positions separately, recover an unset collection CRS from nested geometry, and reject empty or non-polygonal repair results.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureGeometryValidator.java
+    responsibility: Validate streamed NGW Polygon and MultiPolygon members with JTS instead of the legacy quadratic segment-pair scan while preserving the previous member-by-member collection semantics.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoGeometryFactory.java
     responsibility: Dispatch WKT geometry to the matching parser, including Polygon and MultiPolygon recovery paths.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoMultiPolygon.java

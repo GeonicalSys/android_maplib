@@ -30,11 +30,9 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
-import android.preference.PreferenceManager;
 import com.nextgis.maplib.api.ILayer;
 import com.nextgis.maplib.api.INGWLayer;
 import com.nextgis.maplib.datasource.DatabaseHelper;
@@ -46,8 +44,6 @@ import java.io.File;
 import java.util.List;
 
 import static com.nextgis.maplib.util.Constants.*;
-import static com.nextgis.maplib.util.SettingsConstants.KEY_PREF_MAP;
-import static com.nextgis.maplib.util.SettingsConstants.KEY_PREF_MAP_PATH;
 
 
 public class MapContentProviderHelper
@@ -66,16 +62,12 @@ public class MapContentProviderHelper
     {
         super(context, path, layerFactory);
 
-        File dbFullName;
-        SharedPreferences sharedPreferences =
-                PreferenceManager.getDefaultSharedPreferences(context);
-        File defaultPath = getContext().getExternalFilesDir(KEY_PREF_MAP);
-        if (defaultPath != null) {
-            String mapPath = sharedPreferences.getString(KEY_PREF_MAP_PATH, defaultPath.getPath());
-            dbFullName = new File(mapPath, DBNAME);
-        } else {
-            dbFullName = context.getDatabasePath(DBNAME);
-        }
+        /*
+         * The database belongs to the map path passed to this instance. Reading the current
+         * project preference here allowed an older/background map object to open another
+         * project's layers.db after a process restart or project switch.
+         */
+        File dbFullName = resolveDatabaseFile(path, context.getDatabasePath(DBNAME));
 
         mDatabaseHelper = new DatabaseHelper(
                 context,          // the application context
@@ -99,6 +91,14 @@ public class MapContentProviderHelper
         } else {
             context.registerReceiver(new VectorLayerNotifyReceiver(), intentFilter);
         }
+    }
+
+    static File resolveDatabaseFile(File mapFile, File fallbackDatabaseFile)
+    {
+        File mapDirectory = mapFile != null ? mapFile.getParentFile() : null;
+        return mapDirectory != null
+                ? new File(mapDirectory, DBNAME)
+                : fallbackDatabaseFile;
     }
 
     @Override

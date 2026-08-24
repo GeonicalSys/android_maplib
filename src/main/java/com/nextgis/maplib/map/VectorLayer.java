@@ -41,8 +41,6 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.text.TextUtils;
@@ -393,8 +391,7 @@ public class VectorLayer
         Log.d(TAG, "create layer table: " + tableCreate);
 
         //1. create table and populate with values
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(false);
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
         db.execSQL(tableCreate);
         setDefaultRenderer();
 
@@ -517,8 +514,7 @@ public class VectorLayer
             return NOT_FOUND;
         }
 
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(false);
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
 
         final ContentValues values = getFeatureContentValues(feature);
 
@@ -558,9 +554,9 @@ public class VectorLayer
                 id = MIN_LOCAL_FEATURE_ID;
             }
             values.put(FIELD_ID, id);
-            rowId = insertInternal(values);
+            rowId = insertInternal(values, db);
         } else
-            rowId = insertInternal(values);
+            rowId = insertInternal(values, db);
 
         if (rowId == Constants.NOT_FOUND) {
             // A batch cannot be considered valid after even one failed SQL insert. Let the
@@ -574,17 +570,31 @@ public class VectorLayer
         cacheGeometryEnvelope(rowId, feature.getGeometry());
         // add attach info
 
-        if (feature.getAttachments().keySet().size() > 0) {
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    for ( String key :  feature.getAttachments().keySet()){
-                        final AttachItem item = feature.getAttachments().get(key);
-                        putOneAttachment(item, feature);
-                    }
-                }
-            }, 500);
+        if (this instanceof NGWVectorLayer && !feature.getAttachments().isEmpty()) {
+            String attachmentsTable = ((NGWVectorLayer) this).getAttachmentsTableName();
+            for (AttachItem item : feature.getAttachments().values()) {
+                String displayName = normalizeServerAttachmentDisplayName(item.getDisplayName());
+                FeatureAttachments.add(
+                        db,
+                        attachmentsTable,
+                        feature.getId(),
+                        Long.parseLong(item.getAttachId()),
+                        item.getDescription(),
+                        displayName,
+                        item.getMimetype());
+            }
         }
+    }
+
+    private static String normalizeServerAttachmentDisplayName(String displayName) {
+        String normalized = displayName == null ? "attachment" : displayName;
+        if (normalized.contains("%3A")) {
+            normalized = normalized.substring(normalized.indexOf("%3A") + 3);
+        }
+        if (!normalized.contains(".")) {
+            normalized += ".jpg";
+        }
+        return normalized;
     }
 
     protected void putOneAttachment(AttachItem item, Feature feature) {
@@ -670,8 +680,7 @@ public class VectorLayer
                 break;
         }
 
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(false);
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
         db.execSQL(fieldCreate);
     }
 
@@ -1042,8 +1051,7 @@ public class VectorLayer
     {
         try {
             //drop table
-            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-            SQLiteDatabase db = map.getDatabase(false);
+            SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
             String tableDrop = "DROP TABLE IF EXISTS " + mPath.getName();
             db.execSQL(tableDrop);
         } catch (SQLiteFullException e) {
@@ -1456,6 +1464,13 @@ public class VectorLayer
 
     protected long insertInternal(ContentValues contentValues)
     {
+        return insertInternal(
+                contentValues, DatabaseContext.getDatabaseForLayer(this, false));
+    }
+
+
+    protected long insertInternal(ContentValues contentValues, SQLiteDatabase db)
+    {
         if (contentValues.containsKey(Constants.FIELD_GEOM)) {
             try {
                 prepareGeometry(contentValues);
@@ -1464,15 +1479,6 @@ public class VectorLayer
                 return Constants.NOT_FOUND;
             }
         }
-
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        if (null == map) {
-            throw new IllegalArgumentException(
-                    "The map should extends MapContentProviderHelper or inherited");
-        }
-
-        SQLiteDatabase db = map.getDatabase(false);
-
 
         //long rowId = db.insert(mPath.getName(), null, contentValues);
         long rowId;
@@ -2558,7 +2564,7 @@ public class VectorLayer
         for (Field newField : diff.getAddedFields()) {
             try {
                 String sqlType = fieldTypeToSql(newField.getType());
-                MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+                MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
                 if (map != null) {
                     SQLiteDatabase db = map.getDatabase(false);
                     db.execSQL("ALTER TABLE '" + mPath.getName() + "' ADD COLUMN '"
@@ -2675,11 +2681,7 @@ public class VectorLayer
         if (mFields == null || mFields.isEmpty()) {
             return missing;
         }
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        if (map == null) {
-            return missing;
-        }
-        SQLiteDatabase db = map.getDatabase(true);
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, true);
         Set<String> sqliteColumns = new HashSet<>();
         try (Cursor c = db.rawQuery("PRAGMA table_info('" + mPath.getName() + "')", null)) {
             int nameIdx = c.getColumnIndex("name");
@@ -2706,12 +2708,7 @@ public class VectorLayer
      */
     public boolean hasLocalDataTable() {
         try {
-            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-            if (map == null) {
-                return false;
-            }
-            DatabaseContext.getDbForLayer(this);
-            SQLiteDatabase db = map.getDatabase(true);
+            SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, true);
             try (Cursor c = db.rawQuery(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
                     new String[] { mPath.getName() })) {
@@ -2731,12 +2728,7 @@ public class VectorLayer
             return -1;
         }
         try {
-            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-            if (map == null) {
-                return -1;
-            }
-            DatabaseContext.getDbForLayer(this);
-            SQLiteDatabase db = map.getDatabase(true);
+            SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, true);
             try (Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + mPath.getName(), null)) {
                 return c.moveToFirst() ? c.getInt(0) : 0;
             }

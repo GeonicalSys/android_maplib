@@ -68,6 +68,7 @@ import com.nextgis.maplib.util.LayerConfigUtil;
 import com.nextgis.maplib.util.NGWLayerSchemaCompat;
 import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.ProdLogUtil;
+import com.nextgis.maplib.util.NgwFeatureGeometryValidator;
 import com.nextgis.maplib.util.ProgressBufferedInputStream;
 import com.nextgis.maplib.util.SettingsConstants;
 import com.nextgis.maplib.util.SyncResultUtil;
@@ -731,13 +732,7 @@ public class NGWVectorLayer
             JsonReader reader = new JsonReader(new InputStreamReader(in, "UTF-8"));
             reader.beginArray();
 
-            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-            if (null == map) {
-                reader.close();
-                throw new NGException(getContext().getString(R.string.error_download_data));
-            }
-            DatabaseContext.getDbForLayer(this);
-            SQLiteDatabase dbTx = map.getDatabase(false);
+            SQLiteDatabase dbTx = DatabaseContext.getDbForLayer(this);
 
             int streamSize = in.available();
             if (null != progressor) {
@@ -759,7 +754,7 @@ public class NGWVectorLayer
                         final int currentFeatureIndex = featureIndex++;
                         try {
                             final Feature feature = NGWUtil.readNGWFeature(reader, fields, mCRS);
-                            if (feature.getGeometry() == null || !feature.getGeometry().isValid())
+                            if (!NgwFeatureGeometryValidator.isValid(feature.getGeometry()))
                                 continue;
 
                             createFeatureBatch(feature, dbTx, false);
@@ -915,8 +910,9 @@ public class NGWVectorLayer
         }
 
         super.create(geometryType, fields);
-        FeatureChanges.initialize(getChangeTableName());
-        FeatureAttachments.initialize(getAttachmentsTableName());
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        FeatureChanges.initialize(db, getChangeTableName());
+        FeatureAttachments.initialize(db, getAttachmentsTableName());
     }
 
 
@@ -2906,7 +2902,7 @@ public class NGWVectorLayer
         reader.beginArray();
         while (reader.hasNext()) {
             final Feature feature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
-            if (feature.getGeometry() == null || !feature.getGeometry().isValid())
+            if (!NgwFeatureGeometryValidator.isValid(feature.getGeometry()))
                 continue;
             features.add(feature);
         }
@@ -3243,7 +3239,7 @@ public class NGWVectorLayer
         JsonReader reader = new JsonReader(new StringReader(response.getResponseBody()));
         try {
             Feature feature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
-            if (feature.getGeometry() == null || !feature.getGeometry().isValid()) {
+            if (!NgwFeatureGeometryValidator.isValid(feature.getGeometry())) {
                 HyperLog.w(Constants.TAG, "NGW post-push refresh invalid geometry layer=\""
                         + ProdLogUtil.truncateForLog(getName(), 100)
                         + "\" res=" + mRemoteId
@@ -3513,8 +3509,9 @@ public class NGWVectorLayer
     public boolean delete(boolean keepTrack)
             throws SQLiteException
     {
-        FeatureChanges.delete(getChangeTableName());
-        FeatureAttachments.delete(getAttachmentsTableName());
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        FeatureChanges.delete(db, getChangeTableName());
+        FeatureAttachments.delete(db, getAttachmentsTableName());
 
         return super.delete(keepTrack);
     }
