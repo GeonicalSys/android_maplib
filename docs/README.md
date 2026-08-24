@@ -40,6 +40,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `MapDrawable.finishCreateNewFeature` допускает отсутствие временной edit-сессии
   после cold form recovery; если новый id отсутствует в process-local GeoJSON,
   `reloadFeatureToMaplibre` перечитывает данные слоя, а не только стили;
+- `MapDrawable.onTouch` фиксирует живые `MapLibreMap`, `MapView` и host context в
+  начале события и отбрасывает поздний gesture после `onDestroyView`, не вызывая
+  identify/edit API уничтоженного native renderer;
 - `FieldStyleRule` / `MplFeatureStyleProps` — rule-based стили: layer defaults и
   merge unset ← «прочие (по умолчанию)» (зум подписей, stops, scale flags,
   opacity); per-feature `labelminzoom`/`labelmaxzoom` через text-opacity gate;
@@ -196,6 +199,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - После успешного Save объект остаётся выбранным или видны edit sources: app host
   обязан сначала завершить `cancelFeatureEdit(false)`, затем перейти в normal mode
   и вызвать view unselect; `MapDrawable` не владеет политикой нижних панелей.
+- Crash из `MapDrawable.onTouch` после `MapLibreMapView.onDestroy`: проверить, что
+  host очистил map/view ссылки, а touch guard завершил событие до
+  `queryRenderedFeatures`.
 - Мультиполигон не сохранился: проверить безопасный HyperLog-код
   `MultiPolygon geometry repair failed`; исходная геометрия должна остаться в
   редакторе, а координаты в журнал не записываются. Причина
