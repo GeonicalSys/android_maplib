@@ -28,6 +28,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   выполняется один полный повтор, а completion callback до этого не публикуется;
   локальное включение ранее невидимого слоя сверяет тот же live style и при
   отсутствии source/layer загружает данные независимо от старого process-кэша;
+- полный style reload освобождает прежний GeoJSON snapshot до подготовки нового,
+  а после `setStyle` удаляет ссылки на detached MapLibre source/layer wrappers;
+  это ограничивает пиковую Java/native память больших Collector-проектов и не
+  сохраняет данные удалённых слоёв между reload;
 - `LocalVectorTileProvider` / `LocalVectorTileEncoder` — ленивые MVT для
   read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;
 - `LayerIdentifyPolicy` оставляет выключенные классические слои вне identify,
