@@ -234,6 +234,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   `provider`, затем итоговые `filterPassed/filterDropped/filterChordDropped/filterGaps`
   и `networkSuppressed`.
   Для валидного движения до 160 км/ч не должно быть каскада `drop:speed_dist`.
+- Курсор карты движется, но у завершённого трека `raw=0` и `filterInput=0`:
+  фильтр вообще не получил координат; проверять фактический запуск
+  `TrackerService`, а не ослаблять accuracy/speed ограничения.
 - Неверное расстояние выноса: проверить CRS исходной геометрии и ближайшую точку
   `StakeoutGeometryTarget`; пользователю нельзя выдавать плоское расстояние 3857.
 - NGW config/data issue: отделить config parsing от feature sync decision.
