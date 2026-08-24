@@ -134,6 +134,14 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `LayerGroup.createLayerStorage()` атомарно резервирует UUID-каталог; параллельные
   задачи одной Collector-партии не могут разделить SQLite-таблицу. Первый
   неуспешный batch insert аварийно завершает и откатывает неполный слой;
+- `DatabaseContext` разрешает `layers.db` по родительской цепочке самого слоя,
+  а `MapContentProviderHelper` открывает БД рядом со своим map-файлом. Фоновый
+  fill, переживший смену активного проекта или процесса, не может продолжить
+  транзакцию в БД другого workspace;
+- `NgwFeatureGeometryValidator` проверяет полученные от NGW Polygon и каждый
+  member MultiPolygon через JTS `IsValidOp`. Это сохраняет прежнюю семантику
+  коллекции, но убирает квадратичный перебор пар сегментов на контурах с
+  десятками тысяч координат;
 - Collector insertion сохраняет «Мои треки» последним во внутреннем
   `LayerGroup`, то есть наверху UI-списка;
 - `LayerConfigUtil` — server/local render and origin config.
@@ -247,6 +255,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Импорт дошёл до SQLite, но сообщил `Safety level may not be changed inside a
   transaction`: проверить, что `DatabaseContext.getDbForLayer()` вызван до
   `beginTransaction()`, а внутри цикла используется уже полученный `dbTx`.
+- NGW показывает небольшое число объектов, но полный fill зависает на
+  MultiPolygon: считать координаты/части, а не только features; проверка серверной
+  геометрии должна идти через `NgwFeatureGeometryValidator`, без legacy
+  `GeoLinearRing.intersects()`.
 - Созданный вручную слой нельзя редактировать: проверить сохранённый
   `is_editable`; новый обычный `VectorLayer` должен записывать `true`.
 - Collector composition: проверить stable remote IDs/project metadata,

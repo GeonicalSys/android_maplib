@@ -33,6 +33,12 @@ public class FeatureAttachments {
 
     public static void initialize(String tableName)
     {
+        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        initialize(map.getDatabase(false), tableName);
+    }
+
+    public static void initialize(SQLiteDatabase db, String tableName)
+    {
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "init the change log for the layer " + tableName);
 
@@ -52,9 +58,6 @@ public class FeatureAttachments {
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "create the layer change table: " + sqlCreateTable);
 
-        // create table
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(true);
         db.execSQL(sqlCreateTable);
     }
 
@@ -207,9 +210,13 @@ public class FeatureAttachments {
 
     public static void delete(String tableName)
     {
+        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        delete(map.getDatabase(false), tableName);
+    }
+
+    public static void delete(SQLiteDatabase db, String tableName)
+    {
         try {
-            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-            SQLiteDatabase db = map.getDatabase(true);
             String tableDrop = "DROP TABLE IF EXISTS " + tableName;
             db.execSQL(tableDrop);
         } catch (SQLiteFullException | SQLiteReadOnlyDatabaseException e) {
@@ -505,6 +512,24 @@ public class FeatureAttachments {
         values.put(FIELD_ATTACH_OPERATION, 0);
 
         return insert(tableName, values);
+    }
+
+    public static long add(
+            SQLiteDatabase db,
+            String tableName,
+            long featureId,
+            long attachId,
+            String attachDescription,
+            String displayName,
+            String mimeType)
+    {
+        ContentValues values = new ContentValues();
+        values.put(FIELD_FEATURE_ID, featureId);
+        values.put(FIELD_ATTACH_ID, attachId);
+        values.put(FIELD_ATTACH_DESCRIPTION, attachDescription);
+        values.put(FIELD_ATTACH_DISPLAYNAME, displayName);
+        values.put(FIELD_ATTACH_MIMETYPE, mimeType);
+        return db.insert(tableName, null, values);
     }
 
 
