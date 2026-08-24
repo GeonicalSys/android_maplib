@@ -138,4 +138,6 @@
     <string name="error_coordinate_file_empty">В файле не найдено координат</string>
     <string name="error_coordinate_file_cancelled">Импорт координат отменён</string>
     <string name="error_coordinate_file_import">Не удалось загрузить файл KML или GPX</string>
+    <string name="mbtiles_problem_vector">Поддерживаются только растровые подложки MBTiles.</string>
+    <string name="mbtiles_problem_filecorrupted">Не удалось прочитать подложку MBTiles.</string>
 </resources>

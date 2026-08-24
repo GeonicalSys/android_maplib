@@ -121,7 +121,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   health-контроль в `maplibui` использует отдельный поток пригодных фиксов без
   порога перемещения и не зависит от выдачи фильтра или insert/commit. Поэтому
   неподвижное устройство продолжает сигнализировать об активной записи, а
-  прекращение свежих координат гасит сигнал; отзыв Android location permission
+  прекращение свежих координат гасит сигнал; сам `maplib` не выбирает audio
+  stream, alarm-stream/vibration fallback принадлежит владельцу service в
+  `maplibui`; отзыв Android location permission
   обрабатывает владелец foreground-service в `maplibui`;
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
@@ -135,6 +137,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Collector insertion сохраняет «Мои треки» последним во внутреннем
   `LayerGroup`, то есть наверху UI-списка;
 - `LayerConfigUtil` — server/local render and origin config.
+- raster MBTiles validation/storage: `MbTilesInfo` проверяет SQLite schema,
+  metadata, image format и integrity, `TMSLayer` публикует файл только после
+  sync + atomic rename, а `MapDrawable` подключает его через `mbtiles:///`;
+- legacy tile conversion math: OSM row переводится в TMS/MBTiles, bounds
+  вычисляются в Web Mercator tile matrix, raster format определяется по magic
+  bytes без декодирования каждого изображения.
 
 ## Ограничения
 
@@ -142,6 +150,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - MapLibre backend должен оставаться согласованным с `maplibui` и `app`:
   `org.maplibre.gl:android-sdk-opengl:13.0.2` во всех трёх модулях.
 - LayerGroup index `0` — bottom.
+- MBTiles local TMS path принимает только raster PNG/JPEG/WEBP с обязательными
+  `tiles`/`metadata`; vector MBTiles и повреждённая SQLite отклоняются.
 - Точечный `local_vector_tiles` поддерживает только простой круговой marker и
   подпись из одного поля/фиксированного текста; rule/icon/template/editable
   варианты используют classic fallback.

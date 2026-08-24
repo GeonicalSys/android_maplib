@@ -81,6 +81,7 @@ import com.nextgis.maplib.map.MLP.PolygonEditClass;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.MapUtil;
+import com.nextgis.maplib.util.MbTilesInfo;
 import com.nextgis.maplib.util.ProdLogUtil;
 
 import java.io.File;
@@ -157,6 +158,8 @@ import static com.nextgis.maplib.util.GeoConstants.GTPolygon;
 import static com.nextgis.maplib.util.GeoConstants.GT_MEASURMENT;
 import static com.nextgis.maplib.util.GeoConstants.GT_RASTER_WA;
 import static com.nextgis.maplib.util.GeoConstants.GT_TRACK_WA;
+import static com.nextgis.maplib.util.GeoConstants.TMSTYPE_MBTILES_RASTER;
+import static com.nextgis.maplib.util.MbTilesInfo.MBTILES_FILENAME;
 import static com.nextgis.maplib.util.NetworkUtil.extractResourceValue;
 import static com.nextgis.maplib.util.NetworkUtil.fillConnections;
 import static com.nextgis.maplib.util.NetworkUtil.getBaseUrlpart;
@@ -220,6 +223,20 @@ public class MapDrawable
     public final static int MODE_EDIT_BY_WALK = 4;
 
     static int testColor = 0;
+
+    private static String getLocalTmsRasterUrl(LocalTMSLayer layer) {
+        if (layer.getTMSType() != TMSTYPE_MBTILES_RASTER) {
+            return "file://" + layer.getPath() + "/{z}/{x}/{y}.tile";
+        }
+
+        File database = new File(layer.getPath(), MBTILES_FILENAME);
+        if (!MbTilesInfo.isReadyForMapLibre(database)) {
+            HyperLog.w(TAG, "Skipping unreadable MBTiles layer id=" + layer.getId()
+                    + " name=\"" + ProdLogUtil.truncateForLog(layer.getName(), 100) + "\"");
+            return null;
+        }
+        return "mbtiles://" + database.getAbsolutePath();
+    }
 
 
     // map  layerID : list of added features for layer
@@ -803,7 +820,11 @@ public class MapDrawable
                     } else if (iLayer instanceof LocalTMSLayer) {
                         geoType = GT_RASTER_WA;
                         LocalTMSLayer layer = (LocalTMSLayer) iLayer;
-                        rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                        String rasterUrl = getLocalTmsRasterUrl(layer);
+                        if (rasterUrl == null) {
+                            return;
+                        }
+                        rasterLayersURLMap.put(layer.getId(), rasterUrl);
                         rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                     }
 
@@ -1676,11 +1697,15 @@ public class MapDrawable
                         sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                         sourcesOrder.put(layer.getId(), new ArrayList<>());
                     } else if (iLayer instanceof LocalTMSLayer) {
-                        TMSLayer layer = (TMSLayer) iLayer;
+                        LocalTMSLayer layer = (LocalTMSLayer) iLayer;
                         layersType.put(layer.getId(), GT_RASTER_WA);
                         layersPath.put(layer.getId(), layer.getPath().toString());
 
-                        rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                        String rasterUrl = getLocalTmsRasterUrl(layer);
+                        if (rasterUrl == null) {
+                            continue;
+                        }
+                        rasterLayersURLMap.put(layer.getId(), rasterUrl);
                         rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                         sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                         sourcesOrder.put(layer.getId(), new ArrayList<>());
@@ -1847,11 +1872,15 @@ public class MapDrawable
                             sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                             sourcesOrder.put(layer.getId(), new ArrayList<>());
                         } else if (iLayer instanceof LocalTMSLayer) {
-                            TMSLayer layer = (TMSLayer) iLayer;
+                            LocalTMSLayer layer = (LocalTMSLayer) iLayer;
                             layersType.put(layer.getId(), GT_RASTER_WA);
                             layersPath.put(layer.getId(), layer.getPath().toString());
 
-                            rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                            String rasterUrl = getLocalTmsRasterUrl(layer);
+                            if (rasterUrl == null) {
+                                continue;
+                            }
+                            rasterLayersURLMap.put(layer.getId(), rasterUrl);
                             rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                             sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                             sourcesOrder.put(layer.getId(), new ArrayList<>());
@@ -2410,9 +2439,13 @@ public class MapDrawable
                     sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                     sourcesOrder.put(layer.getId(), new ArrayList<>());
                 } else if (iLayer instanceof LocalTMSLayer) {
-                    TMSLayer layer = (TMSLayer) iLayer;
+                    LocalTMSLayer layer = (LocalTMSLayer) iLayer;
                     layersType.put(layer.getId(), GT_RASTER_WA);
-                    rasterLayersURLMap.put(layer.getId(), "file://" + (layer).getPath().toString() + "/{z}/{x}/{y}.tile");
+                    String rasterUrl = getLocalTmsRasterUrl(layer);
+                    if (rasterUrl == null) {
+                        continue;
+                    }
+                    rasterLayersURLMap.put(layer.getId(), rasterUrl);
                     rasterLayersTmsTypeMap.put(layer.getId(), layer.getTMSType());
                     sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
                     sourcesOrder.put(layer.getId(), new ArrayList<>());
