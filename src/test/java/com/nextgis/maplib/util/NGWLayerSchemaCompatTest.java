@@ -40,4 +40,20 @@ public class NGWLayerSchemaCompatTest {
                 NGWLayerSchemaCompat.schemaFingerprint(point, 4, "vector_layer"),
                 NGWLayerSchemaCompat.schemaFingerprint(line, 4, "vector_layer"));
     }
+
+    @Test
+    public void schemaFingerprintChangesWithResourceClass() throws Exception {
+        JSONObject vector = new JSONObject("{\"resource\":{\"cls\":\"vector_layer\"},"
+                + "\"feature_layer\":{\"fields\":["
+                + "{\"keyname\":\"name\",\"display_name\":\"Name\",\"datatype\":\"STRING\"}]},"
+                + "\"vector_layer\":{\"geometry_type\":\"POINT\"}}");
+        JSONObject postgis = new JSONObject("{\"resource\":{\"cls\":\"postgis_layer\"},"
+                + "\"feature_layer\":{\"fields\":["
+                + "{\"keyname\":\"name\",\"display_name\":\"Name\",\"datatype\":\"STRING\"}]},"
+                + "\"postgis_layer\":{\"geometry_type\":\"POINT\"}}");
+
+        assertNotEquals(
+                NGWLayerSchemaCompat.schemaFingerprint(vector, 4, "vector_layer"),
+                NGWLayerSchemaCompat.schemaFingerprint(postgis, 4, "vector_layer"));
+    }
 }

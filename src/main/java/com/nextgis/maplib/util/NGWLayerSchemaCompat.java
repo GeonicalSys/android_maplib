@@ -27,6 +27,59 @@ import static com.nextgis.maplib.util.LayerUtil.unwrapQuotation;
  */
 public final class NGWLayerSchemaCompat {
 
+    /** Result of the three-way server metadata / serialized config / SQLite comparison. */
+    public static final class SchemaComparison {
+        private final boolean mComparable;
+        private final boolean mResourceClassMatches;
+        private final boolean mGeometryMatches;
+        private final boolean mSerializedFieldsMatch;
+        private final boolean mSqliteFieldsMatch;
+        private final String mActualResourceClass;
+        private final List<Field> mRemoteFields;
+
+        private SchemaComparison(
+                boolean comparable,
+                boolean resourceClassMatches,
+                boolean geometryMatches,
+                boolean serializedFieldsMatch,
+                boolean sqliteFieldsMatch,
+                String actualResourceClass,
+                List<Field> remoteFields) {
+            mComparable = comparable;
+            mResourceClassMatches = resourceClassMatches;
+            mGeometryMatches = geometryMatches;
+            mSerializedFieldsMatch = serializedFieldsMatch;
+            mSqliteFieldsMatch = sqliteFieldsMatch;
+            mActualResourceClass = actualResourceClass;
+            mRemoteFields = remoteFields;
+        }
+
+        /** A parse/network ambiguity is fail-open and must not trigger destructive recovery. */
+        public boolean isComparable() { return mComparable; }
+        public boolean isResourceClassMatch() { return mResourceClassMatches; }
+        public boolean isGeometryMatch() { return mGeometryMatches; }
+        public boolean isSerializedFieldsMatch() { return mSerializedFieldsMatch; }
+        public boolean isSqliteFieldsMatch() { return mSqliteFieldsMatch; }
+        public String getActualResourceClass() { return mActualResourceClass; }
+        public List<Field> getRemoteFields() { return mRemoteFields; }
+
+        public boolean needsRebuild() {
+            // vector_layer and postgis_layer share the same local SQLite representation. A wrong
+            // serialized class is metadata drift, not a reason to download the table again.
+            return mComparable && (!mGeometryMatches || !mSqliteFieldsMatch);
+        }
+
+        public boolean isMetadataOnlyMismatch() {
+            return mComparable && mResourceClassMatches && mGeometryMatches
+                    && mSqliteFieldsMatch && !mSerializedFieldsMatch;
+        }
+
+        public boolean isFullyCompatible() {
+            return !mComparable || (mResourceClassMatches && mGeometryMatches
+                    && mSerializedFieldsMatch && mSqliteFieldsMatch);
+        }
+    }
+
     private NGWLayerSchemaCompat() {
     }
 
@@ -64,35 +117,66 @@ public final class NGWLayerSchemaCompat {
             int ngwVersionMajor,
             String vectorLayerClsKey)
     {
+        return compareLocalWithServerMeta(
+                local, geoJSONObject, ngwVersionMajor, vectorLayerClsKey, "")
+                .isFullyCompatible();
+    }
+
+    /**
+     * Compare all three schema representations. Only server resource metadata is authoritative;
+     * description/config fields are treated as repairable metadata when SQLite already agrees
+     * with the server.
+     *
+     * @param expectedResourceCls expected NGW resource class persisted by the local layer, or null
+     *                            to retain legacy class-agnostic behaviour
+     */
+    public static SchemaComparison compareLocalWithServerMeta(
+            VectorLayer local,
+            JSONObject geoJSONObject,
+            int ngwVersionMajor,
+            String vectorLayerClsKey,
+            String expectedResourceCls) {
         if (local == null || geoJSONObject == null) {
-            return true;
+            return unparsed();
         }
         try {
             if (!geoJSONObject.has("feature_layer")) {
-                return true;
+                return unparsed();
             }
             JSONObject featureLayerJSONObject = geoJSONObject.getJSONObject("feature_layer");
             if (!featureLayerJSONObject.has(NGWUtil.NGWKEY_FIELDS)) {
-                return true;
+                return unparsed();
             }
             JSONArray fieldsJSONArray = featureLayerJSONObject.getJSONArray(NGWUtil.NGWKEY_FIELDS);
             List<Field> remoteFields = NGWUtil.getFieldsFromJson(fieldsJSONArray);
 
+            String actualResourceCls = "";
+            JSONObject resource = geoJSONObject.optJSONObject("resource");
+            if (resource != null) {
+                actualResourceCls = resource.optString(NGWUtil.NGWKEY_CLS, "");
+            }
+
             JSONObject vectorLayerJSONObject = null;
-            if (geoJSONObject.has(vectorLayerClsKey)) {
+            if (!actualResourceCls.isEmpty() && geoJSONObject.has(actualResourceCls)) {
+                vectorLayerJSONObject = geoJSONObject.getJSONObject(actualResourceCls);
+            } else if (geoJSONObject.has(vectorLayerClsKey)) {
                 vectorLayerJSONObject = geoJSONObject.getJSONObject(vectorLayerClsKey);
             } else if (ngwVersionMajor >= Constants.NGW_v3 && geoJSONObject.has("postgis_layer")) {
                 vectorLayerJSONObject = geoJSONObject.getJSONObject("postgis_layer");
             }
             if (vectorLayerJSONObject == null) {
-                return true;
+                return unparsed();
             }
 
             String geomTypeString = vectorLayerJSONObject.getString(NGWUtil.NGWKEY_GEOMETRY_TYPE);
             int serverGeomType = GeoGeometryFactory.typeFromString(geomTypeString);
-            if (serverGeomType != local.getGeometryType()) {
-                return false;
-            }
+            boolean geometryMatches = serverGeomType == local.getGeometryType();
+            // Empty string means a legacy caller intentionally does not compare the class. Null
+            // means the serialized layer type is missing and should be repaired from NGW.
+            boolean resourceClassMatches = expectedResourceCls != null
+                    && (expectedResourceCls.isEmpty()
+                    || actualResourceCls.isEmpty()
+                    || expectedResourceCls.equals(actualResourceCls));
 
             Map<String, Integer> localTypeByNorm = new HashMap<>();
             for (Field f : local.getFields()) {
@@ -106,24 +190,25 @@ public final class NGWLayerSchemaCompat {
                 remoteTypeByNorm.put(key, rf.getType());
             }
 
-            /* Bi-directional match: server-only field (added on Web GIS) or local-only (removed on server)
-             * both require a refill/rebuild — previously only server→local was checked. */
-            for (Map.Entry<String, Integer> e : remoteTypeByNorm.entrySet()) {
-                Integer lt = localTypeByNorm.get(e.getKey());
-                if (lt == null || !lt.equals(e.getValue())) {
-                    return false;
-                }
-            }
-            for (Map.Entry<String, Integer> e : localTypeByNorm.entrySet()) {
-                Integer rt = remoteTypeByNorm.get(e.getKey());
-                if (rt == null || !rt.equals(e.getValue())) {
-                    return false;
-                }
-            }
-            return true;
-        } catch (JSONException e) {
-            return true;
+            boolean serializedFieldsMatch = localTypeByNorm.equals(remoteTypeByNorm);
+            boolean sqliteFieldsMatch = local
+                    .validateSqliteSchemaAgainstFields(remoteFields).isEmpty();
+            return new SchemaComparison(
+                    true,
+                    resourceClassMatches,
+                    geometryMatches,
+                    serializedFieldsMatch,
+                    sqliteFieldsMatch,
+                    actualResourceCls,
+                    remoteFields);
+        } catch (JSONException | RuntimeException e) {
+            return unparsed();
         }
+    }
+
+    private static SchemaComparison unparsed() {
+        return new SchemaComparison(
+                false, true, true, true, true, "", java.util.Collections.emptyList());
     }
 
     /**
@@ -141,8 +226,13 @@ public final class NGWLayerSchemaCompat {
             JSONObject featureLayer = geoJSONObject.getJSONObject("feature_layer");
             List<Field> fields = NGWUtil.getFieldsFromJson(
                     featureLayer.getJSONArray(NGWUtil.NGWKEY_FIELDS));
+            JSONObject resource = geoJSONObject.optJSONObject("resource");
+            String resourceClass = resource != null
+                    ? resource.optString(NGWUtil.NGWKEY_CLS, "") : "";
             JSONObject vectorLayer = null;
-            if (geoJSONObject.has(vectorLayerClsKey)) {
+            if (!resourceClass.isEmpty() && geoJSONObject.has(resourceClass)) {
+                vectorLayer = geoJSONObject.getJSONObject(resourceClass);
+            } else if (geoJSONObject.has(vectorLayerClsKey)) {
                 vectorLayer = geoJSONObject.getJSONObject(vectorLayerClsKey);
             } else if (ngwVersionMajor >= Constants.NGW_v3
                     && geoJSONObject.has("postgis_layer")) {
@@ -156,7 +246,8 @@ public final class NGWLayerSchemaCompat {
                         LayerUtil.normalizeFieldName(unwrapQuotation(field.getName())),
                         field.getType());
             }
-            StringBuilder canonical = new StringBuilder("geom=").append(geometry);
+            StringBuilder canonical = new StringBuilder("cls=").append(resourceClass)
+                    .append("|geom=").append(geometry);
             for (Map.Entry<String, Integer> entry : canonicalFields.entrySet()) {
                 canonical.append('|').append(entry.getKey()).append(':').append(entry.getValue());
             }

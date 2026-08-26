@@ -53,6 +53,7 @@ public class  NGWSyncService
     @Override
     public void onCreate()
     {
+        super.onCreate();
         // For service debug
 //        android.os.Debug.waitForDebugger();
 
@@ -99,17 +100,11 @@ public class  NGWSyncService
         unregisterReceiver(mSyncReceiver);
 
         if (isSyncStarted()) {
-            Log.d(Constants.TAG, "SyncAdapter - sync is canceled, sleep");
-
-            try {
-                // We have not guarantee to receive SyncAdapter.SYNC_CANCELED
-                // because of a possible sync service shutdown.
-                // For it we sleep.
-                Thread.sleep(10000);
-                Log.d(Constants.TAG, "SyncAdapter - sleep for SYNC_CANCELED is ended");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            // Never wait for a worker from Service.onDestroy(): this callback is on Android's
+            // main thread and the old ten-second sleep was itself an ANR source. The adapter owns
+            // its finish broadcast/state in finally, while an interrupted pass remains in the
+            // app-side durable recovery journal.
+            Log.w(Constants.TAG, "SyncService destroyed while account sync is still active");
         }
 
         super.onDestroy();

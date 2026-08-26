@@ -25,6 +25,7 @@ package com.nextgis.maplib.map;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
+import android.util.AtomicFile;
 import android.util.Log;
 
 import com.nextgis.maplib.api.IJSONStore;
@@ -36,7 +37,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import static com.nextgis.maplib.util.Constants.CONFIG;
 import static com.nextgis.maplib.util.Constants.JSON_NAME_KEY;
@@ -153,11 +156,17 @@ public class Table implements ILayer, IJSONStore {
     @Override
     public boolean save()
     {
+        FileOutputStream output = null;
+        AtomicFile atomicFile = new AtomicFile(getFileName());
         try {
-            FileUtil.writeToFile(getFileName(), toJSON().toString());
-        } catch (IOException e) {
-            return false;
-        } catch (JSONException e) {
+            byte[] serialized = toJSON().toString().getBytes(StandardCharsets.UTF_8);
+            output = atomicFile.startWrite();
+            output.write(serialized);
+            atomicFile.finishWrite(output);
+        } catch (IOException | JSONException | RuntimeException e) {
+            if (output != null) {
+                atomicFile.failWrite(output);
+            }
             return false;
         }
         return true;
@@ -168,7 +177,9 @@ public class Table implements ILayer, IJSONStore {
     public boolean load()
     {
         try {
-            JSONObject jsonObject = new JSONObject(FileUtil.readFromFile(getFileName()));
+            byte[] serialized = new AtomicFile(getFileName()).readFully();
+            JSONObject jsonObject = new JSONObject(
+                    new String(serialized, StandardCharsets.UTF_8));
             fromJSON(jsonObject);
         } catch (JSONException | IOException | SQLiteException e) {
             e.printStackTrace();

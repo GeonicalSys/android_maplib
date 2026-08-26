@@ -2525,14 +2525,6 @@ public class VectorLayer
     }
 
     /**
-     * Verify that the SQLite table actually contains columns for every field in {@link #mFields}.
-     * Detects cases where the table was created with a stale/incomplete schema (e.g. interrupted
-     * initial fill or server-side field additions that didn't make it into CREATE TABLE).
-     *
-     * @return list of field names present in mFields but missing from the SQLite table;
-     *         empty list means the schema is consistent.
-     */
-    /**
      * Apply "soft" config updates from server description without re-downloading data.
      * Handles: new fields (ALTER TABLE), alias changes, renderer, visibility, zoom, name,
      * sync settings, editable flag.
@@ -2677,30 +2669,107 @@ public class VectorLayer
     }
 
     public List<String> validateSqliteSchemaAgainstFields() {
-        List<String> missing = new ArrayList<>();
-        if (mFields == null || mFields.isEmpty()) {
-            return missing;
+        return validateSqliteSchemaAgainstFields(getFields());
+    }
+
+    /**
+     * Verify the physical SQLite table against an explicit field schema.
+     *
+     * <p>The overload is intentionally independent from {@link #mFields}: a downloaded NGW
+     * description can be stale while the server resource metadata and the SQLite table are
+     * already correct. In that case callers can prove that only serialized metadata needs repair
+     * without rebuilding or downloading the layer again.</p>
+     *
+     * @return remote fields that are missing or have an incompatible SQLite affinity
+     */
+    public List<String> validateSqliteSchemaAgainstFields(List<Field> fields) {
+        List<String> incompatible = new ArrayList<>();
+        if (fields == null || fields.isEmpty()) {
+            return incompatible;
         }
         SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, true);
-        Set<String> sqliteColumns = new HashSet<>();
+        Map<String, String> sqliteColumns = new HashMap<>();
         try (Cursor c = db.rawQuery("PRAGMA table_info('" + mPath.getName() + "')", null)) {
             int nameIdx = c.getColumnIndex("name");
+            int typeIdx = c.getColumnIndex("type");
             while (c.moveToNext()) {
-                sqliteColumns.add(c.getString(nameIdx).toLowerCase(java.util.Locale.ROOT));
+                String name = c.getString(nameIdx);
+                if (name != null) {
+                    sqliteColumns.put(
+                            LayerUtil.normalizeFieldName(name).toLowerCase(java.util.Locale.ROOT),
+                            typeIdx >= 0 ? c.getString(typeIdx) : "");
+                }
             }
         } catch (Exception e) {
             Log.w(TAG, "validateSqliteSchemaAgainstFields: PRAGMA failed", e);
-            return missing;
+            // Unknown is not proof of a metadata-only mismatch. Force the conservative rebuild path.
+            for (Field field : fields) {
+                incompatible.add(field.getName());
+            }
+            return incompatible;
         }
         if (sqliteColumns.isEmpty()) {
-            return missing;
+            for (Field field : fields) {
+                incompatible.add(field.getName());
+            }
+            return incompatible;
         }
-        for (Field f : mFields.values()) {
-            if (!sqliteColumns.contains(f.getName().toLowerCase(java.util.Locale.ROOT))) {
-                missing.add(f.getName());
+        for (Field field : fields) {
+            String normalized = LayerUtil.normalizeFieldName(field.getName())
+                    .toLowerCase(java.util.Locale.ROOT);
+            String sqliteType = sqliteColumns.get(normalized);
+            if (sqliteType == null || !isSqliteAffinityCompatible(field.getType(), sqliteType)) {
+                incompatible.add(field.getName());
             }
         }
-        return missing;
+        return incompatible;
+    }
+
+    private static boolean isSqliteAffinityCompatible(int fieldType, String declaredType) {
+        String type = declaredType == null
+                ? "" : declaredType.trim().toUpperCase(java.util.Locale.ROOT);
+        switch (fieldType) {
+            case GeoConstants.FTInteger:
+            case GeoConstants.FTLong:
+                return type.contains("INT");
+            case GeoConstants.FTReal:
+                return type.contains("REAL") || type.contains("FLOA") || type.contains("DOUB");
+            case GeoConstants.FTDateTime:
+            case GeoConstants.FTDate:
+            case GeoConstants.FTTime:
+                return type.contains("DATE") || type.contains("TIME") || type.contains("TEXT")
+                        || type.contains("INT") || type.contains("REAL");
+            case GeoConstants.FTBinary:
+                return type.contains("BLOB") || type.isEmpty();
+            case GeoConstants.FTString:
+            default:
+                return type.contains("CHAR") || type.contains("CLOB") || type.contains("TEXT");
+        }
+    }
+
+    /**
+     * Replace only the serialized field metadata after the physical table was verified against
+     * authoritative NGW resource metadata. No table or feature data is changed.
+     */
+    public boolean repairFieldMetadataFromVerifiedSchema(List<Field> fields) {
+        if (fields == null || !validateSqliteSchemaAgainstFields(fields).isEmpty()) {
+            return false;
+        }
+
+        LinkedHashMap<String, Field> repaired = new LinkedHashMap<>(fields.size());
+        for (Field source : fields) {
+            String normalizedName = LayerUtil.normalizeFieldName(source.getName());
+            repaired.put(normalizedName, new Field(
+                    source.getType(), normalizedName, source.getAlias()));
+        }
+
+        LinkedHashMap<String, Field> previous = mFields;
+        mFields = repaired;
+        if (save()) {
+            return true;
+        }
+        mFields = previous;
+        return false;
     }
 
     /**

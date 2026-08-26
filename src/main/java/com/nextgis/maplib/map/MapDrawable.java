@@ -1243,6 +1243,37 @@ public class MapDrawable
                     return;
                 VectorLayer layer = (VectorLayer) ilayer;
 
+                if (!layer.isVisible()) {
+                    // A data-change callback for a hidden layer must not allocate a complete Java
+                    // feature list and a second native GeoJSON copy. Visibility enable already has
+                    // an on-demand reload path in checkLayerVisibility().
+                    sourceFeaturesHashMap.remove(layer.getId());
+                    sourcesOrder.remove(layer.getId());
+                    sourceNativeUriMap.remove(layer.getId());
+                    postMainGuarded("clear hidden vector source layer=" + layer.getName(), () -> {
+                        if (maplibreMap.get() == null || maplibreMap.get().getStyle() == null) {
+                            return;
+                        }
+                        Style style = maplibreMap.get().getStyle();
+                        Source source = style.getSource(layer.getPath().toString());
+                        if (source instanceof GeoJsonSource) {
+                            ((GeoJsonSource) source).setGeoJson(
+                                    FeatureCollection.fromFeatures(Collections.emptyList()));
+                        }
+                        Source textSource = style.getSource(
+                                layer.getPath().toString() + source_polygon_text);
+                        if (textSource instanceof GeoJsonSource) {
+                            ((GeoJsonSource) textSource).setGeoJson(
+                                    FeatureCollection.fromFeatures(Collections.emptyList()));
+                        }
+                        checkLayerVisibility(layer.getId());
+                    });
+                    HyperLog.d(Constants.TAG, "MapLibre skipped hidden layer data reload name=\""
+                            + ProdLogUtil.truncateForLog(layer.getName(), 100)
+                            + "\" id=" + layer.getId());
+                    return;
+                }
+
                 if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
                     String tileUrl = localVectorTileUrlMap.get(layer.getId());
                     if (tileUrl == null) {

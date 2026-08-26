@@ -956,7 +956,9 @@ public class LayerGroup
     {
         synchronized (this) {
             for (ILayer layer : mLayers.values()) {
-                layer.save();
+                if (!layer.save()) {
+                    return false;
+                }
             }
         }
         return super.save();

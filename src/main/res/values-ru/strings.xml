@@ -117,6 +117,8 @@
     <string name="map_loading_preparing">Подготовка карты…</string>
     <string name="map_loading_cache_hit">Чтение кэша: </string>
     <string name="ngw_schema_mismatch_title">Изменилась схема слоя</string>
+    <string name="sync_project_repair_blocked_title">Синхронизация приостановлена</string>
+    <string name="sync_project_repair_blocked_message">В копиях слоёв проекта есть неотправленные изменения. Приложение не стало удалять слои, чтобы сохранить данные. Экспортируйте резервную копию и повторите синхронизацию.</string>
     <string name="ngw_schema_mismatch_has_local_changes">Структура слоя на сервере больше не совпадает с картой. На устройстве есть несинхронизированные правки. Синхронизируйте или удалите локальные изменения, затем удалите слой и добавьте его снова из NextGIS Web.</string>
     <string name="ngw_schema_mismatch_backup_reload">Ошибка в слое %1$s. Он будет перезагружен. Чтобы не потерять данные, отправьте администратору ГИС резервную копию.</string>
     <string name="ngw_schema_mismatch_backup_failed">Ошибка в слое %1$s. Его нужно перезагрузить, но приложению не удалось создать резервную копию, поэтому слой оставлен без изменений.</string>

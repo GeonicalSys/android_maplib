@@ -284,6 +284,15 @@ public interface IGISApplication
     void setLayerFillServiceBusy(boolean busy);
 
     /**
+     * Pre-sync integrity gate for crash recovery. Implementations may atomically collapse duplicate
+     * project-managed layers and clean completed staging state, but must fail closed when doing so
+     * could discard local edits.
+     *
+     * @return true when synchronization may continue
+     */
+    boolean repairProjectIntegrityBeforeSync(String accountName);
+
+    /**
      * Register expected NGW vector layers for a collector import (layers being downloaded this run).
      * Clears any previous batch state.
      *

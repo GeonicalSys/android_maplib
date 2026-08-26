@@ -506,6 +506,11 @@ public class SyncAdapter
             }
         }
 
+        // Stable sort: layers with unsent field work are handled before download-only layers.
+        // Layer groups retain their relative position and apply the same policy recursively.
+        layersToSync.sort((left, right) -> Boolean.compare(
+                hasPendingLocalChanges(right), hasPendingLocalChanges(left)));
+
         for (ILayer layer : layersToSync) {
 //            Log.e("RRFRSH", "sync iterate for " + layer.getName());
 
@@ -554,6 +559,10 @@ public class SyncAdapter
         }
 
         Log.d("SSYNC", "END sync syncAdapter account - " + account.name);
+    }
+
+    private static boolean hasPendingLocalChanges(ILayer layer) {
+        return layer instanceof NGWVectorLayer && ((NGWVectorLayer) layer).isChanges();
     }
 
     private void retryDeferredVectorLayers(

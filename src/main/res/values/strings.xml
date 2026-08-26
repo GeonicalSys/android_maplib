@@ -101,6 +101,8 @@
     <string name="sync_error_io">Unexpected error</string>
 
     <string name="ngw_schema_mismatch_title">Layer schema changed</string>
+    <string name="sync_project_repair_blocked_title">Synchronization paused</string>
+    <string name="sync_project_repair_blocked_message">Duplicate project layers contain unsent changes. The app left them unchanged to protect your data. Export a backup and try synchronization again.</string>
     <string name="ngw_schema_mismatch_has_local_changes">The layer structure on the server no longer matches this map. You have unsynced edits on the device. Sync or remove your local changes, then remove the layer and add it again from NextGIS Web.</string>
     <string name="ngw_schema_mismatch_backup_reload">Error in layer %1$s. It will be reloaded. To avoid losing data, send the backup copy to the GIS administrator.</string>
     <string name="ngw_schema_mismatch_backup_failed">Error in layer %1$s. It must be reloaded, but the app could not create a backup copy, so the layer was left unchanged.</string>

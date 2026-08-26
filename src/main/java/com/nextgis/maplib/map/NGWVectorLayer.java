@@ -70,6 +70,7 @@ import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.NgwFeatureGeometryValidator;
 import com.nextgis.maplib.util.ProgressBufferedInputStream;
+import com.nextgis.maplib.util.RemoteAttachmentSyncPolicy;
 import com.nextgis.maplib.util.SettingsConstants;
 import com.nextgis.maplib.util.SyncResultUtil;
 
@@ -77,8 +78,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -95,6 +100,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -156,6 +162,7 @@ public class NGWVectorLayer
     private static final int NGW_FILL_SQL_TX_BATCH = 250;
     private static final int NGW_SYNC_PULL_MAX_ATTEMPTS = 3;
     private static final long NGW_SYNC_PULL_RETRY_DELAY_MS = 1200L;
+    private static final String NGW_SYNC_SNAPSHOT_FILE_PREFIX = ".ngw-sync-snapshot-";
     private transient boolean mDeferTransientPullFailureAccounting;
     private transient boolean mLastSyncHadTransientPullFailure;
 
@@ -417,7 +424,11 @@ public class NGWVectorLayer
 
         mRemoteId = jsonObject.optLong(Constants.JSON_ID_KEY);
         mSyncType = jsonObject.optInt(JSON_SYNC_TYPE_KEY, Constants.SYNC_NONE);
-        mNGWLayerType = jsonObject.optInt(JSON_NGWLAYER_TYPE_KEY, Constants.LAYERTYPE_NGW_VECTOR);
+        // Do not use Constants.LAYERTYPE_NGW_VECTOR as the fallback here. Its numeric value
+        // happens to equal Connection.NGWResourceTypePostgisLayer, so a legacy config without
+        // ngw_layer_type would otherwise be misclassified as PostGIS during schema preflight.
+        mNGWLayerType = jsonObject.optInt(
+                JSON_NGWLAYER_TYPE_KEY, Connection.NGWResourceTypeNone);
         mServerWhere = jsonObject.optString(JSON_SERVERWHERE_KEY);
         mSyncDirection = jsonObject.optInt(JSON_SYNC_DIRECTION_KEY, DIRECTION_BOTH);
         mLayerOriginMetadata = LayerOriginMetadata.fromJSON(
@@ -566,6 +577,47 @@ public class NGWVectorLayer
     protected String getRequiredCls()
     {
         return "vector_layer";
+    }
+
+    private String getExpectedServerResourceCls() {
+        if (mNGWLayerType == NGWResourceTypePostgisLayer) {
+            return "postgis_layer";
+        }
+        if (mNGWLayerType == Connection.NGWResourceTypeVectorLayer) {
+            return getRequiredCls();
+        }
+        // Legacy configs may not have persisted the resource type. Keep them fail-open until a
+        // successful fill records it, rather than rebuilding solely because metadata is absent.
+        return null;
+    }
+
+    /**
+     * Apply presentation/sync policy from a published mobile config without allowing that config
+     * to replace identity and schema already read from authoritative NGW resource metadata.
+     */
+    public void applyMobileConfigPreservingAuthoritativeSchema(JSONObject config)
+            throws JSONException, SQLiteException {
+        int authoritativeGeometryType = mGeometryType;
+        LinkedHashMap<String, Field> authoritativeFields = mFields;
+        int authoritativeCrs = mCRS;
+        int authoritativeNgwLayerType = mNGWLayerType;
+        int authoritativeNgwVersionMajor = mNgwVersionMajor;
+        int authoritativeNgwVersionMinor = mNgwVersionMinor;
+        String authoritativeAccount = mAccountName;
+        long authoritativeRemoteId = mRemoteId;
+        try {
+            fromJSON(config);
+        } finally {
+            mGeometryType = authoritativeGeometryType;
+            mFields = authoritativeFields;
+            mCRS = authoritativeCrs;
+            mNGWLayerType = authoritativeNgwLayerType;
+            mNgwVersionMajor = authoritativeNgwVersionMajor;
+            mNgwVersionMinor = authoritativeNgwVersionMinor;
+            setAccountName(authoritativeAccount);
+            mRemoteId = authoritativeRemoteId;
+            persistNgwIdentityBackup();
+        }
     }
 
 
@@ -1064,6 +1116,30 @@ public class NGWVectorLayer
         // 1. check for old UUID URL and replace it
         replaceUuidWithUrl(syncResult);
 
+        // Validate resource class/geometry/physical table before any write. This also repairs the
+        // common metadata-only drift (for example, idqgs present in NGW + SQLite but absent from a
+        // published mobile config) without scheduling a refill.
+        ConfigRefreshOutcome preflightOutcome = tryRefreshServerResourceMetaAndConfig();
+        if (preflightOutcome == ConfigRefreshOutcome.NETWORK_UNAVAILABLE) {
+            SyncResultUtil.markNetworkUnavailable(syncResult);
+            return;
+        }
+        if (preflightOutcome == ConfigRefreshOutcome.FINISH_LAYERSYNC_OK) {
+            return;
+        }
+
+        // Protect field work first. Pulling a large server snapshot before uploading local edits
+        // needlessly keeps the only unsent copy exposed to process death and remote conflicts.
+        if (!isRemoteReadOnly() && isRemoteSendAllowed()) {
+            HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                    + " send local changes before pull");
+            if (!sendLocalChanges(syncResult)) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                        + " sendLocalChanges failed — remote pull skipped to preserve local edits");
+                return;
+            }
+        }
+
         //ExistFeatureResult result = null;
 //        if (isRemoteGetAllowed()) {
 //            result = checkFeatureForExists(authority, syncResult, this);
@@ -1088,22 +1164,10 @@ public class NGWVectorLayer
                 return; // layer not exist - exits
             }
 
-        //HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " isRemoteReadOnly is " + isRemoteReadOnly());
         if (isRemoteReadOnly()) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " isRemoteReadOnly is true - EXIT");
-            return;
+            HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
+                    + " isRemoteReadOnly is true - pull-only sync finished");
         }
-
-        HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " isRemoteSendAllowed is " + isRemoteSendAllowed());
-        // 3. send current changes
-        if (isRemoteSendAllowed())
-            if (!sendLocalChanges(syncResult)) {
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " sendLocalChanges failed - return false" );
-
-                if (Constants.DEBUG_MODE) {
-                    Log.d(Constants.TAG, "Set local changes failed");
-                }
-            }
     }
 
 
@@ -1790,11 +1854,7 @@ public class NGWVectorLayer
             return;
         }
 
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        if (null == map) {
-            throw new IllegalArgumentException(
-                    "The map should extends MapContentProviderHelper or inherited");
-        }
+        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
         //update id in DB
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "old id: " + oldFeatureId + " new id: " + newFeatureId);
@@ -1919,22 +1979,44 @@ public class NGWVectorLayer
                         getResourceMetaUrl(accountDataForSchema),
                         accountDataForSchema.login,
                         accountDataForSchema.password);
-                if (resourceMeta != null
-                        && !NGWLayerSchemaCompat.localSchemaMatchesServerMeta(
-                                this,
-                                resourceMeta,
-                                mNgwVersionMajor,
-                                getRequiredCls())) {
-                    HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
-                            + " server schema mismatch — scheduling layer rebuild");
-                    ((IGISApplication) mContext.getApplicationContext())
-                            .scheduleNgwLayerRebuildAfterSchemaMismatch(
-                                    this,
-                                    "server_meta:" + NGWLayerSchemaCompat.schemaFingerprint(
-                                            resourceMeta,
-                                            mNgwVersionMajor,
-                                            getRequiredCls()));
-                    return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
+                NGWLayerSchemaCompat.SchemaComparison schemaComparison = null;
+                if (resourceMeta != null) {
+                    schemaComparison = NGWLayerSchemaCompat.compareLocalWithServerMeta(
+                            this,
+                            resourceMeta,
+                            mNgwVersionMajor,
+                            getRequiredCls(),
+                            getExpectedServerResourceCls());
+
+                    if (schemaComparison.needsRebuild()) {
+                        HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                                + " authoritative server schema mismatch"
+                                + " resourceClass=" + schemaComparison.getActualResourceClass()
+                                + " classMatch=" + schemaComparison.isResourceClassMatch()
+                                + " geometryMatch=" + schemaComparison.isGeometryMatch()
+                                + " sqliteMatch=" + schemaComparison.isSqliteFieldsMatch()
+                                + " — scheduling layer rebuild");
+                        ((IGISApplication) mContext.getApplicationContext())
+                                .scheduleNgwLayerRebuildAfterSchemaMismatch(
+                                        this,
+                                        "server_meta:" + NGWLayerSchemaCompat.schemaFingerprint(
+                                                resourceMeta,
+                                                mNgwVersionMajor,
+                                                getRequiredCls()));
+                        return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
+                    }
+
+                    if (schemaComparison.isMetadataOnlyMismatch()) {
+                        if (!repairVerifiedServerMetadata(schemaComparison)) {
+                            HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                                    + " could not persist verified field metadata;"
+                                    + " deferring data pull without rebuilding the table");
+                            return ConfigRefreshOutcome.FINISH_LAYERSYNC_OK;
+                        }
+                        HyperLog.i(Constants.TAG, "NGWVectorLayer: " + getName()
+                                + " repaired serialized fields from authoritative resource meta"
+                                + " without layer refill");
+                    }
                 }
 
                 if (resourceMeta != null) {
@@ -1997,6 +2079,29 @@ public class NGWVectorLayer
         return ConfigRefreshOutcome.CONTINUE_TO_FEATURES;
     }
 
+    private boolean repairVerifiedServerMetadata(
+            NGWLayerSchemaCompat.SchemaComparison comparison) {
+        int verifiedLayerType;
+        if (getRequiredCls().equals(comparison.getActualResourceClass())) {
+            verifiedLayerType = Connection.NGWResourceTypeVectorLayer;
+        } else if ("postgis_layer".equals(comparison.getActualResourceClass())) {
+            verifiedLayerType = NGWResourceTypePostgisLayer;
+        } else {
+            return false;
+        }
+
+        if (!repairFieldMetadataFromVerifiedSchema(comparison.getRemoteFields())) {
+            return false;
+        }
+        int previousLayerType = mNGWLayerType;
+        mNGWLayerType = verifiedLayerType;
+        if (save()) {
+            return true;
+        }
+        mNGWLayerType = previousLayerType;
+        return false;
+    }
+
     /**
      * Reconciles NGW resource meta and description when vector data sync is off ({@code SYNC_NONE}).
      * Invoked from {@link com.nextgis.maplib.datasource.ngw.SyncAdapter} for layers excluded
@@ -2033,6 +2138,10 @@ public class NGWVectorLayer
 
         HyperLog.d(Constants.TAG, LOG_DISTRICT_FILTER + " sync layer=\"" + getName() + "\" remoteId=" + mRemoteId
                 + (mDistrictFilterActive ? " filtered serverWhere=" + mServerWhere : " no district filter"));
+
+        if (!mTracked) {
+            return getFullSnapshotChangesFromServerStreaming(authority, syncResult);
+        }
 
         List<Feature> features, added = new ArrayList<>(), deleted =  new ArrayList<>(), changed =  new ArrayList<>();
         List<Long> deleteItems = new ArrayList<>();
@@ -2177,8 +2286,9 @@ public class NGWVectorLayer
                             }
                             //create new feature with remoteId
                             if (createNewFeature) {
-                                createNewFeature(remoteFeature, authority);
-                                createNewFeatureCount++;
+                                if (createNewFeature(remoteFeature, authority)) {
+                                    createNewFeatureCount++;
+                                }
                             }
                         } else {
                             countChanges += compareFeature(cursor, authority, remoteFeature, changeTableName);
@@ -2334,6 +2444,385 @@ public class NGWVectorLayer
         return true;
     }
 
+    /**
+     * Full (untracked) snapshots can contain very large geometries. Keeping the parsed response,
+     * the local comparison objects and MapLibre's next GeoJSON snapshot alive at the same time was
+     * the dominant memory peak in the reported SIGABRT. Stage the HTTP body on disk, scan it once
+     * for the backup/delete plan, then apply one feature at a time in an atomic SQLite transaction.
+     */
+    private boolean getFullSnapshotChangesFromServerStreaming(
+            String authority,
+            SyncResult syncResult) {
+        FullSnapshotDownload download = downloadFullSnapshot(syncResult);
+        if (download.httpCode == 404) {
+            clearLayerSync(this);
+            return false;
+        }
+        if (download.file == null) {
+            return false;
+        }
+
+        File snapshot = download.file;
+        String changeTableName = getChangeTableName();
+        boolean bulkPullStarted = false;
+        try {
+            FullSnapshotScan scan = scanFullSnapshot(snapshot, changeTableName);
+            if (!backupBeforeRemoteDestructiveApply(scan.destructiveIds)) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                        + " streamed snapshot apply blocked by backup gate ids="
+                        + scan.destructiveIds.size());
+                syncResult.stats.numConflictDetectedExceptions++;
+                return false;
+            }
+
+            SQLiteDatabase database = DatabaseContext.getDatabaseForLayer(this, false);
+            beginBulkImport();
+            bulkPullStarted = true;
+            database.beginTransaction();
+            FullSnapshotApply apply = new FullSnapshotApply();
+            try {
+                applyFullSnapshot(snapshot, authority, changeTableName, scan, apply);
+                reconcileFullSnapshotChangeRecords(changeTableName, scan.remoteIds);
+                database.setTransactionSuccessful();
+            } finally {
+                if (database.inTransaction()) {
+                    database.endTransaction();
+                }
+            }
+
+            boolean changed = apply.updated > 0 || apply.created > 0
+                    || !scan.deleteIds.isEmpty();
+            HyperLog.i(Constants.TAG, "NGWVectorLayer: streamed full snapshot layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" remoteId=" + mRemoteId
+                    + " bytes=" + snapshot.length()
+                    + " features=" + scan.remoteIds.size()
+                    + " updated=" + apply.updated
+                    + " created=" + apply.created
+                    + " deleted=" + scan.deleteIds.size());
+            if (changed) {
+                try {
+                    rebuildCache(null);
+                } catch (RuntimeException e) {
+                    HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                            + " spatial cache rebuild after streamed pull failed", e);
+                }
+                VectorLayerRenderCache.invalidateOnDataChange(this);
+                ((IGISApplication) getContext().getApplicationContext())
+                        .reloadLayerByID(getId());
+            }
+            return true;
+        } catch (NGException | IllegalStateException | NumberFormatException e) {
+            log(e, "streamed full snapshot parse failed");
+            syncResult.stats.numParseExceptions++;
+            return false;
+        } catch (IOException e) {
+            log(e, "streamed full snapshot I/O failed");
+            SyncResultUtil.markConnectFailed(syncResult);
+            return false;
+        } catch (SQLiteException | ConcurrentModificationException e) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: streamed full snapshot SQLite apply failed"
+                    + " layer=\"" + ProdLogUtil.truncateForLog(getName(), 100) + "\"", e);
+            syncResult.stats.numConflictDetectedExceptions++;
+            return false;
+        } catch (OutOfMemoryError e) {
+            // A single pathological geometry can still exceed the heap even though the collection
+            // as a whole is bounded. Preserve the old transaction and let the framework retry.
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: streamed snapshot single-feature OOM layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100) + "\" remoteId=" + mRemoteId);
+            syncResult.stats.numIoExceptions++;
+            syncResult.stats.numSkippedEntries++;
+            return false;
+        } finally {
+            if (bulkPullStarted) {
+                endBulkImport();
+            }
+            if (snapshot.exists() && !snapshot.delete()) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: could not remove staged sync snapshot"
+                        + " layer=\"" + ProdLogUtil.truncateForLog(getName(), 100) + "\"");
+            }
+        }
+    }
+
+    private FullSnapshotScan scanFullSnapshot(
+            File snapshot,
+            String changeTableName) throws IOException, NGException {
+        FullSnapshotScan scan = new FullSnapshotScan();
+        try (JsonReader reader = new JsonReader(new InputStreamReader(
+                new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"))) {
+            reader.beginArray();
+            while (reader.hasNext()) {
+                Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
+                if (remoteFeature == null
+                        || !NgwFeatureGeometryValidator.isValid(remoteFeature.getGeometry())) {
+                    throw new NGException("invalid feature geometry in full snapshot");
+                }
+                scan.remoteIds.add(remoteFeature.getId());
+                if (willRemoteOverwriteLocalFeature(remoteFeature, changeTableName)) {
+                    scan.destructiveIds.add(remoteFeature.getId());
+                }
+            }
+            reader.endArray();
+        }
+
+        for (Long featureId : queryAllFeatureIdsFromDb()) {
+            boolean deleteFeature = !scan.remoteIds.contains(featureId)
+                    && !FeatureChanges.isChanges(
+                            changeTableName, featureId, Constants.CHANGE_OPERATION_NEW)
+                    && !FeatureChanges.hasFeatureFlags(changeTableName, featureId);
+            if (deleteFeature) {
+                scan.deleteIds.add(featureId);
+                scan.destructiveIds.add(featureId);
+            }
+        }
+        return scan;
+    }
+
+    private void applyFullSnapshot(
+            File snapshot,
+            String authority,
+            String changeTableName,
+            FullSnapshotScan scan,
+            FullSnapshotApply apply) throws IOException, NGException {
+        try (JsonReader reader = new JsonReader(new InputStreamReader(
+                new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"))) {
+            reader.beginArray();
+            while (reader.hasNext()) {
+                Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
+                if (remoteFeature == null
+                        || !NgwFeatureGeometryValidator.isValid(remoteFeature.getGeometry())) {
+                    throw new NGException("invalid feature geometry in full snapshot");
+                }
+                Cursor cursor = query(
+                        null,
+                        Constants.FIELD_ID + " = " + remoteFeature.getId(),
+                        null,
+                        null,
+                        null);
+                try {
+                    if (cursor == null || cursor.getCount() == 0) {
+                        if (!FeatureChanges.isChanges(changeTableName, remoteFeature.getId())) {
+                            if (!createNewFeature(remoteFeature, authority)) {
+                                throw new SQLiteException(
+                                        "streamed snapshot feature insert failed");
+                            }
+                            apply.created++;
+                        }
+                    } else {
+                        apply.updated += compareFeature(
+                                cursor, authority, remoteFeature, changeTableName);
+                    }
+                } finally {
+                    if (cursor != null) {
+                        cursor.close();
+                    }
+                }
+            }
+            reader.endArray();
+        }
+        deleteFeatures(scan.deleteIds);
+    }
+
+    private void reconcileFullSnapshotChangeRecords(
+            String changeTableName,
+            Set<Long> remoteIds) {
+        Cursor changeCursor = FeatureChanges.getChanges(changeTableName);
+        if (changeCursor == null) {
+            return;
+        }
+        try {
+            if (!changeCursor.moveToFirst()) {
+                return;
+            }
+            int recordIdColumn = changeCursor.getColumnIndex(Constants.FIELD_ID);
+            int featureIdColumn = changeCursor.getColumnIndex(Constants.FIELD_FEATURE_ID);
+            int operationColumn = changeCursor.getColumnIndex(Constants.FIELD_OPERATION);
+            int attachOperationColumn = changeCursor.getColumnIndex(
+                    Constants.FIELD_ATTACH_OPERATION);
+            do {
+                long changeRecordId = changeCursor.getLong(recordIdColumn);
+                long changeFeatureId = changeCursor.getLong(featureIdColumn);
+                int changeOperation = changeCursor.getInt(operationColumn);
+                int attachChangeOperation = changeCursor.getInt(attachOperationColumn);
+
+                boolean deleteChange = true;
+                if (remoteIds.contains(changeFeatureId)) {
+                    if (0 != (changeOperation & Constants.CHANGE_OPERATION_NEW)) {
+                        FeatureChanges.setOperation(
+                                changeTableName,
+                                changeRecordId,
+                                Constants.CHANGE_OPERATION_CHANGED);
+                    }
+                    deleteChange = false;
+                }
+                if ((0 != (changeOperation & Constants.CHANGE_OPERATION_NEW)
+                        || 0 != (attachChangeOperation & Constants.CHANGE_OPERATION_NEW))
+                        && deleteChange) {
+                    deleteChange = false;
+                }
+                if (deleteChange) {
+                    FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
+                }
+            } while (changeCursor.moveToNext());
+        } finally {
+            changeCursor.close();
+        }
+    }
+
+    private FullSnapshotDownload downloadFullSnapshot(SyncResult syncResult) {
+        AccountUtil.AccountData accountData;
+        try {
+            accountData = AccountUtil.getAccountData(mContext, mAccountName);
+        } catch (IllegalStateException e) {
+            log(e, "downloadFullSnapshot: account is null");
+            syncResult.stats.numAuthExceptions++;
+            return FullSnapshotDownload.failed(0);
+        }
+
+        cleanupStaleFullSnapshotFiles();
+        for (int attempt = 1; attempt <= NGW_SYNC_PULL_MAX_ATTEMPTS; attempt++) {
+            HttpURLConnection connection = null;
+            File snapshot = null;
+            try {
+                connection = getConnection(accountData);
+                int code = connection.getResponseCode();
+                if (code < 200 || code >= 300) {
+                    String responseMessage = connection.getResponseMessage();
+                    String errorBody = null;
+                    try {
+                        errorBody = NetworkUtil.responseToString(connection.getErrorStream());
+                    } catch (IOException ignored) {
+                    }
+                    if (code == 404) {
+                        return FullSnapshotDownload.failed(404);
+                    }
+                    boolean transientHttpError = NetworkUtil.isTransientNgwHttpError(
+                            code, errorBody, responseMessage);
+                    if (transientHttpError && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
+                        sleepBeforeNgwSyncPullRetry(attempt, "HTTP " + code);
+                        continue;
+                    }
+                    if (transientHttpError) {
+                        recordTransientPullFailure(
+                                syncResult,
+                                NetworkUtil.isTemporaryNgwServerFailure(
+                                        code, errorBody, responseMessage));
+                    } else {
+                        syncResult.stats.numIoExceptions++;
+                    }
+                    return FullSnapshotDownload.failed(code);
+                }
+
+                int contentLength = connection.getContentLength();
+                long usable = mPath != null ? mPath.getUsableSpace() : 0L;
+                if (contentLength > 0 && usable > 0
+                        && usable < contentLength + 32L * 1024L * 1024L) {
+                    HyperLog.w(Constants.TAG, "NGWVectorLayer: insufficient disk for staged snapshot"
+                            + " layer=\"" + ProdLogUtil.truncateForLog(getName(), 100) + "\""
+                            + " contentLength=" + contentLength + " usable=" + usable);
+                    syncResult.stats.numIoExceptions++;
+                    return FullSnapshotDownload.failed(code);
+                }
+
+                snapshot = File.createTempFile(
+                        NGW_SYNC_SNAPSHOT_FILE_PREFIX,
+                        ".json",
+                        mPath);
+                try (InputStream input = new BufferedInputStream(connection.getInputStream());
+                     BufferedOutputStream output = new BufferedOutputStream(
+                             new FileOutputStream(snapshot, false))) {
+                    byte[] buffer = new byte[64 * 1024];
+                    int read;
+                    while ((read = input.read(buffer)) >= 0) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            throw new IOException("sync interrupted");
+                        }
+                        if (read > 0) {
+                            output.write(buffer, 0, read);
+                        }
+                    }
+                }
+                return FullSnapshotDownload.success(snapshot, code);
+            } catch (MalformedURLException e) {
+                log(e, "downloadFullSnapshot: malformed URL");
+                syncResult.stats.numIoExceptions++;
+                return FullSnapshotDownload.failed(0);
+            } catch (FileNotFoundException e) {
+                log(e, "downloadFullSnapshot: file not found");
+                SyncResultUtil.markConnectFailed(syncResult);
+                return FullSnapshotDownload.failed(0);
+            } catch (IOException e) {
+                if (snapshot != null && snapshot.exists()) {
+                    snapshot.delete();
+                }
+                boolean transientFailure = NetworkUtil.isTransientNetworkFailure(e);
+                if (transientFailure && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
+                    sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
+                    continue;
+                }
+                log(e, "downloadFullSnapshot: I/O failed");
+                if (transientFailure) {
+                    recordTransientPullFailure(syncResult, false);
+                } else {
+                    SyncResultUtil.markConnectFailed(syncResult);
+                }
+                return FullSnapshotDownload.failed(0);
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }
+        return FullSnapshotDownload.failed(0);
+    }
+
+    private void cleanupStaleFullSnapshotFiles() {
+        if (mPath == null) {
+            return;
+        }
+        File[] files = mPath.listFiles((dir, name) -> name != null
+                && name.startsWith(NGW_SYNC_SNAPSHOT_FILE_PREFIX)
+                && name.endsWith(".json"));
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (file != null && file.isFile() && !file.delete()) {
+                HyperLog.w(Constants.TAG, "NGWVectorLayer: stale staged snapshot remained"
+                        + " layer=\"" + ProdLogUtil.truncateForLog(getName(), 100) + "\"");
+            }
+        }
+    }
+
+    private static final class FullSnapshotDownload {
+        final File file;
+        final int httpCode;
+
+        private FullSnapshotDownload(File file, int httpCode) {
+            this.file = file;
+            this.httpCode = httpCode;
+        }
+
+        static FullSnapshotDownload success(File file, int httpCode) {
+            return new FullSnapshotDownload(file, httpCode);
+        }
+
+        static FullSnapshotDownload failed(int httpCode) {
+            return new FullSnapshotDownload(null, httpCode);
+        }
+    }
+
+    private static final class FullSnapshotScan {
+        final Set<Long> remoteIds = new HashSet<>();
+        final Set<Long> destructiveIds = new LinkedHashSet<>();
+        final List<Long> deleteIds = new ArrayList<>();
+    }
+
+    private static final class FullSnapshotApply {
+        int updated;
+        int created;
+    }
+
 
     protected void proceedAddedFeatures(List<Feature> added, String authority, String changeTableName) {
         if (added != null) {
@@ -2381,7 +2870,7 @@ public class NGWVectorLayer
     }
 
 
-    protected void createNewFeature(Feature remoteFeature, String authority) {
+    protected boolean createNewFeature(Feature remoteFeature, String authority) {
         ContentValues values = remoteFeature.getContentValues(true);
         Uri uri = Uri.parse("content://" + authority + "/" + getPath().getName());
         //prevent add changes and events
@@ -2396,16 +2885,28 @@ public class NGWVectorLayer
             if (!mLoggedCreateInsertSqlError) {
                 mLoggedCreateInsertSqlError = true;
                 try {
-                    MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-                    if (map != null) {
-                        map.getDatabase(false).insertOrThrow(mPath.getName(), null, values);
-                    }
+                    MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
+                    map.getDatabase(false).insertOrThrow(mPath.getName(), null, values);
                 } catch (SQLiteException e) {
                     HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName()
                             + " createNewFeature SQLite (sample): " + e.getMessage());
                 }
             }
+            return false;
         }
+        try {
+            FeatureAttachments.replaceRemoteAttachments(
+                    DatabaseContext.getDatabaseForLayer(this, false),
+                    getAttachmentsTableName(),
+                    remoteFeature.getId(),
+                    remoteFeature.getAttachments().values());
+        } catch (SQLiteException | NumberFormatException e) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
+                    + " could not persist remote attachment metadata featureId="
+                    + remoteFeature.getId(), e);
+            return false;
+        }
+        return true;
     }
 
 
@@ -2488,9 +2989,7 @@ public class NGWVectorLayer
         }
     }
 
-    /**
-     * True when remote apply would replace local geometry/attributes and/or attachments.
-     */
+    /** True when remote apply would replace local geometry/attributes. */
     protected boolean willRemoteOverwriteLocalFeature(
             Feature remoteFeature,
             String changeTableName) {
@@ -2502,14 +3001,9 @@ public class NGWVectorLayer
             }
             Feature currentFeature = cursorToFeature(cursor);
             boolean eqData = remoteFeature.equalsData(currentFeature);
-            boolean eqAttach = remoteFeature.equalsAttachments(currentFeature);
-            if (eqData && eqAttach) {
-                return false;
-            }
-            if (!eqAttach) {
-                return true;
-            }
-            return !FeatureChanges.isChanges(changeTableName, remoteFeature.getId());
+            return RemoteAttachmentSyncPolicy.remoteApplyRequiresBackup(
+                    eqData,
+                    FeatureChanges.isChanges(changeTableName, remoteFeature.getId()));
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -2573,18 +3067,18 @@ public class NGWVectorLayer
 
         //compare features
         boolean eqData = remoteFeature.equalsData(currentFeature);
-        boolean eqAttach = remoteFeature.equalsAttachments(currentFeature);
+        SQLiteDatabase database = DatabaseContext.getDatabaseForLayer(this, false);
+        boolean eqAttach = RemoteAttachmentSyncPolicy.metadataMatches(
+                remoteFeature.getAttachments(),
+                FeatureAttachments.getRemoteAttachments(
+                        database, getAttachmentsTableName(), remoteFeature.getId()));
 
         if (!eqAttach) {
-            // delete all online attachments
-            FeatureAttachments.deleteAllAttachments(getAttachmentsTableName(), remoteFeature.getId());
-
-            // put all to db
-            for (AttachItem item : remoteFeature.getAttachments().values()) {
-                FeatureAttachments.add(getAttachmentsTableName(), remoteFeature.getId(),
-                        Long.valueOf(item.getAttachId()),
-                        item.getDescription(), item.getDisplayName(), item.getMimetype());
-            }
+            FeatureAttachments.replaceRemoteAttachments(
+                    database,
+                    getAttachmentsTableName(),
+                    remoteFeature.getId(),
+                    remoteFeature.getAttachments().values());
         }
 
 

@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-08-24
+last_verified: 2026-08-26
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -13,7 +13,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    responsibility: MapLibre style, sources, layers and raster MBTiles URLs, bounded full-reload feature/style-object cache lifetime, hot add/reload coordination, lifecycle-safe touch dispatch that rejects events after map/view/host teardown, tap-node and midpoint edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, thicker insertion-direction segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+    responsibility: MapLibre style, sources, layers and raster MBTiles URLs, bounded full-reload feature/style-object cache lifetime, hidden-layer data-reload suppression with on-demand visibility recovery, hot add/reload coordination, lifecycle-safe touch dispatch that rejects events after map/view/host teardown, tap-node and midpoint edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, thicker insertion-direction segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
   - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryEditFillPolicy.java
     responsibility: Allow the shared edit fill only for Polygon and MultiPolygon so recovered line sketches cannot inherit polygon rendering state.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
@@ -21,15 +21,21 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/display/FieldStyleRule.java
     responsibility: Rule categories plus other/default style; merge unset optional fields into the effective style at render time.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerGroup.java
-    responsibility: Maintain bottom-to-top model order, atomically reserve collision-free layer storage, and insert mixed vector/raster Collector project layers below the top tracks layer.
+    responsibility: Maintain bottom-to-top model order, atomically reserve collision-free layer storage, reject a composition save when any child config failed, and insert mixed vector/raster Collector project layers below the top tracks layer.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
     responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
-    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, expose the owning policy for direction configuration and recovery from server-only mode, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, bind full fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint schema/config/SQLite mismatch rebuild requests, and persist bounded full-fill failure diagnostics with layer/resource/source-index/error/stack but no feature payload.
+    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, send pending edits before remote pull, three-way verify NGW class/geometry/fields against serialized metadata and physical SQLite, repair metadata-only drift without refill, keep server attachment metadata in SQLite without treating absent local bytes as destructive, stream full untracked snapshots from an app-owned disk stage through one SQLite transaction, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, bind fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint authoritative rebuild requests, and persist bounded failure diagnostics without feature payload.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/RemoteAttachmentSyncPolicy.java
+    responsibility: Keep metadata-only attachment refresh outside the feature backup gate and compare persisted server metadata without byte-size noise.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
     responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
+  - path: maplib/src/main/java/com/nextgis/maplib/service/NGWSyncService.java
+    responsibility: Host Android account synchronization without blocking the main thread while a worker finishes during service teardown.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
     responsibility: Create ordinary local vector layers as editable, load vector configuration, route create/insert/schema/delete operations through the layer-owning workspace database, suppress per-row cache notifications during bulk/rebuild, fail a bulk fill on the first rejected SQL insert, persist server attachment metadata inside the same fill transaction, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/Table.java
+    responsibility: Persist map and layer JSON through Android AtomicFile so process death restores the previous complete configuration instead of exposing a truncated direct write.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeometryRTree.java
     responsibility: Serialize spatial-index reads and mutations so broadcast receivers, sync workers and cache rebuilds cannot expose partially tightened nodes.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoEnvelope.java
@@ -135,6 +141,8 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
   - id: ngw-vector-identity-backup
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
+  - id: ngw-sync-staged-snapshot
+    path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
 invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS]
 global_docs:
   - docs/architecture/map-rendering.md
