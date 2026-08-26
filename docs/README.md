@@ -10,8 +10,8 @@ last_verified: 2026-08-26
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.17` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.17`; отдельный Lisa Debug использует `3.1.2.17`. Оба значения проверяются
+Для выпуска `3.1.2.18` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.18`; отдельный Lisa Debug использует `3.1.2.18`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
@@ -62,6 +62,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   без refill, а legacy config без типа не считается PostGIS;
 - full untracked NGW response сначала пишется в app-owned temporary JSON, затем
   дважды потоково читается для backup/delete plan и одной SQLite-транзакции;
+  отдельная отсутствующая или невалидная геометрия пропускается с сохранением
+  remote ID и прежней локальной копии, а остальные объекты продолжают apply;
   pending local edits отправляются до remote pull;
 - server attachment metadata сверяется с `FeatureAttachments`, а не с
   необязательными локальными файлами/META: metadata-only pull не создаёт backup,

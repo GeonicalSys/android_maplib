@@ -163,6 +163,7 @@ public class NGWVectorLayer
     private static final int NGW_SYNC_PULL_MAX_ATTEMPTS = 3;
     private static final long NGW_SYNC_PULL_RETRY_DELAY_MS = 1200L;
     private static final String NGW_SYNC_SNAPSHOT_FILE_PREFIX = ".ngw-sync-snapshot-";
+    private static final int NGW_SYNC_INVALID_FEATURE_LOG_LIMIT = 20;
     private transient boolean mDeferTransientPullFailureAccounting;
     private transient boolean mLastSyncHadTransientPullFailure;
 
@@ -2499,7 +2500,8 @@ public class NGWVectorLayer
                     + " features=" + scan.remoteIds.size()
                     + " updated=" + apply.updated
                     + " created=" + apply.created
-                    + " deleted=" + scan.deleteIds.size());
+                    + " deleted=" + scan.deleteIds.size()
+                    + " skippedInvalid=" + scan.skippedInvalid);
             if (changed) {
                 try {
                     rebuildCache(null);
@@ -2551,13 +2553,17 @@ public class NGWVectorLayer
         try (JsonReader reader = new JsonReader(new InputStreamReader(
                 new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"))) {
             reader.beginArray();
+            int featureIndex = 0;
             while (reader.hasNext()) {
+                int currentFeatureIndex = featureIndex++;
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
-                if (remoteFeature == null
-                        || !NgwFeatureGeometryValidator.isValid(remoteFeature.getGeometry())) {
-                    throw new NGException("invalid feature geometry in full snapshot");
+                if (!trackFullSnapshotFeatureAndCheckGeometry(
+                        remoteFeature, scan.remoteIds)) {
+                    scan.skippedInvalid++;
+                    logSkippedFullSnapshotFeature(
+                            remoteFeature, currentFeatureIndex, scan.skippedInvalid);
+                    continue;
                 }
-                scan.remoteIds.add(remoteFeature.getId());
                 if (willRemoteOverwriteLocalFeature(remoteFeature, changeTableName)) {
                     scan.destructiveIds.add(remoteFeature.getId());
                 }
@@ -2589,9 +2595,8 @@ public class NGWVectorLayer
             reader.beginArray();
             while (reader.hasNext()) {
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
-                if (remoteFeature == null
-                        || !NgwFeatureGeometryValidator.isValid(remoteFeature.getGeometry())) {
-                    throw new NGException("invalid feature geometry in full snapshot");
+                if (!isFullSnapshotFeatureGeometryUsable(remoteFeature)) {
+                    continue;
                 }
                 Cursor cursor = query(
                         null,
@@ -2621,6 +2626,40 @@ public class NGWVectorLayer
             reader.endArray();
         }
         deleteFeatures(scan.deleteIds);
+    }
+
+    static boolean trackFullSnapshotFeatureAndCheckGeometry(
+            Feature remoteFeature,
+            Set<Long> remoteIds) {
+        if (remoteFeature == null) {
+            return false;
+        }
+        remoteIds.add(remoteFeature.getId());
+        return isFullSnapshotFeatureGeometryUsable(remoteFeature);
+    }
+
+    static boolean isFullSnapshotFeatureGeometryUsable(Feature remoteFeature) {
+        return remoteFeature != null
+                && NgwFeatureGeometryValidator.isValid(remoteFeature.getGeometry());
+    }
+
+    private void logSkippedFullSnapshotFeature(
+            Feature remoteFeature,
+            int featureIndex,
+            int skippedInvalid) {
+        if (skippedInvalid <= NGW_SYNC_INVALID_FEATURE_LOG_LIMIT) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: skipping invalid geometry in full snapshot"
+                    + " layer=\"" + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" remoteId=" + mRemoteId
+                    + " featureId=" + (remoteFeature == null
+                            ? Constants.NOT_FOUND : remoteFeature.getId())
+                    + " featureIndex=" + featureIndex);
+        } else if (skippedInvalid == NGW_SYNC_INVALID_FEATURE_LOG_LIMIT + 1) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: additional invalid full snapshot"
+                    + " geometries omitted from log layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100)
+                    + "\" remoteId=" + mRemoteId);
+        }
     }
 
     private void reconcileFullSnapshotChangeRecords(
@@ -2816,6 +2855,7 @@ public class NGWVectorLayer
         final Set<Long> remoteIds = new HashSet<>();
         final Set<Long> destructiveIds = new LinkedHashSet<>();
         final List<Long> deleteIds = new ArrayList<>();
+        int skippedInvalid;
     }
 
     private static final class FullSnapshotApply {
