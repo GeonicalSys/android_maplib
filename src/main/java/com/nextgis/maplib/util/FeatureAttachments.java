@@ -29,6 +29,10 @@ import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.map.MapBase;
 import com.nextgis.maplib.map.MapContentProviderHelper;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public class FeatureAttachments {
 
     public static void initialize(String tableName)
@@ -530,6 +534,77 @@ public class FeatureAttachments {
         values.put(FIELD_ATTACH_DISPLAYNAME, displayName);
         values.put(FIELD_ATTACH_MIMETYPE, mimeType);
         return db.insert(tableName, null, values);
+    }
+
+
+    /** Read server attachment metadata from SQLite, independent from optional local META/files. */
+    public static Map<String, AttachItem> getRemoteAttachments(
+            SQLiteDatabase db,
+            String tableName,
+            long featureId) {
+        Map<String, AttachItem> attachments = new LinkedHashMap<>();
+        String selection = FIELD_FEATURE_ID + " = ?";
+        String[] args = {String.valueOf(featureId)};
+        try (Cursor cursor = db.query(
+                tableName,
+                new String[]{FIELD_ATTACH_ID, FIELD_ATTACH_DESCRIPTION,
+                        FIELD_ATTACH_DISPLAYNAME, FIELD_ATTACH_MIMETYPE},
+                selection,
+                args,
+                null,
+                null,
+                FIELD_ATTACH_ID + " ASC")) {
+            int idColumn = cursor.getColumnIndexOrThrow(FIELD_ATTACH_ID);
+            int descriptionColumn = cursor.getColumnIndexOrThrow(FIELD_ATTACH_DESCRIPTION);
+            int displayNameColumn = cursor.getColumnIndexOrThrow(FIELD_ATTACH_DISPLAYNAME);
+            int mimeTypeColumn = cursor.getColumnIndexOrThrow(FIELD_ATTACH_MIMETYPE);
+            while (cursor.moveToNext()) {
+                String attachId = String.valueOf(cursor.getLong(idColumn));
+                attachments.put(attachId, new AttachItem(
+                        attachId,
+                        cursor.getString(displayNameColumn),
+                        cursor.getString(mimeTypeColumn),
+                        cursor.getString(descriptionColumn)));
+            }
+        }
+        return attachments;
+    }
+
+
+    /** Replace only online metadata; no file or per-feature META directory is touched. */
+    public static void replaceRemoteAttachments(
+            SQLiteDatabase db,
+            String tableName,
+            long featureId,
+            Collection<AttachItem> attachments) {
+        boolean ownTransaction = !db.inTransaction();
+        if (ownTransaction) {
+            db.beginTransaction();
+        }
+        try {
+            db.delete(
+                    tableName,
+                    FIELD_FEATURE_ID + " = ?",
+                    new String[]{String.valueOf(featureId)});
+            if (attachments != null) {
+                for (AttachItem item : attachments) {
+                    ContentValues values = new ContentValues();
+                    values.put(FIELD_FEATURE_ID, featureId);
+                    values.put(FIELD_ATTACH_ID, Long.parseLong(item.getAttachId()));
+                    values.put(FIELD_ATTACH_DESCRIPTION, item.getDescription());
+                    values.put(FIELD_ATTACH_DISPLAYNAME, item.getDisplayName());
+                    values.put(FIELD_ATTACH_MIMETYPE, item.getMimetype());
+                    db.insertOrThrow(tableName, null, values);
+                }
+            }
+            if (ownTransaction) {
+                db.setTransactionSuccessful();
+            }
+        } finally {
+            if (ownTransaction) {
+                db.endTransaction();
+            }
+        }
     }
 
 

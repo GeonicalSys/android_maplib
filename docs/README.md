@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-08-24
+last_verified: 2026-08-26
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -10,8 +10,8 @@ last_verified: 2026-08-24
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.16` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.16`; отдельный Lisa Debug использует `3.1.2.11`. Оба значения проверяются
+Для выпуска `3.1.2.17` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.17`; отдельный Lisa Debug использует `3.1.2.17`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
@@ -56,9 +56,21 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `Connection`, `SyncAdapter`, `NGWSyncService` — NGW; временно упавшие pull
   векторных слоёв повторяются отдельным проходом после остальных слоёв, а
   process-wide sync state обновляется адаптером напрямую, не только broadcast;
+  destroy bound service не блокирует Android main thread ожиданием worker;
+- schema preflight сравнивает authoritative `resource.cls`/geometry/fields,
+  serialized config и physical SQLite affinities: metadata-only drift чинится
+  без refill, а legacy config без типа не считается PostGIS;
+- full untracked NGW response сначала пишется в app-owned temporary JSON, затем
+  дважды потоково читается для backup/delete plan и одной SQLite-транзакции;
+  pending local edits отправляются до remote pull;
+- server attachment metadata сверяется с `FeatureAttachments`, а не с
+  необязательными локальными файлами/META: metadata-only pull не создаёт backup,
+  и новые server features сразу получают online metadata без скачивания байтов;
 - инкрементальный NGW pull работает как bulk-операция: построчные
   insert/update/delete broadcast подавлены, после всех SQLite-изменений R-tree
   перестраивается и карта перезагружается один раз;
+- reload выключенного vector layer освобождает прежний GeoJSON, не читая всю
+  таблицу; включение использует существующий on-demand reload contract;
 - `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное
   получение NGW-ресурса без загрузки всего дерева;
 - `CollectorProjectItem`, `CollectorProjectMetadata`,
@@ -89,6 +101,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   name/time/elevation, используя SQLite-транзакции не более 250 точек;
 - `VectorLayer.fromJSON()` может восстановить R-tree без сохранения
   недочитанного конфига подкласса;
+- `Table.save/load` использует `AtomicFile` для `default.ngm` и layer configs:
+  после process death читается последняя полная старая либо новая версия JSON;
 - `GeometryRTree` сериализует публичные операции чтения/изменения, а
   `VectorLayer` не принимает feature-notify во время bulk/rebuild. Ошибка
   отдельного receiver логируется и не завершает главный Android-поток;
