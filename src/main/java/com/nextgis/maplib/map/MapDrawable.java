@@ -311,7 +311,17 @@ public class MapDrawable
     private static final String USER_LOCATION_STANDING_ICON_ID = "user-marker-location-stand";
     private static final String USER_LOCATION_MOVING_ICON_ID = "user-marker-location-go";
 
+    private static final String AZIMUTH_SOURCE_ID = "azimuth-measurement-source";
+    private static final String AZIMUTH_LINE_LAYER_ID = "azimuth-measurement-line";
+    private static final String AZIMUTH_START_LAYER_ID = "azimuth-measurement-start";
+    private static final String AZIMUTH_TARGET_LAYER_ID = "azimuth-measurement-target";
+    private static final String AZIMUTH_ROLE_PROPERTY = "azimuth_role";
+    private static final String AZIMUTH_ROLE_START = "start";
+    private static final String AZIMUTH_ROLE_TARGET = "target";
+
     GeoJsonSource locationSource = null;
+    @Nullable private Point azimuthMeasurementStart = null;
+    @Nullable private Point azimuthMeasurementTarget = null;
 
     List<org.maplibre.geojson.Feature> polygonFeatures = new ArrayList<org.maplibre.geojson.Feature>();  //
 
@@ -2260,6 +2270,7 @@ public class MapDrawable
                             HyperLog.d(Constants.TAG,
                                     "MapLibre post-load hooks postponed until deferred reload");
                         }
+                        ensureAzimuthMeasurementOverlay(style);
                         ensureUserLocationLayerOnTop(style);
 
                         } catch (Throwable t) {
@@ -2547,6 +2558,7 @@ public class MapDrawable
             }
         }
 
+        ensureAzimuthMeasurementOverlay(style);
         ensureUserLocationLayerOnTop(style);
         syncUserLocationSourceFromStyle(style);
     }
@@ -4366,6 +4378,117 @@ public class MapDrawable
         pointFeature.addNumberProperty("bearing", bearing);
 
         locationSource.setGeoJson(pointFeature);
+    }
+
+    /**
+     * Shows a transient WGS84 measurement segment above user map layers. Either endpoint may be
+     * absent while the user is selecting points. The user-location cursor remains the top layer.
+     */
+    public void showAzimuthMeasurement(@Nullable Point start, @Nullable Point target) {
+        azimuthMeasurementStart = start;
+        azimuthMeasurementTarget = target;
+        MapLibreMap map = maplibreMap.get();
+        ensureAzimuthMeasurementOverlay(map != null ? map.getStyle() : null);
+        ensureUserLocationLayerOnTop(map != null ? map.getStyle() : null);
+    }
+
+    /** Removes the transient azimuth measurement without touching persistent map layers. */
+    public void clearAzimuthMeasurement() {
+        azimuthMeasurementStart = null;
+        azimuthMeasurementTarget = null;
+        MapLibreMap map = maplibreMap.get();
+        Style style = map != null ? map.getStyle() : null;
+        if (style == null) {
+            return;
+        }
+        Source source = style.getSource(AZIMUTH_SOURCE_ID);
+        if (source instanceof GeoJsonSource) {
+            ((GeoJsonSource) source).setGeoJson(
+                    FeatureCollection.fromFeatures(new ArrayList<>()));
+        }
+    }
+
+    private void ensureAzimuthMeasurementOverlay(@Nullable Style style) {
+        if (style == null || (azimuthMeasurementStart == null && azimuthMeasurementTarget == null)) {
+            return;
+        }
+
+        GeoJsonSource source;
+        Source currentSource = style.getSource(AZIMUTH_SOURCE_ID);
+        if (currentSource instanceof GeoJsonSource) {
+            source = (GeoJsonSource) currentSource;
+        } else {
+            source = new GeoJsonSource(
+                    AZIMUTH_SOURCE_ID,
+                    FeatureCollection.fromFeatures(new ArrayList<>()));
+            style.addSource(source);
+        }
+        source.setGeoJson(buildAzimuthMeasurementFeatures());
+
+        if (style.getLayer(AZIMUTH_LINE_LAYER_ID) == null) {
+            addAzimuthLayer(
+                    style,
+                    new LineLayer(AZIMUTH_LINE_LAYER_ID, AZIMUTH_SOURCE_ID)
+                            .withProperties(
+                                    PropertyFactory.lineColor("#00AEEF"),
+                                    PropertyFactory.lineWidth(4.0f),
+                                    PropertyFactory.lineOpacity(0.9f)));
+        }
+        if (style.getLayer(AZIMUTH_START_LAYER_ID) == null) {
+            CircleLayer startLayer = new CircleLayer(AZIMUTH_START_LAYER_ID, AZIMUTH_SOURCE_ID)
+                    .withFilter(Expression.eq(
+                            Expression.get(AZIMUTH_ROLE_PROPERTY),
+                            Expression.literal(AZIMUTH_ROLE_START)))
+                    .withProperties(
+                            PropertyFactory.circleRadius(6.0f),
+                            PropertyFactory.circleColor("#00AEEF"),
+                            PropertyFactory.circleStrokeColor("#FFFFFF"),
+                            PropertyFactory.circleStrokeWidth(2.0f));
+            addAzimuthLayer(style, startLayer);
+        }
+        if (style.getLayer(AZIMUTH_TARGET_LAYER_ID) == null) {
+            CircleLayer targetLayer = new CircleLayer(AZIMUTH_TARGET_LAYER_ID, AZIMUTH_SOURCE_ID)
+                    .withFilter(Expression.eq(
+                            Expression.get(AZIMUTH_ROLE_PROPERTY),
+                            Expression.literal(AZIMUTH_ROLE_TARGET)))
+                    .withProperties(
+                            PropertyFactory.circleRadius(8.0f),
+                            PropertyFactory.circleColor("#FF5252"),
+                            PropertyFactory.circleStrokeColor("#FFFFFF"),
+                            PropertyFactory.circleStrokeWidth(2.0f));
+            addAzimuthLayer(style, targetLayer);
+        }
+    }
+
+    private void addAzimuthLayer(Style style, Layer layer) {
+        if (style.getLayer(USER_LOCATION_LAYER_ID) != null) {
+            style.addLayerBelow(layer, USER_LOCATION_LAYER_ID);
+        } else {
+            style.addLayer(layer);
+        }
+    }
+
+    private FeatureCollection buildAzimuthMeasurementFeatures() {
+        List<org.maplibre.geojson.Feature> features = new ArrayList<>();
+        if (azimuthMeasurementStart != null && azimuthMeasurementTarget != null) {
+            features.add(org.maplibre.geojson.Feature.fromGeometry(
+                    LineString.fromLngLats(Arrays.asList(
+                            azimuthMeasurementStart,
+                            azimuthMeasurementTarget))));
+        }
+        if (azimuthMeasurementStart != null) {
+            org.maplibre.geojson.Feature start = org.maplibre.geojson.Feature.fromGeometry(
+                    azimuthMeasurementStart);
+            start.addStringProperty(AZIMUTH_ROLE_PROPERTY, AZIMUTH_ROLE_START);
+            features.add(start);
+        }
+        if (azimuthMeasurementTarget != null) {
+            org.maplibre.geojson.Feature target = org.maplibre.geojson.Feature.fromGeometry(
+                    azimuthMeasurementTarget);
+            target.addStringProperty(AZIMUTH_ROLE_PROPERTY, AZIMUTH_ROLE_TARGET);
+            features.add(target);
+        }
+        return FeatureCollection.fromFeatures(features);
     }
 
     public void addPointByWalk(LatLng latLng) {
