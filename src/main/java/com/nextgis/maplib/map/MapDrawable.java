@@ -322,6 +322,10 @@ public class MapDrawable
     GeoJsonSource locationSource = null;
     @Nullable private Point azimuthMeasurementStart = null;
     @Nullable private Point azimuthMeasurementTarget = null;
+    private boolean azimuthMeasurementStartEditable = false;
+    private boolean azimuthMeasurementTargetEditable = false;
+    @Nullable private String draggedAzimuthRole = null;
+    @Nullable private PointF azimuthDragOffset = null;
 
     List<org.maplibre.geojson.Feature> polygonFeatures = new ArrayList<org.maplibre.geojson.Feature>();  //
 
@@ -2586,6 +2590,7 @@ public class MapDrawable
         if (activeMap == null || activeMapContext == null || activeMapView == null) {
             isDragging = false;
             isSwitchVertex = false;
+            clearAzimuthDragState();
             deltaPoint = null;
             startEvent = null;
             clickPoint = null;
@@ -2597,6 +2602,9 @@ public class MapDrawable
             case MotionEvent.ACTION_DOWN: {
                 activeMapContext.setLongLongClickProcesses(false);
                 clickPoint = new PointF(event.getX(), event.getY());
+                if (beginAzimuthMeasurementDrag(activeMap, screenPoint)) {
+                    return true;
+                }
                 android.graphics.RectF rect = new android.graphics.RectF(event.getX() - 20,event.getY() - 20,event.getX() + 20,event.getY() + 20);
                 List<org.maplibre.geojson.Feature> featuresMarker = activeMap.queryRenderedFeatures(rect, "marker-layer");
 
@@ -2662,6 +2670,10 @@ public class MapDrawable
             }
 
             case MotionEvent.ACTION_MOVE: {
+                if (draggedAzimuthRole != null) {
+                    updateDraggedAzimuthPoint(activeMap, activeMapContext, screenPoint, false);
+                    return true;
+                }
                 int selectedVertexIndex = -1;
                 if (editingObject != null )
                     selectedVertexIndex = editingObject.getSelectedVertexIndex();
@@ -2702,6 +2714,12 @@ public class MapDrawable
             }
 
             case MotionEvent.ACTION_UP: {
+                if (draggedAzimuthRole != null) {
+                    updateDraggedAzimuthPoint(activeMap, activeMapContext, screenPoint, true);
+                    clearAzimuthDragState();
+                    clickPoint = null;
+                    return true;
+                }
                 if (activeMapContext.getLongLongClickProcesses()){
                     activeMapContext.setLongLongClickProcesses(false);
                     return false;
@@ -2755,6 +2773,16 @@ public class MapDrawable
                 deltaPoint = null;
                 startEvent = null;
                 return false;
+            }
+
+            case MotionEvent.ACTION_CANCEL: {
+                if (draggedAzimuthRole != null) {
+                    updateDraggedAzimuthPoint(activeMap, activeMapContext, screenPoint, true);
+                    clearAzimuthDragState();
+                    clickPoint = null;
+                    return true;
+                }
+                break;
             }
         }
         return false;
@@ -4385,8 +4413,21 @@ public class MapDrawable
      * absent while the user is selecting points. The user-location cursor remains the top layer.
      */
     public void showAzimuthMeasurement(@Nullable Point start, @Nullable Point target) {
+        showAzimuthMeasurement(start, target, false, false);
+    }
+
+    /**
+     * Shows a transient measurement and optionally lets the user drag either visible endpoint.
+     */
+    public void showAzimuthMeasurement(
+            @Nullable Point start,
+            @Nullable Point target,
+            boolean startEditable,
+            boolean targetEditable) {
         azimuthMeasurementStart = start;
         azimuthMeasurementTarget = target;
+        azimuthMeasurementStartEditable = startEditable;
+        azimuthMeasurementTargetEditable = targetEditable;
         MapLibreMap map = maplibreMap.get();
         ensureAzimuthMeasurementOverlay(map != null ? map.getStyle() : null);
         ensureUserLocationLayerOnTop(map != null ? map.getStyle() : null);
@@ -4396,6 +4437,9 @@ public class MapDrawable
     public void clearAzimuthMeasurement() {
         azimuthMeasurementStart = null;
         azimuthMeasurementTarget = null;
+        azimuthMeasurementStartEditable = false;
+        azimuthMeasurementTargetEditable = false;
+        clearAzimuthDragState();
         MapLibreMap map = maplibreMap.get();
         Style style = map != null ? map.getStyle() : null;
         if (style == null) {
@@ -4489,6 +4533,75 @@ public class MapDrawable
             features.add(target);
         }
         return FeatureCollection.fromFeatures(features);
+    }
+
+    private boolean beginAzimuthMeasurementDrag(MapLibreMap map, PointF screenPoint) {
+        float tolerance = getContext().getResources().getDisplayMetrics().density * 24f;
+        android.graphics.RectF hitArea = new android.graphics.RectF(
+                screenPoint.x - tolerance,
+                screenPoint.y - tolerance,
+                screenPoint.x + tolerance,
+                screenPoint.y + tolerance);
+
+        Point selectedPoint = null;
+        if (azimuthMeasurementTargetEditable
+                && azimuthMeasurementTarget != null
+                && !map.queryRenderedFeatures(hitArea, AZIMUTH_TARGET_LAYER_ID).isEmpty()) {
+            draggedAzimuthRole = AZIMUTH_ROLE_TARGET;
+            selectedPoint = azimuthMeasurementTarget;
+        } else if (azimuthMeasurementStartEditable
+                && azimuthMeasurementStart != null
+                && !map.queryRenderedFeatures(hitArea, AZIMUTH_START_LAYER_ID).isEmpty()) {
+            draggedAzimuthRole = AZIMUTH_ROLE_START;
+            selectedPoint = azimuthMeasurementStart;
+        }
+
+        if (selectedPoint == null) {
+            clearAzimuthDragState();
+            return false;
+        }
+
+        PointF endpointScreen = map.getProjection().toScreenLocation(
+                new LatLng(selectedPoint.latitude(), selectedPoint.longitude()));
+        azimuthDragOffset = new PointF(
+                screenPoint.x - endpointScreen.x,
+                screenPoint.y - endpointScreen.y);
+        return true;
+    }
+
+    private void updateDraggedAzimuthPoint(
+            MapLibreMap map,
+            MaplibreMapInteraction interaction,
+            PointF screenPoint,
+            boolean finished) {
+        String role = draggedAzimuthRole;
+        PointF offset = azimuthDragOffset;
+        if (role == null || offset == null) {
+            return;
+        }
+
+        LatLng coordinate = map.getProjection().fromScreenLocation(new PointF(
+                screenPoint.x - offset.x,
+                screenPoint.y - offset.y));
+        Point point = Point.fromLngLat(coordinate.getLongitude(), coordinate.getLatitude());
+        boolean startPoint = AZIMUTH_ROLE_START.equals(role);
+        if (startPoint) {
+            azimuthMeasurementStart = point;
+        } else {
+            azimuthMeasurementTarget = point;
+        }
+
+        Style style = map.getStyle();
+        Source source = style != null ? style.getSource(AZIMUTH_SOURCE_ID) : null;
+        if (source instanceof GeoJsonSource) {
+            ((GeoJsonSource) source).setGeoJson(buildAzimuthMeasurementFeatures());
+        }
+        interaction.onAzimuthMeasurementPointMoved(startPoint, point, finished);
+    }
+
+    private void clearAzimuthDragState() {
+        draggedAzimuthRole = null;
+        azimuthDragOffset = null;
     }
 
     public void addPointByWalk(LatLng latLng) {

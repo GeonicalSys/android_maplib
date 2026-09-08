@@ -13,7 +13,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    responsibility: MapLibre style, sources, layers and raster MBTiles URLs, bounded full-reload feature/style-object cache lifetime, hidden-layer data-reload suppression with on-demand visibility recovery, hot add/reload coordination, lifecycle-safe touch dispatch that rejects events after map/view/host teardown, tap-node and midpoint edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, transient azimuth line/start/target overlays restored across full/lite reload below the topmost location cursor, thicker insertion-direction segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
+    responsibility: MapLibre style, sources, layers and raster MBTiles URLs, bounded full-reload feature/style-object cache lifetime, hidden-layer data-reload suppression with on-demand visibility recovery, hot add/reload coordination, lifecycle-safe touch dispatch that rejects events after map/view/host teardown, tap-node and midpoint edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, transient azimuth line/start/target overlays restored across full/lite reload below the topmost location cursor with optional endpoint drag callbacks, thicker insertion-direction segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost location-cursor overlay and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
   - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryEditFillPolicy.java
     responsibility: Allow the shared edit fill only for Polygon and MultiPolygon so recovered line sketches cannot inherit polygon rendering state.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
@@ -114,7 +114,7 @@ key_components:
     responsibility: Ordinary location dispatch plus owner-based temporary high-frequency request leases for foreground tools.
 public_contracts:
   - id: map-host
-    symbol: MaplibreMapInteraction
+    symbol: MaplibreMapInteraction including transient azimuth endpoint drag callbacks
     path: maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java
     consumers: [app, maplibui]
   - id: gis-application

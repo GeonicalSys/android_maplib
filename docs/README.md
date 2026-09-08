@@ -52,7 +52,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `user-location-layer` остаётся служебным верхним overlay независимо от порядка
   пользовательских слоёв; непостоянные `azimuth-measurement-*` line/point layers
   для измерения свободных точек восстанавливаются при full/lite reload строго под ним,
-  не входят в `LayerGroup` и не сохраняются как прикладные данные;
+  не входят в `LayerGroup`, не сохраняются как прикладные данные и передают drag
+  редактируемых концов линии host-экрану;
 - `LayerContentProvider` разрешает активный `IGISApplication.getMap()` на каждой операции и не
   маршрутизирует треки/объекты через карту предыдущего Collector workspace;
 - `MaplibreMapInteraction`, `IGISApplication` — API верхних слоёв;

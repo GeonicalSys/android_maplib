@@ -7,6 +7,8 @@ import com.nextgis.maplib.datasource.GeoEnvelope;
 import com.nextgis.maplib.datasource.GeoGeometry;
 import com.nextgis.maplib.map.MLP.MLGeometryEditClass;
 
+import org.maplibre.geojson.Point;
+
 public interface MaplibreMapInteraction {
 
     public boolean processMapLongClick(GeoEnvelope exactEnv,  PointF clickPoint); // x y  - mercator
@@ -47,6 +49,19 @@ public interface MaplibreMapInteraction {
     public void onLengthChanged(Double length);
 
     public void onAreaChanged(Double length);
+
+    /**
+     * Reports a dragged endpoint of the transient azimuth measurement.
+     *
+     * <p>The default implementation keeps the map host API source-compatible for consumers that
+     * do not expose the optional measurement overlay.</p>
+     */
+    default void onAzimuthMeasurementPointMoved(
+            boolean startPoint,
+            Point point,
+            boolean finished) {
+        // Optional transient-overlay interaction.
+    }
 
     public void changeProgress(boolean show);
 
