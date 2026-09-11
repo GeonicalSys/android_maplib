@@ -263,6 +263,25 @@ public class LocationTrackFilterCoreTest {
         return new Fix(x, y, timeMs, timeMs * 1_000_000L, accuracy, speed, true, true);
     }
 
+    @Test
+    public void liveBatchRetainsHistoricalFixesWithoutAcceptingCachedOrReversedOnes() {
+        Harness live = new Harness();
+        live.clockNowNanos = 120_000_000_000L;
+        live.clockNowMillis = 120_000;
+        List<Fix> output = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            output.addAll(live.filter.onSample(fix(i * 1.4, 0, 1000 + i * 1000, 4, 1.4f), true));
+        }
+        output.addAll(live.filter.flushRemaining());
+        assertEquals(20, output.size());
+        assertTrue(live.filter.onSample(fix(0, 0, 1000, 4, 1.4f), true).isEmpty());
+        Harness cached = new Harness();
+        cached.clockNowNanos = live.clockNowNanos;
+        cached.clockNowMillis = live.clockNowMillis;
+        assertTrue(cached.filter.onSample(fix(0, 0, 1000, 4, 1.4f)).isEmpty());
+        assertEquals(1, cached.filter.getDroppedInputFixCount());
+    }
+
     private static final class Harness {
         long clockNowNanos;
         long clockNowMillis;

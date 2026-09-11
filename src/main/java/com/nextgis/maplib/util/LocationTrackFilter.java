@@ -6,6 +6,7 @@
 package com.nextgis.maplib.util;
 
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
@@ -13,6 +14,7 @@ import android.util.Log;
 import com.hypertrack.hyperlog.HyperLog;
 
 import java.util.List;
+import java.util.Collections;
 
 /**
  * Android adapter for the shared track/walk sequence filter.
@@ -43,6 +45,9 @@ public final class LocationTrackFilter {
     public static final float DEFAULT_ABSURD_SPEED_MPS = 100f;
 
     private final LocationTrackFilterCore<Location> mCore;
+    private final LocationMotionFilter mMotion = new LocationMotionFilter();
+    private Location mLastAccepted;
+    private long mRejectedBeforeSequence;
     private String mDiagnosticProvider;
 
     public LocationTrackFilter() {
@@ -80,6 +85,9 @@ public final class LocationTrackFilter {
 
     public void reset() {
         mCore.reset();
+        mMotion.reset();
+        mLastAccepted = null;
+        mRejectedBeforeSequence = 0;
     }
 
     public List<Location> flushRemaining() {
@@ -87,16 +95,43 @@ public final class LocationTrackFilter {
     }
 
     public List<Location> onLocation(Location raw) {
+        return onLocation(raw, false);
+    }
+
+    public List<Location> onLocation(Location raw, boolean historical) {
+        return onLocation(raw, historical, DeviceMotionEvidence.State.UNKNOWN);
+    }
+
+    public List<Location> onLocation(Location raw, boolean historical, DeviceMotionEvidence.State motion) {
         mDiagnosticProvider = raw == null ? "null" : raw.getProvider();
         try {
-            return mCore.onSample(raw);
+            if (!passesRecordingIntegrity(raw, !historical)) {
+                mRejectedBeforeSequence++;
+                return Collections.emptyList();
+            }
+            Location filtered = mMotion.filter(raw, motion);
+            if (filtered == null) {
+                mRejectedBeforeSequence++;
+                return Collections.emptyList();
+            }
+            long passed = mCore.getPassedInputFixCount();
+            // Provider accuracy is the quality gate. The conservative circle added by the
+            // smoother describes the estimate and must not reject an otherwise valid fix.
+            float estimatedAccuracy = filtered.getAccuracy();
+            filtered.setAccuracy(raw.getAccuracy());
+            List<Location> output = mCore.onSample(filtered, historical);
+            if (mCore.getPassedInputFixCount() > passed) {
+                mLastAccepted = new Location(filtered);
+                mLastAccepted.setAccuracy(estimatedAccuracy);
+            }
+            return output;
         } finally {
             mDiagnosticProvider = null;
         }
     }
 
     public long getInputFixCount() {
-        return mCore.getInputFixCount();
+        return mCore.getInputFixCount() + mRejectedBeforeSequence;
     }
 
     public long getPassedInputFixCount() {
@@ -104,7 +139,7 @@ public final class LocationTrackFilter {
     }
 
     public long getDroppedInputFixCount() {
-        return mCore.getDroppedInputFixCount();
+        return mCore.getDroppedInputFixCount() + mRejectedBeforeSequence;
     }
 
     public long getChordDroppedFixCount() {
@@ -119,10 +154,27 @@ public final class LocationTrackFilter {
         return mCore.getBufferedFixCount();
     }
 
+    public Location getLastAcceptedLocation() {
+        return mLastAccepted == null ? null : new Location(mLastAccepted);
+    }
+
+    public static boolean passesRecordingIntegrity(Location location) {
+        return passesRecordingIntegrity(location, true);
+    }
+
+    private static boolean passesRecordingIntegrity(Location location, boolean checkAge) {
+        return location != null && LocationManager.GPS_PROVIDER.equals(location.getProvider())
+                && passesIntegrity(location, checkAge);
+    }
+
     /**
      * First-stage integrity check used by the final closing snap in both recording services.
      */
     public static boolean passesBasicIntegrity(Location location) {
+        return passesIntegrity(location, true);
+    }
+
+    private static boolean passesIntegrity(Location location, boolean checkAge) {
         if (location == null || !hasValidPosition(location)) {
             return false;
         }
@@ -138,18 +190,17 @@ public final class LocationTrackFilter {
             // Treat an unavailable platform mock flag as unknown, not as corrupt data.
         }
         if (!location.hasAccuracy()
+                || !Float.isFinite(location.getAccuracy())
                 || location.getAccuracy() <= 0f
                 || location.getAccuracy() > DEFAULT_MAX_ACCURACY_M) {
             return false;
         }
-        if (location.hasSpeed()
-                && Math.abs(location.getSpeed()) > DEFAULT_ABSURD_SPEED_MPS) {
+        if (location.hasSpeed() && (!Float.isFinite(location.getSpeed())
+                || location.getSpeed() < 0 || location.getSpeed() > DEFAULT_ABSURD_SPEED_MPS)) {
             return false;
         }
-        return LocationTrackFilterCore.passesFixAgeNanos(
-                location.getElapsedRealtimeNanos(),
-                SystemClock.elapsedRealtimeNanos(),
-                DEFAULT_MAX_FIX_AGE_MS);
+        return location.getElapsedRealtimeNanos() > 0 && (!checkAge || LocationFixPolicy.isFresh(
+                location.getElapsedRealtimeNanos(), SystemClock.elapsedRealtimeNanos()));
     }
 
     private void debugDiagnostic(String reason) {

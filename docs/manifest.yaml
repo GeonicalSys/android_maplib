@@ -2,12 +2,28 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-09-08
+last_verified: 2026-09-12
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/location/LocationSubscriptionController.java
+    responsibility: Reconcile independent GPS/network requests without GPS removal on screen lifecycle and retain resources until the final recorder leaves.
+  - path: maplib/src/main/java/com/nextgis/maplib/location/SensorMotionMonitor.java
+    responsibility: Acquire accelerometer evidence for the shared GNSS session without activity-recognition permission.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/DeviceMotionEvidence.java
+    responsibility: Classify bounded accelerometer windows and look up fresh evidence at GNSS measurement time.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSamplerCore.java
+    responsibility: Decimate movement and return stop-vertex corrections without inventing travelled distance.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
+    responsibility: Store trackpoints.segment in database v6 and expose each track as GeoMultiLineString without connecting gaps.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationFixPolicy.java
+    responsibility: Monotonic freshness, position validity and current GPS/network preference rules.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSampler.java
+    responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
+    responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle
     responsibility: Keep release diagnostic VERSION_NAME 3.1.2.18 and debug VERSION_NAME 3.1.2.18 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
@@ -97,22 +113,30 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
     responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed polygon ring to its own first vertex.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
-    responsibility: Adapt Android Location fixes to the shared accuracy-aware track/walk filter, expose basic integrity checks plus safe provider-qualified diagnostics and aggregate counters, make zero input explicitly distinguishable from filtered input, and return accepted fixes without claiming persistence, background-health heartbeat or foreground-service ownership.
+    responsibility: Validate GNSS integrity and live batch timestamps, adapt the robust motion and delayed sequence filters, and expose accepted display estimates and recording points.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java
     responsibility: Format map measurements, including explicit square-metre to hectare conversion for ruler area labels.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
     responsibility: Retain valid movement through 160 km/h, reject corrupt fixes and material isolated spikes, and preserve delayed fixes across long sampling gaps without Android test dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiter.java
-    responsibility: Adapt Android providers to GPS-first recording while retaining timed network fallback.
+    responsibility: Legacy provider-arbitration adapter retained for compatibility; active recording uses GpsEventSource GNSS-only output.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiterCore.java
-    responsibility: Suppress network fixes for 12 seconds after usable GPS and restore network fallback without Android test dependencies.
+    responsibility: Legacy timed provider arbitration retained for compatibility and its historical tests; not used by track or walk recording.
   - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
     responsibility: Index an immutable target and return the nearest boundary point plus WGS84 distance and bearing for repeated stakeout fixes.
   - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
     responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    responsibility: Ordinary location dispatch plus owner-based temporary high-frequency request leases for foreground tools.
+    responsibility: Own application-wide GNSS and display-only network acquisition, current-fix expiry, shared filtered recording, original GNSS/mock precision subscriptions and owner-based high-frequency leases.
 public_contracts:
+  - id: current-location-recording
+    symbol: GpsEventSource.RecordingListener and GpsEventListener.onLocationUnavailable
+    path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
+    consumers: [app, maplibui]
+  - id: segmented-tracks
+    symbol: TrackLayer.getTracks returns GeoMultiLineString values
+    path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
+    consumers: [maplibui]
   - id: map-host
     symbol: MaplibreMapInteraction including transient azimuth endpoint drag callbacks
     path: maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java
@@ -145,6 +169,7 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
 invariant_refs: [INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS]
 global_docs:
+  - docs/architecture/location-pipeline.md
   - docs/architecture/map-rendering.md
   - docs/architecture/collector-projects.md
   - docs/architecture/ngw-sync-and-storage.md

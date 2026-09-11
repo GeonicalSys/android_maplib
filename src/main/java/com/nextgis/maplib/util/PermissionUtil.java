@@ -49,6 +49,11 @@ public final class PermissionUtil {
         return hasCoarse && hasFine;
     }
 
+    public static boolean hasAnyLocationPermission(Context context) {
+        return hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                || hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION);
+    }
+
     public static boolean hasBackgroundLocationPermissions(Context context) {
         String background = Manifest.permission.ACCESS_BACKGROUND_LOCATION;
         return PermissionUtil.hasPermission(context, background);

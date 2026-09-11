@@ -243,15 +243,19 @@ public class MPLFeaturesUtils {
     }
 
     static public List<org.maplibre.geojson.Feature> createFeatureListFromTrackLayer(final TrackLayer layer) {
-        Map<Integer, GeoLineString> tracks = layer.getTracks();
+        Map<Integer, GeoMultiLineString> tracks = layer.getTracks();
         List<org.maplibre.geojson.Feature> lineFeatures = new ArrayList<>();
 
-        for (Map.Entry<Integer, GeoLineString> entry : tracks.entrySet()) {
+        for (Map.Entry<Integer, GeoMultiLineString> entry : tracks.entrySet()) {
             Integer id = entry.getKey();
-            LineString lineString = getLineString(entry.getValue());
-            Feature lineFeature = org.maplibre.geojson.Feature.fromGeometry(lineString);
-            lineFeature.addStringProperty(prop_layerid, String.valueOf(layer.getId()));
-            lineFeatures.add(lineFeature);
+            for (int segment = 0; segment < entry.getValue().size(); segment++) {
+                GeoLineString part = entry.getValue().get(segment);
+                if (part.getPointCount() < 2) continue;
+                LineString lineString = getLineString(part);
+                Feature lineFeature = org.maplibre.geojson.Feature.fromGeometry(lineString);
+                lineFeature.addStringProperty(prop_layerid, String.valueOf(layer.getId()));
+                lineFeatures.add(lineFeature);
+            }
         }
         return lineFeatures;
     }

@@ -268,26 +268,8 @@ public class LocationUtil
             String provider,
             boolean isTracks)
     {
-        int currentProvider = 0;
-
-        switch (provider) {
-            case LocationManager.GPS_PROVIDER:
-                currentProvider = GpsEventSource.GPS_PROVIDER;
-                break;
-            case LocationManager.NETWORK_PROVIDER:
-                currentProvider = GpsEventSource.NETWORK_PROVIDER;
-                break;
-        }
-
-        String tracks = SettingsConstants.KEY_PREF_TRACKS_SOURCE;
-        String location = SettingsConstants.KEY_PREF_LOCATION_SOURCE;
-        String preferenceKey = isTracks ? tracks : location;
-        String preferences = context.getPackageName() + "_preferences";
-        SharedPreferences sharedPreferences = context.getSharedPreferences(preferences, MODE_MULTI_PROCESS);
-        String defaultSource = "3";
-        String value = sharedPreferences.getString(preferenceKey, defaultSource);
-        int providers = value != null ? Integer.parseInt(value) : Integer.parseInt(defaultSource);
-        return 0 != (providers & currentProvider);
+        return LocationManager.GPS_PROVIDER.equals(provider)
+                || !isTracks && LocationManager.NETWORK_PROVIDER.equals(provider);
     }
 
 

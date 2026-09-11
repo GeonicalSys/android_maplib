@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-08
+last_verified: 2026-09-12
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -141,20 +141,15 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   отображаемыми точками, а не с legacy overlay;
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
-- `LocationTrackFilter` и Android-независимый `LocationTrackFilterCore`
-  обслуживают трек и обход одним accuracy-aware pipeline: движение до 160 км/ч,
-  проверка качества/возраста/дистанции/ускорения и буфер из трёх точек для
-  одиночных выбросов;
-- `LocationProviderArbiter` оставляет Network резервным источником, но не смешивает
-  его точки со свежим пригодным GPS-потоком: fallback возвращается через 12 секунд;
-- выход `LocationTrackFilter` остаётся только набором принятых координат; звуковой
-  health-контроль в `maplibui` использует отдельный поток пригодных фиксов без
-  порога перемещения и не зависит от выдачи фильтра или insert/commit. Поэтому
-  неподвижное устройство продолжает сигнализировать об активной записи, а
-  прекращение свежих координат гасит сигнал; сам `maplib` не выбирает audio
-  stream, alarm-stream/vibration fallback принадлежит владельцу service в
-  `maplibui`; отзыв Android location permission
-  обрабатывает владелец foreground-service в `maplibui`;
+- `GpsEventSource` владеет общим потоком позиции и отдельным GNSS-only выходом
+  записи. Карта получает свежий GPS/Network и метрический круг accuracy;
+  источник очищает устаревшую позицию по монотонному времени, в том числе после сна.
+  `AdaptiveLocationFilterCore` сглаживает шум, удерживает остановку, проверяет
+  выбросы и учитывает автомобильные повороты; `LocationRecordingSampler`
+  прореживает только уже проверенные точки. База v6 и `TrackLayer.getTracks()`
+  сохраняют многосегментные линии, Canvas/MapLibre не соединяют разрывы.
+  Исходные GNSS/mock фиксы выноса доступны через `addRawListener`.
+  Подробный контракт: [текущая позиция и запись GPS](../../docs/architecture/location-pipeline.md).
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
   эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает
@@ -199,8 +194,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - GPS-фильтр не имеет профилей движения: рабочий distance-cap равен `55 м/с`
   с запасом над 160 км/ч, а reported speed свыше `100 м/с` считается мусором.
   Разрыв более 30 секунд обязан выгрузить валидный буфер до сброса состояния.
-- При включённых GPS и Network пригодный GPS имеет приоритет; Network остаётся
-  стартовым резервом и снова принимается через 12 секунд без пригодного GPS.
+- Network разрешён только для текущей позиции; трек и обход сохраняют только GNSS.
+  Разрыв пригодного потока более 8 секунд разделяет трек на сегменты.
 - Вынос поддерживает только Point/MultiPoint, LineString/MultiLineString и
   Polygon/MultiPolygon в EPSG:4326/3857. Для полигона расстояние всегда идёт до
   ближайшей внешней или внутренней границы, даже если fix находится внутри.
@@ -268,10 +263,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Пустой список треков после project switch: проверить строку
   `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;
 - Трек/обход замер на скорости: проверить `LocationTrackFilter` причины вместе с
-  `provider`, затем итоговые `filterPassed/filterDropped/filterChordDropped/filterGaps`
-  и `networkSuppressed`.
+  `provider` и причины фильтра; у сервиса счётчик accepted относится к выходу общего GNSS-потока.
   Для валидного движения до 160 км/ч не должно быть каскада `drop:speed_dist`.
-- Курсор карты движется, но у завершённого трека `raw=0` и `filterInput=0`:
+- Курсор карты движется, но у завершённого трека `accepted=0`:
   фильтр вообще не получил координат; проверять фактический запуск
   `TrackerService`, а не ослаблять accuracy/speed ограничения.
 - Неверное расстояние выноса: проверить CRS исходной геометрии и ближайшую точку
@@ -317,3 +311,14 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 Начать с `:maplib:testDebugUnitTest`; затем выбрать device smoke из manifest и
 central registry.
+
+## GPS: фон и уточнение стоянок
+
+GPS-подписка записи сохраняется при скрытии/возврате карты. Источник удерживает
+partial wake lock, пока активен хотя бы один recorder, независимо от звука.
+Акселерометр 25 Гц дополняет GNSS-проверку стоянок; при отсутствии свежих сенсорных
+событий используется состояние «неизвестно». Согласованное движение автомобиля
+может опровергнуть неподвижность телефона в держателе. Уточнение стоянки через
+`takeStationaryCorrection` изменяет последнюю свою вершину, а не дописывает линию.
+Диагностика `GPS health` позволяет сравнить сырые интервалы и accuracy со включённым
+и выключенным экраном. См. [контракт GPS](../../docs/architecture/location-pipeline.md).

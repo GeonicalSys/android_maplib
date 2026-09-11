@@ -36,6 +36,7 @@ import android.text.TextUtils;
 import com.nextgis.maplib.R;
 import com.nextgis.maplib.api.IGISApplication;
 import com.nextgis.maplib.datasource.GeoLineString;
+import com.nextgis.maplib.datasource.GeoMultiLineString;
 import com.nextgis.maplib.datasource.GeoPoint;
 import com.nextgis.maplib.display.TrackRenderer;
 import com.nextgis.maplib.util.Constants;
@@ -75,6 +76,8 @@ public class TrackLayer
     public static final String FIELD_SENT      = "sent";
     public static final String FIELD_SPEED     = "speed";
     public static final String FIELD_ACCURACY  = "accuracy";
+    public static final String FIELD_SEGMENT = "segment";
+    public static final String POINT_ORDER = "rowid ASC";
     public static final String FIELD_BEARING  = "bearing";
 
 
@@ -96,6 +99,7 @@ public class TrackLayer
             FIELD_SPEED + " REAL, " +
             FIELD_ACCURACY + " REAL, " +
             FIELD_BEARING + " REAL, " +
+            FIELD_SEGMENT + " INTEGER NOT NULL DEFAULT 0, " +
             FIELD_TIMESTAMP + " INTEGER NOT NULL, " +
             FIELD_SENT + " INTEGER NOT NULL, " +
             FIELD_SESSION + " INTEGER NOT NULL, FOREIGN KEY(" + FIELD_SESSION + ") REFERENCES " +
@@ -118,7 +122,7 @@ public class TrackLayer
     private UriMatcher mUriMatcher;
     private Uri        mContentUriTracks, mContentUriTrackpoints;
     private MapContentProviderHelper    mMap;
-    private Map<Integer, GeoLineString> mTracks;
+    private Map<Integer, GeoMultiLineString> mTracks;
 
 
     public TrackLayer(
@@ -175,7 +179,7 @@ public class TrackLayer
     }
 
 
-    public Map<Integer, GeoLineString> getTracks()
+    public Map<Integer, GeoMultiLineString> getTracks()
     {
         if (mTracks.size() == 0) {
             reloadTracks(INSERT);
@@ -261,20 +265,22 @@ public class TrackLayer
                 return;
             }
 
-            float x0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LON)),
-                    y0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LAT));
-
-            GeoLineString trackLine = new GeoLineString();
-            trackLine.setCRS(GeoConstants.CRS_WEB_MERCATOR);
-            trackLine.add(new GeoPoint(x0, y0));
-
-            while (track.moveToNext()) {
-                x0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LON));
-                y0 = track.getFloat(track.getColumnIndex(TrackLayer.FIELD_LAT));
-                trackLine.add(new GeoPoint(x0, y0));
-            }
-
-            mTracks.put(trackId, trackLine);
+            GeoMultiLineString segments = new GeoMultiLineString();
+            segments.setCRS(GeoConstants.CRS_WEB_MERCATOR);
+            int previousSegment = Integer.MIN_VALUE;
+            GeoLineString line = null;
+            do {
+                int segment = track.getInt(track.getColumnIndexOrThrow(FIELD_SEGMENT));
+                if (line == null || segment != previousSegment) {
+                    line = new GeoLineString();
+                    line.setCRS(GeoConstants.CRS_WEB_MERCATOR);
+                    segments.add(line);
+                    previousSegment = segment;
+                }
+                line.add(new GeoPoint(track.getDouble(track.getColumnIndexOrThrow(FIELD_LON)),
+                        track.getDouble(track.getColumnIndexOrThrow(FIELD_LAT))));
+            } while (track.moveToNext());
+            mTracks.put(trackId, segments);
         } finally {
             track.close();
         }
@@ -287,10 +293,10 @@ public class TrackLayer
             throw new RuntimeException("Tracks' cursor is null");
         }
 
-        String[] proj = new String[] {FIELD_LON, FIELD_LAT};
+        String[] proj = new String[] {FIELD_LON, FIELD_LAT, FIELD_SEGMENT};
 
         return mContext.getContentResolver().query(
-                Uri.withAppendedPath(mContentUriTracks, id + ""), proj, null, null, null);
+                Uri.withAppendedPath(mContentUriTracks, id + ""), proj, null, null, POINT_ORDER);
     }
 
 
