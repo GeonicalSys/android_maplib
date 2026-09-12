@@ -14,6 +14,19 @@ public final class LocationRecordingSampler {
             public long stopId(Location point) {
                 return point.getExtras() == null ? 0 : point.getExtras().getLong(LocationMotionFilter.STOP_ID, 0);
             }
+            public long departureSinceMs(Location point) {
+                return point.getExtras() == null ? 0
+                        : point.getExtras().getLong(LocationMotionFilter.DEPARTURE_SINCE, 0);
+            }
+            public Location anchor(Location point) { return LocationMotionFilter.anchor(point); }
+            public Location moving(Location point) {
+                Location copy = new Location(point);
+                android.os.Bundle extras = copy.getExtras() == null ? new android.os.Bundle()
+                        : new android.os.Bundle(copy.getExtras());
+                extras.putLong(LocationMotionFilter.STOP_ID, 0);
+                copy.setExtras(extras);
+                return copy;
+            }
             public double distance(Location a, Location b) { return a.distanceTo(b); }
             public double bearing(Location a, Location b) { return a.bearingTo(b); }
         }, minTimeMs, minDistance);

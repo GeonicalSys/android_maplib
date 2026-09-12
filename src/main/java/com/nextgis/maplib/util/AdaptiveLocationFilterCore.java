@@ -37,16 +37,20 @@ final class AdaptiveLocationFilterCore {
     }
 
     static final class Estimate {
-        final double x, y, accuracy;
+        final double x, y, accuracy, candidateX, candidateY;
         final boolean stationary;
-        final long stopId;
+        final long stopId, departureSinceMs;
 
-        Estimate(double x, double y, double accuracy, boolean stationary, long stopId) {
+        Estimate(double x, double y, double accuracy, boolean stationary, long stopId,
+                 double candidateX, double candidateY, long departureSinceMs) {
             this.x = x;
             this.y = y;
             this.accuracy = accuracy;
             this.stationary = stationary;
             this.stopId = stopId;
+            this.candidateX = candidateX;
+            this.candidateY = candidateY;
+            this.departureSinceMs = departureSinceMs;
         }
     }
 
@@ -55,7 +59,7 @@ final class AdaptiveLocationFilterCore {
     private Sample last;
     private double x, y, vx, vy, p00, p01, p11;
     private boolean stationary;
-    private long rejected, stopId, motionSince;
+    private long rejected, stopId, motionSince, departureSince, lastDepartureEvidence;
     private double motionDirectionX, motionDirectionY;
     private double anchorAccuracy;
     private boolean anchorSettled;
@@ -65,7 +69,7 @@ final class AdaptiveLocationFilterCore {
         window.clear();
         candidates.clear();
         stationary = false;
-        rejected = stopId = motionSince = 0;
+        rejected = stopId = motionSince = departureSince = lastDepartureEvidence = 0;
         anchorSettled = false;
     }
 
@@ -83,7 +87,7 @@ final class AdaptiveLocationFilterCore {
             rejected++;
             return null;
         }
-        if (dt > 30) return reacquire(s, false);
+        if (dt > 30) return reacquire(s, true);
 
         double distance = Math.hypot(s.x - last.x, s.y - last.y);
         if (distance > 55 * dt + 2.5 * (last.accuracy + s.accuracy)) {
@@ -99,13 +103,16 @@ final class AdaptiveLocationFilterCore {
             // requires sustained vehicle-scale motion to overrule it, not one nonzero speed.
             last = s;
             candidates.clear();
-            refineAnchor(s);
+            if (departureSince == 0) refineAnchor(s);
             return estimate(s);
         }
         if (stationary) {
             // The stop's zero-velocity covariance is no longer a prediction of this motion.
             // Seed from the confirmed sequence rather than overshooting while catching up.
-            return initialize(s, recent(s.timeMs, 6_000).get(0));
+            long started = departureSince;
+            initialize(s, recent(s.timeMs, 6_000).get(0));
+            departureSince = started;
+            return estimate(s);
         } else if (!motionSupported && isStationaryWindow(s)) {
             enterStop(s);
             last = s;
@@ -175,11 +182,11 @@ final class AdaptiveLocationFilterCore {
         last = s;
         // Start conservatively; a few coherent fixes release walking/vehicle motion.
         // This avoids writing several noisy indoor points before the first stop decision.
-        stationary = previous == null && (s.motion == STILL || s.accuracy > 12
-                || Double.isFinite(s.speed) && speedLowerBound(s) <= .3)
-                && !(speedLowerBound(s) > 3 && Double.isFinite(s.bearing));
+        stationary = previous == null;
         stopId = s.timeMs;
         motionSince = 0;
+        departureSince = previous == null ? 0 : previous.timeMs;
+        lastDepartureEvidence = 0;
         anchorAccuracy = s.accuracy;
         anchorSettled = false;
         window.clear();
@@ -188,7 +195,7 @@ final class AdaptiveLocationFilterCore {
         return estimate(s);
     }
 
-    private Estimate reacquire(Sample s, boolean requireMotion) {
+    private Estimate reacquire(Sample s, boolean afterGap) {
         rejected++;
         if (!candidates.isEmpty()) {
             Sample previous = candidates.peekLast();
@@ -211,7 +218,9 @@ final class AdaptiveLocationFilterCore {
         boolean coherent = travelled >= Math.max(1.5, s.accuracy * 0.3)
                 && travelled >= path * 0.8;
         boolean cluster = path <= Math.max(3, s.accuracy);
-        if (coherent || (!requireMotion && cluster)) return initialize(s, first);
+        // Reacquiring a fix is not proof that a stationary user has started travelling.
+        // In particular, a new cluster after a gap must pass departure confirmation again.
+        if (coherent || cluster) return initialize(s, afterGap || cluster ? null : first);
         return null;
     }
 
@@ -224,10 +233,11 @@ final class AdaptiveLocationFilterCore {
         double[] trend = trend(recent);
         double dx = trend[0] * span, dy = trend[1] * span;
         double displacement = Math.hypot(dx, dy), path = 0, biggest = 0;
-        int progress = 0, movingSpeeds = 0;
+        int progress = 0, movingSpeeds = 0, preciseSpeeds = 0, reportedSpeeds = 0;
         double svx = 0, svy = 0, speedSum = 0;
         for (int i = 0; i < recent.size(); i++) {
             Sample sample = recent.get(i);
+            if (Double.isFinite(sample.speed)) reportedSpeeds++;
             if (i > 0) {
                 Sample previous = recent.get(i - 1);
                 double step = Math.hypot(sample.x - previous.x, sample.y - previous.y);
@@ -235,8 +245,10 @@ final class AdaptiveLocationFilterCore {
                 biggest = Math.max(biggest, step);
                 if (step > .1) progress++;
             }
-            if (speedLowerBound(sample) > .3 && Double.isFinite(sample.bearing)) {
+            if (speedLowerBound(sample) > .15 && Double.isFinite(sample.bearing)) {
                 movingSpeeds++;
+                if (Double.isFinite(sample.speedAccuracy) && sample.speedAccuracy >= 0
+                        && sample.speedAccuracy <= Math.max(.25, sample.speed * .15)) preciseSpeeds++;
                 svx += sample.speed * Math.sin(Math.toRadians(sample.bearing));
                 svy += sample.speed * Math.cos(Math.toRadians(sample.bearing));
                 speedSum += sample.speed;
@@ -260,17 +272,42 @@ final class AdaptiveLocationFilterCore {
                 && Math.hypot(svx, svy) >= speedSum * .85 && displacement >= 1.5
                 && (dx * svx + dy * svy) >= displacement * Math.hypot(svx, svy) * .75
                 && Math.abs(displacement / span - velocity) <= Math.max(.7, velocity * .5);
-        if (!stationary && current.motion != STILL && coherent && trendSpeed > .2) return true;
+        if (stationary) {
+            // Handling the phone is not proof of travel. Several progressing fixes must
+            // also leave the uncertainty of BOTH the stop and the current observation.
+            // A speed/course sequence can corroborate a noisy trend, never bypass the radius.
+            boolean evidence = coherent && trendSpeed > .15
+                    || doppler && progress >= 3 && biggest < path * .55 && trend[2] >= .25;
+            double uncertainty = Math.max(anchorAccuracy, current.accuracy);
+            if (fromAnchor <= Math.max(1, uncertainty * .2)) departureSince = 0;
+            else if (evidence) {
+                if (departureSince == 0) departureSince = first.timeMs;
+                lastDepartureEvidence = current.timeMs;
+            } else if (current.timeMs - lastDepartureEvidence > 8_000) departureSince = 0;
+            if (!evidence || departureSince == 0 || span < 4
+                    || fromAnchor <= Math.max(3, uncertainty * 2)) return false;
+            // Multipath can supply several plausible positions AND a false 5 m/s speed
+            // with a 2 m/s uncertainty while the phone is merely handled. Fast departure
+            // requires precise velocity corroboration. Otherwise require a much longer
+            // directionally persistent position trend, including when speed is absent.
+            boolean preciseVelocity = doppler && preciseSpeeds >= recent.size() * .7;
+            boolean fastVehicle = coherent && trendSpeed >= 8 && displacement >= uncertainty * 2;
+            long positionOnlyDuration = reportedSpeeds == 0 && uncertainty <= 12 ? 10_000 : 30_000;
+            if (!preciseVelocity && !fastVehicle && (!coherent || sustainedMs < positionOnlyDuration)) return false;
+            if (current.motion != STILL) return true;
+            // A quiet sensor is stronger evidence of rest, but smooth driving (even
+            // slowly) must eventually overrule it with corroborating GNSS evidence.
+            return coherent && (trendSpeed >= 3 || doppler && velocity >= 2.5
+                    || doppler && sustainedMs >= 20_000 && velocity >= .5
+                    && fromAnchor > Math.max(15, uncertainty * 3));
+        }
+        if (current.motion != STILL && coherent && trendSpeed > .2) return true;
         if (current.motion == STILL) {
             boolean quietDoppler = doppler
                     && Math.abs(trendSpeed - velocity) <= Math.max(.25, velocity * .3);
             // Hysteresis: once real slow movement was established, do not reapply the
             // stronger departure threshold every second and repeatedly declare false stops.
-            if (!stationary && quietDoppler && coherent) return true;
-            // An accelerometer cannot tell rest from a smooth constant-speed vehicle.
-            // Sustained GNSS velocity AND displacement can override quiet sensor evidence.
-            if (stationary && quietDoppler && coherent && sustainedMs >= 20_000
-                    && velocity >= .5 && fromAnchor > Math.max(15, current.accuracy * 3)) return true;
+            if (quietDoppler && coherent) return true;
             return coherent && span >= 4 && displacement >= Math.max(8, current.accuracy * .5)
                     && (doppler && velocity >= 2.5 || displacement / span >= 3
                     && displacement >= current.accuracy * 2);
@@ -279,11 +316,6 @@ final class AdaptiveLocationFilterCore {
                 && trend[2] >= .25) return true;
         if (doppler && coherent && (current.accuracy <= 12 || span >= 5)
                 && displacement >= Math.max(1.5, current.accuracy * .35)) return true;
-        // Accumulate persistent departure beyond the uncertainty radius. A fixed six-second
-        // threshold alone would permanently pin slow walkers with coarse/missing speed data.
-        if (stationary && coherent && sustainedMs >= (current.motion == MOVING ? 4_000 : 8_000)
-                && fromAnchor > (current.motion == MOVING ? Math.max(3, current.accuracy * .4)
-                : Math.max(6, current.accuracy * 1.5))) return true;
         double threshold = current.motion == MOVING ? Math.max(1.5, current.accuracy * .3)
                 : current.accuracy <= 12 ? Math.max(2, current.accuracy * .5)
                 : Math.max(8, current.accuracy * 1.2);
@@ -316,6 +348,7 @@ final class AdaptiveLocationFilterCore {
         stationary = true;
         stopId = s.timeMs;
         motionSince = 0;
+        departureSince = lastDepartureEvidence = 0;
         anchorAccuracy = s.accuracy;
         anchorSettled = false;
     }
@@ -409,7 +442,13 @@ final class AdaptiveLocationFilterCore {
 
     private Estimate estimate(Sample s) {
         // Covers the original provider circle even when smoothing shifts its centre.
-        return new Estimate(x, y, s.accuracy + Math.hypot(s.x - x, s.y - y), stationary, stationary ? stopId : 0);
+        // Tentative positions are still real GNSS observations, kept out of visible geometry
+        // until departure is confirmed. A short median removes isolated pedestrian jitter.
+        double[] candidate = stationary && speedLowerBound(s) < 3
+                ? centre(recent(s.timeMs, 2_000)) : new double[]{x, y};
+        if (stationary && speedLowerBound(s) >= 3) candidate = new double[]{s.x, s.y};
+        return new Estimate(x, y, s.accuracy + Math.hypot(s.x - x, s.y - y),
+                stationary, stationary ? stopId : 0, candidate[0], candidate[1], departureSince);
     }
 
     private static double variance(double radius68) {

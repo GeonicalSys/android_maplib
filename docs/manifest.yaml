@@ -8,6 +8,8 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/test/java/com/nextgis/maplib/util/LocationDepartureTest.java
+    responsibility: Verify handheld stationary multipath from anonymized A54 observations, uncertainty-aware departure, early-corner backfill and cancellation/session boundaries.
   - path: maplib/src/main/java/com/nextgis/maplib/location/LocationSubscriptionController.java
     responsibility: Reconcile independent GPS/network requests without GPS removal on screen lifecycle and retain resources until the final recorder leaves.
   - path: maplib/src/main/java/com/nextgis/maplib/location/SensorMotionMonitor.java
@@ -15,7 +17,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/DeviceMotionEvidence.java
     responsibility: Classify bounded accelerometer windows and look up fresh evidence at GNSS measurement time.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSamplerCore.java
-    responsibility: Decimate movement and return stop-vertex corrections without inventing travelled distance.
+    responsibility: Buffer tentative GNSS departures per recorder, backfill confirmed movement with original times and corners, and correct one stop vertex without inventing travelled distance.
   - path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
     responsibility: Store trackpoints.segment in database v6 and expose each track as GeoMultiLineString without connecting gaps.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationFixPolicy.java

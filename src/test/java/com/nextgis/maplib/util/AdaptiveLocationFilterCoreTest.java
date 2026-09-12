@@ -50,7 +50,7 @@ public class AdaptiveLocationFilterCoreTest {
                     AdaptiveLocationFilterCore.Estimate result = filter.onSample(fix(speed * i, 0, i, 4,
                             reportsSpeed ? speed : Double.NaN, reportsSpeed ? 90 : Double.NaN));
                     assertNotNull("motion " + speed + " at " + i, result);
-                    if (i > 10) assertEquals(speed * i, result.x, 2.0);
+                    if (i > Math.max(10, Math.ceil(8 / speed) + 4)) assertEquals(speed * i, result.x, 2.0);
                 }
             }
         }
@@ -74,7 +74,9 @@ public class AdaptiveLocationFilterCoreTest {
                 double y = Math.max(0, i - 20) * speed;
                 AdaptiveLocationFilterCore.Estimate result = filter.onSample(fix(x, y, i, 4, speed, i <= 20 ? 90 : 0));
                 assertNotNull("corner speed=" + speed + " time=" + i, result);
-                assertTrue("corner deviation speed=" + speed + " time=" + i + " error=" + Math.hypot(result.x - x, result.y - y), Math.hypot(result.x - x, result.y - y) < 6);
+                if (!result.stationary) assertTrue("corner deviation speed=" + speed + " time=" + i
+                        + " error=" + Math.hypot(result.x - x, result.y - y), Math.hypot(result.x - x, result.y - y) < 6);
+                else assertTrue("departure still awaiting confirmation", i <= 6);
             }
         }
     }
@@ -111,6 +113,21 @@ public class AdaptiveLocationFilterCoreTest {
         assertEquals(0, filter.onSample(fix(0, 0, 11, 4, 0, 0)).x, 0);
     }
 
+    @Test public void reacquiringAnotherClusterAfterGpsLossDoesNotBypassDepartureConfirmation() {
+        AdaptiveLocationFilterCore filter = new AdaptiveLocationFilterCore();
+        for (int i = 0; i < 20; i++) filter.onSample(fix(0, 0, i, 10, 0, Double.NaN));
+        assertNull(filter.onSample(fix(100, 0, 80, 15, 1, 90)));
+        assertNull(filter.onSample(fix(101, 0, 81, 15, 1, 90)));
+        AdaptiveLocationFilterCore.Estimate e = filter.onSample(fix(102, 0, 82, 15, 1, 90));
+        assertNotNull(e);
+        assertTrue(e.stationary);
+        for (int i = 83; i < 95; i++) {
+            e = filter.onSample(fix(102 + Math.sin(i), 0, i, 15, 1, 90));
+            assertNotNull(e);
+            assertTrue(e.stationary);
+        }
+    }
+
     @Test public void stationaryWindowWorksWithThePrecisionToolQuarterSecondLease() {
         AdaptiveLocationFilterCore filter = new AdaptiveLocationFilterCore();
         AdaptiveLocationFilterCore.Estimate result = null;
@@ -130,7 +147,7 @@ public class AdaptiveLocationFilterCoreTest {
             double x = 50 * Math.sin(angle), y = 50 * (1 - Math.cos(angle));
             AdaptiveLocationFilterCore.Estimate result = filter.onSample(fix(x, y, i, 4, Double.NaN, Double.NaN));
             assertNotNull("road curve time=" + i, result);
-            assertTrue("road curve error=" + Math.hypot(result.x - x, result.y - y),
+            if (i >= 4) assertTrue("road curve error=" + Math.hypot(result.x - x, result.y - y),
                     Math.hypot(result.x - x, result.y - y) < 6);
         }
     }
@@ -226,7 +243,8 @@ public class AdaptiveLocationFilterCoreTest {
                         moving ? DeviceMotionEvidence.State.MOVING : DeviceMotionEvidence.State.STILL));
                 if (moving && result != null && !result.stationary && releasedAt < 0) releasedAt = i;
             }
-            assertTrue("slow walk departure " + speed + " at " + releasedAt, releasedAt >= 20 && releasedAt <= 30);
+            assertTrue("slow walk departure " + speed + " at " + releasedAt,
+                    releasedAt >= 20 && releasedAt <= 20 + Math.ceil(12 / speed) + 8);
             assertNotNull(result);
             assertEquals(79 * speed, result.x, 2);
         }
@@ -259,7 +277,7 @@ public class AdaptiveLocationFilterCoreTest {
                     random.nextGaussian() * 3, i, 25, 1.4, .15, 90, DeviceMotionEvidence.State.MOVING));
             if (result != null && !result.stationary && departure < 0) departure = i;
         }
-        assertTrue("departure " + departure, departure >= 0 && departure <= 15);
+        assertTrue("departure " + departure, departure >= 25 && departure <= 50);
         assertNotNull(result);
         assertEquals(149 * 1.4, result.x, 10);
     }
@@ -276,7 +294,7 @@ public class AdaptiveLocationFilterCoreTest {
                 if (i >= 20 && result != null && !result.stationary && departure < 0) departure = i;
             }
             assertTrue("permanently pinned, motion=" + motion + " departure=" + departure,
-                    departure >= 20 && departure <= 100);
+                    departure >= 120 && departure <= 130);
             assertNotNull(result);
             assertEquals(79.5, result.x, 2);
         }

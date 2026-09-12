@@ -121,7 +121,7 @@ public final class LocationTrackFilter {
             filtered.setAccuracy(raw.getAccuracy());
             List<Location> output = mCore.onSample(filtered, historical);
             if (mCore.getPassedInputFixCount() > passed) {
-                mLastAccepted = new Location(filtered);
+                mLastAccepted = mMotion.getDisplayLocation();
                 mLastAccepted.setAccuracy(estimatedAccuracy);
             }
             return output;
