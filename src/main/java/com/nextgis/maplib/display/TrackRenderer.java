@@ -25,7 +25,7 @@ package com.nextgis.maplib.display;
 
 import android.graphics.Paint;
 import com.nextgis.maplib.api.ILayer;
-import com.nextgis.maplib.datasource.GeoLineString;
+import com.nextgis.maplib.datasource.GeoMultiLineString;
 import com.nextgis.maplib.datasource.GeoPoint;
 import com.nextgis.maplib.map.TrackLayer;
 import org.json.JSONException;
@@ -73,7 +73,7 @@ public class TrackRenderer
 
         mPaint.setStrokeWidth((float) Math.ceil(4 / display.getScale()));
 
-        Map<Integer, GeoLineString> trackLines = layer.getTracks();
+        Map<Integer, GeoMultiLineString> trackLines = layer.getTracks();
         int trackLinesSize = trackLines.size();
         if (trackLinesSize < 1) {
             return;
@@ -84,24 +84,26 @@ public class TrackRenderer
         if(nStep == 0)
             nStep = 1;
 
-        for (Map.Entry<Integer, GeoLineString> entry : trackLines.entrySet()) {
+        for (Map.Entry<Integer, GeoMultiLineString> entry : trackLines.entrySet()) {
             i++;
             if (Thread.currentThread().isInterrupted()) {
                 break;
             }
 
             mPaint.setColor(layer.getColor(entry.getKey()));
-            List<GeoPoint> points = entry.getValue().getPoints();
-            for (int k = 1; k < points.size(); k++) {
-                if (Thread.currentThread().isInterrupted()) {
-                    break;
+            for (int segment = 0; segment < entry.getValue().size(); segment++) {
+                List<GeoPoint> points = entry.getValue().get(segment).getPoints();
+                for (int k = 1; k < points.size(); k++) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        break;
+                    }
+
+                    display.drawLine(
+                            (float) points.get(k - 1).getX(), (float) points.get(k - 1).getY(),
+                            (float) points.get(k).getX(), (float) points.get(k).getY(), mPaint);
                 }
 
-                display.drawLine(
-                        (float) points.get(k - 1).getX(), (float) points.get(k - 1).getY(),
-                        (float) points.get(k).getX(), (float) points.get(k).getY(), mPaint);
             }
-
             float percent = (float) i / trackLinesSize;
             if(i % nStep == 0) //0..10..20..30..40..50..60..70..80..90..100
                 layer.onDrawFinished(layer.getId(), percent);

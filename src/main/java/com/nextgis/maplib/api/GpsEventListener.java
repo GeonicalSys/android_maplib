@@ -48,4 +48,7 @@ public interface GpsEventListener
      * @param event Id
      */
     void onGpsStatusChanged(int event);
+
+    /** There is no fresh display fix; consumers must remove any current-position indicator. */
+    default void onLocationUnavailable() { }
 }

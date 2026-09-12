@@ -52,7 +52,7 @@ public class MapContentProviderHelper
     protected DatabaseHelper mDatabaseHelper;
 
     protected static final String DBNAME           = "layers";
-    protected static final int    DATABASE_VERSION = 5;
+    protected static final int    DATABASE_VERSION = 6;
 
 
     public MapContentProviderHelper(
@@ -147,6 +147,10 @@ public class MapContentProviderHelper
 
         if (oldVersion <= 4 && tableExists) {
             sqLiteDatabase.execSQL("alter table " + TrackLayer.TABLE_TRACKPOINTS + " add column " + TrackLayer.FIELD_BEARING + " real;");
+        }
+        if (oldVersion <= 5 && tableExists) {
+            sqLiteDatabase.execSQL("ALTER TABLE " + TrackLayer.TABLE_TRACKPOINTS
+                    + " ADD COLUMN " + TrackLayer.FIELD_SEGMENT + " INTEGER NOT NULL DEFAULT 0");
         }
 
     }
