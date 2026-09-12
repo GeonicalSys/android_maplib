@@ -154,6 +154,8 @@ public final class LocationTrackFilter {
         return mCore.getBufferedFixCount();
     }
 
+    public String getMotionDiagnostics() { return mMotion.diagnostics(); }
+
     public Location getLastAcceptedLocation() {
         return mLastAccepted == null ? null : new Location(mLastAccepted);
     }

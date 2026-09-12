@@ -75,6 +75,11 @@ final class AdaptiveLocationFilterCore {
 
     long getRejectedCount() { return rejected; }
 
+    String diagnostics() {
+        return "stationary=" + stationary + " departureMs="
+                + (last == null || departureSince == 0 ? 0 : last.timeMs - departureSince);
+    }
+
     Estimate onSample(Sample s) {
         if (!Double.isFinite(s.x) || !Double.isFinite(s.y)
                 || !Double.isFinite(s.accuracy) || s.accuracy <= 0 || s.timeMs <= 0) {
@@ -272,20 +277,36 @@ final class AdaptiveLocationFilterCore {
                 && Math.hypot(svx, svy) >= speedSum * .85 && displacement >= 1.5
                 && (dx * svx + dy * svy) >= displacement * Math.hypot(svx, svy) * .75
                 && Math.abs(displacement / span - velocity) <= Math.max(.7, velocity * .5);
+        PositionEvidence position = outdoorPositionEvidence(current);
+        // Good position accuracy does not imply good Doppler speed accuracy. In particular,
+        // a walking Android receiver may report 0.4-1 m/s speed uncertainty at 3-10 m hAcc.
+        // Do not require thirty uninterrupted seconds of one heading from such a receiver.
+        boolean precisePositions = span >= 5 && coherent && trendSpeed >= .5;
+        for (Sample s : recent) precisePositions &= s.accuracy <= 5;
         if (stationary) {
             // Handling the phone is not proof of travel. Several progressing fixes must
             // also leave the uncertainty of BOTH the stop and the current observation.
             // A speed/course sequence can corroborate a noisy trend, never bypass the radius.
-            boolean evidence = coherent && trendSpeed > .15
+            boolean evidence = position != null || coherent && trendSpeed > .15
                     || doppler && progress >= 3 && biggest < path * .55 && trend[2] >= .25;
             double uncertainty = Math.max(anchorAccuracy, current.accuracy);
             if (fromAnchor <= Math.max(1, uncertainty * .2)) departureSince = 0;
             else if (evidence) {
-                if (departureSince == 0) departureSince = first.timeMs;
+                if (departureSince == 0) departureSince = position == null ? first.timeMs : position.since;
                 lastDepartureEvidence = current.timeMs;
             } else if (current.timeMs - lastDepartureEvidence > 8_000) departureSince = 0;
+            // A single far fix cannot cross the departure gate. At very good reception a
+            // consistent sequence may leave after 1.5 radii; ordinary reception keeps two.
+            double[] latest = centre(recent(current.timeMs, 2_000));
+            boolean outsideStop = Math.hypot(latest[0] - x, latest[1] - y)
+                    > Math.max(3, uncertainty * (precisePositions ? 1.5 : 2));
+            // A poor first fix must not impose its large radius forever after reception
+            // improves. Independently observed motion between the new, accurate fixes can
+            // establish travel even inside that old circle; this does not shrink its error.
+            boolean improvedDeparture = position != null && anchorAccuracy > position.accuracy * 1.5
+                    && position.displacement > position.accuracy * 2;
             if (!evidence || departureSince == 0 || span < 4
-                    || fromAnchor <= Math.max(3, uncertainty * 2)) return false;
+                    || !outsideStop && !improvedDeparture) return false;
             // Multipath can supply several plausible positions AND a false 5 m/s speed
             // with a 2 m/s uncertainty while the phone is merely handled. Fast departure
             // requires precise velocity corroboration. Otherwise require a much longer
@@ -293,7 +314,8 @@ final class AdaptiveLocationFilterCore {
             boolean preciseVelocity = doppler && preciseSpeeds >= recent.size() * .7;
             boolean fastVehicle = coherent && trendSpeed >= 8 && displacement >= uncertainty * 2;
             long positionOnlyDuration = reportedSpeeds == 0 && uncertainty <= 12 ? 10_000 : 30_000;
-            if (!preciseVelocity && !fastVehicle && (!coherent || sustainedMs < positionOnlyDuration)) return false;
+            if (!preciseVelocity && !fastVehicle && !precisePositions && position == null
+                    && (!coherent || sustainedMs < positionOnlyDuration)) return false;
             if (current.motion != STILL) return true;
             // A quiet sensor is stronger evidence of rest, but smooth driving (even
             // slowly) must eventually overrule it with corroborating GNSS evidence.
@@ -301,6 +323,9 @@ final class AdaptiveLocationFilterCore {
                     || doppler && sustainedMs >= 20_000 && velocity >= .5
                     && fromAnchor > Math.max(15, uncertainty * 3));
         }
+        // Keep an established walk through a corner or a few noisy fixes. The short
+        // five-second cluster test alone mistakes normal walking inside hAcc for a stop.
+        if (current.motion != STILL && position != null) return true;
         if (current.motion != STILL && coherent && trendSpeed > .2) return true;
         if (current.motion == STILL) {
             boolean quietDoppler = doppler
@@ -320,6 +345,38 @@ final class AdaptiveLocationFilterCore {
                 : current.accuracy <= 12 ? Math.max(2, current.accuracy * .5)
                 : Math.max(8, current.accuracy * 1.2);
         return coherent && displacement > threshold && (current.accuracy <= 12 || span >= 5);
+    }
+
+    private static final class PositionEvidence {
+        final long since;
+        final double accuracy, displacement;
+        PositionEvidence(long since, double accuracy, double displacement) {
+            this.since = since; this.accuracy = accuracy; this.displacement = displacement;
+        }
+    }
+
+    private PositionEvidence outdoorPositionEvidence(Sample current) {
+        List<Sample> samples = recent(current.timeMs, 12_000);
+        if (samples.size() < 8) return null;
+        long since = samples.get(0).timeMs, duration = current.timeMs - since;
+        if (duration < 8_000) return null;
+        List<Sample> start = new ArrayList<>(), middle = new ArrayList<>(), end = new ArrayList<>();
+        double accuracy = 0;
+        for (Sample s : samples) {
+            if (s.accuracy > 12) return null;
+            accuracy = Math.max(accuracy, s.accuracy);
+            long offset = s.timeMs - since;
+            (offset < duration / 3 ? start : offset < duration * 2 / 3 ? middle : end).add(s);
+        }
+        if (start.size() < 2 || middle.size() < 2 || end.size() < 2) return null;
+        double[] a = centre(start), b = centre(middle), c = centre(end), trend = trend(samples);
+        double abx = b[0] - a[0], aby = b[1] - a[1], bcx = c[0] - b[0], bcy = c[1] - b[1];
+        double ab = Math.hypot(abx, aby), bc = Math.hypot(bcx, bcy);
+        // Two progressing robust blocks reject a jump followed by a static cluster.
+        // A turn is allowed: the phone need not keep its first heading throughout departure.
+        if (ab < 1 || bc < 1 || abx * bcx + aby * bcy < 0 || trend[2] < .7
+                || Math.hypot(trend[0], trend[1]) < .25) return null;
+        return new PositionEvidence(since, accuracy, Math.hypot(c[0] - a[0], c[1] - a[1]));
     }
 
     private boolean isStationaryWindow(Sample current) {
@@ -441,13 +498,15 @@ final class AdaptiveLocationFilterCore {
     }
 
     private Estimate estimate(Sample s) {
-        // Covers the original provider circle even when smoothing shifts its centre.
+        // The current marker follows the short observation estimate, independently of
+        // whether the recorder has confirmed departure. Its circle covers that estimate's
+        // displacement from the provider fix, never the distance from an old stop anchor.
         // Tentative positions are still real GNSS observations, kept out of visible geometry
         // until departure is confirmed. A short median removes isolated pedestrian jitter.
         double[] candidate = stationary && speedLowerBound(s) < 3
                 ? centre(recent(s.timeMs, 2_000)) : new double[]{x, y};
         if (stationary && speedLowerBound(s) >= 3) candidate = new double[]{s.x, s.y};
-        return new Estimate(x, y, s.accuracy + Math.hypot(s.x - x, s.y - y),
+        return new Estimate(x, y, s.accuracy + Math.hypot(s.x - candidate[0], s.y - candidate[1]),
                 stationary, stationary ? stopId : 0, candidate[0], candidate[1], departureSince);
     }
 

@@ -145,6 +145,85 @@ public class LocationDepartureTest {
         for (Point p : second.stored) assertTrue(p.time >= 31_000);
     }
 
+    @Test public void ordinaryWalkingAccuracyAndEarlyTurnsConfirmWithinThirtySecondsAndRetainTheStart() {
+        // A synthetic outdoor walk, not a replay of the user's filtered map log.
+        // Android can report good position accuracy but 0.4-1 m/s speed uncertainty.
+        for (double error : new double[]{.4, .8, 1.0, Double.NaN}) {
+            for (DeviceMotionEvidence.State motion : new DeviceMotionEvidence.State[]{MOVING, UNKNOWN}) {
+                Recording r = new Recording();
+                java.util.Random noise = new java.util.Random(903);
+                int departure = -1, stoppedWhileWalking = 0;
+                for (int second = 0; second <= 160; second++) {
+                    double t = Math.max(0, second - 20);
+                    double x = Math.min(10, t * 1.25), y = Math.max(0, t * 1.25 - 10);
+                    // Turn again around the building after the first leg.
+                    if (y > 65) { x -= y - 65; y = 65; }
+                    double bearing = t * 1.25 <= 10 ? 90 : t * 1.25 <= 75 ? 0 : 270;
+                    Point p = r.accept(second, x + noise.nextGaussian() * 1.2,
+                            y + noise.nextGaussian() * 1.2, 8 + second % 3,
+                            t == 0 ? 0 : 1.25, error, bearing, t == 0 ? STILL : motion);
+                    if (p.stop == 0 && departure < 0) departure = second;
+                    if (departure >= 0 && p.stop != 0) stoppedWhileWalking++;
+                }
+                r.stored.addAll(r.sampler.flush());
+                assertTrue("departure=" + departure + " speedError=" + error + " motion=" + motion,
+                        departure >= 20 && departure <= 50);
+                assertEquals("must not repeatedly park a walker at corners", 0, stoppedWhileWalking);
+                assertTrue("early leg lost", r.stored.stream().anyMatch(p ->
+                        p.time >= 23_000 && p.time <= 30_000 && p.x > 2 && Math.abs(p.y) < 3));
+                assertTrue("early corner lost", r.stored.stream().anyMatch(p ->
+                        p.time >= 27_000 && p.time <= 34_000 && p.x > 7 && Math.abs(p.y) < 4));
+                Point last = r.stored.get(r.stored.size() - 1);
+                assertEquals(-90, last.x, 4);
+                assertEquals(65, last.y, 4);
+            }
+        }
+    }
+
+    @Test public void aWalkAroundACurveDoesNotRequireThirtySecondsOfTheSameHeading() {
+        Recording r = new Recording();
+        int departure = -1;
+        for (int second = 0; second < 110; second++) {
+            double angle = second * 1.4 / 24;
+            Point p = r.accept(second, 24 * Math.sin(angle) + Math.sin(second) * 1.5,
+                    24 * (1 - Math.cos(angle)) + Math.cos(second) * 1.5,
+                    9, 1.4, .8, 90 - Math.toDegrees(angle), MOVING);
+            if (p.stop == 0 && departure < 0) departure = second;
+        }
+        assertTrue("curved walk departure=" + departure, departure >= 0 && departure <= 25);
+        assertTrue(r.stored.size() > 15);
+    }
+
+    @Test public void goodOutdoorFixesReleaseWalkingInSecondsEvenWithUncertainReportedSpeed() {
+        for (double accuracy : new double[]{3, 5}) {
+            Recording r = new Recording();
+            int departure = -1;
+            for (int second = 0; second < 45; second++) {
+                double t = Math.max(0, second - 20);
+                Point p = r.accept(second, t * 1.4 + Math.sin(second) * .5,
+                        Math.cos(second) * .5, accuracy, t > 0 ? 1.4 : 0, .8, 90,
+                        t > 0 ? MOVING : STILL);
+                if (p.stop == 0 && departure < 0) departure = second;
+            }
+            assertTrue("good GPS accuracy=" + accuracy + " departure=" + departure,
+                    departure > 20 && departure <= 28);
+            // The recorder decimates at 5 m / 5 s, while retaining observation timestamps.
+            assertTrue("first sampled walking point lost", r.stored.stream().anyMatch(p ->
+                    p.time >= 22_000 && p.time <= 27_000 && p.x > 3));
+        }
+    }
+
+    @Test public void improvedPositionAccuracyDuringDepartureDoesNotKeepTheOldLargeAnchorRadius() {
+        Recording r = new Recording();
+        int departure = -1;
+        for (int second = 0; second < 50; second++) {
+            Point p = r.accept(second, second == 0 ? 30 : second * 1.2, Math.sin(second),
+                    second == 0 ? 40 : 6, 1.2, .8, 90, MOVING);
+            if (p.stop == 0 && departure < 0) departure = second;
+        }
+        assertTrue("initial poor fix blocked departure until " + departure, departure >= 0 && departure <= 25);
+    }
+
     @Test public void recordedA54MultipathWithFalseSixMetrePerSecondSpeedStaysOneStop() throws Exception {
         for (DeviceMotionEvidence.State state : new DeviceMotionEvidence.State[]{MOVING, UNKNOWN, STILL}) {
             Recording r = new Recording();

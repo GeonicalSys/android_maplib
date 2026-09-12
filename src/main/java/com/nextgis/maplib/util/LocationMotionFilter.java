@@ -17,6 +17,7 @@ final class LocationMotionFilter {
 
     void reset() { initialized = false; displayLocation = null; core.reset(); }
     long getRejectedCount() { return core.getRejectedCount(); }
+    String diagnostics() { return core.diagnostics(); }
     Location getDisplayLocation() { return new Location(displayLocation); }
 
     Location filter(Location raw, DeviceMotionEvidence.State motion) {
@@ -47,7 +48,7 @@ final class LocationMotionFilter {
         extras.putDouble(ANCHOR_LON, Math.IEEEremainder(longitude
                 + Math.toDegrees(result.x / (EARTH_RADIUS * scale)), 360));
         output.setExtras(extras);
-        displayLocation = anchor(output);
+        displayLocation = new Location(output);
         return output;
     }
 

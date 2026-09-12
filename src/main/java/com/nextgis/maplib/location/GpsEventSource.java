@@ -249,6 +249,7 @@ public class GpsEventSource {
         return "input=" + filter.getInputFixCount() + " passed=" + filter.getPassedInputFixCount()
                 + " dropped=" + filter.getDroppedInputFixCount()
                 + " chordDropped=" + filter.getChordDroppedFixCount()
+                + " " + filter.getMotionDiagnostics()
                 + " gpsRequests=" + gpsRequests + " gpsStops=" + gpsStops
                 + " wakeLock=" + (recordingWakeLock != null && recordingWakeLock.isHeld());
     }

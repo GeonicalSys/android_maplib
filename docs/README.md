@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-12
+last_verified: 2026-09-13
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -328,3 +328,17 @@ partial wake lock, пока активен хотя бы один recorder, не
 Sampler держит до 120 секунд / 512 неподтверждённых GNSS точек и после подтверждения
 восстанавливает начало с временами и поворотами; остановка/разрыв не выгружает
 сомнительный буфер. Regression fixture содержит обезличенный ADB-замер стоящего A54.
+
+## Независимый preview и подтверждение ходьбы
+
+`MapDrawable.showWalkPreview` принимает полную геометрию сервиса отдельно от
+foreground-редактора. `WalkPreviewGeometry` восстанавливает CRS приватной копии
+перед WGS84-проекцией и отображает также незавершённые кольца. Источник переживает
+полную и облегчённую загрузку style. Резервирование слоя доступно через default
+hook `IGISApplication.isLayerReservedForWalk` и учитывается перед удалением.
+
+`LocationMotionFilter` выдаёт текущий display candidate отдельно от stop anchor.
+Короткое окно для accuracy до 5 м и медианные части 12-секундного окна для
+accuracy до 12 м допускают обычную неопределённость speed и ранний поворот.
+`stationary`/`departureMs` в диагностике различают ожидание фильтра и отсутствие
+GNSS. Пороговые значения и пределы: [GPS pipeline](../../docs/architecture/location-pipeline.md).

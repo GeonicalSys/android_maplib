@@ -158,7 +158,18 @@ public class AdaptiveLocationFilterCoreTest {
             double x = Math.sin(i) * 2;
             AdaptiveLocationFilterCore.Estimate result = filter.onSample(fix(x, 0, i, 8, 0, Double.NaN));
             assertNotNull(result);
-            assertTrue(result.accuracy >= 8 + Math.abs(x - result.x) - 0.001);
+            assertTrue(result.accuracy >= 8 + Math.abs(x - result.candidateX) - 0.001);
+        }
+    }
+    @Test public void currentPositionKeepsFollowingFixesWhileRecordingDepartureIsStillUnconfirmed() {
+        AdaptiveLocationFilterCore filter = new AdaptiveLocationFilterCore();
+        for (int second = 0; second <= 45; second++) {
+            double x = second * 1.4;
+            AdaptiveLocationFilterCore.Estimate e = filter.onSample(measured(x, 0, second,
+                    25, 1.4, .8, 90, DeviceMotionEvidence.State.MOVING));
+            assertNotNull(e);
+            assertEquals("current marker at " + second, x, e.candidateX, 2.5);
+            assertTrue("circle must not grow with distance from stop", e.accuracy <= 28);
         }
     }
     private static AdaptiveLocationFilterCore.Sample measured(double x, double y, int second,

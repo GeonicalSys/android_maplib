@@ -309,6 +309,8 @@ public class MapDrawable
     private static final String USER_LOCATION_SOURCE_ID = "user-location-source";
     private static final String USER_ACCURACY_LAYER_ID = "user-location-accuracy";
     private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
+    private static final String WALK_PREVIEW_SOURCE = "walk-preview-source";
+    private FeatureCollection walkPreview = FeatureCollection.fromFeatures(new ArrayList<>());
     private static final String USER_LOCATION_STANDING_ICON_ID = "user-marker-location-stand";
     private static final String USER_LOCATION_MOVING_ICON_ID = "user-marker-location-go";
 
@@ -2269,6 +2271,7 @@ public class MapDrawable
                                     "MapLibre post-load hooks postponed until deferred reload");
                         }
                         ensureAzimuthMeasurementOverlay(style);
+                        ensureWalkPreview(style);
                         ensureUserLocationLayerOnTop(style);
 
                         } catch (Throwable t) {
@@ -2557,6 +2560,7 @@ public class MapDrawable
         }
 
         ensureAzimuthMeasurementOverlay(style);
+        ensureWalkPreview(style);
         ensureUserLocationLayerOnTop(style);
         syncUserLocationSourceFromStyle(style);
     }
@@ -4427,9 +4431,44 @@ public class MapDrawable
     }
 
     /**
-     * Shows a transient WGS84 measurement segment above user map layers. Either endpoint may be
-     * absent while the user is selecting points. The user-location cursor remains the top layer.
+     * Renders the recorder's private geometry without taking ownership of the foreground editor.
      */
+    public void showWalkPreview(@Nullable GeoGeometry geometry) {
+        try {
+            walkPreview = WalkPreviewGeometry.build(geometry);
+            MapLibreMap map = maplibreMap.get();
+            ensureWalkPreview(map != null ? map.getStyle() : null);
+        } catch (RuntimeException | org.json.JSONException exception) {
+            Log.w(TAG, "Walk preview awaits a usable style/geometry", exception);
+        }
+    }
+
+    private void ensureWalkPreview(@Nullable Style style) {
+        if (style == null) return;
+        GeoJsonSource source = style.getSourceAs(WALK_PREVIEW_SOURCE);
+        if (source == null) {
+            source = new GeoJsonSource(WALK_PREVIEW_SOURCE, walkPreview);
+            style.addSource(source);
+        } else source.setGeoJson(walkPreview);
+        if (style.getLayer("walk-preview-fill") == null) {
+            addWalkPreviewLayer(style, new FillLayer("walk-preview-fill", WALK_PREVIEW_SOURCE)
+                    .withFilter(Expression.eq(Expression.geometryType(), Expression.literal("Polygon")))
+                    .withProperties(PropertyFactory.fillColor("#D84343"), PropertyFactory.fillOpacity(0.15f)));
+            addWalkPreviewLayer(style, new LineLayer("walk-preview-line", WALK_PREVIEW_SOURCE)
+                    .withProperties(PropertyFactory.lineColor("#C62828"), PropertyFactory.lineWidth(3.0f)));
+            addWalkPreviewLayer(style, new CircleLayer("walk-preview-point", WALK_PREVIEW_SOURCE)
+                    .withFilter(Expression.eq(Expression.geometryType(), Expression.literal("Point")))
+                    .withProperties(PropertyFactory.circleColor("#C62828"), PropertyFactory.circleRadius(4.0f)));
+        }
+        ensureUserLocationLayerOnTop(style);
+    }
+
+    private void addWalkPreviewLayer(Style style, Layer layer) {
+        if (style.getLayer("selected-polygon-fill") != null) style.addLayerBelow(layer, "selected-polygon-fill");
+        else if (style.getLayer(USER_LOCATION_LAYER_ID) != null) style.addLayerBelow(layer, USER_LOCATION_LAYER_ID);
+        else style.addLayer(layer);
+    }
+
     public void showAzimuthMeasurement(@Nullable Point start, @Nullable Point target) {
         showAzimuthMeasurement(start, target, false, false);
     }

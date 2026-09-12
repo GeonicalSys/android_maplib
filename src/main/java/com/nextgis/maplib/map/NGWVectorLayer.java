@@ -4043,6 +4043,7 @@ public class NGWVectorLayer
     public boolean delete(boolean keepTrack)
             throws SQLiteException
     {
+        if (isReservedForWalk()) return false;
         SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
         FeatureChanges.delete(db, getChangeTableName());
         FeatureAttachments.delete(db, getAttachmentsTableName());
