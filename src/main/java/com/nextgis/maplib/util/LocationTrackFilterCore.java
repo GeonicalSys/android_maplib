@@ -116,6 +116,11 @@ final class LocationTrackFilterCore<T> {
     }
 
     List<T> onSample(T raw) {
+        return onSample(raw, false);
+    }
+
+    /** Only the active provider subscription may supply historical, ordered batch samples. */
+    List<T> onSample(T raw, boolean historical) {
         mInputFixCount++;
         if (raw == null) {
             return dropInput("drop:null");
@@ -128,7 +133,7 @@ final class LocationTrackFilterCore<T> {
 
         long elapsedNanos = mOps.getElapsedRealtimeNanos(raw);
         long nowNanos = mClock.elapsedRealtimeNanos();
-        if (!passesFixAgeNanos(elapsedNanos, nowNanos, mMaxFixAgeMs)) {
+        if (!historical && !passesFixAgeNanos(elapsedNanos, nowNanos, mMaxFixAgeMs)) {
             long ageMs = elapsedNanos > 0L
                     ? (nowNanos - elapsedNanos) / 1_000_000L
                     : -1L;
@@ -290,13 +295,15 @@ final class LocationTrackFilterCore<T> {
         if (mOps.isMock(sample)) {
             return "drop:mock";
         }
-        if (!mOps.hasAccuracy(sample) || mOps.getAccuracy(sample) <= 0f) {
+        if (!mOps.hasAccuracy(sample) || !Float.isFinite(mOps.getAccuracy(sample))
+                || mOps.getAccuracy(sample) <= 0f) {
             return "drop:no_accuracy";
         }
         if (mOps.getAccuracy(sample) > mMaxAccuracyM) {
             return "drop:accuracy:" + mOps.getAccuracy(sample);
         }
-        if (mOps.hasSpeed(sample) && Math.abs(mOps.getSpeed(sample)) > mAbsurdSpeedMps) {
+        if (mOps.hasSpeed(sample) && (!Float.isFinite(mOps.getSpeed(sample))
+                || mOps.getSpeed(sample) < 0 || mOps.getSpeed(sample) > mAbsurdSpeedMps)) {
             return "drop:absurd_speed:" + mOps.getSpeed(sample);
         }
         return null;

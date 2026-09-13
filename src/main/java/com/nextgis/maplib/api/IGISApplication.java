@@ -219,6 +219,9 @@ public interface IGISApplication
 
     public void deleteLayerByID(int id);
 
+    /** A durable recording/form owns this layer (or one of a group's descendants). */
+    default boolean isLayerReservedForWalk(int id) { return false; }
+
     public void addLayerByID(int id);
 
     public AuthInterceptorNG getAuthInterceptor();

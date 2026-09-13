@@ -1049,6 +1049,7 @@ public class VectorLayer
     public boolean delete(boolean keepTrack)
             throws SQLiteException
     {
+        if (isReservedForWalk()) return false;
         try {
             //drop table
             SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
@@ -4253,7 +4254,12 @@ public class VectorLayer
 
     public boolean isLocked()
     {
-        return mIsLocked;
+        return mIsLocked || isReservedForWalk();
+    }
+
+    public boolean isReservedForWalk() {
+        Context app = mContext.getApplicationContext();
+        return app instanceof IGISApplication && ((IGISApplication) app).isLayerReservedForWalk(getId());
     }
 
     public void toNGW(Long id, String account, int syncType, Pair<Integer, Integer> ver) {
