@@ -342,3 +342,8 @@ hook `IGISApplication.isLayerReservedForWalk` и учитывается пере
 accuracy до 12 м допускают обычную неопределённость speed и ранний поворот.
 `stationary`/`departureMs` в диагностике различают ожидание фильтра и отсутствие
 GNSS. Пороговые значения и пределы: [GPS pipeline](../../docs/architecture/location-pipeline.md).
+
+
+## Общее хранилище подложек
+
+SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTiles и тонкими shared_underlay_id ссылками. NgrcArchive читает ZIP двумя потоковыми проходами; RasterMbtilesWriter пишет одну базу без дерева файлов. Legacy migration — rename с журналом, хеширование старых MBTiles отложено. UnderlayWorkspaceIndex меняет закрытые карты без MapBase singleton. Контракт и recovery: [shared-underlays](../../docs/architecture/shared-underlays.md).
