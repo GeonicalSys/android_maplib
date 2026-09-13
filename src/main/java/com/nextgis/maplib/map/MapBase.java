@@ -130,15 +130,38 @@ public class MapBase
             return;
         }
 
-        clearLayers();
-
-        if (newPath != null && newPath.listFiles() !=null && newPath.listFiles().length != 0)
-            FileUtil.deleteRecursive(newPath);
-
-        if (FileUtil.move(mPath, newPath)) {
-            //change path
+        // A legacy map root also owns the shared catalog and project registry directory.
+        // Move only this map's referenced layers/database, never the enclosing app storage.
+        java.util.List<File> owned = new java.util.ArrayList<>();
+        java.util.List<File> moved = new java.util.ArrayList<>();
+        try {
+            if (newPath == null || !save()) throw new java.io.IOException("Cannot save map before moving");
+            com.nextgis.maplib.util.UnderlayFiles.directory(newPath);
+            for (com.nextgis.maplib.api.ILayer layer : getLayers()) owned.add(layer.getPath());
+            for (String name : new String[]{"layers.db", "layers.db-journal", "layers.db-wal", "layers.db-shm"}) {
+                File file = new File(mPath, name); if (file.exists()) owned.add(file);
+            }
+            owned.add(getFileName()); // Publish the map entry point last.
+            for (File file : owned) {
+                com.nextgis.maplib.util.UnderlayFiles.requireChild(mPath, file);
+                File destination = new File(newPath, file.getName());
+                com.nextgis.maplib.util.UnderlayFiles.requireChild(newPath, destination);
+                if (destination.exists()) throw new java.io.IOException("Map destination is occupied");
+            }
+            for (File file : owned) {
+                if (!file.renameTo(new File(newPath, file.getName()))) throw new java.io.IOException("Cannot move map on this storage");
+                moved.add(file);
+            }
             mPath = newPath;
+        } catch (java.io.IOException error) {
+            java.util.Collections.reverse(moved);
+            for (File file : moved) {
+                if (!new File(newPath, file.getName()).renameTo(file))
+                    android.util.Log.e(com.nextgis.maplib.util.Constants.TAG, "Map move rollback incomplete");
+            }
+            android.util.Log.e(com.nextgis.maplib.util.Constants.TAG, "Map move failed; shared storage preserved", error);
         }
+        clearLayers();
         load();
     }
 

@@ -36,6 +36,8 @@ import com.nextgis.maplib.datasource.TileItem;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.NGException;
+import com.nextgis.maplib.util.SharedUnderlayCatalog;
+import com.nextgis.maplib.util.SharedUnderlayStore;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -65,6 +67,54 @@ public class LocalTMSLayer
         extends TMSLayer
 {
     protected Map<Integer, TileCacheLevelDescItem> mLimits;
+    private String mSharedUnderlayId;
+
+    public String getSharedUnderlayId() { return mSharedUnderlayId; }
+    public boolean isSharedUnderlay() { return mSharedUnderlayId != null && !mSharedUnderlayId.isEmpty(); }
+
+    @Override public boolean load() {
+        try {
+            SharedUnderlayStore.catalog(mContext).recover();
+            File config = new File(mPath, "config.json");
+            if (config.isFile()) SharedUnderlayStore.migrate(mContext, mPath,
+                    com.nextgis.maplib.util.UnderlayFiles.readJson(config));
+        } catch (IOException e) {
+            Log.e(Constants.TAG, "Cannot prepare shared underlay", e);
+            // Keep the original configuration; a failed migration must not erase the map entry.
+            return super.load();
+        }
+        return super.load();
+    }
+
+    @Override public boolean delete(boolean deleteChildren) {
+        if (!isSharedUnderlay()) {
+            try {
+                JSONObject config = toJSON();
+                if (SharedUnderlayStore.eligible(mPath, config))
+                    fromJSON(SharedUnderlayStore.migrate(mContext, mPath, config));
+            } catch (IOException | JSONException e) {
+                Log.e(Constants.TAG, "Underlay removal deferred: payload is not protected", e);
+                return false;
+            }
+        }
+        return super.delete(deleteChildren);
+    }
+    public File getPayloadDirectory() {
+        if (isSharedUnderlay()) {
+            try {
+                File payload = SharedUnderlayStore.catalog(mContext).payload(mSharedUnderlayId);
+                if (payload.isDirectory()) return payload;
+            } catch (IOException e) { Log.w(Constants.TAG, "Shared underlay is unavailable", e); }
+        }
+        return mPath;
+    }
+
+    @Override public void fillFromNgrc(Uri uri, IProgressor progressor) throws IOException, NGException {
+        SharedUnderlayStore.importNgrc(this, uri, progressor);
+    }
+    @Override public void fillFromMBTiles(Uri uri, IProgressor progressor) throws IOException, NGException {
+        SharedUnderlayStore.importMbtiles(this, uri, progressor);
+    }
 
 
     public LocalTMSLayer(
@@ -91,7 +141,7 @@ public class LocalTMSLayer
         TileCacheLevelDescItem item = mLimits.get(tile.getZoomLevel());
         boolean isInside = item != null && item.isInside(tile.getX(), tile.getY());
         if (isInside) {
-            File tilePath = new File(mPath, tile.toString() + TILE_EXT);
+            File tilePath = new File(getPayloadDirectory(), tile.toString() + TILE_EXT);
             boolean isExist = tilePath.exists();
             if (isExist) {
                 ret = BitmapFactory.decodeFile(tilePath.getAbsolutePath());
@@ -115,6 +165,7 @@ public class LocalTMSLayer
             throws JSONException
     {
         JSONObject rootConfig = super.toJSON();
+        if (isSharedUnderlay()) rootConfig.put(SharedUnderlayCatalog.LAYER_KEY, mSharedUnderlayId);
 
         if(null != mLimits) {
             JSONArray jsonArray = new JSONArray();
@@ -154,6 +205,7 @@ public class LocalTMSLayer
             throws JSONException
     {
         super.fromJSON(jsonObject);
+        mSharedUnderlayId = jsonObject.optString(SharedUnderlayCatalog.LAYER_KEY, "");
         mLimits = new HashMap<>();
 
         if(jsonObject.has(JSON_LEVELS_KEY)) {

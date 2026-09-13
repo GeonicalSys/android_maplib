@@ -226,10 +226,10 @@ public class MapDrawable
 
     private static String getLocalTmsRasterUrl(LocalTMSLayer layer) {
         if (layer.getTMSType() != TMSTYPE_MBTILES_RASTER) {
-            return "file://" + layer.getPath() + "/{z}/{x}/{y}.tile";
+            return "file://" + layer.getPayloadDirectory() + "/{z}/{x}/{y}.tile";
         }
 
-        File database = new File(layer.getPath(), MBTILES_FILENAME);
+        File database = new File(layer.getPayloadDirectory(), MBTILES_FILENAME);
         if (!MbTilesInfo.isReadyForMapLibre(database)) {
             HyperLog.w(TAG, "Skipping unreadable MBTiles layer id=" + layer.getId()
                     + " name=\"" + ProdLogUtil.truncateForLog(layer.getName(), 100) + "\"");

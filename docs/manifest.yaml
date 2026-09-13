@@ -8,6 +8,16 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
+    responsibility: Durable asset index, publication and move recovery, dedup and payload lifecycle.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
+    responsibility: App-private catalog placement, stream imports and project attachment.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
+    responsibility: Bounded two-pass NGRc reader with complete source hash and explicit tile scheme.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
+    responsibility: Shared batched raster database writer for NGRc and Debug streams.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/UnderlayWorkspaceIndex.java
+    responsibility: Closed workspace traversal and unlink without a MapBase singleton.
   - path: maplib/src/main/java/com/nextgis/maplib/map/WalkPreviewGeometry.java
     responsibility: Build a passive walk preview from a private CRS-preserving copy, including incomplete rings and multipart geometry.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationMotionFilter.java
