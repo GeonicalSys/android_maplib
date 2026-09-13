@@ -28,6 +28,8 @@ public final class SharedUnderlayStore {
 
     /** Metadata and rename only. Existing MBTiles hashes and directory sizes are indexed later. */
     public static JSONObject migrate(Context context, File directory, JSONObject config) throws IOException {
+        if (!config.optString(SharedUnderlayCatalog.LAYER_KEY, "").isEmpty())
+            return catalog(context).repairReference(directory, config);
         if (!eligible(directory, config)) return config;
         JSONObject provenance = config.optJSONObject("ngrc_provenance");
         String hash = provenance == null ? "" : provenance.optString("archive_sha256", "");
@@ -46,12 +48,10 @@ public final class SharedUnderlayStore {
     public static void attach(LocalTMSLayer layer, SharedUnderlayCatalog.Asset asset) throws IOException {
         if (asset == null || !asset.isReady()) throw new IOException("Underlay is not available");
         try {
-            JSONObject own = layer.toJSON(), template = asset.layerConfig();
-            for (String key : new String[]{"tms_type", "min_level", "max_level", "levels",
-                    "bbox_minx", "bbox_miny", "bbox_maxx", "bbox_maxy", "ngrc_provenance"}) {
+            JSONObject own = asset.referenceConfig(layer.toJSON()), template = asset.layerConfig();
+            for (String key : new String[]{"min_level", "max_level", "ngrc_provenance"}) {
                 if (template.has(key)) own.put(key, template.get(key)); else own.remove(key);
             }
-            own.put(SharedUnderlayCatalog.LAYER_KEY, asset.id);
             layer.fromJSON(own);
             if (!layer.save()) throw new IOException("Cannot save underlay reference");
         } catch (JSONException e) { throw new IOException("Invalid underlay configuration", e); }

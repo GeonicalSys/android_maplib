@@ -39,6 +39,16 @@ public final class SharedUnderlayCatalog {
             try { return new JSONObject(json.getJSONObject("layer_config").toString()); }
             catch (JSONException e) { throw new IOException("Missing underlay configuration", e); }
         }
+        /** Payload layout comes from the asset; presentation and zoom limits remain project-owned. */
+        public JSONObject referenceConfig(JSONObject projectConfig) throws IOException {
+            try {
+                JSONObject linked = new JSONObject(projectConfig.toString()), raster = layerConfig();
+                for (String key : new String[]{"tms_type", "levels", "bbox_minx", "bbox_miny", "bbox_maxx", "bbox_maxy"}) {
+                    if (raster.has(key)) linked.put(key, raster.get(key)); else linked.remove(key);
+                }
+                return linked.put(LAYER_KEY, id);
+            } catch (JSONException e) { throw new IOException("Invalid underlay configuration", e); }
+        }
         public boolean isReady() { return READY.equals(state); }
         public boolean hasSource(String source) {
             JSONArray sources = json.optJSONArray("source_keys");
@@ -78,6 +88,19 @@ public final class SharedUnderlayCatalog {
         File directory = new File(new File(root, id), "payload");
         UnderlayFiles.requireChild(root, directory);
         return directory;
+    }
+
+    /** Repair references written by versions that changed only the ID during cross-format dedup. */
+    public JSONObject repairReference(File directory, JSONObject config) throws IOException {
+        synchronized (LOCK) {
+            Asset asset = get(config.optString(LAYER_KEY, ""));
+            if (asset == null || !asset.isReady() || !payload(asset.id).isDirectory()) return config;
+            JSONObject raster = asset.layerConfig();
+            if (!raster.has("tms_type") || config.optInt("tms_type", -1) == raster.optInt("tms_type")) return config;
+            JSONObject repaired = asset.referenceConfig(config);
+            UnderlayFiles.writeJson(new File(directory, "config.json"), repaired);
+            return repaired;
+        }
     }
 
     /** Only this importer owns and may discard its unpublished stage. */
@@ -165,12 +188,16 @@ public final class SharedUnderlayCatalog {
                 throw new IOException("Invalid migration source");
             File payload = payload(asset.id);
             String targetId = asset.json.getString("target_id");
+            Asset target = targetId.equals(asset.id) ? asset : get(targetId);
+            if (target == null || (!targetId.equals(asset.id)
+                    && (!target.isReady() || !payload(targetId).isDirectory())))
+                throw new IOException("Duplicate underlay target disappeared");
+            JSONObject thin = target.referenceConfig(asset.layerConfig());
             if (!payload.exists()) {
                 if (!source.isDirectory() || !source.renameTo(payload))
                     throw new IOException("Cannot move the existing underlay on this storage");
                 checkpoint.reached("migration-moved");
             }
-            JSONObject thin = asset.layerConfig().put(LAYER_KEY, targetId);
             try { UnderlayFiles.writeJson(new File(source, "config.json"), thin); }
             catch (IOException failure) {
                 // A failed thin-config creation must leave a loadable original at the map path.
@@ -189,9 +216,6 @@ public final class SharedUnderlayCatalog {
                 ready.remove("source_layer"); ready.remove("target_id");
                 put(ready);
             } else {
-                Asset target = get(targetId);
-                if (target == null || !target.isReady() || !payload(targetId).isDirectory())
-                    throw new IOException("Duplicate underlay target disappeared");
                 // The complete original is retained until the replacement link is durable.
                 put(asset.json.put("state", GARBAGE));
             }
@@ -271,8 +295,8 @@ public final class SharedUnderlayCatalog {
             throw new IOException("Duplicate target unavailable");
         for (File map : maps) for (UnderlayWorkspaceIndex.Link layer : UnderlayWorkspaceIndex.layers(map)) {
             if (!asset.id.equals(layer.assetId())) continue;
-            try { UnderlayFiles.writeJson(new File(layer.directory, "config.json"), layer.config.put(LAYER_KEY, target)); }
-            catch (JSONException e) { throw new IOException(e); }
+            UnderlayFiles.writeJson(new File(layer.directory, "config.json"), canonical.referenceConfig(layer.config));
+            checkpoint.reached("redirect-linked");
         }
         JSONArray sources = asset.json.optJSONArray("source_keys");
         if (sources != null) for (int i = 0; i < sources.length(); i++) addSource(target, sources.optString(i));

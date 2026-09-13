@@ -9,9 +9,9 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
-    responsibility: Durable asset index, publication and move recovery, dedup and payload lifecycle.
+    responsibility: Durable asset index, publication and move recovery, format-aware dedup, repair of previously mislinked references and payload lifecycle; Asset.referenceConfig preserves project presentation and zoom limits.
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
-    responsibility: App-private catalog placement, stream imports and project attachment.
+    responsibility: App-private catalog placement, stream imports, project attachment and reference repair before layer load.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
     responsibility: Bounded two-pass NGRc reader with complete source hash and explicit tile scheme.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
