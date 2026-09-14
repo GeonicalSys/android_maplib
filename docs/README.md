@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -10,8 +10,8 @@ last_verified: 2026-09-14
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.18` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.18`; отдельный Lisa Debug использует `3.1.2.18`. Оба значения проверяются
+Для выпуска `3.1.2.19` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.19`; отдельный Lisa Debug использует `3.1.2.19`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
