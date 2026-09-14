@@ -24,12 +24,13 @@ public class UserLocationGeometryTest {
     }
 
     @Test
-    public void coneRadiusClampsTinyAndHugeAccuracy() {
-        assertEquals(UserLocationGeometry.MIN_CONE_METERS, UserLocationGeometry.coneRadiusMeters(0.1f), 0f);
-        assertEquals(UserLocationGeometry.MIN_CONE_METERS, UserLocationGeometry.coneRadiusMeters(0f), 0f);
-        assertEquals(50f, UserLocationGeometry.coneRadiusMeters(50f), 0f);
-        assertEquals(UserLocationGeometry.MAX_CONE_METERS, UserLocationGeometry.coneRadiusMeters(400f), 0f);
-        assertEquals(UserLocationGeometry.MIN_CONE_METERS, UserLocationGeometry.coneRadiusMeters(Float.NaN), 0f);
+    public void coneRadiusIsFixedAndIndependentOfAccuracy() {
+        assertEquals(UserLocationGeometry.CONE_METERS, UserLocationGeometry.coneRadiusMeters(0.1f), 0f);
+        assertEquals(UserLocationGeometry.CONE_METERS, UserLocationGeometry.coneRadiusMeters(0f), 0f);
+        assertEquals(UserLocationGeometry.CONE_METERS, UserLocationGeometry.coneRadiusMeters(50f), 0f);
+        assertEquals(UserLocationGeometry.CONE_METERS, UserLocationGeometry.coneRadiusMeters(400f), 0f);
+        assertEquals(UserLocationGeometry.CONE_METERS, UserLocationGeometry.coneRadiusMeters(Float.NaN), 0f);
+        assertEquals(8f, UserLocationGeometry.CONE_METERS, 0f);
     }
 
     @Test

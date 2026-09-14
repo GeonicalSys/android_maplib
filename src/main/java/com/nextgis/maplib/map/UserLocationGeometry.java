@@ -20,16 +20,15 @@ public final class UserLocationGeometry {
     public static final double EARTH_RADIUS_METERS = 6371008.8;
     public static final int CIRCLE_STEPS = 64;
     public static final int SECTOR_ARC_STEPS = 32;
-    public static final float MIN_CONE_METERS = 32f;
-    public static final float MAX_CONE_METERS = 80f;
+    public static final float CONE_METERS = 8f;
     public static final float MIN_HALF_ANGLE_DEGREES = 5f;
     public static final float MAX_HALF_ANGLE_DEGREES = 90f;
 
     private UserLocationGeometry() { }
 
+    /** Heading cone length is fixed in metres and does not follow GPS accuracy. */
     public static float coneRadiusMeters(float accuracyMeters) {
-        float accuracy = Float.isFinite(accuracyMeters) ? Math.max(accuracyMeters, 0f) : 0f;
-        return Math.min(MAX_CONE_METERS, Math.max(MIN_CONE_METERS, accuracy));
+        return CONE_METERS;
     }
 
     public static float clampHalfAngleDegrees(float halfAngleDegrees) {
