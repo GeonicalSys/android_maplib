@@ -50,7 +50,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   merge unset ← «прочие (по умолчанию)» (зум подписей, stops, scale flags,
   opacity); per-feature `labelminzoom`/`labelmaxzoom` через text-opacity gate;
 - `user-location-layer` остаётся служебным верхним overlay независимо от порядка
-  пользовательских слоёв; непостоянные `azimuth-measurement-*` line/point layers
+  пользовательских слоёв; геодезический круг `user-location-accuracy` и сектор
+  направления `user-location-heading` лежат непосредственно под ним (роль Polygon
+  `accuracy`/`heading`); непостоянные `azimuth-measurement-*` line/point layers
   для измерения свободных точек восстанавливаются при full/lite reload строго под ним,
   не входят в `LayerGroup`, не сохраняются как прикладные данные и передают drag
   редактируемых концов линии host-экрану;
@@ -142,8 +144,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
 - `GpsEventSource` владеет общим потоком позиции и отдельным GNSS-only выходом
-  записи. Карта получает свежий GPS/Network и метрический круг accuracy;
-  источник очищает устаревшую позицию по монотонному времени, в том числе после сна.
+  записи. Карта получает свежий GPS/Network, метрический круг accuracy и
+  геодезический сектор направления (`UserLocationGeometry`); host обновляет
+  сектор при повороте телефона без нового GPS. Источник очищает устаревшую
+  позицию по монотонному времени, в том числе после сна.
   `AdaptiveLocationFilterCore` сглаживает шум, удерживает остановку, проверяет
   выбросы и учитывает автомобильные повороты; `LocationRecordingSampler`
   прореживает только уже проверенные точки. База v6 и `TrackLayer.getTracks()`
@@ -229,7 +233,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Zoom-stops «не действуют»: кривая слоя общая из other; нужен флаг scale
   (на other или унаследованный); data-driven scale — outer switchCase.
 - Курсор перекрывается треком/вектором: проверить, что `user-location-layer`
-  последний в live style после cold/lite/hot reload.
+  последний в live style после cold/lite/hot reload, а под ним
+  `user-location-heading` и `user-location-accuracy`.
 - Объект после cold form recovery выбирается, но не виден до restart: проверить
   `MapLibre feature missing after form Save` и следующий полный data reload слоя.
 - После успешного Save объект остаётся выбранным или видны edit sources: app host
