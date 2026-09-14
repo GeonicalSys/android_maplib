@@ -21,7 +21,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/WalkPreviewGeometry.java
     responsibility: Build a passive walk preview from a private CRS-preserving copy, including incomplete rings and multipart geometry.
   - path: maplib/src/main/java/com/nextgis/maplib/map/UserLocationGeometry.java
-    responsibility: Build geodesic accuracy-circle and heading-sector GeoJSON with role properties; cone length is clamped in metres independently of a huge GPS circle.
+    responsibility: Build geodesic accuracy-circle and heading-sector GeoJSON with role properties; cone length is clamped in metres independently of a huge GPS circle; half-angle is clamped 5–90°.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationMotionFilter.java
     responsibility: Separate the fresh display candidate from the recorder stop anchor and expose departure diagnostics.
   - path: maplib/src/test/java/com/nextgis/maplib/util/LocationDepartureTest.java

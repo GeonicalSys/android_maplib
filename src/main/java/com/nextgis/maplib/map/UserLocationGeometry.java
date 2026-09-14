@@ -22,7 +22,7 @@ public final class UserLocationGeometry {
     public static final int SECTOR_ARC_STEPS = 32;
     public static final float MIN_CONE_METERS = 32f;
     public static final float MAX_CONE_METERS = 80f;
-    public static final float MIN_HALF_ANGLE_DEGREES = 8f;
+    public static final float MIN_HALF_ANGLE_DEGREES = 5f;
     public static final float MAX_HALF_ANGLE_DEGREES = 90f;
 
     private UserLocationGeometry() { }

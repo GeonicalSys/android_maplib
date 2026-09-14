@@ -90,7 +90,7 @@ public class UserLocationGeometryTest {
         assertEquals(halfMid.longitude(), hugeMid.longitude(), 1e-9);
         assertEquals(halfMid.latitude(), hugeMid.latitude(), 1e-9);
         assertEquals(90f, UserLocationGeometry.clampHalfAngleDegrees(400f), 0f);
-        assertEquals(8f, UserLocationGeometry.clampHalfAngleDegrees(1f), 0f);
+        assertEquals(5f, UserLocationGeometry.clampHalfAngleDegrees(1f), 0f);
     }
 
     @Test
