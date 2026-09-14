@@ -8,9 +8,12 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.regex.Pattern;
 
 /** Two bounded passes: identify the whole archive, then write tiles without an extracted tree. */
 public final class NgrcArchive {
+    private static final Pattern RASTER_PATH = Pattern.compile(
+            "[0-9]+/[0-9]+/[0-9]+\\.(?:tile|png|jpe?g|webp)", Pattern.CASE_INSENSITIVE);
     public interface Source { InputStream open() throws IOException; }
     public interface Tiles { void add(String path, byte[] data, int scheme) throws IOException; }
     public interface Progress { void check() throws IOException; }
@@ -83,7 +86,12 @@ public final class NgrcArchive {
             throw new IOException("Invalid NGRc path");
         for (String part : name.split("/")) if ("..".equals(part) || ".".equals(part))
             throw new IOException("Invalid NGRc path");
-        return name.startsWith("mapnik/") ? name.substring(7) : name;
+        String path = name.regionMatches(true, 0, "mapnik/", 0, 7) ? name.substring(7) : name;
+        if ("mapnik.json".equalsIgnoreCase(path) || "config.json".equalsIgnoreCase(path))
+            return "config.json";
+        if (RASTER_PATH.matcher(path).matches())
+            return path.substring(0, path.lastIndexOf('.')) + ".tile";
+        return path;
     }
     private static boolean isTile(String path) { return path.matches("[0-9]+/[0-9]+/[0-9]+\\.tile"); }
 }

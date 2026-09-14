@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-09-13
+last_verified: 2026-09-14
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -13,7 +13,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
     responsibility: App-private catalog placement, stream imports, project attachment and reference repair before layer load.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
-    responsibility: Bounded two-pass NGRc reader with complete source hash and explicit tile scheme.
+    responsibility: Bounded two-pass NGRc reader with complete source hash, explicit tile scheme, case-insensitive Mapnik.json/config.json and Mapnik raster-path normalization, and ambiguous metadata rejection.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
     responsibility: Shared batched raster database writer for NGRc and Debug streams.
   - path: maplib/src/main/java/com/nextgis/maplib/util/UnderlayWorkspaceIndex.java

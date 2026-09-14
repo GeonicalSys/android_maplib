@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-13
+last_verified: 2026-09-14
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -355,3 +355,12 @@ SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTil
 `repairReference` исправляет ссылки старых сборок с несовпадающим `tms_type`.
 Регрессии проверяют оба направления NGRc/MBTiles, возобновление move/redirect,
 закрытые проекты и недоступный целевой payload.
+
+Потоковый `NgrcArchive` принимает исходные `Mapnik.json` и `Mapnik/z/x/y.jpg`
+наряду с `config.json` и `.tile`, включая PNG/JPEG/WebP и разный регистр.
+Проверки пути, схемы, полного archive hash и неоднозначной конфигурации
+сохраняются. При ошибке либо отмене импорта worker вызывает удаление слоя;
+`MapDrawable.deleteLayerByID` переносит удаление native style и связанных
+реестров на main thread, сохраняя синхронный вызов из UI. Это устраняет
+`CalledFromWorkerThreadException` в cleanup; ошибка самого импорта остаётся
+доступна диагностике.

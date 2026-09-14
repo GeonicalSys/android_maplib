@@ -648,6 +648,12 @@ public class MapDrawable
     }
 
     public void deleteLayerByID(int id){
+        // Failed/cancelled imports delete their staging layer from LayerFillWorker.
+        // Both the native style and its Java registries belong to the UI thread.
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            postMainGuarded("deleteLayerByID id=" + id, () -> deleteLayerByID(id));
+            return;
+        }
         localVectorTileUrlMap.remove(id);
         LocalVectorTileServer.getInstance().unregisterLayer(id);
         MapLibreMap map = maplibreMap.get();
