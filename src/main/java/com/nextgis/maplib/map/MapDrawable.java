@@ -308,6 +308,7 @@ public class MapDrawable
 
     private static final String USER_LOCATION_SOURCE_ID = "user-location-source";
     private static final String USER_ACCURACY_LAYER_ID = "user-location-accuracy";
+    private static final String USER_HEADING_LAYER_ID = "user-location-heading";
     private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
     private static final String WALK_PREVIEW_SOURCE = "walk-preview-source";
     private FeatureCollection walkPreview = FeatureCollection.fromFeatures(new ArrayList<>());
@@ -323,6 +324,12 @@ public class MapDrawable
     private static final String AZIMUTH_ROLE_TARGET = "target";
 
     GeoJsonSource locationSource = null;
+    @Nullable private Point lastUserLocationPoint = null;
+    private boolean lastUserLocationStanding = true;
+    private float lastUserLocationBearing = 0f;
+    private float lastUserLocationAccuracyMeters = 0f;
+    private float lastUserHeadingTrueDegrees = Float.NaN;
+    private float lastUserHeadingHalfAngleDegrees = Float.NaN;
     @Nullable private Point azimuthMeasurementStart = null;
     @Nullable private Point azimuthMeasurementTarget = null;
     private boolean azimuthMeasurementStartEditable = false;
@@ -441,28 +448,70 @@ public class MapDrawable
 
     /**
      * Keeps the location cursor outside the user {@link LayerGroup} order and above every rendered
-     * map object. MapLibre paints style layers bottom-to-top, so the cursor must be the last layer.
-     * Re-adding a removed {@link Layer} is supported by MapLibre and preserves its properties.
+     * map object. MapLibre paints style layers bottom-to-top, so the stack is accuracy fill, heading
+     * sector, then the cursor as the last layer. Re-adding a removed {@link Layer} is supported by
+     * MapLibre and preserves its properties.
      */
     private void ensureUserLocationLayerOnTop(@Nullable Style style) {
         if (style == null || style.getSource(USER_LOCATION_SOURCE_ID) == null) return;
         List<Layer> layers = style.getLayers();
         int n = layers.size();
-        if (n >= 2 && USER_LOCATION_LAYER_ID.equals(layers.get(n - 1).getId())
-                && USER_ACCURACY_LAYER_ID.equals(layers.get(n - 2).getId())) return;
+        if (n >= 3
+                && USER_LOCATION_LAYER_ID.equals(layers.get(n - 1).getId())
+                && USER_HEADING_LAYER_ID.equals(layers.get(n - 2).getId())
+                && USER_ACCURACY_LAYER_ID.equals(layers.get(n - 3).getId())) return;
         Layer accuracy = style.getLayer(USER_ACCURACY_LAYER_ID);
+        Layer heading = style.getLayer(USER_HEADING_LAYER_ID);
         Layer location = style.getLayer(USER_LOCATION_LAYER_ID);
         if (accuracy == null) {
-            accuracy = new FillLayer(USER_ACCURACY_LAYER_ID, USER_LOCATION_SOURCE_ID)
-                    .withFilter(Expression.eq(Expression.geometryType(), Expression.literal("Polygon")))
-                    .withProperties(PropertyFactory.fillColor("#3189D6"),
-                            PropertyFactory.fillOpacity(0.16f),
-                            PropertyFactory.fillOutlineColor("#3189D6"));
-        } else if (!style.removeLayer(accuracy)) return;
+            accuracy = createUserAccuracyLayer();
+        } else if (!style.removeLayer(accuracy)) {
+            return;
+        } else if (accuracy instanceof FillLayer) {
+            ((FillLayer) accuracy).setFilter(userLocationAccuracyFilter());
+        }
+        if (heading == null) {
+            heading = createUserHeadingLayer();
+        } else if (!style.removeLayer(heading)) {
+            return;
+        } else if (heading instanceof FillLayer) {
+            ((FillLayer) heading).setFilter(userLocationHeadingFilter());
+        }
         if (location == null) location = createUserLocationLayer();
         else if (!style.removeLayer(location)) return;
         style.addLayer(accuracy);
+        style.addLayer(heading);
         style.addLayer(location);
+    }
+
+    private static FillLayer createUserAccuracyLayer() {
+        return new FillLayer(USER_ACCURACY_LAYER_ID, USER_LOCATION_SOURCE_ID)
+                .withFilter(userLocationAccuracyFilter())
+                .withProperties(PropertyFactory.fillColor("#3189D6"),
+                        PropertyFactory.fillOpacity(0.16f),
+                        PropertyFactory.fillOutlineColor("#3189D6"));
+    }
+
+    private static FillLayer createUserHeadingLayer() {
+        return new FillLayer(USER_HEADING_LAYER_ID, USER_LOCATION_SOURCE_ID)
+                .withFilter(userLocationHeadingFilter())
+                .withProperties(PropertyFactory.fillColor("#3189D6"),
+                        PropertyFactory.fillOpacity(0.32f),
+                        PropertyFactory.fillOutlineColor("#3189D6"));
+    }
+
+    private static Expression userLocationAccuracyFilter() {
+        return Expression.all(
+                Expression.eq(Expression.geometryType(), Expression.literal("Polygon")),
+                Expression.eq(Expression.get(UserLocationGeometry.ROLE_PROPERTY),
+                        Expression.literal(UserLocationGeometry.ROLE_ACCURACY)));
+    }
+
+    private static Expression userLocationHeadingFilter() {
+        return Expression.all(
+                Expression.eq(Expression.geometryType(), Expression.literal("Polygon")),
+                Expression.eq(Expression.get(UserLocationGeometry.ROLE_PROPERTY),
+                        Expression.literal(UserLocationGeometry.ROLE_HEADING)));
     }
 
     private SymbolLayer createUserLocationLayer() {
@@ -4398,42 +4447,84 @@ public class MapDrawable
     }
 
     public void updateLocation(Point point, boolean isStanding, float bearing, float accuracyMeters) {
-        MapLibreMap map = maplibreMap.get();
-        if (map == null) return;
-        syncUserLocationSourceFromStyle(map.getStyle());
-        if (locationSource == null) return;
-        List<org.maplibre.geojson.Feature> features = new ArrayList<>();
-        if (Float.isFinite(accuracyMeters) && accuracyMeters > 0) {
-            List<Point> ring = new ArrayList<>();
-            // Geodesic radius in metres: zoom, latitude and camera tilt cannot change its meaning.
-            double lat = Math.toRadians(point.latitude());
-            double radius = Math.min(accuracyMeters / 6371008.8, Math.PI / 2);
-            for (int i = 0; i <= 64; i++) {
-                double angle = 2 * Math.PI * i / 64;
-                double phi = Math.asin(Math.sin(lat) * Math.cos(radius)
-                        + Math.cos(lat) * Math.sin(radius) * Math.cos(angle));
-                double delta = Math.atan2(Math.sin(angle) * Math.sin(radius) * Math.cos(lat),
-                        Math.cos(radius) - Math.sin(lat) * Math.sin(phi));
-                ring.add(Point.fromLngLat(point.longitude() + Math.toDegrees(delta), Math.toDegrees(phi)));
-            }
-            ring.set(64, ring.get(0));
-            features.add(org.maplibre.geojson.Feature.fromGeometry(
-                    Polygon.fromLngLats(java.util.Collections.singletonList(ring))));
-        }
-        org.maplibre.geojson.Feature marker = org.maplibre.geojson.Feature.fromGeometry(point);
-        marker.addStringProperty("type", isStanding ? "stand" : "go");
-        marker.addNumberProperty("bearing", isStanding ? 0f : bearing);
-        features.add(marker);
-        locationSource.setGeoJson(FeatureCollection.fromFeatures(features));
-        ensureUserLocationLayerOnTop(map.getStyle());
+        rememberUserLocation(point, isStanding, bearing, accuracyMeters);
+        publishUserLocation();
+    }
+
+    /**
+     * Updates the GPS fix and the heading cone together. A null heading hides the cone until the
+     * next heading sample; the accuracy circle and puck stay.
+     */
+    public void updateLocation(
+            Point point,
+            boolean isStanding,
+            float bearing,
+            float accuracyMeters,
+            @Nullable Float headingTrueDegrees,
+            @Nullable Float headingHalfAngleDegrees) {
+        rememberUserLocation(point, isStanding, bearing, accuracyMeters);
+        rememberUserHeading(headingTrueDegrees, headingHalfAngleDegrees);
+        publishUserLocation();
+    }
+
+    /**
+     * Rebuilds the heading sector from the last GPS fix without changing the puck or accuracy circle.
+     */
+    public void updateLocationHeading(
+            @Nullable Float headingTrueDegrees,
+            @Nullable Float headingHalfAngleDegrees) {
+        rememberUserHeading(headingTrueDegrees, headingHalfAngleDegrees);
+        if (lastUserLocationPoint != null) publishUserLocation();
     }
 
     public void clearLocation() {
+        lastUserLocationPoint = null;
+        lastUserLocationStanding = true;
+        lastUserLocationBearing = 0f;
+        lastUserLocationAccuracyMeters = 0f;
+        lastUserHeadingTrueDegrees = Float.NaN;
+        lastUserHeadingHalfAngleDegrees = Float.NaN;
         MapLibreMap map = maplibreMap.get();
         if (map == null) return;
         syncUserLocationSourceFromStyle(map.getStyle());
         if (locationSource != null)
             locationSource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
+    }
+
+    private void rememberUserLocation(Point point, boolean isStanding, float bearing, float accuracyMeters) {
+        lastUserLocationPoint = point;
+        lastUserLocationStanding = isStanding;
+        lastUserLocationBearing = bearing;
+        lastUserLocationAccuracyMeters = accuracyMeters;
+    }
+
+    private void rememberUserHeading(
+            @Nullable Float headingTrueDegrees,
+            @Nullable Float headingHalfAngleDegrees) {
+        if (headingTrueDegrees != null && headingHalfAngleDegrees != null
+                && UserLocationGeometry.hasHeadingSector(headingTrueDegrees, headingHalfAngleDegrees)) {
+            lastUserHeadingTrueDegrees = headingTrueDegrees;
+            lastUserHeadingHalfAngleDegrees = headingHalfAngleDegrees;
+        } else {
+            lastUserHeadingTrueDegrees = Float.NaN;
+            lastUserHeadingHalfAngleDegrees = Float.NaN;
+        }
+    }
+
+    private void publishUserLocation() {
+        MapLibreMap map = maplibreMap.get();
+        if (map == null || lastUserLocationPoint == null) return;
+        syncUserLocationSourceFromStyle(map.getStyle());
+        if (locationSource == null) return;
+        locationSource.setGeoJson(FeatureCollection.fromFeatures(
+                UserLocationGeometry.overlayFeatures(
+                        lastUserLocationPoint,
+                        lastUserLocationStanding,
+                        lastUserLocationBearing,
+                        lastUserLocationAccuracyMeters,
+                        lastUserHeadingTrueDegrees,
+                        lastUserHeadingHalfAngleDegrees)));
+        ensureUserLocationLayerOnTop(map.getStyle());
     }
 
     /**
