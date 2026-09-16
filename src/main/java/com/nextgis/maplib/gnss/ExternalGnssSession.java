@@ -27,14 +27,20 @@ public final class ExternalGnssSession {
     public static final String STATUS_CONNECTED = "connected";
     public static final String STATUS_NO_DEVICE = "no_device";
 
+    private static final long ASCII_WAIT_MS = 2_000L;
+
     private final Context context;
     private final SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final NmeaParser parser = new NmeaParser();
     private final NmeaLineBuffer lines = new NmeaLineBuffer();
+    private final CnbPreamble cnb = new CnbPreamble();
+    private final Runnable requestNmea = this::requestNmeaIfNeeded;
     private Callback callback;
     private GnssTransport transport;
     private boolean wanted;
+    private boolean asciiSeen;
+    private boolean commandsSent;
     private int attempt;
     private String status = STATUS_IDLE;
     private GnssFix lastFix;
@@ -63,6 +69,9 @@ public final class ExternalGnssSession {
             closeTransport();
             parser.reset();
             lines.reset();
+            cnb.reset();
+            asciiSeen = false;
+            commandsSent = false;
             lastFix = null;
             setStatus(STATUS_IDLE);
             return;
@@ -74,6 +83,9 @@ public final class ExternalGnssSession {
         closeTransport();
         parser.reset();
         lines.reset();
+        cnb.reset();
+        asciiSeen = false;
+        commandsSent = false;
         lastFix = null;
         attempt = 0;
         if (wanted) {
@@ -94,6 +106,9 @@ public final class ExternalGnssSession {
             return;
         }
         setStatus(STATUS_CONNECTING);
+        asciiSeen = false;
+        commandsSent = false;
+        cnb.reset();
         transport = GnssTransportFactory.create(context, prefs);
         transport.open(new GnssTransport.Listener() {
             @Override
@@ -101,6 +116,10 @@ public final class ExternalGnssSession {
                 handler.post(() -> {
                     attempt = 0;
                     setStatus(STATUS_CONNECTED);
+                    handler.removeCallbacks(requestNmea);
+                    if (!commandsSent && !asciiSeen) {
+                        handler.postDelayed(requestNmea, ASCII_WAIT_MS);
+                    }
                 });
             }
 
@@ -121,7 +140,13 @@ public final class ExternalGnssSession {
         if (!wanted || transport == null) {
             return;
         }
+        if (!asciiSeen && !commandsSent && cnb.accept(data, length)) {
+            requestNmeaIfNeeded();
+        }
         lines.append(data, length, line -> {
+            if (isAsciiGnss(line)) {
+                asciiSeen = true;
+            }
             boolean ready = parser.accept(line);
             GnssFix snapshot = parser.snapshot();
             lastFix = snapshot;
@@ -144,6 +169,31 @@ public final class ExternalGnssSession {
                 local.onExternalLocation(location);
             }
         });
+    }
+
+    private void requestNmeaIfNeeded() {
+        if (!wanted || transport == null || commandsSent || asciiSeen) {
+            return;
+        }
+        commandsSent = true;
+        handler.removeCallbacks(requestNmea);
+        transport.write(ComNavAsciiCommands.nmeaEnable());
+        DiagnosticLog.v("External GNSS requested ComNav NMEA");
+    }
+
+    static boolean isAsciiGnss(String line) {
+        if (line == null || line.isEmpty()) {
+            return false;
+        }
+        if (line.charAt(0) == '#' && line.regionMatches(true, 1, "BESTPOSA", 0, 8)) {
+            return true;
+        }
+        if (line.charAt(0) != '$' || line.length() < 6) {
+            return false;
+        }
+        String upper = line.toUpperCase();
+        return upper.contains("GGA") || upper.contains("RMC") || upper.contains("GST")
+                || upper.contains("GSA");
     }
 
     private void onTransportClosed(String reason) {

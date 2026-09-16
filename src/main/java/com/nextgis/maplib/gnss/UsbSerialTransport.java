@@ -165,6 +165,19 @@ public final class UsbSerialTransport implements GnssTransport {
     }
 
     @Override
+    public void write(byte[] data) {
+        UsbSerialPort local = port;
+        if (local == null || data == null || data.length == 0) {
+            return;
+        }
+        try {
+            local.write(data, 1000);
+        } catch (Exception exception) {
+            Log.w(Constants.TAG, "USB GNSS write failed", exception);
+        }
+    }
+
+    @Override
     public void close() {
         running.set(false);
         if (permissionReceiver != null) {
