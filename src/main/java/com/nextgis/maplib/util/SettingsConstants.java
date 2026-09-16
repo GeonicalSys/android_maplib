@@ -50,6 +50,8 @@ public interface SettingsConstants
     String KEY_PREF_GNSS_DEVICE_NAME        = "gnss_device_name";
     String KEY_PREF_GNSS_TCP_HOST           = "gnss_tcp_host";
     String KEY_PREF_GNSS_TCP_PORT           = "gnss_tcp_port";
+    /** Opt-in HyperLog dump of every GNSS/NMEA measurement, including coordinates. */
+    String KEY_PREF_VERBOSE_LOG             = "verbose_log";
     String KEY_PREF_LOCATION_MIN_TIME       = "location_min_time";
     String KEY_PREF_LOCATION_MIN_DISTANCE   = "location_min_distance";
     String KEY_PREF_LOCATION_ACCURATE_COUNT = "accurate_max_count";

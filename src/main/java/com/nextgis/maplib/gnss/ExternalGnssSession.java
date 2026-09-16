@@ -9,6 +9,7 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.DiagnosticLog;
 
 /**
  * Owns one external NMEA transport, reconnects while consumers remain, and
@@ -128,6 +129,12 @@ public final class ExternalGnssSession {
             if (local != null) {
                 local.onExternalFix(snapshot);
             }
+            DiagnosticLog.v("NMEA q=" + snapshot.quality
+                    + " sats=" + snapshot.satellites
+                    + " hdop=" + snapshot.hdop
+                    + " hasFix=" + snapshot.hasFix()
+                    + " locPublished=" + ready
+                    + " line=" + line);
             if (!ready) {
                 return;
             }
@@ -141,6 +148,7 @@ public final class ExternalGnssSession {
 
     private void onTransportClosed(String reason) {
         Log.i(Constants.TAG, "External GNSS closed: " + reason);
+        DiagnosticLog.v("External GNSS closed: " + reason);
         closeTransport();
         if (!wanted) {
             setStatus(STATUS_IDLE);
@@ -162,6 +170,7 @@ public final class ExternalGnssSession {
 
     private void setStatus(String value) {
         status = value;
+        DiagnosticLog.v("External GNSS status=" + value);
         Callback local = callback;
         if (local != null) {
             local.onExternalStatus(value);

@@ -8,9 +8,18 @@ public final class LocationFixPolicy {
     private LocationFixPolicy() { }
 
     public static boolean isFresh(long fixNanos, long nowNanos) {
+        return isFresh(fixNanos, nowNanos, FRESHNESS_MS);
+    }
+
+    public static boolean isFresh(long fixNanos, long nowNanos, long maxAgeMs) {
         if (fixNanos <= 0 || nowNanos <= 0) return false;
-        long age = (nowNanos - fixNanos) / 1_000_000L;
-        return age >= -FUTURE_TOLERANCE_MS && age <= FRESHNESS_MS;
+        long age = ageMs(fixNanos, nowNanos);
+        return age >= -FUTURE_TOLERANCE_MS && age <= maxAgeMs;
+    }
+
+    public static long ageMs(long fixNanos, long nowNanos) {
+        if (fixNanos <= 0 || nowNanos <= 0) return -1L;
+        return (nowNanos - fixNanos) / 1_000_000L;
     }
 
     public static boolean validPosition(double latitude, double longitude, float accuracy) {

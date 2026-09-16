@@ -11,8 +11,6 @@ import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
 
-import com.hypertrack.hyperlog.HyperLog;
-
 import java.util.List;
 import java.util.Collections;
 
@@ -240,9 +238,12 @@ public final class LocationTrackFilter {
     }
 
     private void debugDiagnostic(String reason) {
+        if (!DiagnosticLog.isVerbose()) {
+            return;
+        }
         String message = "LocationTrackFilter: " + reason
                 + " provider=" + (mDiagnosticProvider == null ? "unknown" : mDiagnosticProvider);
-        HyperLog.d(Constants.TAG, message);
+        DiagnosticLog.v(message);
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, message);
         }

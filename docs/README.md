@@ -158,7 +158,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   позицию по монотонному времени, в том числе после сна.
   `ExternalGnssFixPolicy` отбрасывает заглушку GPS Connector без extras и чип
   при живом mock. `gnss_input=external` читает NMEA напрямую (Bluetooth Classic/LE,
-  USB, TCP/IP) без Mock Location; `NmeaParser` собирает GGA/GST/GSA/RMC без бренда
+  USB, TCP/IP) без Mock Location и не закрывает транспорт из-за снятия
+  слушателей карты; `NmeaParser` собирает GGA/GST/GSA/RMC без бренда
   приёмника. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
   выбросы и учитывает автомобильные повороты; mock и native NMEA пишутся как есть.
   `LocationRecordingSampler`
@@ -332,7 +333,8 @@ central registry.
 ## GPS: фон и уточнение стоянок
 
 GPS-подписка записи сохраняется при скрытии/возврате карты. Источник удерживает
-partial wake lock, пока активен хотя бы один recorder, независимо от звука.
+partial wake lock, пока активен хотя бы один recorder или внешняя NMEA-сессия,
+независимо от звука.
 Акселерометр 25 Гц дополняет GNSS-проверку стоянок; при отсутствии свежих сенсорных
 событий используется состояние «неизвестно». Согласованное движение автомобиля
 может опровергнуть неподвижность телефона в держателе. Уточнение стоянки через
