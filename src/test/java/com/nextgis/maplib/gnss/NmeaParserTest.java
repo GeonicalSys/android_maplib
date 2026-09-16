@@ -103,6 +103,31 @@ public class NmeaParserTest {
         assertEquals("Autonomous", parser.snapshot().qualityLabel());
     }
 
+    @Test public void lineBufferIgnoresDollarHashInsideCnb() {
+        NmeaLineBuffer buffer = new NmeaLineBuffer();
+        byte[] mixed = new byte[] {
+                (byte) 0xAA, 0x44, 0x12, '$', 'B', (byte) 0xAA, 0x44, 0x12, 0x0A,
+                '#', 0x1A, (byte) 0xC7, 0x0A
+        };
+        final int[] lines = {0};
+        buffer.append(mixed, mixed.length, line -> lines[0]++);
+        assertEquals(0, lines[0]);
+        String sentence = nmea(
+                "GPGGA,191408.00,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,");
+        byte[] nmeaBytes = (sentence + "\r\n").getBytes();
+        final boolean[] ready = {false};
+        NmeaParser parser = new NmeaParser();
+        buffer.append(nmeaBytes, nmeaBytes.length, line -> ready[0] = parser.accept(line));
+        assertTrue(ready[0]);
+    }
+
+    @Test public void bestPosQualityFromOemCodes() {
+        assertEquals(1, NmeaParser.bestPosQualityFromCode(16));
+        assertEquals(5, NmeaParser.bestPosQualityFromCode(34));
+        assertEquals(4, NmeaParser.bestPosQualityFromCode(50));
+        assertEquals(0, NmeaParser.bestPosQualityFromCode(0));
+    }
+
     @Test public void bestPosANarrowIntIsRtkFix() {
         NmeaParser parser = new NmeaParser();
         assertTrue(parser.accept(bestposa(

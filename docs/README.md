@@ -160,9 +160,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   при живом mock или native NMEA; сам NMEA не считается чипом. `gnss_input=external` читает NMEA напрямую (Bluetooth Classic/LE,
   USB, TCP/IP) без Mock Location и не закрывает транспорт из-за снятия
   слушателей карты; `NmeaParser` собирает GGA/GST/GSA/RMC и `#BESTPOSA`.
-  Двоичный ComNav CNB (`AA 44 12`, как у PiGoLite) не режется по `0x0A`;
-  после connect сессия один раз пишет `unlogall` и `log gpgga/gst/gsa/rmc/bestposa`,
-  если поток ещё не ASCII. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
+  Двоичный ComNav CNB (`AA 44 12`, как у PiGoLite) даёт координаты из BESTPOSB
+  (сообщение 42); `$`/`#` внутри кадра не начинают NMEA. `unlogall` не пишется;
+  при отсутствии ASCII сессия может по одной команде добавить `log gpgga/gst/gsa/rmc`.
+  `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
   выбросы и учитывает автомобильные повороты; mock и native NMEA пишутся как есть.
   `LocationRecordingSampler`
   прореживает только уже проверенные точки (для mock и native NMEA не грубее 2 с / 1 м).

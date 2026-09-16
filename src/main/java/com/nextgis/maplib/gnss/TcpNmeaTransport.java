@@ -71,16 +71,18 @@ public final class TcpNmeaTransport implements GnssTransport {
     }
 
     @Override
-    public void write(byte[] data) {
+    public boolean write(byte[] data) {
         OutputStream local = output;
         if (local == null || data == null || data.length == 0) {
-            return;
+            return false;
         }
         try {
             local.write(data);
             local.flush();
+            return true;
         } catch (Exception exception) {
             Log.w(Constants.TAG, "TCP GNSS write failed", exception);
+            return false;
         }
     }
 

@@ -13,8 +13,10 @@ public interface GnssTransport {
     /**
      * Send OEM ASCII to the receiver. Implementations must be safe before
      * {@link Listener#onOpened()} and after {@link #close()}.
+     *
+     * @return true if the bytes were accepted for sending
      */
-    void write(byte[] data);
+    boolean write(byte[] data);
 
     void close();
 }

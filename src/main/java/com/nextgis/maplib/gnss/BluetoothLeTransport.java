@@ -10,16 +10,19 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.DiagnosticLog;
 
 import java.util.ArrayDeque;
 import java.util.UUID;
 
 /**
  * NMEA over common UART GATT profiles (Nordic UART and HM-10 FFE0).
- * Commands are written to Nordic RX or any writable UART characteristic.
+ * Commands are written to Nordic RX or the same notify characteristic if writable.
  */
 public final class BluetoothLeTransport implements GnssTransport {
     static final UUID NORDIC_UART_SERVICE =
@@ -35,16 +38,21 @@ public final class BluetoothLeTransport implements GnssTransport {
     static final UUID CCCD =
             UUID.fromString("00002902-0000-1000-8000-00805F9B34FB");
     static final int ATT_PAYLOAD = 20;
+    static final int REQUEST_MTU = 185;
 
     private final Context context;
     private final BluetoothAdapter adapter;
     private final String address;
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private final ArrayDeque<byte[]> writeQueue = new ArrayDeque<>();
     private final Object writeLock = new Object();
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic writeChar;
     private Listener listener;
     private boolean writing;
+    private boolean discovering;
+    private int attPayload = ATT_PAYLOAD;
+    private final Runnable discoverFallback = this::discoverIfNeeded;
 
     public BluetoothLeTransport(Context context, BluetoothAdapter adapter, String address) {
         this.context = context.getApplicationContext();
@@ -72,10 +80,24 @@ public final class BluetoothLeTransport implements GnssTransport {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                gatt.discoverServices();
+                discovering = false;
+                handler.removeCallbacks(discoverFallback);
+                handler.postDelayed(discoverFallback, 1500);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
+                        && gatt.requestMtu(REQUEST_MTU)) {
+                    return;
+                }
+                startDiscovery(gatt);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 notifyClosed("disconnected");
             }
+        }
+
+        @Override
+        public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+            attPayload = Math.max(ATT_PAYLOAD, mtu - 3);
+            DiagnosticLog.v("BLE GNSS MTU=" + mtu + " status=" + status);
+            startDiscovery(gatt);
         }
 
         @Override
@@ -86,6 +108,9 @@ public final class BluetoothLeTransport implements GnssTransport {
                 return;
             }
             writeChar = findWriteCharacteristic(gatt, notify);
+            DiagnosticLog.v("BLE GNSS rx="
+                    + (writeChar == null ? "none" : writeChar.getUuid())
+                    + " tx=" + notify.getUuid());
             if (!gatt.setCharacteristicNotification(notify, true)) {
                 notifyClosed("notify failed");
                 return;
@@ -116,12 +141,29 @@ public final class BluetoothLeTransport implements GnssTransport {
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
                 int status) {
+            DiagnosticLog.v("BLE GNSS write status=" + status);
             synchronized (writeLock) {
                 writing = false;
             }
             pumpWrite();
         }
     };
+
+    private void discoverIfNeeded() {
+        BluetoothGatt local = gatt;
+        if (local != null && !discovering) {
+            startDiscovery(local);
+        }
+    }
+
+    private void startDiscovery(BluetoothGatt gatt) {
+        if (discovering) {
+            return;
+        }
+        discovering = true;
+        handler.removeCallbacks(discoverFallback);
+        gatt.discoverServices();
+    }
 
     static BluetoothGattCharacteristic findNotifyCharacteristic(BluetoothGatt gatt) {
         BluetoothGattCharacteristic nordic = characteristic(gatt, NORDIC_UART_SERVICE, NORDIC_UART_TX);
@@ -152,13 +194,6 @@ public final class BluetoothLeTransport implements GnssTransport {
         if (writable(notify)) {
             return notify;
         }
-        for (BluetoothGattService service : gatt.getServices()) {
-            for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-                if (writable(characteristic)) {
-                    return characteristic;
-                }
-            }
-        }
         return null;
     }
 
@@ -185,14 +220,18 @@ public final class BluetoothLeTransport implements GnssTransport {
     }
 
     @Override
-    public void write(byte[] data) {
+    public boolean write(byte[] data) {
         if (data == null || data.length == 0) {
-            return;
+            return false;
         }
         synchronized (writeLock) {
+            if (gatt == null || writeChar == null) {
+                return false;
+            }
+            int payload = Math.max(ATT_PAYLOAD, attPayload);
             int offset = 0;
             while (offset < data.length) {
-                int n = Math.min(ATT_PAYLOAD, data.length - offset);
+                int n = Math.min(payload, data.length - offset);
                 byte[] chunk = new byte[n];
                 System.arraycopy(data, offset, chunk, 0, n);
                 writeQueue.addLast(chunk);
@@ -200,13 +239,14 @@ public final class BluetoothLeTransport implements GnssTransport {
             }
         }
         pumpWrite();
+        return true;
     }
 
     private void pumpWrite() {
         BluetoothGatt localGatt;
         BluetoothGattCharacteristic localChar;
         byte[] chunk;
-        boolean noResponse;
+        boolean withResponse;
         synchronized (writeLock) {
             localGatt = gatt;
             localChar = writeChar;
@@ -216,20 +256,21 @@ public final class BluetoothLeTransport implements GnssTransport {
             chunk = writeQueue.removeFirst();
             writing = true;
             int props = localChar.getProperties();
-            noResponse = (props & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0;
-            localChar.setWriteType(noResponse
-                    ? BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-                    : BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+            withResponse = (props & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0;
+            localChar.setWriteType(withResponse
+                    ? BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    : BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
             localChar.setValue(chunk);
         }
         boolean accepted = localGatt.writeCharacteristic(localChar);
         if (!accepted) {
+            DiagnosticLog.v("BLE GNSS writeCharacteristic=false");
             synchronized (writeLock) {
                 writing = false;
             }
             return;
         }
-        if (noResponse) {
+        if (!withResponse) {
             synchronized (writeLock) {
                 writing = false;
             }
@@ -253,10 +294,13 @@ public final class BluetoothLeTransport implements GnssTransport {
     }
 
     private void closeGatt() {
+        handler.removeCallbacks(discoverFallback);
         synchronized (writeLock) {
             writeQueue.clear();
             writing = false;
             writeChar = null;
+            attPayload = ATT_PAYLOAD;
+            discovering = false;
         }
         BluetoothGatt local = gatt;
         gatt = null;

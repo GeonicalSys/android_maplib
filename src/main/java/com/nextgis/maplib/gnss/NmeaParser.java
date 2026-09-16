@@ -136,6 +136,39 @@ public final class NmeaParser {
         return 0;
     }
 
+    /** NovAtel/ComNav BESTPOS {@code pos type} integer (OEM6). */
+    static int bestPosQualityFromCode(int posType) {
+        switch (posType) {
+            case 48:
+            case 49:
+            case 50:
+            case 51:
+            case 56:
+                return 4;
+            case 4:
+            case 32:
+            case 33:
+            case 34:
+            case 55:
+                return 5;
+            case 17:
+            case 18:
+            case 20:
+            case 52:
+            case 54:
+                return 2;
+            case 1:
+            case 2:
+            case 8:
+            case 16:
+            case 19:
+            case 53:
+                return 1;
+            default:
+                return 0;
+        }
+    }
+
     public GnssFix snapshot() {
         return fix.copy();
     }
