@@ -31,8 +31,13 @@ public final class ExternalGnssFixPolicy {
         return mock && !receiverExtras && freshReceiverMock;
     }
 
+    /** Phone chip yields to a live mock or native NMEA receiver stream. */
     public static boolean dropChipWhileMock(boolean mock, boolean freshMock) {
-        return !mock && freshMock;
+        return dropChipWhileMock(mock, false, freshMock);
+    }
+
+    public static boolean dropChipWhileMock(boolean mock, boolean nativeNmea, boolean freshMock) {
+        return !isReceiverStream(mock, nativeNmea) && freshMock;
     }
 
     public static long sampleMinTimeMs(boolean mock, long settingMs) {

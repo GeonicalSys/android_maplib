@@ -30,6 +30,12 @@ public class ExternalGnssFixPolicyTest {
         assertFalse(ExternalGnssFixPolicy.dropChipWhileMock(false, false));
     }
 
+    @Test public void nativeNmeaIsNotDroppedAsChipWhileMock() {
+        assertFalse(ExternalGnssFixPolicy.dropChipWhileMock(false, true, true));
+        assertTrue(ExternalGnssFixPolicy.dropChipWhileMock(false, false, true));
+        assertFalse(ExternalGnssFixPolicy.dropChipWhileMock(false, true, false));
+    }
+
     @Test public void mockSamplingIsNotCoarserThanTwoSecondsAndOneMetre() {
         assertEquals(2_000L, ExternalGnssFixPolicy.sampleMinTimeMs(true, 5_000L));
         assertEquals(1f, ExternalGnssFixPolicy.sampleMinDistanceM(true, 5f), 0f);

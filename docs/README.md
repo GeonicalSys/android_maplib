@@ -157,7 +157,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   сектор при повороте телефона без нового GPS. Источник очищает устаревшую
   позицию по монотонному времени, в том числе после сна.
   `ExternalGnssFixPolicy` отбрасывает заглушку GPS Connector без extras и чип
-  при живом mock. `gnss_input=external` читает NMEA напрямую (Bluetooth Classic/LE,
+  при живом mock или native NMEA; сам NMEA не считается чипом. `gnss_input=external` читает NMEA напрямую (Bluetooth Classic/LE,
   USB, TCP/IP) без Mock Location и не закрывает транспорт из-за снятия
   слушателей карты; `NmeaParser` собирает GGA/GST/GSA/RMC без бренда
   приёмника. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
@@ -211,7 +211,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - GPS-фильтр не имеет профилей движения: рабочий distance-cap равен `55 м/с`
   с запасом над 160 км/ч, а reported speed свыше `100 м/с` считается мусором.
   Разрыв более 30 секунд обязан выгрузить валидный буфер до сброса состояния.
-- Network разрешён только если нет свежего GPS; трек и обход сохраняют GNSS чипа, mock приёмника или native NMEA.
+- Network разрешён только если нет свежего GPS и источник не `gnss_input=external`; трек и обход сохраняют GNSS чипа, mock приёмника или native NMEA.
   Разрыв пригодного потока более 8 секунд разделяет трек на сегменты.
 - Вынос поддерживает только Point/MultiPoint, LineString/MultiLineString и
   Polygon/MultiPolygon в EPSG:4326/3857. Для полигона расстояние всегда идёт до

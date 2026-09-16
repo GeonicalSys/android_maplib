@@ -377,7 +377,7 @@ public class GpsEventSource {
         long interval = !highFrequencyClients.isEmpty() ? 250L : 1_000L;
         boolean recording = !recorders.isEmpty();
         subscriptions.update(external ? 0 : (fine ? interval : 0),
-                coarse && !listeners.isEmpty(),
+                coarse && !listeners.isEmpty() && !external,
                 keepExternal ? recording : fine && recording);
         externalSession.setWanted(keepExternal);
         notifyKeepAlive(keepExternal);
@@ -524,7 +524,7 @@ public class GpsEventSource {
                         location.getLatitude(), location.getLongitude(), "drop:placeholder"));
                 return;
             }
-            if (ExternalGnssFixPolicy.dropChipWhileMock(mock, isFresh(lastMock))) {
+            if (ExternalGnssFixPolicy.dropChipWhileMock(mock, nmea, isFresh(lastMock))) {
                 DiagnosticLog.v(LocationDiagnosticFormat.incoming(
                         location.getProvider(), location.getAccuracy(), ageMs, mock, nmea, sats,
                         location.getLatitude(), location.getLongitude(), "drop:chipWhileMock"));
