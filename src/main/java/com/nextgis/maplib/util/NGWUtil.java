@@ -94,6 +94,7 @@ public class NGWUtil
     public static String NGWKEY_MINUTE          = "minute";
     public static String NGWKEY_SECOND          = "second";
     public static String NGWKEY_FEATURE_COUNT   = "total_count";
+    public static String NGWKEY_FILTERED_COUNT  = "filtered_count";
     public static String NGWKEY_KEYNAME         = "keyname";
     public static String NGWKEY_PASSWORD        = "password";
     public static String NGWKEY_CLS             = "cls";
@@ -425,6 +426,40 @@ public class NGWUtil
             return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment";
         }
         return getFeaturesUrl(server, remoteId) + "?dt_format=iso&extensions=attachment&" + where;
+    }
+
+
+    /**
+     * NGW {@code /feature_count}. {@code where} is the same query fragment as
+     * {@link #getFeaturesUrl(String, long, String)} ({@code fld_*} filters).
+     */
+    public static String getFeatureCountUrl(
+            String server,
+            long remoteId,
+            String where)
+    {
+        String url = getResourceUrl(server, remoteId) + "/feature_count";
+        if (where == null || where.length() == 0) {
+            return url;
+        }
+        return url + "?" + where;
+    }
+
+
+    /**
+     * Feature list without geometries, attachments or field values — used to count a
+     * filtered subset when {@code /feature_count} does not return {@code filtered_count}.
+     */
+    public static String getFeaturesIdOnlyUrl(
+            String server,
+            long remoteId,
+            String where)
+    {
+        String url = getFeaturesUrl(server, remoteId) + "?geom=no&extensions=&fields=";
+        if (where == null || where.length() == 0) {
+            return url;
+        }
+        return url + "&" + where;
     }
 
 

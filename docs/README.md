@@ -96,7 +96,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   класс/сообщение ошибки и ограниченный стек без координат и значений полей;
   opt-in фильтр `resmeta.items.district` ищет вхождение ключа в поле `district`
   через `fld_district__like=%value%` (список районов через запятую с пробелом,
-  не точное равенство);
+  не точное равенство); для `SYNC_NONE` сравнивается отфильтрованный server
+  count с локальным `COUNT(*)`, и при расхождении (если сервер не пуст) слой
+  пересобирается полным snapshot;
 - при schema/config/SQLite mismatch `NGWVectorLayer` передаёт через
   `IGISApplication.scheduleNgwLayerRebuildAfterSchemaMismatch()` устойчивый
   fingerprint причины, чтобы UI-orchestrator мог ограничить повтор тяжёлого

@@ -25,4 +25,30 @@ public class NGWUtilFeaturesUrlTest {
         assertTrue(url.contains("dt_format=iso"));
         assertTrue(url.contains("extensions=attachment"));
     }
+
+    @Test
+    public void getFeatureCountUrl_emptyWhere_hasNoQuery() {
+        assertEquals(
+                NGWUtil.getResourceUrl(SERVER, REMOTE_ID) + "/feature_count",
+                NGWUtil.getFeatureCountUrl(SERVER, REMOTE_ID, ""));
+    }
+
+    @Test
+    public void getFeatureCountUrl_withDistrictFilter_appendsWhere() {
+        String url = NGWUtil.getFeatureCountUrl(
+                SERVER, REMOTE_ID, "fld_district__like=%25olonec%25");
+        assertEquals(
+                NGWUtil.getResourceUrl(SERVER, REMOTE_ID)
+                        + "/feature_count?fld_district__like=%25olonec%25",
+                url);
+    }
+
+    @Test
+    public void getFeaturesIdOnlyUrl_omitsGeomAndFields() {
+        String url = NGWUtil.getFeaturesIdOnlyUrl(
+                SERVER, REMOTE_ID, "fld_district__like=%25olonec%25");
+        assertTrue(url.contains("geom=no"));
+        assertTrue(url.contains("fld_district__like=%25olonec%25"));
+        assertTrue(url.contains("/feature/"));
+    }
 }

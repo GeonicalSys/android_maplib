@@ -55,7 +55,9 @@ import com.nextgis.maplib.util.AttachItem;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.DatabaseContext;
 import com.nextgis.maplib.util.ExistFeatureResult;
+import com.nextgis.maplib.util.NgwFeatureCountParser;
 import com.nextgis.maplib.util.NgwPullDecision;
+import com.nextgis.maplib.util.NgwSyncNoneReloadDecision;
 import com.nextgis.maplib.util.DistrictFilterUtil;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
@@ -2106,14 +2108,148 @@ public class NGWVectorLayer
     /**
      * Reconciles NGW resource meta and description when vector data sync is off ({@code SYNC_NONE}).
      * Invoked from {@link com.nextgis.maplib.datasource.ngw.SyncAdapter} for layers excluded
-     * from the main sync list.
+     * from the main sync list. After config refresh, compares the local SQLite row count with
+     * the filtered server feature count and, if the server has objects and the counts differ,
+     * replaces the local table with a full untracked snapshot. A server count of zero or a
+     * failed count request leaves local features unchanged.
      *
      * @param authority content resolver authority (for parity with {@link #sync})
-     * @param syncResult  sync result object (unchanged; reserved for error reporting)
+     * @param syncResult  sync result object
      */
     @SuppressWarnings("unused")
     public void syncNgwResourceConfigOnly(String authority, SyncResult syncResult) {
-        tryRefreshServerResourceMetaAndConfig();
+        ConfigRefreshOutcome refreshOutcome = tryRefreshServerResourceMetaAndConfig();
+        if (refreshOutcome == ConfigRefreshOutcome.NETWORK_UNAVAILABLE) {
+            SyncResultUtil.markNetworkUnavailable(syncResult);
+            return;
+        }
+        if (refreshOutcome == ConfigRefreshOutcome.FINISH_LAYERSYNC_OK) {
+            return;
+        }
+
+        applyDistrictFilterFromProjectGroup();
+
+        int localCount = getSqliteTableRowCount();
+        int serverCount = fetchFilteredServerFeatureCount(syncResult);
+        NgwSyncNoneReloadDecision.Action action =
+                NgwSyncNoneReloadDecision.decide(localCount, serverCount);
+        HyperLog.i(Constants.TAG, "NGWVectorLayer: SYNC_NONE count layer=\""
+                + ProdLogUtil.truncateForLog(getName(), 100)
+                + "\" remoteId=" + mRemoteId
+                + " local=" + localCount
+                + " server=" + serverCount
+                + " action=" + action
+                + (mDistrictFilterActive ? " filtered" : " unfiltered"));
+        if (action != NgwSyncNoneReloadDecision.Action.RELOAD) {
+            return;
+        }
+        // Snapshot must hit /feature/ with mServerWhere, not the tracked diff endpoint.
+        mTracked = false;
+        getFullSnapshotChangesFromServerStreaming(authority, syncResult);
+    }
+
+    /**
+     * Filtered NGW object count for the current {@link #mServerWhere}. Negative values mean
+     * the count is unknown (keep local). Does not use resource-meta {@code total_count}:
+     * that figure is unfiltered and would false-trigger a district-subset reload every sync.
+     */
+    private int fetchFilteredServerFeatureCount(SyncResult syncResult) {
+        AccountUtil.AccountData accountData;
+        try {
+            accountData = AccountUtil.getAccountData(mContext, mAccountName);
+        } catch (IllegalStateException e) {
+            log(e, "SYNC_NONE feature count");
+            return NgwFeatureCountParser.UNKNOWN;
+        }
+        if (accountData.url == null) {
+            return NgwFeatureCountParser.UNKNOWN;
+        }
+        boolean hasWhere = !TextUtils.isEmpty(mServerWhere);
+        String countUrl = NGWUtil.getFeatureCountUrl(accountData.url, mRemoteId, mServerWhere);
+        try {
+            HttpResponse response = NetworkUtil.get(
+                    countUrl, accountData.login, accountData.password, false);
+            if (!response.isOk()) {
+                HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure(
+                        "featureCount", getName(), mRemoteId, -1, -1, response));
+                if (response.getResponseCode() == NetworkUtil.ERROR_CONNECT_FAILED) {
+                    SyncResultUtil.markConnectFailed(syncResult);
+                }
+                return NgwFeatureCountParser.UNKNOWN;
+            }
+            int parsed = NgwFeatureCountParser.parse(response.getResponseBody(), hasWhere);
+            if (parsed == NgwFeatureCountParser.NEED_FALLBACK) {
+                HyperLog.d(Constants.TAG, "NGWVectorLayer: SYNC_NONE count layer=\""
+                        + ProdLogUtil.truncateForLog(getName(), 100)
+                        + "\" feature_count lacks filtered_count, counting id-only list");
+                return countFilteredFeaturesWithoutGeometry(accountData, syncResult);
+            }
+            return parsed;
+        } catch (IOException e) {
+            log(e, "SYNC_NONE feature count");
+            SyncResultUtil.markConnectFailed(syncResult);
+            return NgwFeatureCountParser.UNKNOWN;
+        }
+    }
+
+    private int countFilteredFeaturesWithoutGeometry(
+            AccountUtil.AccountData accountData,
+            SyncResult syncResult) {
+        String sURL = NGWUtil.getFeaturesIdOnlyUrl(accountData.url, mRemoteId, mServerWhere);
+        HttpURLConnection urlConnection = null;
+        try {
+            urlConnection = NetworkUtil.getHttpConnection(
+                    NetworkUtil.HTTP_GET, sURL, accountData.login, accountData.password);
+            if (urlConnection == null) {
+                SyncResultUtil.markConnectFailed(syncResult);
+                return NgwFeatureCountParser.UNKNOWN;
+            }
+            if (urlConnection.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM
+                    && urlConnection.getURL().getProtocol().equals("http")) {
+                sURL = sURL.replace("http", "https");
+                urlConnection.disconnect();
+                urlConnection = NetworkUtil.getHttpConnection(
+                        NetworkUtil.HTTP_GET, sURL, accountData.login, accountData.password);
+                if (urlConnection == null) {
+                    SyncResultUtil.markConnectFailed(syncResult);
+                    return NgwFeatureCountParser.UNKNOWN;
+                }
+            }
+            int code = urlConnection.getResponseCode();
+            if (code < 200 || code >= 300) {
+                HttpResponse response = new HttpResponse(code, urlConnection.getResponseMessage());
+                HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure(
+                        "featureCountFallback", getName(), mRemoteId, -1, -1, response));
+                return NgwFeatureCountParser.UNKNOWN;
+            }
+            try (JsonReader reader = new JsonReader(new InputStreamReader(
+                    new BufferedInputStream(urlConnection.getInputStream()), "UTF-8"))) {
+                reader.beginArray();
+                int count = 0;
+                while (reader.hasNext()) {
+                    reader.skipValue();
+                    count++;
+                }
+                reader.endArray();
+                return count;
+            }
+        } catch (IOException e) {
+            log(e, "SYNC_NONE id-only feature count");
+            SyncResultUtil.markConnectFailed(syncResult);
+            return NgwFeatureCountParser.UNKNOWN;
+        } catch (IllegalStateException | NumberFormatException e) {
+            log(e, "SYNC_NONE id-only feature count parse");
+            return NgwFeatureCountParser.UNKNOWN;
+        } catch (OutOfMemoryError e) {
+            HyperLog.w(Constants.TAG, "NGWVectorLayer: SYNC_NONE id-only count OOM layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100) + "\"");
+            syncResult.stats.numIoExceptions++;
+            return NgwFeatureCountParser.UNKNOWN;
+        } finally {
+            if (urlConnection != null) {
+                urlConnection.disconnect();
+            }
+        }
     }
 
     public boolean getChangesFromServer(
