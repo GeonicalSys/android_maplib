@@ -339,7 +339,7 @@ public class NGWVectorLayer
     /**
      * Opt-in collector district filter from parent {@link LayerGroup#getCollectorDistrict()}.
      *
-     * @return {@code true} if {@code fld_district=} filter is active for this fill/pull
+     * @return {@code true} if {@code fld_district__like=} filter is active for this fill/pull
      */
     protected boolean applyDistrictFilterFromProjectGroup() {
         String district = mCollectorDistrictOverride;

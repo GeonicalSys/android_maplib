@@ -20,8 +20,8 @@ public class NGWUtilFeaturesUrlTest {
 
     @Test
     public void getFeaturesUrl_withDistrictFilter_appendsWhere() {
-        String url = NGWUtil.getFeaturesUrl(SERVER, REMOTE_ID, "fld_district=vologda");
-        assertTrue(url.contains("fld_district=vologda"));
+        String url = NGWUtil.getFeaturesUrl(SERVER, REMOTE_ID, "fld_district__like=%25olonec%25");
+        assertTrue(url.contains("fld_district__like=%25olonec%25"));
         assertTrue(url.contains("dt_format=iso"));
         assertTrue(url.contains("extensions=attachment"));
     }

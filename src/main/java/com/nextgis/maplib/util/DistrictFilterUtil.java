@@ -1,6 +1,7 @@
 /*
  * Project:  NextGIS Mobile
- * Purpose:  Optional district filter for collector project vector layers (fld_district=...).
+ * Purpose:  Optional district filter for collector project vector layers
+ *           (fld_district__like=... for comma-separated district lists).
  * *****************************************************************************
  * Copyright (c) 2016-2026 NextGIS, info@nextgis.com
  *
@@ -21,7 +22,8 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * Builds NGW feature API filter query for collector project district (Latin values, e.g. {@code vologda}).
+ * Builds NGW feature API filter query for collector project district
+ * (Latin values, e.g. {@code vologda} or a comma-separated list token).
  */
 public final class DistrictFilterUtil {
 
@@ -76,6 +78,28 @@ public final class DistrictFilterUtil {
     }
 
     /**
+     * NGW Feature API {@code LIKE} membership query for a comma-separated field.
+     * Publisher writes {@code district} as {@code name1, name2} (comma-space), so exact
+     * {@code fld_district=olonec} misses objects that also belong to another district.
+     *
+     * @return query fragment without leading {@code ?}, e.g.
+     * {@code fld_district__like=%25olonec%25} after URL-encoding
+     */
+    public static String buildFldLikeContainsQuery(String fieldKey, String value) {
+        if (isEmpty(fieldKey) || isEmpty(value)) {
+            return "";
+        }
+        String pattern = "%" + escapeLikeLiteral(value.trim()) + "%";
+        String encoded;
+        try {
+            encoded = URLEncoder.encode(pattern, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            encoded = pattern;
+        }
+        return "fld_" + fieldKey + "__like=" + encoded;
+    }
+
+    /**
      * Opt-in filter: vector/PostGIS layer + non-empty collector district + {@code district} field in schema.
      */
     public static Decision resolveDistrictFilter(
@@ -97,11 +121,22 @@ public final class DistrictFilterUtil {
             return new Decision(false, "",
                     "schema has no field \"" + DISTRICT_FIELD_KEY + "\" (keys=" + fieldKeys + ")");
         }
-        String serverWhere = buildFldEqualsQuery(DISTRICT_FIELD_KEY, collectorDistrict);
+        String serverWhere = buildFldLikeContainsQuery(DISTRICT_FIELD_KEY, collectorDistrict);
         if (isEmpty(serverWhere)) {
             return new Decision(false, "", "could not build fld_ query for district=" + collectorDistrict);
         }
         return new Decision(true, serverWhere, "");
+    }
+
+    /**
+     * Escape {@code \}, {@code %} and {@code _} so SQL LIKE treats them as literals.
+     * District keys such as {@code karel_west} must not use {@code _} as a wildcard.
+     */
+    static String escapeLikeLiteral(String value) {
+        if (value == null || value.length() == 0) {
+            return "";
+        }
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static boolean isSupportedLayerType(int ngwLayerType) {

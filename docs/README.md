@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -94,6 +94,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   конфигурации; первый сбой чтения или записи объекта при полном fill сохраняет
   в HyperLog имя слоя, remote id, нулевой индекс объекта в исходном массиве,
   класс/сообщение ошибки и ограниченный стек без координат и значений полей;
+  opt-in фильтр `resmeta.items.district` ищет вхождение ключа в поле `district`
+  через `fld_district__like=%value%` (список районов через запятую с пробелом,
+  не точное равенство);
 - при schema/config/SQLite mismatch `NGWVectorLayer` передаёт через
   `IGISApplication.scheduleNgwLayerRebuildAfterSchemaMismatch()` устойчивый
   fingerprint причины, чтобы UI-orchestrator мог ограничить повтор тяжёлого

@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -60,6 +60,8 @@ key_components:
     responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
     responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, send pending edits before remote pull, three-way verify NGW class/geometry/fields against serialized metadata and physical SQLite, repair metadata-only drift without refill, keep server attachment metadata in SQLite without treating absent local bytes as destructive, stream full untracked snapshots from an app-owned disk stage through one SQLite transaction while skipping invalid geometries without deleting their prior local rows, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, bind fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint authoritative rebuild requests, and persist bounded failure diagnostics without feature payload.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/DistrictFilterUtil.java
+    responsibility: Opt-in Collector district subset uses NGW fld_district__like=%value% so comma-separated district lists match a project key; SQL LIKE wildcards in the key are escaped.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RemoteAttachmentSyncPolicy.java
     responsibility: Keep metadata-only attachment refresh outside the feature backup gate and compare persisted server metadata without byte-size noise.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
