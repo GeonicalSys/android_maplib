@@ -10,8 +10,8 @@ last_verified: 2026-09-16
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.19` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.19`; отдельный Lisa Debug использует `3.1.2.19`. Оба значения проверяются
+Для выпуска `3.1.2.20` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.20`; отдельный Lisa Debug использует `3.1.2.20`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
@@ -157,10 +157,13 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   сектор при повороте телефона без нового GPS. Источник очищает устаревшую
   позицию по монотонному времени, в том числе после сна.
   `ExternalGnssFixPolicy` отбрасывает заглушку GPS Connector без extras и чип
-  при живом mock. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
-  выбросы и учитывает автомобильные повороты; mock пишется как есть.
+  при живом mock или native NMEA; сам NMEA не считается чипом. `gnss_input=external` читает NMEA напрямую (Bluetooth Classic/LE,
+  USB, TCP/IP) без Mock Location и не закрывает транспорт из-за снятия
+  слушателей карты; `NmeaParser` собирает GGA/GST/GSA/RMC без бренда
+  приёмника. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
+  выбросы и учитывает автомобильные повороты; mock и native NMEA пишутся как есть.
   `LocationRecordingSampler`
-  прореживает только уже проверенные точки (для mock не грубее 2 с / 1 м).
+  прореживает только уже проверенные точки (для mock и native NMEA не грубее 2 с / 1 м).
   База v6 и `TrackLayer.getTracks()` сохраняют многосегментные линии, Canvas/MapLibre не соединяют разрывы.
   Исходные GNSS/mock фиксы выноса доступны через `addRawListener`.
   Подробный контракт: [текущая позиция и запись GPS](../../docs/architecture/location-pipeline.md).
@@ -208,7 +211,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - GPS-фильтр не имеет профилей движения: рабочий distance-cap равен `55 м/с`
   с запасом над 160 км/ч, а reported speed свыше `100 м/с` считается мусором.
   Разрыв более 30 секунд обязан выгрузить валидный буфер до сброса состояния.
-- Network разрешён только если нет свежего GPS; трек и обход сохраняют GNSS чипа или mock приёмника.
+- Network разрешён только если нет свежего GPS и источник не `gnss_input=external`; трек и обход сохраняют GNSS чипа, mock приёмника или native NMEA.
   Разрыв пригодного потока более 8 секунд разделяет трек на сегменты.
 - Вынос поддерживает только Point/MultiPoint, LineString/MultiLineString и
   Polygon/MultiPolygon в EPSG:4326/3857. Для полигона расстояние всегда идёт до
@@ -330,7 +333,8 @@ central registry.
 ## GPS: фон и уточнение стоянок
 
 GPS-подписка записи сохраняется при скрытии/возврате карты. Источник удерживает
-partial wake lock, пока активен хотя бы один recorder, независимо от звука.
+partial wake lock, пока активен хотя бы один recorder или внешняя NMEA-сессия,
+независимо от звука.
 Акселерометр 25 Гц дополняет GNSS-проверку стоянок; при отсутствии свежих сенсорных
 событий используется состояние «неизвестно». Согласованное движение автомобиля
 может опровергнуть неподвижность телефона в держателе. Уточнение стоянки через

@@ -20,6 +20,14 @@ public class LocationFixPolicyTest {
         assertTrue(LocationFixPolicy.preferGps(seconds(499), 470, seconds(499), 18, seconds(500)));
     }
 
+    @Test public void stakeoutWindowAllowsSlightlyFutureFixes() {
+        long now = seconds(100);
+        assertTrue(LocationFixPolicy.isFresh(now + 500_000_000L, now, 3_000L));
+        assertFalse(LocationFixPolicy.isFresh(now + 2_000_000_000L, now, 3_000L));
+        assertFalse(LocationFixPolicy.isFresh(seconds(96), now, 3_000L));
+        assertTrue(LocationFixPolicy.isFresh(seconds(97), now, 3_000L));
+    }
+
     @Test public void corruptAndFarFutureFixesAreUnknown() {
         assertFalse(LocationFixPolicy.isFresh(seconds(503), seconds(500)));
         assertFalse(LocationFixPolicy.validPosition(Double.NaN, 37, 5));

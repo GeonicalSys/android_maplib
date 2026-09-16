@@ -30,6 +30,12 @@ public class ExternalGnssFixPolicyTest {
         assertFalse(ExternalGnssFixPolicy.dropChipWhileMock(false, false));
     }
 
+    @Test public void nativeNmeaIsNotDroppedAsChipWhileMock() {
+        assertFalse(ExternalGnssFixPolicy.dropChipWhileMock(false, true, true));
+        assertTrue(ExternalGnssFixPolicy.dropChipWhileMock(false, false, true));
+        assertFalse(ExternalGnssFixPolicy.dropChipWhileMock(false, true, false));
+    }
+
     @Test public void mockSamplingIsNotCoarserThanTwoSecondsAndOneMetre() {
         assertEquals(2_000L, ExternalGnssFixPolicy.sampleMinTimeMs(true, 5_000L));
         assertEquals(1f, ExternalGnssFixPolicy.sampleMinDistanceM(true, 5f), 0f);
@@ -37,5 +43,11 @@ public class ExternalGnssFixPolicyTest {
         assertEquals(0.5f, ExternalGnssFixPolicy.sampleMinDistanceM(true, 0.5f), 0f);
         assertEquals(5_000L, ExternalGnssFixPolicy.sampleMinTimeMs(false, 5_000L));
         assertEquals(5f, ExternalGnssFixPolicy.sampleMinDistanceM(false, 5f), 0f);
+    }
+
+    @Test public void nativeNmeaUsesTheSameDenseSamplingAsMock() {
+        assertTrue(ExternalGnssFixPolicy.isReceiverStream(false, true));
+        assertEquals(2_000L, ExternalGnssFixPolicy.sampleMinTimeMs(false, true, 5_000L));
+        assertEquals(1f, ExternalGnssFixPolicy.sampleMinDistanceM(false, true, 5f), 0f);
     }
 }

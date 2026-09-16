@@ -43,6 +43,15 @@ public interface SettingsConstants
     /** Collector architecture foundation: last project selected in multi-project UX. */
     String KEY_PREF_ACTIVE_COLLECTOR_PROJECT_UID = "active_collector_project_uid";
     String KEY_PREF_LOCATION_SOURCE         = "location_source";
+    String KEY_PREF_GNSS_INPUT              = "gnss_input";
+    String KEY_PREF_GNSS_DEVICE             = "gnss_device";
+    String KEY_PREF_GNSS_TRANSPORT          = "gnss_transport";
+    String KEY_PREF_GNSS_DEVICE_ID          = "gnss_device_id";
+    String KEY_PREF_GNSS_DEVICE_NAME        = "gnss_device_name";
+    String KEY_PREF_GNSS_TCP_HOST           = "gnss_tcp_host";
+    String KEY_PREF_GNSS_TCP_PORT           = "gnss_tcp_port";
+    /** Opt-in HyperLog dump of every GNSS/NMEA measurement, including coordinates. */
+    String KEY_PREF_VERBOSE_LOG             = "verbose_log";
     String KEY_PREF_LOCATION_MIN_TIME       = "location_min_time";
     String KEY_PREF_LOCATION_MIN_DISTANCE   = "location_min_distance";
     String KEY_PREF_LOCATION_ACCURATE_COUNT = "accurate_max_count";

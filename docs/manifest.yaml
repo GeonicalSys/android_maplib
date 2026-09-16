@@ -37,15 +37,25 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
     responsibility: Store trackpoints.segment in database v6 and expose each track as GeoMultiLineString without connecting gaps.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationFixPolicy.java
-    responsibility: Monotonic freshness, position validity and GPS-first display (Network only when GPS is absent or stale).
+    responsibility: Monotonic freshness with a one-second future tolerance, optional max-age windows, position validity and GPS-first display (Network only when GPS is absent or stale).
+  - path: maplib/src/main/java/com/nextgis/maplib/util/DiagnosticLog.java
+    responsibility: Gate verbose GNSS HyperLog dumps on the verbose_log preference without writing coordinates by default.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationDiagnosticFormat.java
+    responsibility: Format verbose GNSS/stakeout HyperLog lines without Android UI types.
+  - path: maplib/src/main/java/com/nextgis/maplib/api/ExternalGnssKeepAliveHost.java
+    responsibility: Let the application host start a connected-device foreground service without maplib depending on maplibui.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSampler.java
     responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop; mock GNSS is sampled no coarser than 2 s / 1 m.
   - path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
-    responsibility: Keep mock receiver extras, drop GPS Connector 47 m placeholders and phone-chip GPS while mock is fresh, and cap mock sampling at 2 s / 1 m.
+    responsibility: Keep mock GPS Connector extras exclusive of the 47 m placeholder and phone chip; native NMEA uses the same dense 2 s / 1 m sampling.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaParser.java
+    responsibility: Talker-agnostic GGA/GST/GSA/RMC parsing with checksum, RTK quality and GST centimetre accuracy.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/ExternalGnssSession.java
+    responsibility: Own one NMEA transport, reconnect, and publish Location without Mock Location while a configured external endpoint remains selected, independent of map listeners.
   - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
     responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle
-    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.19 and debug VERSION_NAME 3.1.2.19 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
+    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.20 and debug VERSION_NAME 3.1.2.20 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
@@ -155,7 +165,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
     responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, shared filtered recording including mock receiver extras, original GNSS/mock precision subscriptions and owner-based high-frequency leases.
+    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases.
 public_contracts:
   - id: passive-walk-preview
     symbol: MapDrawable.showWalkPreview

@@ -33,6 +33,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import com.nextgis.maplib.api.GpsEventListener;
 import com.nextgis.maplib.api.IGISApplication;
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.PermissionUtil;
@@ -42,7 +43,7 @@ import java.util.Collections;
 
 
 @SuppressLint("MissingPermission")
-public class AccurateLocationTaker implements LocationListener
+public class AccurateLocationTaker implements LocationListener, GpsEventListener
 {
     protected Float   mMaxTakenAccuracy;
     protected Integer mMaxTakeCount;
@@ -61,6 +62,7 @@ public class AccurateLocationTaker implements LocationListener
 
     protected ArrayList<Location> mGpsTakings;
     protected LocationManager mLocationManager;
+    protected GpsEventSource mGpsEventSource;
     protected Context mContext;
 
     // Create a Handler that uses the Main Looper to run in
@@ -99,7 +101,8 @@ public class AccurateLocationTaker implements LocationListener
         mContext = context;
         IGISApplication app = (IGISApplication) context.getApplicationContext();
         mMaxTakenAccuracy = maxTakenAccuracy;
-        mLocationManager = app.getGpsEventSource().mLocationManager;
+        mGpsEventSource = app.getGpsEventSource();
+        mLocationManager = mGpsEventSource.mLocationManager;
         mMaxTakeCount = maxTakeCount;
         mMaxTakeTimeMillis = maxTakeTimeMillis;
         mPublishProgressDelayMillis = publishProgressDelayMillis;
@@ -246,6 +249,12 @@ public class AccurateLocationTaker implements LocationListener
     }
 
     @Override
+    public void onBestLocationChanged(Location location) { }
+
+    @Override
+    public void onGpsStatusChanged(int event) { }
+
+    @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {
 
     }
@@ -322,6 +331,10 @@ public class AccurateLocationTaker implements LocationListener
 
         mProgressUpdateRunner.run();
 
+        if (null != mGpsEventSource) {
+            mGpsEventSource.addRawListener(this);
+            return;
+        }
         if (!PermissionUtil.hasLocationPermissions(mContext))
             return;
 
@@ -357,6 +370,10 @@ public class AccurateLocationTaker implements LocationListener
                     mTakeTimeMillis);
         }
 
+        if (null != mGpsEventSource) {
+            mGpsEventSource.removeRawListener(this);
+            return;
+        }
         if (!PermissionUtil.hasLocationPermissions(mContext))
             return;
 

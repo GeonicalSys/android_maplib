@@ -98,8 +98,8 @@ final class LocationRecordingSamplerCore<T> {
             }
         } else if (RecordingSamplingPolicy.save(ops.timeMs(location) - savedAtMs,
                 ops.distance(saved, location),
-                ExternalGnssFixPolicy.sampleMinTimeMs(ops.isMock(location), minTimeMs),
-                ExternalGnssFixPolicy.sampleMinDistanceM(ops.isMock(location), minDistance))) {
+                ExternalGnssFixPolicy.sampleMinTimeMs(ops.isMock(location), false, minTimeMs),
+                ExternalGnssFixPolicy.sampleMinDistanceM(ops.isMock(location), false, minDistance))) {
             save(location, result);
         }
         else pending = ops.copy(location);

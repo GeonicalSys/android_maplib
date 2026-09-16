@@ -29,7 +29,7 @@ public final class LocationRecordingSampler {
             }
             public double distance(Location a, Location b) { return a.distanceTo(b); }
             public double bearing(Location a, Location b) { return a.bearingTo(b); }
-            public boolean isMock(Location point) { return LocationTrackFilter.isMockLocation(point); }
+            public boolean isMock(Location point) { return LocationTrackFilter.isReceiverStream(point); }
         }, minTimeMs, minDistance);
     }
 

@@ -40,12 +40,22 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import com.hypertrack.hyperlog.HyperLog;
+import android.content.SharedPreferences;
+
+import com.nextgis.maplib.api.ExternalGnssKeepAliveHost;
 import com.nextgis.maplib.api.GpsEventListener;
+import com.nextgis.maplib.gnss.ExternalGnssSession;
+import com.nextgis.maplib.gnss.GnssFix;
+import com.nextgis.maplib.gnss.GnssInputPrefs;
+import com.nextgis.maplib.gnss.GnssTransportFactory;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.DiagnosticLog;
 import com.nextgis.maplib.util.ExternalGnssFixPolicy;
+import com.nextgis.maplib.util.LocationDiagnosticFormat;
 import com.nextgis.maplib.util.LocationFixPolicy;
 import com.nextgis.maplib.util.LocationTrackFilter;
 import com.nextgis.maplib.util.PermissionUtil;
+import com.nextgis.maplib.util.SettingsConstants;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,7 +86,10 @@ public class GpsEventSource {
     private final Map<RecordingListener, Long> recorders = new IdentityHashMap<>();
     private final LocationTrackFilter filter = new LocationTrackFilter();
     private Location gps, network, rawGps, lastPublished, lastMock, lastReceiverMock;
+    private GnssFix lastExternalFix;
     private boolean recordingAvailable, statusRegistered;
+    private final SharedPreferences prefs;
+    private final ExternalGnssSession externalSession;
     private long subscriptionStartedNanos;
     private final LocationSubscriptionController subscriptions;
     private final SensorMotionMonitor motionMonitor;
@@ -84,12 +97,17 @@ public class GpsEventSource {
     private long gpsRequests, gpsStops, lastDiagnosticAt, diagnosticFixes, diagnosticMaxGapMs;
     private float diagnosticMaxAccuracy;
     private Boolean diagnosticScreenOn;
+    private final SharedPreferences.OnSharedPreferenceChangeListener gnssPrefListener;
+    private final ExternalGnssKeepAliveHost keepAliveHost;
+    private boolean postedKeepAlive;
 
     private final Runnable expiry = new Runnable() {
         @Override public void run() {
-            if (!hasConsumers()) return;
-            if (!PermissionUtil.hasAnyLocationPermission(context)) {
+            if (!hasConsumers() && !keepExternalSession()) return;
+            if (!PermissionUtil.hasAnyLocationPermission(context) && !isExternalInput()) {
                 gps = network = rawGps = lastMock = lastReceiverMock = null;
+            } else if (!PermissionUtil.hasAnyLocationPermission(context)) {
+                network = null;
             }
             publishCurrent();
             logRecordingHealth();
@@ -130,6 +148,7 @@ public class GpsEventSource {
         }
 
         @Override public void onProviderDisabled(String provider) {
+            DiagnosticLog.v("GNSS provider disabled=" + provider);
             if (LocationManager.GPS_PROVIDER.equals(provider)) {
                 flushRecordingLocations();
             gps = rawGps = lastMock = lastReceiverMock = null;
@@ -139,12 +158,17 @@ public class GpsEventSource {
             }
             publishCurrent();
         }
-        @Override public void onProviderEnabled(String provider) { refreshLocationRequests(); }
+        @Override public void onProviderEnabled(String provider) {
+            DiagnosticLog.v("GNSS provider enabled=" + provider);
+            refreshLocationRequests();
+        }
         @Override public void onStatusChanged(String provider, int value, Bundle extras) { }
     }; }
 
     public GpsEventSource(Context context) {
         this.context = context.getApplicationContext();
+        keepAliveHost = context instanceof ExternalGnssKeepAliveHost
+                ? (ExternalGnssKeepAliveHost) context : null;
         // Retire obsolete source switches: map uses every available source; recording uses GNSS.
         this.context.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE)
                 .edit().putString("location_source", "3").putString("tracks_location_source", "1").apply();
@@ -180,6 +204,38 @@ public class GpsEventSource {
             @Override public void stopNetwork() { removeProvider(networkListener); }
             @Override public void setRecordingActive(boolean active) { setRecordingResources(active); }
         });
+        prefs = this.context.getSharedPreferences(context.getPackageName() + "_preferences",
+                Context.MODE_PRIVATE);
+        externalSession = new ExternalGnssSession(this.context, prefs);
+        externalSession.setCallback(new ExternalGnssSession.Callback() {
+            @Override public void onExternalLocation(Location location) {
+                processLocation(location, false);
+                publishCurrent();
+            }
+            @Override public void onExternalFix(GnssFix fix) {
+                lastExternalFix = fix;
+                publishExternalFix(fix);
+            }
+            @Override public void onExternalStatus(String status) {
+                publishExternalStatus(status);
+            }
+        });
+        gnssPrefListener = (preferences, key) -> {
+            if (SettingsConstants.KEY_PREF_GNSS_INPUT.equals(key)
+                    || SettingsConstants.KEY_PREF_GNSS_TRANSPORT.equals(key)
+                    || SettingsConstants.KEY_PREF_GNSS_DEVICE_ID.equals(key)
+                    || SettingsConstants.KEY_PREF_GNSS_TCP_HOST.equals(key)
+                    || SettingsConstants.KEY_PREF_GNSS_TCP_PORT.equals(key)) {
+                gps = network = rawGps = lastPublished = lastMock = lastReceiverMock = null;
+                lastExternalFix = null;
+                filter.reset();
+                externalSession.restart();
+                refreshLocationRequests();
+            }
+        };
+        prefs.registerOnSharedPreferenceChangeListener(gnssPrefListener);
+        DiagnosticLog.attach(prefs);
+        refreshLocationRequests();
     }
 
     public void addListener(GpsEventListener listener) {
@@ -188,6 +244,8 @@ public class GpsEventSource {
             Location current = getLastKnownLocation();
             if (current == null) listener.onLocationUnavailable();
             else listener.onLocationChanged(current);
+            if (lastExternalFix != null) listener.onExternalGnssFix(lastExternalFix);
+            listener.onExternalGnssStatus(externalSession.status());
         }
     }
 
@@ -226,16 +284,33 @@ public class GpsEventSource {
 
     public Location getLastRecordingLocation() {
         Location location = filter.getLastAcceptedLocation();
-        return isFresh(location) && PermissionUtil.hasLocationPermissions(context)
+        if (!isFresh(location)) return null;
+        if (isExternalInput()) return location;
+        return PermissionUtil.hasLocationPermissions(context)
                 && isProviderEnabled(LocationManager.GPS_PROVIDER) ? location : null;
+    }
+
+    public boolean isExternalInput() {
+        return GnssInputPrefs.isExternal(prefs);
+    }
+
+    public GnssFix getLastExternalFix() {
+        return lastExternalFix == null ? null : lastExternalFix.copy();
+    }
+
+    public String getExternalGnssStatus() {
+        return externalSession.status();
     }
 
     /** Only a current estimate is returned. Cached coordinates cannot live across expiry. */
     public Location getLastKnownLocation() {
-        if (!PermissionUtil.hasAnyLocationPermission(context)) return null;
-        Location currentGps = isProviderEnabled(LocationManager.GPS_PROVIDER)
-                && PermissionUtil.hasLocationPermissions(context) && isFresh(gps) ? gps : null;
-        Location currentNetwork = isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        Location currentGps = isFresh(gps) && (isExternalInput()
+                || (PermissionUtil.hasLocationPermissions(context)
+                && isProviderEnabled(LocationManager.GPS_PROVIDER))) ? gps : null;
+        if (currentGps == null && !PermissionUtil.hasAnyLocationPermission(context)
+                && !isExternalInput()) return null;
+        Location currentNetwork = PermissionUtil.hasAnyLocationPermission(context)
+                && isProviderEnabled(LocationManager.NETWORK_PROVIDER)
                 && isFresh(network) ? network : null;
         if (currentGps == null) return copy(currentNetwork);
         if (currentNetwork == null) return copy(currentGps);
@@ -274,6 +349,17 @@ public class GpsEventSource {
         catch (RuntimeException exception) { return false; }
     }
 
+    private boolean keepExternalSession() {
+        boolean allowed = keepAliveHost == null || keepAliveHost.canKeepExternalGnssAlive();
+        return allowed && isExternalInput() && GnssTransportFactory.hasEndpoint(prefs);
+    }
+
+    private void notifyKeepAlive(boolean wanted) {
+        if (keepAliveHost == null || postedKeepAlive == wanted) return;
+        postedKeepAlive = wanted;
+        keepAliveHost.setExternalGnssKeepAlive(wanted);
+    }
+
     private void refreshLocationRequests() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post(this::refreshLocationRequests);
@@ -281,21 +367,35 @@ public class GpsEventSource {
         }
         handler.removeCallbacks(expiry);
         boolean consumers = hasConsumers();
+        boolean external = isExternalInput();
+        boolean keepExternal = keepExternalSession();
         boolean coarse = consumers && mLocationManager != null && PermissionUtil.hasAnyLocationPermission(context);
         boolean fine = coarse && PermissionUtil.hasLocationPermissions(context);
         boolean hadGps = subscriptions.hasGps();
         boolean hadNetwork = subscriptions.hasNetwork();
-        if (!hadGps && fine) subscriptionStartedNanos = SystemClock.elapsedRealtimeNanos();
+        if (!hadGps && (fine || external)) subscriptionStartedNanos = SystemClock.elapsedRealtimeNanos();
         long interval = !highFrequencyClients.isEmpty() ? 250L : 1_000L;
-        subscriptions.update(fine ? interval : 0, coarse && !listeners.isEmpty(), fine && !recorders.isEmpty());
-        if (!consumers) {
+        boolean recording = !recorders.isEmpty();
+        subscriptions.update(external ? 0 : (fine ? interval : 0),
+                coarse && !listeners.isEmpty() && !external,
+                keepExternal ? recording : fine && recording);
+        externalSession.setWanted(keepExternal);
+        notifyKeepAlive(keepExternal);
+        updateSharedWakeLock();
+        if (!consumers && !keepExternal) {
             filter.reset();
             gps = network = rawGps = lastPublished = lastMock = lastReceiverMock = null;
+            lastExternalFix = null;
             recordingAvailable = false;
             return;
         }
+        if (!consumers) {
+            publishCurrent();
+            handler.post(expiry);
+            return;
+        }
         // Seed only a newly started source. A map reopen must not replace the live GNSS state.
-        if (!hadGps && subscriptions.hasGps()) seedFreshCache(LocationManager.GPS_PROVIDER);
+        if (!external && !hadGps && subscriptions.hasGps()) seedFreshCache(LocationManager.GPS_PROVIDER);
         if (!hadNetwork && subscriptions.hasNetwork() && (gps == null || !isFresh(gps))) {
             seedFreshCache(LocationManager.NETWORK_PROVIDER);
         }
@@ -333,14 +433,20 @@ public class GpsEventSource {
             lastDiagnosticAt = 0;
             diagnosticFixes = diagnosticMaxGapMs = 0;
             diagnosticMaxAccuracy = 0;
+        }
+        updateSharedWakeLock();
+    }
+
+    private void updateSharedWakeLock() {
+        boolean needed = keepExternalSession() || !recorders.isEmpty();
+        if (needed) {
+            if (recordingWakeLock != null && recordingWakeLock.isHeld()) return;
             PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
             if (power == null) return;
             try {
                 recordingWakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                         context.getPackageName() + ":GnssRecording");
                 recordingWakeLock.setReferenceCounted(false);
-                // User-controlled, possibly many-hour recording. The final recorder releases
-                // this lock, regardless of UI visibility or whether audible feedback is enabled.
                 recordingWakeLock.acquire();
             } catch (RuntimeException exception) {
                 HyperLog.e(Constants.TAG, "GPS recording wake lock acquisition failed", exception);
@@ -386,15 +492,50 @@ public class GpsEventSource {
     }
 
     private void processLocation(Location location, boolean historical) {
-        if (location == null || !location.hasAccuracy()
+        if (location == null) {
+            DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                    "null", -1f, -1L, false, false, 0, 0, 0, "drop:null"));
+            return;
+        }
+        long nowNanos = SystemClock.elapsedRealtimeNanos();
+        long ageMs = LocationFixPolicy.ageMs(location.getElapsedRealtimeNanos(), nowNanos);
+        boolean mock = LocationTrackFilter.isMockLocation(location);
+        boolean nmea = LocationTrackFilter.isNativeNmea(location);
+        int sats = location.getExtras() != null ? location.getExtras().getInt("satellites") : 0;
+        if (!location.hasAccuracy()
                 || !LocationFixPolicy.validPosition(location.getLatitude(), location.getLongitude(),
-                location.getAccuracy()) || (!historical && !isFresh(location))) return;
+                location.getAccuracy())) {
+            DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                    location.getProvider(), location.getAccuracy(), ageMs, mock, nmea, sats,
+                    location.getLatitude(), location.getLongitude(), "drop:invalid"));
+            return;
+        }
+        if (!historical && !isFresh(location)) {
+            DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                    location.getProvider(), location.getAccuracy(), ageMs, mock, nmea, sats,
+                    location.getLatitude(), location.getLongitude(), "drop:stale"));
+            return;
+        }
         if (LocationManager.GPS_PROVIDER.equals(location.getProvider())) {
-            boolean mock = LocationTrackFilter.isMockLocation(location);
             boolean extras = LocationTrackFilter.hasReceiverExtras(location);
-            if (ExternalGnssFixPolicy.dropPlaceholderMock(mock, extras, isFresh(lastReceiverMock))) return;
-            if (ExternalGnssFixPolicy.dropChipWhileMock(mock, isFresh(lastMock))) return;
-            if (rawGps != null && location.getElapsedRealtimeNanos() <= rawGps.getElapsedRealtimeNanos()) return;
+            if (ExternalGnssFixPolicy.dropPlaceholderMock(mock, extras, isFresh(lastReceiverMock))) {
+                DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                        location.getProvider(), location.getAccuracy(), ageMs, mock, nmea, sats,
+                        location.getLatitude(), location.getLongitude(), "drop:placeholder"));
+                return;
+            }
+            if (ExternalGnssFixPolicy.dropChipWhileMock(mock, nmea, isFresh(lastMock))) {
+                DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                        location.getProvider(), location.getAccuracy(), ageMs, mock, nmea, sats,
+                        location.getLatitude(), location.getLongitude(), "drop:chipWhileMock"));
+                return;
+            }
+            if (rawGps != null && location.getElapsedRealtimeNanos() <= rawGps.getElapsedRealtimeNanos()) {
+                DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                        location.getProvider(), location.getAccuracy(), ageMs, mock, nmea, sats,
+                        location.getLatitude(), location.getLongitude(), "drop:dup"));
+                return;
+            }
             if (!recorders.isEmpty()) {
                 diagnosticFixes++;
                 if (rawGps != null) diagnosticMaxGapMs = Math.max(diagnosticMaxGapMs,
@@ -402,9 +543,9 @@ public class GpsEventSource {
                 diagnosticMaxAccuracy = Math.max(diagnosticMaxAccuracy, location.getAccuracy());
             }
             rawGps = new Location(location);
-            if (mock) {
+            if (mock || LocationTrackFilter.isNativeNmea(location)) {
                 lastMock = rawGps;
-                if (extras) lastReceiverMock = rawGps;
+                if (extras || LocationTrackFilter.isNativeNmea(location)) lastReceiverMock = rawGps;
             }
             if (isFresh(location)) {
                 for (GpsEventListener listener : new ArrayList<>(rawListeners))
@@ -412,14 +553,24 @@ public class GpsEventSource {
             }
             List<Location> points = filter.onLocation(location, historical, motionMonitor.stateAt(location.getElapsedRealtimeNanos()));
             Location accepted = filter.getLastAcceptedLocation();
+            String action = "accept";
             if (accepted != null && accepted.getElapsedRealtimeNanos() == location.getElapsedRealtimeNanos()) {
                 gps = accepted;
             } else if (location.getAccuracy() > LocationTrackFilter.DEFAULT_MAX_ACCURACY_M
-                    || mock) {
+                    || mock || LocationTrackFilter.isNativeNmea(location)) {
                 gps = new Location(location);
+                action = "accept:display";
+            } else {
+                action = "hold:filter";
             }
+            DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                    location.getProvider(), location.getAccuracy(), ageMs, mock, nmea, sats,
+                    location.getLatitude(), location.getLongitude(), action));
             emitRecording(points);
         } else if (LocationManager.NETWORK_PROVIDER.equals(location.getProvider()) && isFresh(location)) {
+            DiagnosticLog.v(LocationDiagnosticFormat.incoming(
+                    location.getProvider(), location.getAccuracy(), ageMs, false, false, 0,
+                    location.getLatitude(), location.getLongitude(), "accept:network"));
             if (network == null || location.getElapsedRealtimeNanos() > network.getElapsedRealtimeNanos())
                 network = new Location(location);
         }
@@ -438,6 +589,7 @@ public class GpsEventSource {
         Location current = getLastKnownLocation();
         if (current == null) {
             if (lastPublished != null) {
+                DiagnosticLog.v(unavailableDiagnostic());
                 lastPublished = null;
                 for (GpsEventListener listener : new ArrayList<>(listeners)) listener.onLocationUnavailable();
             }
@@ -458,6 +610,20 @@ public class GpsEventSource {
         recordingAvailable = available;
     }
 
+    private String unavailableDiagnostic() {
+        long now = SystemClock.elapsedRealtimeNanos();
+        long gpsAge = gps == null ? -1L : LocationFixPolicy.ageMs(gps.getElapsedRealtimeNanos(), now);
+        long netAge = network == null ? -1L : LocationFixPolicy.ageMs(network.getElapsedRealtimeNanos(), now);
+        String reason;
+        if (gps == null) reason = "gpsNull";
+        else if (!isFresh(gps)) reason = "stale";
+        else if (!isExternalInput() && !isProviderEnabled(LocationManager.GPS_PROVIDER)) reason = "providerDisabled";
+        else if (!isExternalInput() && !PermissionUtil.hasLocationPermissions(context)) reason = "noPerm";
+        else reason = "noNetworkFallback";
+        return LocationDiagnosticFormat.unavailable(reason, gpsAge,
+                isProviderEnabled(LocationManager.GPS_PROVIDER), netAge, isExternalInput());
+    }
+
     private void publishStatus(int event) {
         for (GpsEventListener listener : new ArrayList<>(listeners)) listener.onGpsStatusChanged(event);
         for (GpsEventListener listener : new ArrayList<>(rawListeners)) listener.onGpsStatusChanged(event);
@@ -466,6 +632,16 @@ public class GpsEventSource {
     public static boolean isFresh(Location location) {
         return location != null && LocationFixPolicy.isFresh(location.getElapsedRealtimeNanos(),
                 SystemClock.elapsedRealtimeNanos());
+    }
+
+    private void publishExternalFix(GnssFix fix) {
+        for (GpsEventListener listener : new ArrayList<>(listeners)) listener.onExternalGnssFix(fix);
+        for (GpsEventListener listener : new ArrayList<>(rawListeners)) listener.onExternalGnssFix(fix);
+    }
+
+    private void publishExternalStatus(String status) {
+        for (GpsEventListener listener : new ArrayList<>(listeners)) listener.onExternalGnssStatus(status);
+        for (GpsEventListener listener : new ArrayList<>(rawListeners)) listener.onExternalGnssStatus(status);
     }
 
     private static Location copy(Location location) { return location == null ? null : new Location(location); }
