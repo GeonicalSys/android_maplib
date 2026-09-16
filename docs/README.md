@@ -81,6 +81,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   таблицу; включение использует существующий on-demand reload contract;
 - `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное
   получение NGW-ресурса без загрузки всего дерева;
+- `LisaCatalog` / `LisaCatalogLookup` — поиск группы `keyname=lisa` и список
+  `collector_project` внутри неё;
 - `CollectorProjectItem`, `CollectorProjectMetadata`,
   `CollectorProjectCompositionSync` — normalized Collector composition;
 - `NGWRasterLayer` хранит style identity, отдельный parent extent id и

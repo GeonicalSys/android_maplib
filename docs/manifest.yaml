@@ -10,8 +10,8 @@ entrypoints:
 key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
     responsibility: Durable asset index, publication and move recovery, format-aware dedup, repair of previously mislinked references and payload lifecycle; Asset.referenceConfig preserves project presentation and zoom limits.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
-    responsibility: App-private catalog placement, stream imports, project attachment and reference repair before layer load.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayKind.java
+    responsibility: Classify NGRc, raster MBTiles and ZIP contents before shared-catalog import without extracting a tile tree.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
     responsibility: Bounded two-pass NGRc reader with complete source hash, explicit tile scheme, case-insensitive Mapnik.json/config.json and Mapnik raster-path normalization, and ambiguous metadata rejection.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
@@ -116,8 +116,10 @@ key_components:
     responsibility: Validate raster MBTiles SQLite structure, integrity, format, zoom range and optional bounds before publication or rendering.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LegacyTileMbtilesMath.java
     responsibility: Convert legacy TMS/OSM rows to standard MBTiles rows and derive deterministic raster format and Web Mercator bounds without Android dependencies.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
-    responsibility: Parse and normalize a direct NGW resource URL without Android dependencies.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalog.java
+    responsibility: Parse NGW search and children JSON for the shared lisa catalog key and collector_project entries.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalogLookup.java
+    responsibility: Look up keyname lisa by search then subtree walk and list collector projects under that group.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
     responsibility: Load one target NGW resource and resolve QGIS style URLs to their parent layer.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LayerConfigUtil.java

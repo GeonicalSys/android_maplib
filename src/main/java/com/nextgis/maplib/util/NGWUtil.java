@@ -378,6 +378,19 @@ public class NGWUtil
 
 
     /**
+     * Search resources by keyname.
+     */
+    public static String getResourceSearchUrl(String server, String keyname) {
+        String encoded = keyname == null ? "" : keyname;
+        try {
+            encoded = URLEncoder.encode(encoded, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException ignored) {
+        }
+        return getBaseUrl(server) + "search/?keyname=" + encoded;
+    }
+
+
+    /**
      * Get one row from vector layer
      *
      * @param server
