@@ -42,6 +42,7 @@ import android.util.Log;
 import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.api.GpsEventListener;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.ExternalGnssFixPolicy;
 import com.nextgis.maplib.util.LocationFixPolicy;
 import com.nextgis.maplib.util.LocationTrackFilter;
 import com.nextgis.maplib.util.PermissionUtil;
@@ -74,7 +75,7 @@ public class GpsEventSource {
     private final Set<Object> highFrequencyClients = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<RecordingListener, Long> recorders = new IdentityHashMap<>();
     private final LocationTrackFilter filter = new LocationTrackFilter();
-    private Location gps, network, rawGps, lastPublished;
+    private Location gps, network, rawGps, lastPublished, lastMock, lastReceiverMock;
     private boolean recordingAvailable, statusRegistered;
     private long subscriptionStartedNanos;
     private final LocationSubscriptionController subscriptions;
@@ -88,7 +89,7 @@ public class GpsEventSource {
         @Override public void run() {
             if (!hasConsumers()) return;
             if (!PermissionUtil.hasAnyLocationPermission(context)) {
-                gps = network = rawGps = null;
+                gps = network = rawGps = lastMock = lastReceiverMock = null;
             }
             publishCurrent();
             logRecordingHealth();
@@ -131,7 +132,7 @@ public class GpsEventSource {
         @Override public void onProviderDisabled(String provider) {
             if (LocationManager.GPS_PROVIDER.equals(provider)) {
                 flushRecordingLocations();
-                gps = rawGps = null;
+            gps = rawGps = lastMock = lastReceiverMock = null;
                 filter.reset();
             } else if (LocationManager.NETWORK_PROVIDER.equals(provider)) {
                 network = null;
@@ -289,13 +290,15 @@ public class GpsEventSource {
         subscriptions.update(fine ? interval : 0, coarse && !listeners.isEmpty(), fine && !recorders.isEmpty());
         if (!consumers) {
             filter.reset();
-            gps = network = rawGps = lastPublished = null;
+            gps = network = rawGps = lastPublished = lastMock = lastReceiverMock = null;
             recordingAvailable = false;
             return;
         }
         // Seed only a newly started source. A map reopen must not replace the live GNSS state.
         if (!hadGps && subscriptions.hasGps()) seedFreshCache(LocationManager.GPS_PROVIDER);
-        if (!hadNetwork && subscriptions.hasNetwork()) seedFreshCache(LocationManager.NETWORK_PROVIDER);
+        if (!hadNetwork && subscriptions.hasNetwork() && (gps == null || !isFresh(gps))) {
+            seedFreshCache(LocationManager.NETWORK_PROVIDER);
+        }
         publishCurrent();
         handler.post(expiry);
     }
@@ -387,6 +390,10 @@ public class GpsEventSource {
                 || !LocationFixPolicy.validPosition(location.getLatitude(), location.getLongitude(),
                 location.getAccuracy()) || (!historical && !isFresh(location))) return;
         if (LocationManager.GPS_PROVIDER.equals(location.getProvider())) {
+            boolean mock = LocationTrackFilter.isMockLocation(location);
+            boolean extras = LocationTrackFilter.hasReceiverExtras(location);
+            if (ExternalGnssFixPolicy.dropPlaceholderMock(mock, extras, isFresh(lastReceiverMock))) return;
+            if (ExternalGnssFixPolicy.dropChipWhileMock(mock, isFresh(lastMock))) return;
             if (rawGps != null && location.getElapsedRealtimeNanos() <= rawGps.getElapsedRealtimeNanos()) return;
             if (!recorders.isEmpty()) {
                 diagnosticFixes++;
@@ -395,6 +402,10 @@ public class GpsEventSource {
                 diagnosticMaxAccuracy = Math.max(diagnosticMaxAccuracy, location.getAccuracy());
             }
             rawGps = new Location(location);
+            if (mock) {
+                lastMock = rawGps;
+                if (extras) lastReceiverMock = rawGps;
+            }
             if (isFresh(location)) {
                 for (GpsEventListener listener : new ArrayList<>(rawListeners))
                     listener.onLocationChanged(new Location(location));
@@ -404,9 +415,7 @@ public class GpsEventSource {
             if (accepted != null && accepted.getElapsedRealtimeNanos() == location.getElapsedRealtimeNanos()) {
                 gps = accepted;
             } else if (location.getAccuracy() > LocationTrackFilter.DEFAULT_MAX_ACCURACY_M
-                    || isMock(location)) {
-                // Coarse GNSS and external precision/mock receivers can locate the display.
-                // They never bypass the GNSS recording validator.
+                    || mock) {
                 gps = new Location(location);
             }
             emitRecording(points);
@@ -457,10 +466,6 @@ public class GpsEventSource {
     public static boolean isFresh(Location location) {
         return location != null && LocationFixPolicy.isFresh(location.getElapsedRealtimeNanos(),
                 SystemClock.elapsedRealtimeNanos());
-    }
-
-    private static boolean isMock(Location location) {
-        return location.isFromMockProvider();
     }
 
     private static Location copy(Location location) { return location == null ? null : new Location(location); }

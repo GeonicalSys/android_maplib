@@ -48,6 +48,7 @@ public final class LocationTrackFilter {
     private final LocationMotionFilter mMotion = new LocationMotionFilter();
     private Location mLastAccepted;
     private long mRejectedBeforeSequence;
+    private long mMockRecorded;
     private String mDiagnosticProvider;
 
     public LocationTrackFilter() {
@@ -88,6 +89,7 @@ public final class LocationTrackFilter {
         mMotion.reset();
         mLastAccepted = null;
         mRejectedBeforeSequence = 0;
+        mMockRecorded = 0;
     }
 
     public List<Location> flushRemaining() {
@@ -108,6 +110,12 @@ public final class LocationTrackFilter {
             if (!passesRecordingIntegrity(raw, !historical)) {
                 mRejectedBeforeSequence++;
                 return Collections.emptyList();
+            }
+            if (isMockLocation(raw)) {
+                Location copy = new Location(raw);
+                mLastAccepted = copy;
+                mMockRecorded++;
+                return Collections.singletonList(new Location(copy));
             }
             Location filtered = mMotion.filter(raw, motion);
             if (filtered == null) {
@@ -131,11 +139,11 @@ public final class LocationTrackFilter {
     }
 
     public long getInputFixCount() {
-        return mCore.getInputFixCount() + mRejectedBeforeSequence;
+        return mCore.getInputFixCount() + mRejectedBeforeSequence + mMockRecorded;
     }
 
     public long getPassedInputFixCount() {
-        return mCore.getPassedInputFixCount();
+        return mCore.getPassedInputFixCount() + mMockRecorded;
     }
 
     public long getDroppedInputFixCount() {
@@ -165,8 +173,36 @@ public final class LocationTrackFilter {
     }
 
     private static boolean passesRecordingIntegrity(Location location, boolean checkAge) {
-        return location != null && LocationManager.GPS_PROVIDER.equals(location.getProvider())
-                && passesIntegrity(location, checkAge);
+        if (location == null || !LocationManager.GPS_PROVIDER.equals(location.getProvider())) {
+            return false;
+        }
+        if (isMockLocation(location) && !hasReceiverExtras(location)) {
+            return false;
+        }
+        return passesIntegrity(location, checkAge);
+    }
+
+    public static boolean isMockLocation(Location location) {
+        if (location == null) {
+            return false;
+        }
+        try {
+            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    ? location.isMock()
+                    : location.isFromMockProvider();
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    public static boolean hasReceiverExtras(Location location) {
+        if (location == null || location.getExtras() == null) {
+            return false;
+        }
+        android.os.Bundle extras = location.getExtras();
+        return ExternalGnssFixPolicy.hasReceiverExtras(
+                extras.containsKey(ExternalGnssFixPolicy.EXTRA_HDOP),
+                extras.containsKey(ExternalGnssFixPolicy.EXTRA_DIFF_STATUS));
     }
 
     /**
@@ -179,17 +215,6 @@ public final class LocationTrackFilter {
     private static boolean passesIntegrity(Location location, boolean checkAge) {
         if (location == null || !hasValidPosition(location)) {
             return false;
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (location.isMock()) {
-                    return false;
-                }
-            } else if (location.isFromMockProvider()) {
-                return false;
-            }
-        } catch (RuntimeException ignored) {
-            // Treat an unavailable platform mock flag as unknown, not as corrupt data.
         }
         if (!location.hasAccuracy()
                 || !Float.isFinite(location.getAccuracy())
@@ -251,13 +276,7 @@ public final class LocationTrackFilter {
 
         @Override
         public boolean isMock(Location sample) {
-            try {
-                return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                        ? sample.isMock()
-                        : sample.isFromMockProvider();
-            } catch (RuntimeException ignored) {
-                return false;
-            }
+            return LocationTrackFilter.isMockLocation(sample);
         }
 
         @Override

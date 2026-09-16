@@ -151,14 +151,17 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   редактор MultiPolygon отклоняет добавление второй части, не изменяя уже
   существующие многосоставные геометрии и отверстия при их загрузке;
 - `GpsEventSource` владеет общим потоком позиции и отдельным GNSS-only выходом
-  записи. Карта получает свежий GPS/Network, метрический круг accuracy и
+  записи. Карта получает свежий GPS (чип или mock) и Network только без GPS,
+  метрический круг accuracy и
   геодезический сектор направления (`UserLocationGeometry`); host обновляет
   сектор при повороте телефона без нового GPS. Источник очищает устаревшую
   позицию по монотонному времени, в том числе после сна.
-  `AdaptiveLocationFilterCore` сглаживает шум, удерживает остановку, проверяет
-  выбросы и учитывает автомобильные повороты; `LocationRecordingSampler`
-  прореживает только уже проверенные точки. База v6 и `TrackLayer.getTracks()`
-  сохраняют многосегментные линии, Canvas/MapLibre не соединяют разрывы.
+  `ExternalGnssFixPolicy` отбрасывает заглушку GPS Connector без extras и чип
+  при живом mock. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
+  выбросы и учитывает автомобильные повороты; mock пишется как есть.
+  `LocationRecordingSampler`
+  прореживает только уже проверенные точки (для mock не грубее 2 с / 1 м).
+  База v6 и `TrackLayer.getTracks()` сохраняют многосегментные линии, Canvas/MapLibre не соединяют разрывы.
   Исходные GNSS/mock фиксы выноса доступны через `addRawListener`.
   Подробный контракт: [текущая позиция и запись GPS](../../docs/architecture/location-pipeline.md).
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
@@ -205,7 +208,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - GPS-фильтр не имеет профилей движения: рабочий distance-cap равен `55 м/с`
   с запасом над 160 км/ч, а reported speed свыше `100 м/с` считается мусором.
   Разрыв более 30 секунд обязан выгрузить валидный буфер до сброса состояния.
-- Network разрешён только для текущей позиции; трек и обход сохраняют только GNSS.
+- Network разрешён только если нет свежего GPS; трек и обход сохраняют GNSS чипа или mock приёмника.
   Разрыв пригодного потока более 8 секунд разделяет трек на сегменты.
 - Вынос поддерживает только Point/MultiPoint, LineString/MultiLineString и
   Polygon/MultiPolygon в EPSG:4326/3857. Для полигона расстояние всегда идёт до

@@ -9,14 +9,19 @@ public class LocationRecordingSamplerCoreTest {
     private static final class Point {
         final double x, y;
         final long time, stop;
-        Point(double x, double y, long time, long stop) { this.x = x; this.y = y; this.time = time; this.stop = stop; }
+        final boolean mock;
+        Point(double x, double y, long time, long stop) { this(x, y, time, stop, false); }
+        Point(double x, double y, long time, long stop, boolean mock) {
+            this.x = x; this.y = y; this.time = time; this.stop = stop; this.mock = mock;
+        }
     }
     private static final LocationRecordingSamplerCore.Ops<Point> OPS = new LocationRecordingSamplerCore.Ops<Point>() {
-        public Point copy(Point p) { return new Point(p.x, p.y, p.time, p.stop); }
+        public Point copy(Point p) { return new Point(p.x, p.y, p.time, p.stop, p.mock); }
         public long timeMs(Point p) { return p.time; }
         public long stopId(Point p) { return p.stop; }
         public double distance(Point a, Point b) { return Math.hypot(a.x - b.x, a.y - b.y); }
         public double bearing(Point a, Point b) { return Math.toDegrees(Math.atan2(b.x - a.x, b.y - a.y)); }
+        public boolean isMock(Point p) { return p.mock; }
     };
 
     @Test public void improvingStopReplacesOneVertexInsteadOfDrawingSpuriousDistance() {
@@ -84,5 +89,17 @@ public class LocationRecordingSamplerCoreTest {
         assertTrue(sampler.onLocation(new Point(20, 0, 9000, 1)).isEmpty());
         assertNull(sampler.takeStationaryCorrection());
         assertTrue(sampler.flush().isEmpty());
+    }
+
+    @Test public void mockKeepsTwoSecondOneMetreSamplingWhenSettingsAreCoarser() {
+        LocationRecordingSamplerCore<Point> sampler = new LocationRecordingSamplerCore<>(OPS, 5000, 5);
+        List<Point> stored = new ArrayList<>(sampler.onLocation(new Point(0, 0, 1000, 0, true)));
+        assertEquals(1, stored.size());
+        assertTrue(sampler.onLocation(new Point(0.6, 0, 2000, 0, true)).isEmpty());
+        stored.addAll(sampler.onLocation(new Point(1.2, 0, 3000, 0, true)));
+        assertEquals(2, stored.size());
+        LocationRecordingSamplerCore<Point> chip = new LocationRecordingSamplerCore<>(OPS, 5000, 5);
+        chip.onLocation(new Point(0, 0, 1000, 0, false));
+        assertTrue(chip.onLocation(new Point(1.2, 0, 3000, 0, false)).isEmpty());
     }
 }

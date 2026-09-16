@@ -16,7 +16,8 @@ public class LocationFixPolicyTest {
     @Test public void newNetworkFixReplacesGpsFromBeforeSleep() {
         assertFalse(LocationFixPolicy.preferGps(seconds(100), 2, seconds(499), 500, seconds(500)));
         assertTrue(LocationFixPolicy.preferGps(seconds(499), 8, seconds(499), 500, seconds(500)));
-        assertFalse(LocationFixPolicy.preferGps(seconds(498), 300, seconds(499), 30, seconds(500)));
+        assertTrue(LocationFixPolicy.preferGps(seconds(498), 300, seconds(499), 30, seconds(500)));
+        assertTrue(LocationFixPolicy.preferGps(seconds(499), 470, seconds(499), 18, seconds(500)));
     }
 
     @Test public void corruptAndFarFutureFixesAreUnknown() {
