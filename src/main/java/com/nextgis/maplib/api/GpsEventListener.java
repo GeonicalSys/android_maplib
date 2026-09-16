@@ -25,6 +25,8 @@ package com.nextgis.maplib.api;
 
 import android.location.Location;
 
+import com.nextgis.maplib.gnss.GnssFix;
+
 /**
  * Interface for listen location events
  * @author Dmitry Baryshnikov <dmitry.baryshnikov@nextgis.com>
@@ -51,4 +53,10 @@ public interface GpsEventListener
 
     /** There is no fresh display fix; consumers must remove any current-position indicator. */
     default void onLocationUnavailable() { }
+
+    /** Native NMEA HUD snapshot; may lack a position when the receiver has no fix. */
+    default void onExternalGnssFix(GnssFix fix) { }
+
+    /** Connecting / connected / idle status for the in-app external GNSS session. */
+    default void onExternalGnssStatus(String status) { }
 }

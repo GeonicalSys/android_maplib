@@ -157,10 +157,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   сектор при повороте телефона без нового GPS. Источник очищает устаревшую
   позицию по монотонному времени, в том числе после сна.
   `ExternalGnssFixPolicy` отбрасывает заглушку GPS Connector без extras и чип
-  при живом mock. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
-  выбросы и учитывает автомобильные повороты; mock пишется как есть.
+  при живом mock. `gnss_input=external` читает NMEA напрямую (Bluetooth Classic/LE,
+  USB, TCP/IP) без Mock Location; `NmeaParser` собирает GGA/GST/GSA/RMC без бренда
+  приёмника. `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
+  выбросы и учитывает автомобильные повороты; mock и native NMEA пишутся как есть.
   `LocationRecordingSampler`
-  прореживает только уже проверенные точки (для mock не грубее 2 с / 1 м).
+  прореживает только уже проверенные точки (для mock и native NMEA не грубее 2 с / 1 м).
   База v6 и `TrackLayer.getTracks()` сохраняют многосегментные линии, Canvas/MapLibre не соединяют разрывы.
   Исходные GNSS/mock фиксы выноса доступны через `addRawListener`.
   Подробный контракт: [текущая позиция и запись GPS](../../docs/architecture/location-pipeline.md).
@@ -208,7 +210,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - GPS-фильтр не имеет профилей движения: рабочий distance-cap равен `55 м/с`
   с запасом над 160 км/ч, а reported speed свыше `100 м/с` считается мусором.
   Разрыв более 30 секунд обязан выгрузить валидный буфер до сброса состояния.
-- Network разрешён только если нет свежего GPS; трек и обход сохраняют GNSS чипа или mock приёмника.
+- Network разрешён только если нет свежего GPS; трек и обход сохраняют GNSS чипа, mock приёмника или native NMEA.
   Разрыв пригодного потока более 8 секунд разделяет трек на сегменты.
 - Вынос поддерживает только Point/MultiPoint, LineString/MultiLineString и
   Polygon/MultiPolygon в EPSG:4326/3857. Для полигона расстояние всегда идёт до

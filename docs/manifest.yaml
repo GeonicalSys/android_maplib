@@ -41,7 +41,11 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSampler.java
     responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop; mock GNSS is sampled no coarser than 2 s / 1 m.
   - path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
-    responsibility: Keep mock receiver extras, drop GPS Connector 47 m placeholders and phone-chip GPS while mock is fresh, and cap mock sampling at 2 s / 1 m.
+    responsibility: Keep mock GPS Connector extras exclusive of the 47 m placeholder and phone chip; native NMEA uses the same dense 2 s / 1 m sampling.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaParser.java
+    responsibility: Talker-agnostic GGA/GST/GSA/RMC parsing with checksum, RTK quality and GST centimetre accuracy.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/ExternalGnssSession.java
+    responsibility: Own one NMEA transport, reconnect, and publish Location without Mock Location.
   - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
     responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle
@@ -155,7 +159,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
     responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, shared filtered recording including mock receiver extras, original GNSS/mock precision subscriptions and owner-based high-frequency leases.
+    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases.
 public_contracts:
   - id: passive-walk-preview
     symbol: MapDrawable.showWalkPreview

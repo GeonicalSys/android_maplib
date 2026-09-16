@@ -38,4 +38,10 @@ public class ExternalGnssFixPolicyTest {
         assertEquals(5_000L, ExternalGnssFixPolicy.sampleMinTimeMs(false, 5_000L));
         assertEquals(5f, ExternalGnssFixPolicy.sampleMinDistanceM(false, 5f), 0f);
     }
+
+    @Test public void nativeNmeaUsesTheSameDenseSamplingAsMock() {
+        assertTrue(ExternalGnssFixPolicy.isReceiverStream(false, true));
+        assertEquals(2_000L, ExternalGnssFixPolicy.sampleMinTimeMs(false, true, 5_000L));
+        assertEquals(1f, ExternalGnssFixPolicy.sampleMinDistanceM(false, true, 5f), 0f);
+    }
 }

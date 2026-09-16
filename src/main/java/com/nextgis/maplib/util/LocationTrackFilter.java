@@ -111,7 +111,7 @@ public final class LocationTrackFilter {
                 mRejectedBeforeSequence++;
                 return Collections.emptyList();
             }
-            if (isMockLocation(raw)) {
+            if (isReceiverStream(raw)) {
                 Location copy = new Location(raw);
                 mLastAccepted = copy;
                 mMockRecorded++;
@@ -176,7 +176,7 @@ public final class LocationTrackFilter {
         if (location == null || !LocationManager.GPS_PROVIDER.equals(location.getProvider())) {
             return false;
         }
-        if (isMockLocation(location) && !hasReceiverExtras(location)) {
+        if (isMockLocation(location) && !isNativeNmea(location) && !hasReceiverExtras(location)) {
             return false;
         }
         return passesIntegrity(location, checkAge);
@@ -195,12 +195,21 @@ public final class LocationTrackFilter {
         }
     }
 
+    public static boolean isNativeNmea(Location location) {
+        return location != null && location.getExtras() != null
+                && location.getExtras().getBoolean(ExternalGnssFixPolicy.EXTRA_NATIVE_NMEA, false);
+    }
+
+    public static boolean isReceiverStream(Location location) {
+        return ExternalGnssFixPolicy.isReceiverStream(isMockLocation(location), isNativeNmea(location));
+    }
+
     public static boolean hasReceiverExtras(Location location) {
         if (location == null || location.getExtras() == null) {
             return false;
         }
         android.os.Bundle extras = location.getExtras();
-        return ExternalGnssFixPolicy.hasReceiverExtras(
+        return isNativeNmea(location) || ExternalGnssFixPolicy.hasReceiverExtras(
                 extras.containsKey(ExternalGnssFixPolicy.EXTRA_HDOP),
                 extras.containsKey(ExternalGnssFixPolicy.EXTRA_DIFF_STATUS));
     }
@@ -276,7 +285,7 @@ public final class LocationTrackFilter {
 
         @Override
         public boolean isMock(Location sample) {
-            return LocationTrackFilter.isMockLocation(sample);
+            return LocationTrackFilter.isReceiverStream(sample);
         }
 
         @Override
