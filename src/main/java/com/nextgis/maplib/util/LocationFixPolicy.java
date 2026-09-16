@@ -19,13 +19,12 @@ public final class LocationFixPolicy {
                 && Float.isFinite(accuracy) && accuracy >= 0;
     }
 
-    /** A precise but old fix must never mask a current approximate one. */
+    /**
+     * Fresh GPS (chip or mock, any reported accuracy) always wins. Network is only
+     * a fallback when GPS is missing or older than {@link #FRESHNESS_MS}.
+     */
     public static boolean preferGps(long gpsNanos, float gpsAccuracy,
                                     long networkNanos, float networkAccuracy, long nowNanos) {
-        if (!isFresh(gpsNanos, nowNanos)) return false;
-        if (!isFresh(networkNanos, nowNanos)) return true;
-        // Allow a materially better and newer network estimate when GNSS reception is poor.
-        return !(networkNanos - gpsNanos > 2_000_000_000L
-                || networkNanos > gpsNanos && networkAccuracy * 2 < gpsAccuracy);
+        return isFresh(gpsNanos, nowNanos);
     }
 }

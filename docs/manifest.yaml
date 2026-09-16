@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -10,8 +10,8 @@ entrypoints:
 key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
     responsibility: Durable asset index, publication and move recovery, format-aware dedup, repair of previously mislinked references and payload lifecycle; Asset.referenceConfig preserves project presentation and zoom limits.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
-    responsibility: App-private catalog placement, stream imports, project attachment and reference repair before layer load.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayKind.java
+    responsibility: Classify NGRc, raster MBTiles and ZIP contents before shared-catalog import without extracting a tile tree.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
     responsibility: Bounded two-pass NGRc reader with complete source hash, explicit tile scheme, case-insensitive Mapnik.json/config.json and Mapnik raster-path normalization, and ambiguous metadata rejection.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
@@ -37,9 +37,11 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
     responsibility: Store trackpoints.segment in database v6 and expose each track as GeoMultiLineString without connecting gaps.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationFixPolicy.java
-    responsibility: Monotonic freshness, position validity and current GPS/network preference rules.
+    responsibility: Monotonic freshness, position validity and GPS-first display (Network only when GPS is absent or stale).
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSampler.java
-    responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop.
+    responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop; mock GNSS is sampled no coarser than 2 s / 1 m.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
+    responsibility: Keep mock receiver extras, drop GPS Connector 47 m placeholders and phone-chip GPS while mock is fresh, and cap mock sampling at 2 s / 1 m.
   - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
     responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle
@@ -59,11 +61,17 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
     responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
-    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, send pending edits before remote pull, three-way verify NGW class/geometry/fields against serialized metadata and physical SQLite, repair metadata-only drift without refill, keep server attachment metadata in SQLite without treating absent local bytes as destructive, stream full untracked snapshots from an app-owned disk stage through one SQLite transaction while skipping invalid geometries without deleting their prior local rows, execute incremental pulls as one broadcast-free bulk cache mutation, expose transient pull failures for a deferred retry pass, bind fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint authoritative rebuild requests, and persist bounded failure diagnostics without feature payload.
+    responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, send pending edits before remote pull, three-way verify NGW class/geometry/fields against serialized metadata and physical SQLite, repair metadata-only drift without refill, keep server attachment metadata in SQLite without treating absent local bytes as destructive, stream full untracked snapshots from an app-owned disk stage through one SQLite transaction while skipping invalid geometries without deleting their prior local rows, execute incremental pulls as one broadcast-free bulk cache mutation, for SYNC_NONE compare filtered server feature counts with the local table and reload a full snapshot when they differ unless the server reports zero, expose transient pull failures for a deferred retry pass, bind fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint authoritative rebuild requests, and persist bounded failure diagnostics without feature payload.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncNoneReloadDecision.java
+    responsibility: Pure KEEP/RELOAD policy for SYNC_NONE count comparison; server count <= 0 keeps local data.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureCountParser.java
+    responsibility: Parse NGW feature_count JSON; with a where clause use filtered_count only, never unfiltered total_count.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/DistrictFilterUtil.java
+    responsibility: Opt-in Collector district subset uses NGW fld_district__like=%value% so comma-separated district lists match a project key; SQL LIKE wildcards in the key are escaped.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RemoteAttachmentSyncPolicy.java
     responsibility: Keep metadata-only attachment refresh outside the feature backup gate and compare persisted server metadata without byte-size noise.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
-    responsibility: Synchronize account layers in order, own process-wide started/finished state, and retry only transiently failed vector pulls after the main pass without repeating successful layers.
+    responsibility: Synchronize account layers in order, own process-wide started/finished state, refresh SYNC_NONE config and count-driven snapshot after the main pass, and retry only transiently failed vector pulls without repeating successful layers.
   - path: maplib/src/main/java/com/nextgis/maplib/service/NGWSyncService.java
     responsibility: Host Android account synchronization without blocking the main thread while a worker finishes during service teardown.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
@@ -110,8 +118,10 @@ key_components:
     responsibility: Validate raster MBTiles SQLite structure, integrity, format, zoom range and optional bounds before publication or rendering.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LegacyTileMbtilesMath.java
     responsibility: Convert legacy TMS/OSM rows to standard MBTiles rows and derive deterministic raster format and Web Mercator bounds without Android dependencies.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
-    responsibility: Parse and normalize a direct NGW resource URL without Android dependencies.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalog.java
+    responsibility: Parse NGW search and children JSON for the shared lisa catalog key and collector_project entries.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalogLookup.java
+    responsibility: Look up keyname lisa by search then subtree walk and list collector projects under that group.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
     responsibility: Load one target NGW resource and resolve QGIS style URLs to their parent layer.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LayerConfigUtil.java
@@ -131,7 +141,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
     responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed polygon ring to its own first vertex.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
-    responsibility: Validate GNSS integrity and live batch timestamps, adapt the robust motion and delayed sequence filters, and expose accepted display estimates and recording points.
+    responsibility: Validate GNSS integrity and live batch timestamps, accept mock receiver extras without pedestrian smoothing, adapt the robust motion and delayed sequence filters for the phone chip, and expose accepted display estimates and recording points.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java
     responsibility: Format map measurements, including explicit square-metre to hectare conversion for ruler area labels.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
@@ -145,7 +155,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
     responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    responsibility: Own application-wide GNSS and display-only network acquisition, current-fix expiry, shared filtered recording, original GNSS/mock precision subscriptions and owner-based high-frequency leases.
+    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, shared filtered recording including mock receiver extras, original GNSS/mock precision subscriptions and owner-based high-frequency leases.
 public_contracts:
   - id: passive-walk-preview
     symbol: MapDrawable.showWalkPreview

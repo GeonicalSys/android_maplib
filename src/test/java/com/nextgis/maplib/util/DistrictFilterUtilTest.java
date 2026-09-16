@@ -22,6 +22,28 @@ public class DistrictFilterUtilTest {
     }
 
     @Test
+    public void buildFldLikeContainsQuery_latinValue() {
+        assertEquals("fld_district__like=%25olonec%25",
+                DistrictFilterUtil.buildFldLikeContainsQuery("district", "olonec"));
+    }
+
+    @Test
+    public void buildFldLikeContainsQuery_escapesLikeWildcards() {
+        assertEquals("fld_district__like=%25karel%5C_west%25",
+                DistrictFilterUtil.buildFldLikeContainsQuery("district", "karel_west"));
+        assertEquals("\\_", DistrictFilterUtil.escapeLikeLiteral("_"));
+        assertEquals("\\%", DistrictFilterUtil.escapeLikeLiteral("%"));
+        assertEquals("\\\\", DistrictFilterUtil.escapeLikeLiteral("\\"));
+    }
+
+    @Test
+    public void buildFldLikeContainsQuery_empty_returnsEmpty() {
+        assertEquals("", DistrictFilterUtil.buildFldLikeContainsQuery("district", ""));
+        assertEquals("", DistrictFilterUtil.buildFldLikeContainsQuery("district", null));
+        assertEquals("", DistrictFilterUtil.buildFldLikeContainsQuery("", "olonec"));
+    }
+
+    @Test
     public void resolveDistrictFilter_postgisWithField_active() {
         Map<String, Field> fields = new HashMap<>();
         fields.put("district", new Field(1, "district", "District"));
@@ -30,7 +52,7 @@ public class DistrictFilterUtilTest {
                 fields,
                 "vologda");
         assertTrue(d.active);
-        assertEquals("fld_district=vologda", d.serverWhere);
+        assertEquals("fld_district__like=%25vologda%25", d.serverWhere);
     }
 
     @Test
@@ -40,9 +62,9 @@ public class DistrictFilterUtilTest {
         DistrictFilterUtil.Decision d = DistrictFilterUtil.resolveDistrictFilter(
                 Connection.NGWResourceTypeVectorLayer,
                 fields,
-                "vologda");
+                "olonec");
         assertTrue(d.active);
-        assertEquals("fld_district=vologda", d.serverWhere);
+        assertEquals("fld_district__like=%25olonec%25", d.serverWhere);
     }
 
     @Test

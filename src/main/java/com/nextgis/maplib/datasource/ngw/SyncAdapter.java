@@ -618,6 +618,9 @@ public class SyncAdapter
         }
     }
 
+    /**
+     * Config refresh plus optional count-driven full snapshot for layers with {@code SYNC_NONE}.
+     */
     private void syncNgwConfigForSyncDisabledLayers(
             Account account,
             LayerGroup layerGroup,

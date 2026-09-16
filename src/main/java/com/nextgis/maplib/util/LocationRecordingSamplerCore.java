@@ -13,6 +13,7 @@ final class LocationRecordingSamplerCore<T> {
         default long departureSinceMs(T point) { return 0; }
         default T anchor(T point) { return copy(point); }
         default T moving(T point) { return copy(point); }
+        default boolean isMock(T point) { return false; }
         double distance(T a, T b);
         double bearing(T a, T b);
     }
@@ -96,7 +97,11 @@ final class LocationRecordingSamplerCore<T> {
                 pending = corner = null;
             }
         } else if (RecordingSamplingPolicy.save(ops.timeMs(location) - savedAtMs,
-                ops.distance(saved, location), minTimeMs, minDistance)) save(location, result);
+                ops.distance(saved, location),
+                ExternalGnssFixPolicy.sampleMinTimeMs(ops.isMock(location), minTimeMs),
+                ExternalGnssFixPolicy.sampleMinDistanceM(ops.isMock(location), minDistance))) {
+            save(location, result);
+        }
         else pending = ops.copy(location);
     }
 

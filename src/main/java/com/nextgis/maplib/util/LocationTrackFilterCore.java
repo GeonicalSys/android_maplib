@@ -292,9 +292,6 @@ final class LocationTrackFilterCore<T> {
         if (!mOps.hasValidPosition(sample)) {
             return "drop:position";
         }
-        if (mOps.isMock(sample)) {
-            return "drop:mock";
-        }
         if (!mOps.hasAccuracy(sample) || !Float.isFinite(mOps.getAccuracy(sample))
                 || mOps.getAccuracy(sample) <= 0f) {
             return "drop:no_accuracy";
