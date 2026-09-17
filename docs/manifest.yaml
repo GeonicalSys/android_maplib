@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -49,9 +49,19 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
     responsibility: Keep mock GPS Connector extras exclusive of the 47 m placeholder and phone chip; native NMEA uses the same dense 2 s / 1 m sampling.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaParser.java
-    responsibility: Talker-agnostic GGA/GST/GSA/RMC parsing with checksum, RTK quality and GST centimetre accuracy.
+    responsibility: Talker-agnostic GGA/GST/GSA/RMC and ComNav/NovAtel BESTPOSA parsing with checksum, RTK quality and GST centimetre accuracy.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaLineBuffer.java
+    responsibility: Assemble $talker+type and #BESTPOS sentences; ignore $/# bytes inside ComNav binary.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/CnbFrameBuffer.java
+    responsibility: Assemble AA 44 12 ComNav frames with NovAtel CRC-32.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/CnbBestPos.java
+    responsibility: Parse BESTPOSB message 42 into WGS84 GnssFix (фикс/плав/авто).
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/ComNavAsciiCommands.java
+    responsibility: Optional CRLF log gpgga/gst/gsa/rmc commands, each at most 20 bytes, without unlogall.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/BluetoothLeTransport.java
+    responsibility: Nordic UART notify TX and write RX (6E400002) or writable notify; MTU request; WRITE with response; no arbitrary writable GATT fallback.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/ExternalGnssSession.java
-    responsibility: Own one NMEA transport, reconnect, and publish Location without Mock Location while a configured external endpoint remains selected, independent of map listeners.
+    responsibility: Own one GNSS transport, parse CNB BESTPOSB first, optionally request ASCII NMEA, reconnect, and publish Location without Mock Location while a configured external endpoint remains selected, independent of map listeners.
   - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
     responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle

@@ -1,8 +1,9 @@
 package com.nextgis.maplib.gnss;
 
 /**
- * Talker-agnostic NMEA parser ($GP/$GN/$GL/$GA/$GB/$GQ). Validates checksum when present.
- * GGA supplies position and quality; GST/GSA/RMC enrich the same epoch.
+ * Talker-agnostic NMEA parser ($GP/$GN/$GL/$GA/$GB/$GQ) plus ComNav/NovAtel
+ * {@code #BESTPOSA}. Validates checksum when present. GGA supplies position
+ * and quality; GST/GSA/RMC enrich the same epoch.
  */
 public final class NmeaParser {
     private final GnssFix fix = new GnssFix();
@@ -21,6 +22,10 @@ public final class NmeaParser {
             return false;
         }
         String line = sentence.trim();
+        if (line.startsWith("#")) {
+            parseBestPosA(line);
+            return updated && fix.hasFix();
+        }
         if (!line.startsWith("$") || line.length() < 6) {
             return false;
         }
@@ -51,6 +56,117 @@ public final class NmeaParser {
                 return false;
         }
         return updated && fix.hasFix();
+    }
+
+    private void parseBestPosA(String line) {
+        if (line.length() < 10) {
+            return;
+        }
+        if (!line.regionMatches(true, 1, "BESTPOSA", 0, 8)) {
+            return;
+        }
+        if (!checksumOk(line)) {
+            return;
+        }
+        int star = line.indexOf('*');
+        String payload = star >= 0 ? line.substring(0, star) : line;
+        int semi = payload.indexOf(';');
+        if (semi < 0 || semi + 1 >= payload.length()) {
+            return;
+        }
+        String[] fields = payload.substring(semi + 1).split(",", -1);
+        if (fields.length < 14) {
+            return;
+        }
+        String solStatus = fields[0].trim();
+        String posType = fields[1].trim();
+        if (!"SOL_COMPUTED".equalsIgnoreCase(solStatus)) {
+            fix.hasPosition = false;
+            fix.quality = 0;
+            updated = true;
+            return;
+        }
+        double lat = parseDouble(fields[2], Double.NaN);
+        double lon = parseDouble(fields[3], Double.NaN);
+        int quality = bestPosQuality(posType);
+        if (!Double.isFinite(lat) || !Double.isFinite(lon) || quality <= 0) {
+            fix.hasPosition = false;
+            fix.quality = quality;
+            updated = true;
+            return;
+        }
+        fix.hasPosition = true;
+        fix.latitude = lat;
+        fix.longitude = lon;
+        fix.quality = quality;
+        fix.altitude = parseDouble(fields[4], fix.altitude);
+        if (fields.length > 8) {
+            fix.stdLat = parseFloat(fields[7]);
+            fix.stdLon = parseFloat(fields[8]);
+        }
+        if (fields.length > 11) {
+            fix.ageOfDiff = parseFloat(fields[11]);
+        }
+        if (fields.length > 13) {
+            fix.satellites = parseInt(fields[13], 0);
+        }
+        updated = true;
+    }
+
+    static int bestPosQuality(String posType) {
+        if (posType == null) {
+            return 0;
+        }
+        String type = posType.trim().toUpperCase();
+        if (type.contains("NARROW_INT") || type.equals("L1_INT") || type.equals("WIDE_INT")
+                || type.contains("RTKFIXED") || type.equals("RTK_DIRECT_INS")) {
+            return 4;
+        }
+        if (type.contains("FLOAT") || type.equals("FLOATCONV")) {
+            return 5;
+        }
+        if (type.equals("PSRDIFF") || type.equals("WAAS") || type.equals("CDGPS")
+                || type.startsWith("OMNISTAR") || type.equals("INS_PSRDIFF")) {
+            return 2;
+        }
+        if (type.equals("SINGLE") || type.equals("INS_PSRSP") || type.equals("PROPAGATED")
+                || type.equals("DOPPLER_VELOCITY")) {
+            return 1;
+        }
+        return 0;
+    }
+
+    /** NovAtel/ComNav BESTPOS {@code pos type} integer (OEM6). */
+    static int bestPosQualityFromCode(int posType) {
+        switch (posType) {
+            case 48:
+            case 49:
+            case 50:
+            case 51:
+            case 56:
+                return 4;
+            case 4:
+            case 32:
+            case 33:
+            case 34:
+            case 55:
+                return 5;
+            case 17:
+            case 18:
+            case 20:
+            case 52:
+            case 54:
+                return 2;
+            case 1:
+            case 2:
+            case 8:
+            case 16:
+            case 19:
+            case 53:
+                return 1;
+            default:
+                return 0;
+        }
     }
 
     public GnssFix snapshot() {

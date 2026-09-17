@@ -5,6 +5,7 @@ import android.util.Log;
 import com.nextgis.maplib.util.Constants;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -15,6 +16,7 @@ public final class TcpNmeaTransport implements GnssTransport {
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean();
     private Socket socket;
+    private OutputStream output;
 
     public TcpNmeaTransport(String host, int port) {
         this.host = host;
@@ -44,6 +46,7 @@ public final class TcpNmeaTransport implements GnssTransport {
                 return;
             }
             socket = local;
+            output = local.getOutputStream();
             listener.onOpened();
             InputStream in = local.getInputStream();
             byte[] buffer = new byte[1024];
@@ -68,8 +71,25 @@ public final class TcpNmeaTransport implements GnssTransport {
     }
 
     @Override
+    public boolean write(byte[] data) {
+        OutputStream local = output;
+        if (local == null || data == null || data.length == 0) {
+            return false;
+        }
+        try {
+            local.write(data);
+            local.flush();
+            return true;
+        } catch (Exception exception) {
+            Log.w(Constants.TAG, "TCP GNSS write failed", exception);
+            return false;
+        }
+    }
+
+    @Override
     public void close() {
         running.set(false);
+        output = null;
         Socket local = socket;
         socket = null;
         if (local == null) {

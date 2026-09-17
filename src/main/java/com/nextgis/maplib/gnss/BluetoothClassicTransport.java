@@ -8,6 +8,7 @@ import android.util.Log;
 import com.nextgis.maplib.util.Constants;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -19,6 +20,7 @@ public final class BluetoothClassicTransport implements GnssTransport {
     private final String address;
     private final AtomicBoolean running = new AtomicBoolean();
     private BluetoothSocket socket;
+    private OutputStream output;
 
     public BluetoothClassicTransport(BluetoothAdapter adapter, String address) {
         this.adapter = adapter;
@@ -57,6 +59,7 @@ public final class BluetoothClassicTransport implements GnssTransport {
                 return;
             }
             socket = local;
+            output = local.getOutputStream();
             listener.onOpened();
             InputStream in = local.getInputStream();
             byte[] buffer = new byte[1024];
@@ -81,8 +84,25 @@ public final class BluetoothClassicTransport implements GnssTransport {
     }
 
     @Override
+    public boolean write(byte[] data) {
+        OutputStream local = output;
+        if (local == null || data == null || data.length == 0) {
+            return false;
+        }
+        try {
+            local.write(data);
+            local.flush();
+            return true;
+        } catch (Exception exception) {
+            Log.w(Constants.TAG, "Bluetooth Classic GNSS write failed", exception);
+            return false;
+        }
+    }
+
+    @Override
     public void close() {
         running.set(false);
+        output = null;
         BluetoothSocket local = socket;
         socket = null;
         closeQuietly(local);
