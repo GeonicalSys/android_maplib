@@ -45,6 +45,7 @@ public class  NGWSyncService
 
     protected SyncReceiver mSyncReceiver;
     public static volatile boolean mIsSyncStarted = false;
+    private static final java.util.Set<Thread> ACTIVE_WORKERS = new java.util.HashSet<>();
 
 
     /*
@@ -67,8 +68,6 @@ public class  NGWSyncService
                 mSyncAdapter = createSyncAdapter(getApplicationContext(), true);
             }
         }
-
-        mIsSyncStarted = false;
 
         mSyncReceiver = new SyncReceiver();
         IntentFilter intentFilter = new IntentFilter();
@@ -119,12 +118,14 @@ public class  NGWSyncService
      * Direct adapter-to-UI state update. Broadcast receivers remain for compatibility, but the
      * process state no longer depends on a lifecycle-sensitive receiver seeing every event.
      */
-    public static void markSyncStarted() {
-        mIsSyncStarted = true;
+    public static synchronized void markSyncStarted() {
+        ACTIVE_WORKERS.add(Thread.currentThread());
+        mIsSyncStarted = !ACTIVE_WORKERS.isEmpty();
     }
 
-    public static void markSyncFinished() {
-        mIsSyncStarted = false;
+    public static synchronized void markSyncFinished() {
+        ACTIVE_WORKERS.remove(Thread.currentThread());
+        mIsSyncStarted = !ACTIVE_WORKERS.isEmpty();
     }
 
 
@@ -141,23 +142,23 @@ public class  NGWSyncService
             switch (action) {
                 case SyncAdapter.SYNC_START:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_START");
-                    markSyncStarted();
+                    // The worker owns state; a delayed main-thread broadcast cannot overwrite it.
                     break;
 
                 case SyncAdapter.SYNC_FINISH:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_FINISH");
-                    markSyncFinished();
+                    // State was already updated by the worker.
                     break;
 
                 case SyncAdapter.SYNC_CANCELED:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_CANCELED");
                     Log.d(Constants.TAG, "SyncAdapter - SYNC_CANCELED is received");
-                    markSyncFinished();
+                    // State was already updated by the worker.
                     break;
 
                 case SyncAdapter.SYNC_CHANGES:
 //                    Log.e("RRFRSH", "SyncReceiver - SYNC_CHANGES");
-                    markSyncFinished();
+                    // State was already updated by the worker.
                     // TODO:  ???  mIsSyncStarted = true;  ???
                     break;
             }

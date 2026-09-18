@@ -2,12 +2,22 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/util/CoalescingRefresh.java
+    responsibility: Bound incremental track refresh to one active read and one pending request per kind; release the slot after success, failure or stale UI result.
+  - path: maplib/src/main/java/com/nextgis/maplib/datasource/Feature.java
+    responsibility: Compare mutable field schemas in linear field traversal without indexed LinkedList scans, preserving name, null, numeric, date and geometry equality semantics.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncIo.java
+    responsibility: Configure finite snapshot connection and read inactivity timeouts, and preserve cancellation interrupts through the account adapter.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncTrace.java
+    responsibility: Log bounded payload-free snapshot attempt, stage, elapsed time and progress.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSnapshotCheckpoint.java
+    responsibility: Reuse only committed fully explained missing-invalid counts in the same scope for one hour, with forced recheck support.
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
     responsibility: Durable asset index, publication and move recovery, format-aware dedup, repair of previously mislinked references and payload lifecycle; Asset.referenceConfig preserves project presentation and zoom limits.
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayKind.java
@@ -177,6 +187,10 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
     responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases.
 public_contracts:
+  - id: asynchronous-track-refresh
+    symbol: MapDrawable.reloadCurrentTrackToMap and reloadTrackListToMap
+    path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+    consumers: [app, maplibui]
   - id: passive-walk-preview
     symbol: MapDrawable.showWalkPreview
     path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
@@ -211,6 +225,8 @@ public_contracts:
     consumers: [app]
 settings_refs: [feature_label_field, mobile_render_mode, render_mode, layer_origin, mobile, ngw_identity_backup, ngrc_provenance, legacy_underlay_migration]
 storage_contracts:
+  - id: ngw-snapshot-count-checkpoint
+    path: maplib/src/main/java/com/nextgis/maplib/util/NgwSnapshotCheckpoint.java
   - id: layer-json
     path: maplib/src/main/java/com/nextgis/maplib/map/Layer.java
   - id: ngw-raster-layer-json

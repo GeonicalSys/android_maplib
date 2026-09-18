@@ -29,6 +29,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -79,6 +80,7 @@ import com.nextgis.maplib.map.MLP.MultiPolygonEditClass;
 import com.nextgis.maplib.map.MLP.PointEditClass;
 import com.nextgis.maplib.map.MLP.PolygonEditClass;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.CoalescingRefresh;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.MapUtil;
 import com.nextgis.maplib.util.MbTilesInfo;
@@ -244,6 +246,11 @@ public class MapDrawable
 
     private final ExecutorService mMaplibreVectorReloadExecutor =
             Executors.newSingleThreadExecutor(r -> new Thread(r, "MaplibreVectorReload"));
+
+    private static final ExecutorService TRACK_RELOAD_EXECUTOR =
+            Executors.newSingleThreadExecutor(r -> new Thread(r, "MaplibreTrackReload"));
+    private final CoalescingRefresh mCurrentTrackRefresh = new CoalescingRefresh();
+    private final CoalescingRefresh mTrackListRefresh = new CoalescingRefresh();
 
     private final java.util.concurrent.ConcurrentHashMap<Integer, Long> mVectorLayerReloadTokens =
             new java.util.concurrent.ConcurrentHashMap<>();
@@ -4857,29 +4864,40 @@ public class MapDrawable
     }
 
     public void reloadCurrentTrackToMap() {
-        MapLibreMap map = maplibreMap.get();
-        if (map == null || map.getStyle() == null) return;
-        GeoJsonSource source = map.getStyle().getSourceAs("track-inprogress-source");
-        if (source != null) source.setGeoJson(FeatureCollection.fromFeatures(
-                createFeatureListFromCurrentTrack(getContext())));
+        reloadTrackSnapshot(true);
     }
 
     /** Compatibility overload; display positions never extend recorded geometry. */
     public void reloadCurrentTrackToMap(@Nullable Location ignored) { reloadCurrentTrackToMap(); }
 
     public static List<org.maplibre.geojson.Feature> createFeatureListFromCurrentTrack(Context context) {
-        List<org.maplibre.geojson.Feature> result = new ArrayList<>();
         IGISApplication app = (IGISApplication) context.getApplicationContext();
-        Uri uri = Uri.parse("content://" + app.getAuthority() + "/" + TrackLayer.TABLE_TRACKS);
-        String selection = TrackLayer.FIELD_VISIBLE + " = 1 AND (" + TrackLayer.FIELD_END
-                + " IS NULL OR " + TrackLayer.FIELD_END + " = '')";
-        try (Cursor tracks = context.getContentResolver().query(uri,
-                new String[]{TrackLayer.FIELD_ID}, selection, null, null)) {
+        MapBase owner = app.getMap();
+        if (!(owner instanceof MapContentProviderHelper)) return new ArrayList<>();
+        try {
+            return readTrackSnapshot((MapContentProviderHelper) owner, true, Constants.NOT_FOUND);
+        } catch (RuntimeException exception) {
+            logErr("Read current track segments", exception);
+            return new ArrayList<>();
+        }
+    }
+
+    /** Worker-only read, bound to the captured workspace, not the active ContentProvider. */
+    private static List<org.maplibre.geojson.Feature> readTrackSnapshot(
+            MapContentProviderHelper owner, boolean current, int layerId) {
+        List<org.maplibre.geojson.Feature> result = new ArrayList<>();
+        String end = TrackLayer.FIELD_END;
+        String selection = TrackLayer.FIELD_VISIBLE + " = 1 AND " + (current
+                ? "(" + end + " IS NULL OR " + end + " = '')"
+                : end + " IS NOT NULL AND " + end + " != ''");
+        SQLiteDatabase database = owner.getDatabase(true);
+        try (Cursor tracks = database.query(TrackLayer.TABLE_TRACKS,
+                new String[]{TrackLayer.FIELD_ID}, selection, null, null, null, null)) {
             if (tracks == null) return result;
             while (tracks.moveToNext()) {
-                try (Cursor points = context.getContentResolver().query(
-                        Uri.withAppendedPath(uri, tracks.getString(0)),
+                try (Cursor points = database.query(TrackLayer.TABLE_TRACKPOINTS,
                         new String[]{TrackLayer.FIELD_LON, TrackLayer.FIELD_LAT, TrackLayer.FIELD_SEGMENT},
+                        TrackLayer.FIELD_SESSION + " = ?", new String[]{tracks.getString(0)},
                         null, null, TrackLayer.POINT_ORDER)) {
                     if (points == null) continue;
                     List<Point> part = new ArrayList<>();
@@ -4897,9 +4915,9 @@ public class MapDrawable
                     addTrackSegment(result, part);
                 }
             }
-        } catch (RuntimeException exception) {
-            logErr("Read current track segments", exception);
         }
+        if (!current) for (org.maplibre.geojson.Feature feature : result)
+            feature.addStringProperty(prop_layerid, String.valueOf(layerId));
         return result;
     }
 
@@ -4907,30 +4925,53 @@ public class MapDrawable
         if (points.size() >= 2) features.add(org.maplibre.geojson.Feature.fromGeometry(LineString.fromLngLats(points)));
     }
 
-    public void reloadTrackListToMap(){
-        if (maplibreMap.get() == null)
+    public void reloadTrackListToMap() {
+        reloadTrackSnapshot(false);
+    }
+
+    private void reloadTrackSnapshot(boolean current) {
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(() -> reloadTrackSnapshot(current));
             return;
+        }
+        IGISApplication app = (IGISApplication) getContext().getApplicationContext();
+        MapLibreMap renderer = maplibreMap.get();
+        MapView view = maplibreMapView.get();
+        if (app.getMap() != this || renderer == null || view == null) return;
+        Style style = renderer.getStyle();
+        String sourceId = current ? "track-inprogress-source" : "track-line-source";
+        if (style == null || style.getSource(sourceId) == null) return;
         List<ILayer> tracks = new ArrayList<>();
         LayerGroup.getLayersByType(this, Constants.LAYERTYPE_TRACKS, tracks);
-        if (tracks.size() > 0){
-
-            Style style = maplibreMap.get().getStyle();
-            if (style != null) {
-
-                TrackLayer trackLayer = (TrackLayer) (tracks.get(0));
-                List<org.maplibre.geojson.Feature> tracksFeatures = createFeatureListFromTrackLayer(trackLayer);
-
-                GeoJsonSource tracksLineSource = (GeoJsonSource)style.getSource("track-line-source");
-                if (tracksLineSource!=null)
-                    tracksLineSource.setGeoJson(FeatureCollection.fromFeatures(tracksFeatures));
-
-                /* Upstream updates track-flag-source here; per CUSTOMIZATIONS §14 «Tracks: no start/end
-                   flag icons» we skip flag source update (it does not exist in our style). */
-                checkLayerVisibility(trackLayer.getId());
+        if (tracks.isEmpty()) return;
+        int layerId = tracks.get(0).getId();
+        CoalescingRefresh gate = current ? mCurrentTrackRefresh : mTrackListRefresh;
+        if (!gate.request()) return;
+        TRACK_RELOAD_EXECUTOR.execute(() -> {
+            List<org.maplibre.geojson.Feature> features = null;
+            try {
+                features = readTrackSnapshot(this, current, layerId);
+            } catch (RuntimeException exception) {
+                logErr("Read track snapshot", exception);
             }
-
-
-        }
+            List<org.maplibre.geojson.Feature> snapshot = features;
+            mainHandler.post(() -> {
+                boolean stillActive = app.getMap() == this && maplibreMap.get() == renderer
+                        && maplibreMapView.get() == view;
+                try {
+                    if (stillActive && renderer.getStyle() == style && snapshot != null) {
+                        GeoJsonSource source = style.getSourceAs(sourceId);
+                        if (source != null) source.setGeoJson(FeatureCollection.fromFeatures(snapshot));
+                        if (!current) checkLayerVisibility(layerId);
+                    }
+                } catch (RuntimeException exception) {
+                    logErr("Apply track snapshot", exception);
+                } finally {
+                    if (gate.complete() && stillActive) reloadTrackSnapshot(current);
+                }
+            });
+        });
     }
 
 

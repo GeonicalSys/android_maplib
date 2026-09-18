@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -16,6 +16,29 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 ## Критичные области
 
+- GPS-triggered обновление текущего трека и явный reload истории читают SQLite
+  в фоне из захваченной карты, не через переключаемый ContentProvider и не через
+  mutable cache `TrackLayer`. `CoalescingRefresh` оставляет одну активную и одну
+  отложенную задачу для каждого вида; публикация проверяет карту/view/style.
+  Сегменты, фильтр видимости, исключение текущего трека из истории и отсутствие
+  start/end flags сохранены.
+- `Feature.equalsData` строит временный индекс имён полей за один проход,
+  поддерживая перестановку колонок и прежние правила null/number/date; индекс
+  не кешируется между вызовами, поскольку имена `Field` изменяемы. Поиск имени
+  не обращается по индексу к linked schema.
+- Snapshot-соединения, включая HTTPS redirect, имеют connect timeout 45 с и
+  read inactivity timeout 180 с. Отмена сохраняет interrupt-флаг и проверяется
+  между стадиями и объектами; сетевое ожидание может продолжаться до timeout.
+  `NgwSyncTrace` пишет attempt/stage/elapsed и не чаще раза в 10 с прогресс без
+  содержимого объектов. `DatabaseContext` больше не отключает SQLite journal
+  и synchronous; целостность bulk apply важнее прежней PRAGMA-оптимизации.
+- `NgwSnapshotCheckpoint` после commit на час запоминает только полностью
+  объяснённый невалидными отсутствующими геометриями count mismatch `SYNC_NONE`.
+  Workspace/account/server/resource/filter/schema и оба count должны совпасть;
+  старый локальный объект не считается отсутствующим. Ручная перепроверка
+  `SyncAdapter.EXTRA_RECHECK_SKIPPED` обходит checkpoint.
+- Sync state принадлежит работающим потокам адаптера; чужой early finish,
+  delayed broadcast и повторное создание Service не снимают чужую активность.
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
 - MapLibre Android `13.0.2` подключён через явный OpenGL-артефакт
   `android-sdk-opengl`; generic `android-sdk` этой версии использует Vulkan и

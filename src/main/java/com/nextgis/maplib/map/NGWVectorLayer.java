@@ -58,6 +58,9 @@ import com.nextgis.maplib.util.ExistFeatureResult;
 import com.nextgis.maplib.util.NgwFeatureCountParser;
 import com.nextgis.maplib.util.NgwPullDecision;
 import com.nextgis.maplib.util.NgwSyncNoneReloadDecision;
+import com.nextgis.maplib.util.NgwSnapshotCheckpoint;
+import com.nextgis.maplib.util.NgwSyncIo;
+import com.nextgis.maplib.util.NgwSyncTrace;
 import com.nextgis.maplib.util.DistrictFilterUtil;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
@@ -2118,6 +2121,11 @@ public class NGWVectorLayer
      */
     @SuppressWarnings("unused")
     public void syncNgwResourceConfigOnly(String authority, SyncResult syncResult) {
+        syncNgwResourceConfigOnly(authority, syncResult, false);
+    }
+
+    public void syncNgwResourceConfigOnly(String authority, SyncResult syncResult,
+                                         boolean forceRecheck) {
         ConfigRefreshOutcome refreshOutcome = tryRefreshServerResourceMetaAndConfig();
         if (refreshOutcome == ConfigRefreshOutcome.NETWORK_UNAVAILABLE) {
             SyncResultUtil.markNetworkUnavailable(syncResult);
@@ -2143,9 +2151,35 @@ public class NGWVectorLayer
         if (action != NgwSyncNoneReloadDecision.Action.RELOAD) {
             return;
         }
+        String scope = snapshotCheckpointScope();
+        String checkpoint = mContext.getSharedPreferences("ngw_snapshot_checkpoints", Context.MODE_PRIVATE)
+                .getString(LayerConfigUtil.md5(scope), null);
+        if (NgwSnapshotCheckpoint.canReuse(checkpoint, scope, localCount, serverCount,
+                System.currentTimeMillis(), forceRecheck)) {
+            HyperLog.i(Constants.TAG, "NGWVectorLayer: count mismatch already accounted for"
+                    + " remoteId=" + mRemoteId + " recheckWithinMs="
+                    + NgwSnapshotCheckpoint.RECHECK_AFTER_MS);
+            return;
+        }
         // Snapshot must hit /feature/ with mServerWhere, not the tracked diff endpoint.
         mTracked = false;
         getFullSnapshotChangesFromServerStreaming(authority, syncResult);
+    }
+
+    private String snapshotCheckpointScope() {
+        // The layer directory identifies its workspace; schema/config and district changes expire it.
+        StringBuilder scope = new StringBuilder(mPath.getAbsolutePath()).append('|')
+                .append(mAccountName).append('|').append(mRemoteId).append('|')
+                .append(mServerWhere).append('|').append(mCRS).append('|').append(mGeometryType);
+        try {
+            scope.append('|').append(AccountUtil.getAccountData(mContext, mAccountName).url);
+        } catch (IllegalStateException missingAccount) {
+            scope.append("|account-unavailable");
+        }
+        for (Field field : getFields()) {
+            scope.append('|').append(field.getName()).append(':').append(field.getType());
+        }
+        return scope.toString();
     }
 
     /**
@@ -2590,20 +2624,27 @@ public class NGWVectorLayer
     private boolean getFullSnapshotChangesFromServerStreaming(
             String authority,
             SyncResult syncResult) {
-        FullSnapshotDownload download = downloadFullSnapshot(syncResult);
+        NgwSyncTrace trace = new NgwSyncTrace(mRemoteId);
+        FullSnapshotDownload download = downloadFullSnapshot(syncResult, trace);
         if (download.httpCode == 404) {
+            trace.finish(false);
             clearLayerSync(this);
             return false;
         }
         if (download.file == null) {
+            trace.finish(false);
             return false;
         }
 
         File snapshot = download.file;
         String changeTableName = getChangeTableName();
         boolean bulkPullStarted = false;
+        boolean committed = false;
         try {
-            FullSnapshotScan scan = scanFullSnapshot(snapshot, changeTableName);
+            trace.stage("scan");
+            FullSnapshotScan scan = scanFullSnapshot(snapshot, changeTableName, trace);
+            NgwSyncIo.checkInterrupted();
+            trace.stage("backup");
             if (!backupBeforeRemoteDestructiveApply(scan.destructiveIds)) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
                         + " streamed snapshot apply blocked by backup gate ids="
@@ -2613,18 +2654,37 @@ public class NGWVectorLayer
             }
 
             SQLiteDatabase database = DatabaseContext.getDatabaseForLayer(this, false);
+            NgwSyncIo.checkInterrupted();
             beginBulkImport();
             bulkPullStarted = true;
+            trace.stage("database-wait");
             database.beginTransaction();
             FullSnapshotApply apply = new FullSnapshotApply();
             try {
-                applyFullSnapshot(snapshot, authority, changeTableName, scan, apply);
+                trace.stage("apply");
+                applyFullSnapshot(snapshot, authority, changeTableName, scan, apply, trace);
+                trace.stage("reconcile");
                 reconcileFullSnapshotChangeRecords(changeTableName, scan.remoteIds);
+                NgwSyncIo.checkInterrupted();
+                trace.stage("commit");
                 database.setTransactionSuccessful();
             } finally {
                 if (database.inTransaction()) {
                     database.endTransaction();
                 }
+            }
+            committed = true;
+            // Publish evidence only after commit. A failed attempt must not suppress a later retry.
+            try {
+                String scope = snapshotCheckpointScope();
+                String checkpoint = NgwSnapshotCheckpoint.encode(scope, getSqliteTableRowCount(),
+                        scan.remoteIds.size(), scan.missingInvalidIds.size(), System.currentTimeMillis());
+                boolean saved = mContext.getSharedPreferences("ngw_snapshot_checkpoints", Context.MODE_PRIVATE)
+                        .edit().putString(LayerConfigUtil.md5(scope), checkpoint).commit();
+                if (!saved) HyperLog.w(Constants.TAG, "Snapshot count checkpoint was not persisted");
+            } catch (JSONException | RuntimeException checkpointFailure) {
+                // Optional retry suppression must never prevent publication of the committed data.
+                HyperLog.w(Constants.TAG, "Snapshot count checkpoint unavailable", checkpointFailure);
             }
 
             boolean changed = apply.updated > 0 || apply.created > 0
@@ -2639,6 +2699,7 @@ public class NGWVectorLayer
                     + " deleted=" + scan.deleteIds.size()
                     + " skippedInvalid=" + scan.skippedInvalid);
             if (changed) {
+                trace.stage("cache-rebuild");
                 try {
                     rebuildCache(null);
                 } catch (RuntimeException e) {
@@ -2672,6 +2733,7 @@ public class NGWVectorLayer
             syncResult.stats.numSkippedEntries++;
             return false;
         } finally {
+            trace.finish(committed);
             if (bulkPullStarted) {
                 endBulkImport();
             }
@@ -2684,18 +2746,31 @@ public class NGWVectorLayer
 
     private FullSnapshotScan scanFullSnapshot(
             File snapshot,
-            String changeTableName) throws IOException, NGException {
+            String changeTableName, NgwSyncTrace trace) throws IOException, NGException {
         FullSnapshotScan scan = new FullSnapshotScan();
         try (JsonReader reader = new JsonReader(new InputStreamReader(
                 new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"))) {
             reader.beginArray();
             int featureIndex = 0;
             while (reader.hasNext()) {
+                NgwSyncIo.checkInterrupted();
                 int currentFeatureIndex = featureIndex++;
+                trace.progress(featureIndex, "features");
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
                 if (!trackFullSnapshotFeatureAndCheckGeometry(
                         remoteFeature, scan.remoteIds)) {
                     scan.skippedInvalid++;
+                    if (remoteFeature != null) {
+                        Cursor existing = query(new String[]{Constants.FIELD_ID},
+                                Constants.FIELD_ID + " = " + remoteFeature.getId(), null, null, null);
+                        try {
+                            if (existing != null && !existing.moveToFirst()) {
+                                scan.missingInvalidIds.add(remoteFeature.getId());
+                            }
+                        } finally {
+                            if (existing != null) existing.close();
+                        }
+                    }
                     logSkippedFullSnapshotFeature(
                             remoteFeature, currentFeatureIndex, scan.skippedInvalid);
                     continue;
@@ -2708,6 +2783,7 @@ public class NGWVectorLayer
         }
 
         for (Long featureId : queryAllFeatureIdsFromDb()) {
+            NgwSyncIo.checkInterrupted();
             boolean deleteFeature = !scan.remoteIds.contains(featureId)
                     && !FeatureChanges.isChanges(
                             changeTableName, featureId, Constants.CHANGE_OPERATION_NEW)
@@ -2725,11 +2801,14 @@ public class NGWVectorLayer
             String authority,
             String changeTableName,
             FullSnapshotScan scan,
-            FullSnapshotApply apply) throws IOException, NGException {
+            FullSnapshotApply apply, NgwSyncTrace trace) throws IOException, NGException {
         try (JsonReader reader = new JsonReader(new InputStreamReader(
                 new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"))) {
             reader.beginArray();
+            int processed = 0;
             while (reader.hasNext()) {
+                NgwSyncIo.checkInterrupted();
+                trace.progress(++processed, "features");
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
                 if (!isFullSnapshotFeatureGeometryUsable(remoteFeature)) {
                     continue;
@@ -2761,7 +2840,11 @@ public class NGWVectorLayer
             }
             reader.endArray();
         }
-        deleteFeatures(scan.deleteIds);
+        trace.stage("delete");
+        for (long featureId : scan.deleteIds) {
+            NgwSyncIo.checkInterrupted();
+            delete(featureId, Constants.FIELD_ID + " = " + featureId, null);
+        }
     }
 
     static boolean trackFullSnapshotFeatureAndCheckGeometry(
@@ -2800,7 +2883,7 @@ public class NGWVectorLayer
 
     private void reconcileFullSnapshotChangeRecords(
             String changeTableName,
-            Set<Long> remoteIds) {
+            Set<Long> remoteIds) throws IOException {
         Cursor changeCursor = FeatureChanges.getChanges(changeTableName);
         if (changeCursor == null) {
             return;
@@ -2815,6 +2898,7 @@ public class NGWVectorLayer
             int attachOperationColumn = changeCursor.getColumnIndex(
                     Constants.FIELD_ATTACH_OPERATION);
             do {
+                NgwSyncIo.checkInterrupted();
                 long changeRecordId = changeCursor.getLong(recordIdColumn);
                 long changeFeatureId = changeCursor.getLong(featureIdColumn);
                 int changeOperation = changeCursor.getInt(operationColumn);
@@ -2844,7 +2928,7 @@ public class NGWVectorLayer
         }
     }
 
-    private FullSnapshotDownload downloadFullSnapshot(SyncResult syncResult) {
+    private FullSnapshotDownload downloadFullSnapshot(SyncResult syncResult, NgwSyncTrace trace) {
         AccountUtil.AccountData accountData;
         try {
             accountData = AccountUtil.getAccountData(mContext, mAccountName);
@@ -2859,6 +2943,8 @@ public class NGWVectorLayer
             HttpURLConnection connection = null;
             File snapshot = null;
             try {
+                NgwSyncIo.checkInterrupted();
+                trace.stage("connect-" + attempt);
                 connection = getConnection(accountData);
                 int code = connection.getResponseCode();
                 if (code < 200 || code >= 300) {
@@ -2903,17 +2989,19 @@ public class NGWVectorLayer
                         NGW_SYNC_SNAPSHOT_FILE_PREFIX,
                         ".json",
                         mPath);
+                trace.stage("download-" + attempt);
                 try (InputStream input = new BufferedInputStream(connection.getInputStream());
                      BufferedOutputStream output = new BufferedOutputStream(
                              new FileOutputStream(snapshot, false))) {
                     byte[] buffer = new byte[64 * 1024];
                     int read;
+                    long received = 0;
                     while ((read = input.read(buffer)) >= 0) {
-                        if (Thread.currentThread().isInterrupted()) {
-                            throw new IOException("sync interrupted");
-                        }
+                        NgwSyncIo.checkInterrupted();
                         if (read > 0) {
                             output.write(buffer, 0, read);
+                            received += read;
+                            trace.progress(received, "bytes");
                         }
                     }
                 }
@@ -2930,7 +3018,8 @@ public class NGWVectorLayer
                 if (snapshot != null && snapshot.exists()) {
                     snapshot.delete();
                 }
-                boolean transientFailure = NetworkUtil.isTransientNetworkFailure(e);
+                boolean transientFailure = !Thread.currentThread().isInterrupted()
+                        && NetworkUtil.isTransientNetworkFailure(e);
                 if (transientFailure && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
                     sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
                     continue;
@@ -2992,6 +3081,7 @@ public class NGWVectorLayer
         final Set<Long> destructiveIds = new LinkedHashSet<>();
         final List<Long> deleteIds = new ArrayList<>();
         int skippedInvalid;
+        final Set<Long> missingInvalidIds = new HashSet<>();
     }
 
     private static final class FullSnapshotApply {
@@ -3370,23 +3460,32 @@ public class NGWVectorLayer
     }
 
     protected HttpURLConnection getConnection(AccountUtil.AccountData accountData) throws IOException {
+        NgwSyncIo.checkInterrupted();
         URL url = new URL(getFeaturesUrl(accountData));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        try {
+            NgwSyncIo.configure(connection);
 
-        connection.setRequestProperty("User-Agent", getUserAgent(Constants.MAPLIB_USER_AGENT_PART));
-        connection.setRequestProperty("connection", "keep-alive");
-
-        authenticate(accountData, connection);
-
-        if (connection.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM && url.getProtocol().equals("http")) {
-            url = new URL(url.toString().replace("http", "https"));
-            configureSSLdefault();
-            connection = (HttpsURLConnection) url.openConnection();
-            connection.setRequestProperty("User-Agent",
-                    getUserAgent(Constants.MAPLIB_USER_AGENT_PART));
+            connection.setRequestProperty("User-Agent", getUserAgent(Constants.MAPLIB_USER_AGENT_PART));
+            connection.setRequestProperty("connection", "keep-alive");
             authenticate(accountData, connection);
+
+            if (connection.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM && url.getProtocol().equals("http")) {
+                connection.disconnect();
+                NgwSyncIo.checkInterrupted();
+                url = new URL("https" + url.toString().substring(4));
+                configureSSLdefault();
+                connection = (HttpsURLConnection) url.openConnection();
+                NgwSyncIo.configure(connection);
+                connection.setRequestProperty("User-Agent",
+                        getUserAgent(Constants.MAPLIB_USER_AGENT_PART));
+                authenticate(accountData, connection);
+            }
+            return connection;
+        } catch (IOException | RuntimeException failure) {
+            connection.disconnect();
+            throw failure;
         }
-        return connection;
     }
 
 
@@ -3505,7 +3604,8 @@ public class NGWVectorLayer
                 SyncResultUtil.markConnectFailed(syncResult);
                 return new ExistFeatureResult(null, false, 0);
             } catch (IOException e) {
-                boolean transientNetworkFailure = NetworkUtil.isTransientNetworkFailure(e);
+                boolean transientNetworkFailure = !Thread.currentThread().isInterrupted()
+                        && NetworkUtil.isTransientNetworkFailure(e);
                 if (transientNetworkFailure && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
                     sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
                     continue;
@@ -3564,7 +3664,11 @@ public class NGWVectorLayer
                 + " attempt=" + attempt + "/" + NGW_SYNC_PULL_MAX_ATTEMPTS
                 + (TextUtils.isEmpty(reason) ? "" : " reason=\""
                 + ProdLogUtil.truncateForLog(reason, 160) + "\""));
-        SystemClock.sleep(NGW_SYNC_PULL_RETRY_DELAY_MS * attempt);
+        try {
+            Thread.sleep(NGW_SYNC_PULL_RETRY_DELAY_MS * attempt);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     protected void readFeatures(JsonReader reader, List<Feature> features) throws IOException, IllegalStateException,

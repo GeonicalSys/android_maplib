@@ -46,7 +46,7 @@ public class Connections
     }
 
 
-    public static int getNewId()
+    public static synchronized int getNewId()
     {
         return mNewId++;
     }

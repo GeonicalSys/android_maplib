@@ -132,13 +132,9 @@ public class DatabaseContext
             return db;
         }
 
-        // speedup writing
+        // Keep Android's journal and synchronous settings: disabling either here also affected
+        // later snapshot transactions on this shared connection and made rollback unsafe.
         Cursor c;
-        c = db.rawQuery("PRAGMA synchronous=OFF", null);
-        try { c.moveToFirst(); } finally { c.close(); }
-        //db.rawQuery("PRAGMA locking_mode=EXCLUSIVE", null);
-        c = db.rawQuery("PRAGMA journal_mode=OFF", null);
-        try { c.moveToFirst(); } finally { c.close(); }
         c = db.rawQuery("PRAGMA count_changes=OFF", null);
         try { c.moveToFirst(); } finally { c.close(); }
         c = db.rawQuery("PRAGMA cache_size=15000", null);

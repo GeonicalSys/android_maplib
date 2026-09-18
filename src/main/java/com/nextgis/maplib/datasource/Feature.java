@@ -170,10 +170,12 @@ public class Feature
 
     public int getFieldValueIndex(String fieldName)
     {
-        for (int i = 0; i < mFields.size(); i++) {
-            if (mFields.get(i).getName().equals(fieldName)) {
+        int i = 0;
+        for (Field field : mFields) {
+            if (field.getName().equals(fieldName)) {
                 return i;
             }
+            i++;
         }
         return NOT_FOUND;
     }
@@ -563,13 +565,18 @@ public class Feature
         if (null == f) {
             return false;
         }
-        //compare attributes
-//        Log.d(TAG, "Feature id:" + mId + " compare attributes");
-        for (int i = 0; i < mFields.size(); i++) {
-            Field field = mFields.get(i);
-
-            Object value = getFieldValue(i);
-            Object valueOther = f.getFieldValue(field.getName());
+        // Schemas may be LinkedLists. Index once per comparison without caching mutable
+        // Field names or assuming identical column order. First duplicate name wins as before.
+        Map<String, Integer> otherIndexes = new HashMap<>();
+        int otherIndex = 0;
+        for (Field field : f.mFields) {
+            otherIndexes.putIfAbsent(field.getName(), otherIndex++);
+        }
+        int index = 0;
+        for (Field field : mFields) {
+            Object value = getFieldValue(index++);
+            Integer matchingIndex = otherIndexes.get(field.getName());
+            Object valueOther = matchingIndex == null ? null : f.getFieldValue(matchingIndex);
 
             //Log.d(TAG, value + "<->" + valueOther);
 
