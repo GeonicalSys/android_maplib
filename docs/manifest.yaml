@@ -75,7 +75,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
     responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle
-    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.20 and debug VERSION_NAME 3.1.2.20 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
+    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.21 and debug VERSION_NAME 3.1.2.21 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
