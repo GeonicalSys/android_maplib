@@ -73,9 +73,4 @@ public interface SettingsConstants
     String KEY_PREF_LIGHT                = "light";
     String KEY_PREF_DARK                 = "dark";
     String KEY_PREF_NEUTRAL              = "neutral";
-
-    String KEY_PREF_WHITE_AS_TRANSPARENT = "map_white_as_transparent";
-    boolean DEFAULT_WHITE_AS_TRANSPARENT = true;
-    String KEY_PREF_UNDERLAY_LAST_LEVEL_OVERZOOM = "map_underlay_last_level_overzoom";
-    boolean DEFAULT_UNDERLAY_LAST_LEVEL_OVERZOOM = true;
 }

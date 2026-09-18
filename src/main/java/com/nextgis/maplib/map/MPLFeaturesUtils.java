@@ -1043,19 +1043,6 @@ public class MPLFeaturesUtils {
                         }
                     }
 
-                    LocalRasterTileServer rasterServer = LocalRasterTileServer.getInstance();
-                    if (rasterServer.isLocalUrl(url)) {
-                        tileSet.setScheme("xyz");
-                        int sourceMin = rasterServer.getSourceMinZoom(layerId);
-                        int sourceMax = rasterServer.getSourceMaxZoom(layerId);
-                        if (sourceMin >= 0) {
-                            tileSet.setMinZoom(sourceMin);
-                        }
-                        if (sourceMax >= sourceMin) {
-                            tileSet.setMaxZoom(sourceMax);
-                        }
-                    }
-
                     rasterSource = new RasterSource(layerPath,tileSet, 256 );
                     style.addSource(rasterSource);
                 }

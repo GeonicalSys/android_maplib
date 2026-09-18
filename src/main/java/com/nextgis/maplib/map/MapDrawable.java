@@ -86,7 +86,6 @@ import com.nextgis.maplib.util.MapUtil;
 import com.nextgis.maplib.util.CameraZoom;
 import com.nextgis.maplib.util.MbTilesInfo;
 import com.nextgis.maplib.util.ProdLogUtil;
-import com.nextgis.maplib.util.UnderlayDisplaySettings;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -228,7 +227,7 @@ public class MapDrawable
 
     static int testColor = 0;
 
-    private String getLocalTmsRasterUrl(LocalTMSLayer layer) {
+    private static String getLocalTmsRasterUrl(LocalTMSLayer layer) {
         if (layer.getTMSType() != TMSTYPE_MBTILES_RASTER) {
             return "file://" + layer.getPayloadDirectory() + "/{z}/{x}/{y}.tile";
         }
@@ -239,10 +238,7 @@ public class MapDrawable
                     + " name=\"" + ProdLogUtil.truncateForLog(layer.getName(), 100) + "\"");
             return null;
         }
-        UnderlayDisplaySettings settings = UnderlayDisplaySettings.from(layer.getContext());
-        String proxyUrl = LocalRasterTileServer.getInstance()
-                .registerLayer(layer, database, settings);
-        return proxyUrl != null ? proxyUrl : "mbtiles://" + database.getAbsolutePath();
+        return "mbtiles://" + database.getAbsolutePath();
     }
 
 
@@ -717,7 +713,6 @@ public class MapDrawable
         }
         localVectorTileUrlMap.remove(id);
         LocalVectorTileServer.getInstance().unregisterLayer(id);
-        LocalRasterTileServer.getInstance().unregisterLayer(id);
         MapLibreMap map = maplibreMap.get();
         if (map == null) {
             return;
@@ -1629,7 +1624,6 @@ public class MapDrawable
         sourceNativeUriMap.clear();
         localVectorTileUrlMap.clear();
         LocalVectorTileServer.getInstance().clearLayers();
-        LocalRasterTileServer.getInstance().clearLayers();
 
         mapFrag.changeProgress(true);
 
@@ -5175,12 +5169,13 @@ public class MapDrawable
                 return;
             }
             SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(getContext());
-            int  colorRes = 0; // black
+            int colorRes = 0;
+            boolean solidWhite = false;
             String KEY_PREF_MAP_BG = "map_bg"; // copy of
             String namepart = "neutral_";
             switch (mSharedPreferences.getString(KEY_PREF_MAP_BG, KEY_PREF_LIGHT)) {
                     case KEY_PREF_LIGHT:
-                        colorRes = R.drawable.bk_tile_light;
+                        solidWhite = true;
                         namepart = "light_";
                         break;
                     case KEY_PREF_DARK:
@@ -5193,7 +5188,13 @@ public class MapDrawable
                         break;
                 }
 
-            Bitmap bitmap = BitmapFactory.decodeResource(getContext().getResources(), colorRes);
+            Bitmap bitmap;
+            if (solidWhite) {
+                bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+                bitmap.eraseColor(Color.WHITE);
+            } else {
+                bitmap = BitmapFactory.decodeResource(getContext().getResources(), colorRes);
+            }
             bgStyle.addImage("bg-pattern" + namepart, bitmap);
 
             BackgroundLayer bgLayer = (BackgroundLayer) bgStyle.getLayer("background");
