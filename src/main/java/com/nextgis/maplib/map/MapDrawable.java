@@ -83,6 +83,7 @@ import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.CoalescingRefresh;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.MapUtil;
+import com.nextgis.maplib.util.CameraZoom;
 import com.nextgis.maplib.util.MbTilesInfo;
 import com.nextgis.maplib.util.ProdLogUtil;
 
@@ -3671,18 +3672,25 @@ public class MapDrawable
             int delay)
     {
         if (mDisplay != null) {
-            float newZoom = zoom;
-            if (zoom < mDisplay.getMinZoomLevel()) {
+            float newZoom = CameraZoom.clamp(zoom);
+            if (newZoom < mDisplay.getMinZoomLevel()) {
                 newZoom = mDisplay.getMinZoomLevel();
-            } else if (zoom > mDisplay.getMaxZoomLevel()) {
+            } else if (newZoom > mDisplay.getMaxZoomLevel()) {
                 newZoom = mDisplay.getMaxZoomLevel();
             }
+            newZoom = CameraZoom.clamp(newZoom);
 
-            newZoom = Math.round(newZoom);
-            mDisplay.setZoomAndCenter(newZoom, center);
-            onExtentChanged((int) newZoom, center);
-            zoomSaved = zoom;
+            float displayZoom = Math.round(newZoom);
+            if (displayZoom < GeoConstants.CAMERA_MIN_ZOOM) {
+                displayZoom = newZoom;
+            }
+            mDisplay.setZoomAndCenter(displayZoom, center);
+            onExtentChanged((int) Math.ceil(newZoom), center);
+            zoomSaved = newZoom;
             centerSaved = center;
+            zoom = newZoom;
+        } else {
+            zoom = CameraZoom.clamp(zoom);
         }
 
         if (!startSecondMaplibre)
@@ -3730,6 +3738,7 @@ public class MapDrawable
                 zoom = getMinZoom();
             if (zoom > maxZoom)
                 zoom = maxZoom;
+            zoom = CameraZoom.clamp(zoom);
 
             setZoomAndCenter((float) zoom, envelope.getCenter(), startSecondMaplibre, 800);
             if (!startSecondMaplibre)
@@ -3947,10 +3956,10 @@ public class MapDrawable
         if (null != mDisplay) {
             float displayMin = mDisplay.getMinZoomLevel();
             if (displayMin > mapMin) {
-                return displayMin;
+                mapMin = displayMin;
             }
         }
-        return mapMin;
+        return CameraZoom.clamp(mapMin);
     }
 
 
@@ -5160,12 +5169,13 @@ public class MapDrawable
                 return;
             }
             SharedPreferences mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(getContext());
-            int  colorRes = 0; // black
+            int colorRes = 0;
+            boolean solidWhite = false;
             String KEY_PREF_MAP_BG = "map_bg"; // copy of
             String namepart = "neutral_";
             switch (mSharedPreferences.getString(KEY_PREF_MAP_BG, KEY_PREF_LIGHT)) {
                     case KEY_PREF_LIGHT:
-                        colorRes = R.drawable.bk_tile_light;
+                        solidWhite = true;
                         namepart = "light_";
                         break;
                     case KEY_PREF_DARK:
@@ -5178,7 +5188,13 @@ public class MapDrawable
                         break;
                 }
 
-            Bitmap bitmap = BitmapFactory.decodeResource(getContext().getResources(), colorRes);
+            Bitmap bitmap;
+            if (solidWhite) {
+                bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+                bitmap.eraseColor(Color.WHITE);
+            } else {
+                bitmap = BitmapFactory.decodeResource(getContext().getResources(), colorRes);
+            }
             bgStyle.addImage("bg-pattern" + namepart, bitmap);
 
             BackgroundLayer bgLayer = (BackgroundLayer) bgStyle.getLayer("background");

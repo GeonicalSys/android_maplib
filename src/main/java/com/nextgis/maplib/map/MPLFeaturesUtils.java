@@ -1860,8 +1860,7 @@ public class MPLFeaturesUtils {
                     style.addLayer(rasterLayer);
                 }
             }
-                if (minZoom!= -1)
-                    rasterLayer.setMinZoom(minZoom);
+                rasterLayer.setMinZoom(GeoConstants.UNDERLAY_MIN_ZOOM);
                 if (maxZoom!= -1)
                     rasterLayer.setMaxZoom(maxZoom + 1);
 

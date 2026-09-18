@@ -216,6 +216,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - raster MBTiles validation/storage: `MbTilesInfo` проверяет SQLite schema,
   metadata, image format и integrity, `TMSLayer` публикует файл только после
   sync + atomic rename, а `MapDrawable` подключает его через `mbtiles:///`;
+  `MapDrawable` подключает его напрямую через `mbtiles:///`, без display proxy
+  и преобразования тайлов;
 - legacy tile conversion math: OSM row переводится в TMS/MBTiles, bounds
   вычисляются в Web Mercator tile matrix, raster format определяется по magic
   bytes без декодирования каждого изображения.
