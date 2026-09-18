@@ -216,6 +216,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - raster MBTiles validation/storage: `MbTilesInfo` проверяет SQLite schema,
   metadata, image format и integrity, `TMSLayer` публикует файл только после
   sync + atomic rename, а `MapDrawable` подключает его через `mbtiles:///`;
+  отображение (точный белый → alpha и overzoom только последнего масштаба)
+  идёт через sidecar `map-mbtiles.display.mbtiles`, без перезаписи оригинала;
+  `tile_min_zoom`/`tile_max_zoom` — пирамида из metadata, не padded `min_level`;
 - legacy tile conversion math: OSM row переводится в TMS/MBTiles, bounds
   вычисляются в Web Mercator tile matrix, raster format определяется по magic
   bytes без декодирования каждого изображения.
@@ -391,7 +394,7 @@ GNSS. Пороговые значения и пределы: [GPS pipeline](../.
 
 ## Общее хранилище подложек
 
-SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTiles и тонкими shared_underlay_id ссылками. NgrcArchive читает ZIP двумя потоковыми проходами; RasterMbtilesWriter пишет одну базу без дерева файлов. Legacy migration — rename с журналом, хеширование старых MBTiles отложено. UnderlayWorkspaceIndex меняет закрытые карты без MapBase singleton. Контракт и recovery: [shared-underlays](../../docs/architecture/shared-underlays.md).
+SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTiles и тонкими shared_underlay_id ссылками. NgrcArchive читает ZIP двумя потоковыми проходами; RasterMbtilesWriter пишет одну базу без дерева файлов. Sidecar отображения не входит в SHA-256 identity. Legacy migration — rename с журналом, хеширование старых MBTiles отложено. UnderlayWorkspaceIndex меняет закрытые карты без MapBase singleton. Контракт и recovery: [shared-underlays](../../docs/architecture/shared-underlays.md).
 
 При объединении одинакового NGRc в разных форматах `Asset.referenceConfig`
 переносит тип, уровни тайлов и bounds целевого payload, сохраняя проектные

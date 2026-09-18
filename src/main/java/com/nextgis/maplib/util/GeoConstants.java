@@ -43,6 +43,8 @@ public interface GeoConstants
     int DEFAULT_MAX_ZOOM = 25;
     int DEFAULT_CACHE_MAX_ZOOM = 18;
     int DEFAULT_MIN_ZOOM = 0;
+    /** MapLibre camera floor. Not a layer visibility default. */
+    float CAMERA_MIN_ZOOM = 7.1f;
 
     /**
      * geometry type

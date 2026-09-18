@@ -80,6 +80,9 @@ public abstract class TMSLayer
     public static final String TILE_EXT = ".tile";
 
     protected int mTMSType;
+    /** Real MBTiles pyramid, not padded min_level/max_level. */
+    protected int mTileMinZoom = -1;
+    protected int mTileMaxZoom = -1;
     protected static final int HTTP_SEPARATE_THREADS = 2;
     protected Map<String, Bitmap> mBitmapCache;
     protected int                 mCacheSize, mCacheSizeMult;
@@ -114,6 +117,45 @@ public abstract class TMSLayer
     public void setTMSType(int type)
     {
         mTMSType = type;
+    }
+
+    public int getTileMinZoom() {
+        ensureTilePyramid();
+        return mTileMinZoom;
+    }
+
+    public int getTileMaxZoom() {
+        ensureTilePyramid();
+        return mTileMaxZoom;
+    }
+
+    public void setTilePyramidZoom(int minZoom, int maxZoom) {
+        mTileMinZoom = minZoom;
+        mTileMaxZoom = maxZoom;
+    }
+
+    protected File mbtilesDatabaseFile() {
+        return new File(mPath, MbTilesInfo.MBTILES_FILENAME);
+    }
+
+    protected void ensureTilePyramid() {
+        if (mTileMinZoom >= 0 && mTileMaxZoom >= 0) {
+            return;
+        }
+        if (mTMSType != GeoConstants.TMSTYPE_MBTILES_RASTER) {
+            return;
+        }
+        File database = mbtilesDatabaseFile();
+        if (!MbTilesInfo.isSQLiteFile(database)) {
+            return;
+        }
+        MbTilesInfo info = MbTilesInfo.inspect(database);
+        if (info.minZoom >= 0) {
+            mTileMinZoom = info.minZoom;
+        }
+        if (info.maxZoom >= 0) {
+            mTileMaxZoom = info.maxZoom;
+        }
     }
 
     public abstract Bitmap getBitmap(TileItem tile);
@@ -171,6 +213,12 @@ public abstract class TMSLayer
         }
 
         rootConfig.put(JSON_CACHE_SIZE_MULT, mCacheSizeMult);
+        if (mTileMinZoom >= 0) {
+            rootConfig.put(Constants.JSON_TILE_MIN_ZOOM_KEY, mTileMinZoom);
+        }
+        if (mTileMaxZoom >= 0) {
+            rootConfig.put(Constants.JSON_TILE_MAX_ZOOM_KEY, mTileMaxZoom);
+        }
         if (mNgrcArchiveSha256 != null && !mNgrcArchiveSha256.isEmpty()) {
             JSONObject provenance = new JSONObject();
             provenance.put(JSON_NGRC_SOURCE_NAME, mNgrcSourceName);
@@ -206,6 +254,8 @@ public abstract class TMSLayer
         if (jsonObject.has(JSON_CACHE_SIZE_MULT)) {
             mCacheSizeMult = jsonObject.getInt(JSON_CACHE_SIZE_MULT);
         }
+        mTileMinZoom = jsonObject.optInt(Constants.JSON_TILE_MIN_ZOOM_KEY, -1);
+        mTileMaxZoom = jsonObject.optInt(Constants.JSON_TILE_MAX_ZOOM_KEY, -1);
         if (jsonObject.has(Constants.JSON_BBOX_MAXX_KEY)
                 && jsonObject.has(Constants.JSON_BBOX_MINX_KEY)
                 && jsonObject.has(Constants.JSON_BBOX_MAXY_KEY)
@@ -466,9 +516,11 @@ public abstract class TMSLayer
         setTMSType(GeoConstants.TMSTYPE_MBTILES_RASTER);
         if (info.minZoom >= 0) {
             setMinZoom(info.minZoom);
+            mTileMinZoom = info.minZoom;
         }
         if (info.maxZoom >= 0) {
             setMaxZoom(info.maxZoom);
+            mTileMaxZoom = info.maxZoom;
         }
         if (info.boundsValid) {
             mExtents.setMin(

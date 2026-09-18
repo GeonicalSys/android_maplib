@@ -83,8 +83,11 @@ import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.CoalescingRefresh;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.MapUtil;
+import com.nextgis.maplib.util.CameraZoom;
+import com.nextgis.maplib.util.MbTilesDisplaySidecar;
 import com.nextgis.maplib.util.MbTilesInfo;
 import com.nextgis.maplib.util.ProdLogUtil;
+import com.nextgis.maplib.util.UnderlayDisplaySettings;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -226,7 +229,7 @@ public class MapDrawable
 
     static int testColor = 0;
 
-    private static String getLocalTmsRasterUrl(LocalTMSLayer layer) {
+    private String getLocalTmsRasterUrl(LocalTMSLayer layer) {
         if (layer.getTMSType() != TMSTYPE_MBTILES_RASTER) {
             return "file://" + layer.getPayloadDirectory() + "/{z}/{x}/{y}.tile";
         }
@@ -237,7 +240,22 @@ public class MapDrawable
                     + " name=\"" + ProdLogUtil.truncateForLog(layer.getName(), 100) + "\"");
             return null;
         }
-        return "mbtiles://" + database.getAbsolutePath();
+        UnderlayDisplaySettings settings = UnderlayDisplaySettings.from(layer.getContext());
+        MbTilesDisplaySidecar.rememberLastLevel(database, settings.lastLevelOverzoom);
+        scheduleUnderlayDisplaySidecar(database, settings);
+        return MbTilesDisplaySidecar.urlFor(database, settings);
+    }
+
+    private void scheduleUnderlayDisplaySidecar(File database, UnderlayDisplaySettings settings) {
+        MbTilesDisplaySidecar.ensureAsync(database, settings, () -> {
+            Handler mainHandler = new Handler(Looper.getMainLooper());
+            mainHandler.post(() -> {
+                MaplibreMapInteraction host = mapContext.get();
+                if (host != null) {
+                    host.loadLayersLite();
+                }
+            });
+        });
     }
 
 
@@ -3671,18 +3689,25 @@ public class MapDrawable
             int delay)
     {
         if (mDisplay != null) {
-            float newZoom = zoom;
-            if (zoom < mDisplay.getMinZoomLevel()) {
+            float newZoom = CameraZoom.clamp(zoom);
+            if (newZoom < mDisplay.getMinZoomLevel()) {
                 newZoom = mDisplay.getMinZoomLevel();
-            } else if (zoom > mDisplay.getMaxZoomLevel()) {
+            } else if (newZoom > mDisplay.getMaxZoomLevel()) {
                 newZoom = mDisplay.getMaxZoomLevel();
             }
+            newZoom = CameraZoom.clamp(newZoom);
 
-            newZoom = Math.round(newZoom);
-            mDisplay.setZoomAndCenter(newZoom, center);
-            onExtentChanged((int) newZoom, center);
-            zoomSaved = zoom;
+            float displayZoom = Math.round(newZoom);
+            if (displayZoom < GeoConstants.CAMERA_MIN_ZOOM) {
+                displayZoom = newZoom;
+            }
+            mDisplay.setZoomAndCenter(displayZoom, center);
+            onExtentChanged((int) Math.ceil(newZoom), center);
+            zoomSaved = newZoom;
             centerSaved = center;
+            zoom = newZoom;
+        } else {
+            zoom = CameraZoom.clamp(zoom);
         }
 
         if (!startSecondMaplibre)
@@ -3730,6 +3755,7 @@ public class MapDrawable
                 zoom = getMinZoom();
             if (zoom > maxZoom)
                 zoom = maxZoom;
+            zoom = CameraZoom.clamp(zoom);
 
             setZoomAndCenter((float) zoom, envelope.getCenter(), startSecondMaplibre, 800);
             if (!startSecondMaplibre)
@@ -3947,10 +3973,10 @@ public class MapDrawable
         if (null != mDisplay) {
             float displayMin = mDisplay.getMinZoomLevel();
             if (displayMin > mapMin) {
-                return displayMin;
+                mapMin = displayMin;
             }
         }
-        return mapMin;
+        return CameraZoom.clamp(mapMin);
     }
 
 

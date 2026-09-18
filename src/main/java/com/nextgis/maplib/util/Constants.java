@@ -155,6 +155,8 @@ public interface Constants
     String JSON_TYPE_KEY          = "type";
     String JSON_MAXLEVEL_KEY      = "max_level";
     String JSON_MINLEVEL_KEY      = "min_level";
+    String JSON_TILE_MAX_ZOOM_KEY = "tile_max_zoom";
+    String JSON_TILE_MIN_ZOOM_KEY = "tile_min_zoom";
     String JSON_LAYERS_KEY        = "layers";
     String JSON_LAYER_KEY         = "layer";
     String JSON_PATH_KEY          = "path";
