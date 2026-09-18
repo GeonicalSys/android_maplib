@@ -84,7 +84,6 @@ import com.nextgis.maplib.util.CoalescingRefresh;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.MapUtil;
 import com.nextgis.maplib.util.CameraZoom;
-import com.nextgis.maplib.util.MbTilesDisplaySidecar;
 import com.nextgis.maplib.util.MbTilesInfo;
 import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.UnderlayDisplaySettings;
@@ -241,21 +240,9 @@ public class MapDrawable
             return null;
         }
         UnderlayDisplaySettings settings = UnderlayDisplaySettings.from(layer.getContext());
-        MbTilesDisplaySidecar.rememberLastLevel(database, settings.lastLevelOverzoom);
-        scheduleUnderlayDisplaySidecar(database, settings);
-        return MbTilesDisplaySidecar.urlFor(database, settings);
-    }
-
-    private void scheduleUnderlayDisplaySidecar(File database, UnderlayDisplaySettings settings) {
-        MbTilesDisplaySidecar.ensureAsync(database, settings, () -> {
-            Handler mainHandler = new Handler(Looper.getMainLooper());
-            mainHandler.post(() -> {
-                MaplibreMapInteraction host = mapContext.get();
-                if (host != null) {
-                    host.loadLayersLite();
-                }
-            });
-        });
+        String proxyUrl = LocalRasterTileServer.getInstance()
+                .registerLayer(layer, database, settings);
+        return proxyUrl != null ? proxyUrl : "mbtiles://" + database.getAbsolutePath();
     }
 
 
@@ -730,6 +717,7 @@ public class MapDrawable
         }
         localVectorTileUrlMap.remove(id);
         LocalVectorTileServer.getInstance().unregisterLayer(id);
+        LocalRasterTileServer.getInstance().unregisterLayer(id);
         MapLibreMap map = maplibreMap.get();
         if (map == null) {
             return;
@@ -1641,6 +1629,7 @@ public class MapDrawable
         sourceNativeUriMap.clear();
         localVectorTileUrlMap.clear();
         LocalVectorTileServer.getInstance().clearLayers();
+        LocalRasterTileServer.getInstance().clearLayers();
 
         mapFrag.changeProgress(true);
 

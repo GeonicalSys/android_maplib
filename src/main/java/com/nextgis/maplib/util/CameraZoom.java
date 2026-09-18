@@ -1,6 +1,6 @@
 package com.nextgis.maplib.util;
 
-/** Clamps the MapLibre camera, not layer visibility (`DEFAULT_MIN_ZOOM`). */
+/** Clamps the MapLibre camera without changing layer visibility defaults. */
 public final class CameraZoom {
     private CameraZoom() {
     }

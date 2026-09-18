@@ -8,18 +8,18 @@ import static org.junit.Assert.assertTrue;
 
 public class UnderlayDisplaySettingsTest {
     @Test
-    public void defaultsNeedSidecar() {
+    public void defaultsEnableBothDisplayOptions() {
         UnderlayDisplaySettings settings = UnderlayDisplaySettings.from((android.content.Context) null);
         assertTrue(settings.whiteAsTransparent);
         assertTrue(settings.lastLevelOverzoom);
-        assertTrue(settings.needsSidecar());
         assertEquals("wl", settings.fingerprint());
     }
 
     @Test
-    public void bothOffSkipSidecar() {
+    public void fingerprintTracksDisabledOptions() {
         UnderlayDisplaySettings settings = new UnderlayDisplaySettings(false, false);
-        assertFalse(settings.needsSidecar());
+        assertFalse(settings.whiteAsTransparent);
+        assertFalse(settings.lastLevelOverzoom);
         assertEquals("--", settings.fingerprint());
     }
 }

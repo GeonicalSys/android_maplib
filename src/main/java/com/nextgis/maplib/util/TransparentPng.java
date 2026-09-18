@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 
-/** 256×256 fully transparent RGBA PNG, generated once. */
+/** 256x256 fully transparent RGBA PNG, generated once. */
 public final class TransparentPng {
     public static final int TILE_SIZE = 256;
     private static final byte[] PNG_SIGNATURE = new byte[] {
@@ -20,42 +20,29 @@ public final class TransparentPng {
         return BYTES.clone();
     }
 
-    static byte[] rawBytes() {
-        return BYTES;
-    }
-
     private static byte[] build() {
         int rowBytes = 1 + TILE_SIZE * 4;
         byte[] raw = new byte[rowBytes * TILE_SIZE];
-        Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION);
+        Deflater deflater = new Deflater(Deflater.BEST_SPEED);
         deflater.setInput(raw);
         deflater.finish();
         ByteArrayOutputStream deflated = new ByteArrayOutputStream();
-        byte[] buf = new byte[1024];
+        byte[] buffer = new byte[1024];
         while (!deflater.finished()) {
-            int count = deflater.deflate(buf);
-            deflated.write(buf, 0, count);
+            int count = deflater.deflate(buffer);
+            deflated.write(buffer, 0, count);
         }
         deflater.end();
-        byte[] idat = deflated.toByteArray();
         ByteArrayOutputStream png = new ByteArrayOutputStream();
         try {
             png.write(PNG_SIGNATURE);
-            writeChunk(png, "IHDR", ihdr());
-            writeChunk(png, "IDAT", idat);
+            writeChunk(png, "IHDR", new byte[] {0, 0, 1, 0, 0, 0, 1, 0, 8, 6, 0, 0, 0});
+            writeChunk(png, "IDAT", deflated.toByteArray());
             writeChunk(png, "IEND", new byte[0]);
         } catch (IOException e) {
             throw new IllegalStateException("transparent PNG", e);
         }
         return png.toByteArray();
-    }
-
-    private static byte[] ihdr() {
-        return new byte[] {
-                0, 0, 1, 0,
-                0, 0, 1, 0,
-                8, 6, 0, 0, 0
-        };
     }
 
     private static void writeChunk(ByteArrayOutputStream out, String type, byte[] data)

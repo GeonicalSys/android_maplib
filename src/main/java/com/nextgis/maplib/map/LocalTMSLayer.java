@@ -109,11 +109,6 @@ public class LocalTMSLayer
         return mPath;
     }
 
-    @Override
-    protected File mbtilesDatabaseFile() {
-        return new File(getPayloadDirectory(), com.nextgis.maplib.util.MbTilesInfo.MBTILES_FILENAME);
-    }
-
     @Override public void fillFromNgrc(Uri uri, IProgressor progressor) throws IOException, NGException {
         SharedUnderlayStore.importNgrc(this, uri, progressor);
     }

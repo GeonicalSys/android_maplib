@@ -14,7 +14,7 @@ public class CameraZoomTest {
 
     @Test
     public void keepsFloorAndHigherZooms() {
-        assertEquals(7.1f, CameraZoom.clamp(7.1f), 0);
+        assertEquals(7.5f, CameraZoom.clamp(7.5f), 0);
         assertEquals(12f, CameraZoom.clamp(12f), 0);
         assertEquals(GeoConstants.DEFAULT_MAX_ZOOM, CameraZoom.clamp(99f), 0);
     }
@@ -22,6 +22,6 @@ public class CameraZoomTest {
     @Test
     public void doesNotRaiseLayerVisibilityFloor() {
         assertEquals(0, GeoConstants.DEFAULT_MIN_ZOOM);
-        assertEquals(7.1f, GeoConstants.CAMERA_MIN_ZOOM, 0);
+        assertEquals(7.5f, GeoConstants.CAMERA_MIN_ZOOM, 0);
     }
 }

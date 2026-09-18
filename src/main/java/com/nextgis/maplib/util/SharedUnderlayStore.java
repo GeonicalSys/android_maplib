@@ -49,7 +49,7 @@ public final class SharedUnderlayStore {
         if (asset == null || !asset.isReady()) throw new IOException("Underlay is not available");
         try {
             JSONObject own = asset.referenceConfig(layer.toJSON()), template = asset.layerConfig();
-            for (String key : new String[]{"min_level", "max_level", "tile_min_zoom", "tile_max_zoom", "ngrc_provenance"}) {
+            for (String key : new String[]{"min_level", "max_level", "ngrc_provenance"}) {
                 if (template.has(key)) own.put(key, template.get(key)); else own.remove(key);
             }
             layer.fromJSON(own);

@@ -8,9 +8,7 @@ public final class RasterWhiteChromaKey {
     private RasterWhiteChromaKey() {
     }
 
-    /**
-     * @return true if at least one pixel was changed
-     */
+    /** @return true if at least one pixel was changed. */
     public static boolean punchExactWhite(int[] argb) {
         if (argb == null || argb.length == 0) {
             return false;

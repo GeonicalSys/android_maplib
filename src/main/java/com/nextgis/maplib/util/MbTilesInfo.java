@@ -31,6 +31,7 @@ public final class MbTilesInfo {
     public boolean raster;
     public boolean vector;
     public String format;
+    public String scheme;
     public int minZoom = -1;
     public int maxZoom = -1;
     public String name;
@@ -71,6 +72,7 @@ public final class MbTilesInfo {
             }
 
             info.format = readMetadata(database, "format");
+            info.scheme = readMetadata(database, "scheme");
             info.name = readMetadata(database, "name");
             info.minZoom = parseZoom(readMetadata(database, "minzoom"));
             info.maxZoom = parseZoom(readMetadata(database, "maxzoom"));
@@ -98,6 +100,63 @@ public final class MbTilesInfo {
                 info.diagnostic = info.vector
                         ? "vector MBTiles are not supported"
                         : "raster format metadata is missing or unsupported";
+            }
+        } catch (RuntimeException e) {
+            info.diagnostic = e.getClass().getSimpleName() + ": " + e.getMessage();
+        } finally {
+            if (database != null) {
+                database.close();
+            }
+        }
+        return info;
+    }
+
+    /**
+     * Reads only the metadata needed by the renderer. Unlike {@link #inspect(File)}, this method
+     * deliberately skips SQLite quick_check so opening a map never scans multi-gigabyte MBTiles.
+     */
+    public static MbTilesInfo inspectForDisplay(File file) {
+        MbTilesInfo info = new MbTilesInfo();
+        if (!isSQLiteFile(file)) {
+            info.diagnostic = "missing SQLite header";
+            return info;
+        }
+        SQLiteDatabase database = null;
+        try {
+            database = SQLiteDatabase.openDatabase(
+                    file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+            if (!hasTableWithColumns(database, "tiles",
+                    new String[]{"zoom_level", "tile_column", "tile_row", "tile_data"})
+                    || !hasTableWithColumns(
+                    database, "metadata", new String[]{"name", "value"})) {
+                info.diagnostic = "required MBTiles tables or columns are missing";
+                return info;
+            }
+            info.format = readMetadata(database, "format");
+            info.scheme = readMetadata(database, "scheme");
+            info.name = readMetadata(database, "name");
+            info.minZoom = parseZoom(readMetadata(database, "minzoom"));
+            info.maxZoom = parseZoom(readMetadata(database, "maxzoom"));
+            parseBounds(readMetadata(database, "bounds"), info);
+            if (info.minZoom < 0 || info.maxZoom < 0) {
+                try (Cursor cursor = database.rawQuery(
+                        "SELECT MIN(zoom_level), MAX(zoom_level) FROM tiles", null)) {
+                    if (cursor.moveToFirst() && !cursor.isNull(0) && !cursor.isNull(1)) {
+                        if (info.minZoom < 0) {
+                            info.minZoom = cursor.getInt(0);
+                        }
+                        if (info.maxZoom < 0) {
+                            info.maxZoom = cursor.getInt(1);
+                        }
+                    }
+                }
+            }
+            String normalizedFormat = normalizeFormat(info.format);
+            info.raster = isRasterFormat(normalizedFormat);
+            info.vector = "pbf".equals(normalizedFormat) || "mvt".equals(normalizedFormat);
+            info.valid = info.raster;
+            if (!info.valid) {
+                info.diagnostic = "raster format metadata is missing or unsupported";
             }
         } catch (RuntimeException e) {
             info.diagnostic = e.getClass().getSimpleName() + ": " + e.getMessage();

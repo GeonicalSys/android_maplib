@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 
-/** Map-settings pair for local raster underlay display. Defaults are on. */
+/** Display options applied lazily by the local raster tile server. */
 public final class UnderlayDisplaySettings {
     public final boolean whiteAsTransparent;
     public final boolean lastLevelOverzoom;
@@ -16,19 +16,14 @@ public final class UnderlayDisplaySettings {
 
     public static UnderlayDisplaySettings from(Context context) {
         if (context == null) {
-            return new UnderlayDisplaySettings(
-                    SettingsConstants.DEFAULT_WHITE_AS_TRANSPARENT,
-                    SettingsConstants.DEFAULT_UNDERLAY_LAST_LEVEL_OVERZOOM);
+            return defaults();
         }
-        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        return from(preferences);
+        return from(PreferenceManager.getDefaultSharedPreferences(context));
     }
 
     public static UnderlayDisplaySettings from(SharedPreferences preferences) {
         if (preferences == null) {
-            return new UnderlayDisplaySettings(
-                    SettingsConstants.DEFAULT_WHITE_AS_TRANSPARENT,
-                    SettingsConstants.DEFAULT_UNDERLAY_LAST_LEVEL_OVERZOOM);
+            return defaults();
         }
         return new UnderlayDisplaySettings(
                 preferences.getBoolean(
@@ -39,15 +34,13 @@ public final class UnderlayDisplaySettings {
                         SettingsConstants.DEFAULT_UNDERLAY_LAST_LEVEL_OVERZOOM));
     }
 
-    public boolean needsSidecar() {
-        return whiteAsTransparent || lastLevelOverzoom;
+    private static UnderlayDisplaySettings defaults() {
+        return new UnderlayDisplaySettings(
+                SettingsConstants.DEFAULT_WHITE_AS_TRANSPARENT,
+                SettingsConstants.DEFAULT_UNDERLAY_LAST_LEVEL_OVERZOOM);
     }
 
     public String fingerprint() {
         return (whiteAsTransparent ? "w" : "-") + (lastLevelOverzoom ? "l" : "-");
-    }
-
-    public static boolean lastLevelFromFingerprint(String fingerprint) {
-        return fingerprint != null && fingerprint.length() >= 2 && fingerprint.charAt(1) == 'l';
     }
 }

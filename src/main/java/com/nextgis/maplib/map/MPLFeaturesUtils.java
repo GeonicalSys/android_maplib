@@ -71,10 +71,6 @@ import com.nextgis.maplib.map.MLP.MultiPolygonEditClass;
 import com.nextgis.maplib.map.MLP.PointEditClass;
 import com.nextgis.maplib.map.MLP.PolygonEditClass;
 import com.nextgis.maplib.util.GeoConstants;
-import com.nextgis.maplib.util.MbTilesDisplaySidecar;
-import com.nextgis.maplib.util.MbTilesInfo;
-import com.nextgis.maplib.util.UnderlayDisplaySettings;
-import com.nextgis.maplib.util.UnderlayRasterZoomPolicy;
 
 
 import org.maplibre.android.geometry.LatLng;
@@ -103,7 +99,6 @@ import org.maplibre.geojson.MultiPolygon;
 import org.maplibre.geojson.Point;
 import org.maplibre.geojson.Polygon;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -1048,19 +1043,16 @@ public class MPLFeaturesUtils {
                         }
                     }
 
-                    if (url.startsWith("mbtiles://")) {
-                        File mbtiles = new File(url.substring("mbtiles://".length()));
-                        MbTilesInfo info = MbTilesInfo.inspect(mbtiles);
-                        boolean lastLevel = MbTilesDisplaySidecar.lastLevelOverzoomEnabled(mbtiles);
-                        Integer tileSetMin = UnderlayRasterZoomPolicy.tileSetMinZoom(
-                                lastLevel, info.minZoom);
-                        Integer tileSetMax = UnderlayRasterZoomPolicy.tileSetMaxZoom(
-                                lastLevel, info.maxZoom);
-                        if (tileSetMin != null) {
-                            tileSet.setMinZoom(tileSetMin);
+                    LocalRasterTileServer rasterServer = LocalRasterTileServer.getInstance();
+                    if (rasterServer.isLocalUrl(url)) {
+                        tileSet.setScheme("xyz");
+                        int sourceMin = rasterServer.getSourceMinZoom(layerId);
+                        int sourceMax = rasterServer.getSourceMaxZoom(layerId);
+                        if (sourceMin >= 0) {
+                            tileSet.setMinZoom(sourceMin);
                         }
-                        if (tileSetMax != null) {
-                            tileSet.setMaxZoom(tileSetMax);
+                        if (sourceMax >= sourceMin) {
+                            tileSet.setMaxZoom(sourceMax);
                         }
                     }
 
@@ -1881,25 +1873,9 @@ public class MPLFeaturesUtils {
                     style.addLayer(rasterLayer);
                 }
             }
-                UnderlayDisplaySettings displaySettings = iLayer != null
-                        ? UnderlayDisplaySettings.from(iLayer.getContext())
-                        : UnderlayDisplaySettings.from((android.content.Context) null);
-                int tileMin = -1;
-                int tileMax = -1;
-                if (iLayer instanceof TMSLayer) {
-                    tileMin = ((TMSLayer) iLayer).getTileMinZoom();
-                    tileMax = ((TMSLayer) iLayer).getTileMaxZoom();
-                }
-                Float rasterMin = UnderlayRasterZoomPolicy.rasterLayerMinZoom(
-                        displaySettings.lastLevelOverzoom, tileMin, minZoom);
-                Float rasterMax = UnderlayRasterZoomPolicy.rasterLayerMaxZoom(
-                        displaySettings.lastLevelOverzoom, tileMax, maxZoom);
-                if (rasterMin != null) {
-                    rasterLayer.setMinZoom(rasterMin);
-                }
-                if (rasterMax != null) {
-                    rasterLayer.setMaxZoom(rasterMax);
-                }
+                rasterLayer.setMinZoom(GeoConstants.UNDERLAY_MIN_ZOOM);
+                if (maxZoom!= -1)
+                    rasterLayer.setMaxZoom(maxZoom + 1);
 
                 if (layerOpacityFactor < 0.999f) {
                     rasterLayer.setProperties(PropertyFactory.rasterOpacity(layerOpacityFactor));
