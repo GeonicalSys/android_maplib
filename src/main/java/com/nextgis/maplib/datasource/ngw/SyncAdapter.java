@@ -90,6 +90,7 @@ https://books.google.ru/books?id=SXlMAQAAQBAJ&pg=PA158&lpg=PA158&dq=android:sync
 public class SyncAdapter
         extends AbstractThreadedSyncAdapter
 {
+    public static final String EXTRA_RECHECK_SKIPPED = "ngw_recheck_skipped";
     public static final String SYNC_START    = "com.nextgis.maplib.sync_start";
     public static final String SYNC_FINISH   = "com.nextgis.maplib.sync_finish";
     public static final String SYNC_CANCELED = "com.nextgis.maplib.sync_canceled";
@@ -201,9 +202,12 @@ public class SyncAdapter
                     if (!isCanceled()
                             && (bundle == null || bundle.getString(ACTION_LPATH) == null)) {
                         syncNgwConfigForSyncDisabledLayers(
-                                account, mapContentProviderHelper, authority, syncResult);
-                        CollectorProjectCompositionSync.runApplyForAccount(
-                                getContext(), account, mapContentProviderHelper);
+                                account, mapContentProviderHelper, authority, syncResult,
+                                bundle != null && bundle.getBoolean(EXTRA_RECHECK_SKIPPED, false));
+                        if (!isCanceled()) {
+                            CollectorProjectCompositionSync.runApplyForAccount(
+                                    getContext(), account, mapContentProviderHelper);
+                        }
                     }
                 } else {
                     Log.d("SSYNC", "mapContentProviderHelper=null");
@@ -625,7 +629,7 @@ public class SyncAdapter
             Account account,
             LayerGroup layerGroup,
             String authority,
-            SyncResult syncResult) {
+            SyncResult syncResult, boolean forceRecheck) {
         if (isCanceled()) {
             return;
         }
@@ -636,11 +640,12 @@ public class SyncAdapter
             ILayer layer = layerGroup.getLayer(i);
             if (layer instanceof LayerGroup) {
                 syncNgwConfigForSyncDisabledLayers(
-                        account, (LayerGroup) layer, authority, syncResult);
+                        account, (LayerGroup) layer, authority, syncResult, forceRecheck);
             } else if (layer instanceof NGWVectorLayer) {
                 INGWLayer ngw = (INGWLayer) layer;
                 if (account.name.equals(ngw.getAccountName()) && ngw.getSyncType() == SYNC_NONE) {
-                    ((NGWVectorLayer) layer).syncNgwResourceConfigOnly(authority, syncResult);
+                    ((NGWVectorLayer) layer).syncNgwResourceConfigOnly(authority, syncResult,
+                            forceRecheck);
                 }
             }
         }
