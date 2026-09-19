@@ -1,5 +1,6 @@
 package com.nextgis.maplib.map;
 
+import com.google.gson.JsonObject;
 import com.nextgis.maplib.datasource.GeoLinearRing;
 import com.nextgis.maplib.datasource.GeoGeometry;
 import com.nextgis.maplib.datasource.GeoGeometryFactory;
@@ -9,9 +10,13 @@ import com.nextgis.maplib.util.GeoConstants;
 
 import org.junit.Test;
 import org.maplibre.geojson.Feature;
+import org.maplibre.geojson.Geometry;
+import org.maplibre.geojson.MultiPolygon;
 import org.maplibre.geojson.Point;
 import org.maplibre.geojson.Polygon;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -114,6 +119,73 @@ public class MPLFeaturesUtilsPolygonTest {
         assertEquals(1, restoredPolygon.getInnerRingCount());
         assertEquals(4, restoredPolygon.getInnerRing(0).getPointCount());
         assertEquals(source.toWKT(true), restoredPolygon.toWKT(true));
+    }
+
+    @Test
+    public void labelAnchorStaysInsideConcavePolygon() {
+        Polygon polygon = Polygon.fromLngLats(Collections.singletonList(ring(
+                0, 0, 6, 0, 6, 1, 1, 1, 1, 6, 0, 6, 0, 0)));
+        JsonObject properties = new JsonObject();
+        properties.addProperty("signature", "concave");
+
+        Feature label = labelFor(polygon, properties);
+        Point anchor = (Point) label.geometry();
+
+        assertTrue((anchor.longitude() > 0 && anchor.longitude() < 1
+                && anchor.latitude() > 0 && anchor.latitude() < 6)
+                || (anchor.longitude() > 0 && anchor.longitude() < 6
+                && anchor.latitude() > 0 && anchor.latitude() < 1));
+        assertEquals("concave", label.properties().get("signature").getAsString());
+    }
+
+    @Test
+    public void labelAnchorAvoidsPolygonHole() {
+        Polygon polygon = Polygon.fromLngLats(Arrays.asList(
+                ring(0, 0, 10, 0, 10, 10, 0, 10, 0, 0),
+                ring(3, 3, 3, 7, 7, 7, 7, 3, 3, 3)));
+
+        Point anchor = (Point) labelFor(polygon, new JsonObject()).geometry();
+
+        assertTrue(anchor.longitude() > 0 && anchor.longitude() < 10);
+        assertTrue(anchor.latitude() > 0 && anchor.latitude() < 10);
+        assertTrue(anchor.longitude() <= 3 || anchor.longitude() >= 7
+                || anchor.latitude() <= 3 || anchor.latitude() >= 7);
+    }
+
+    @Test
+    public void labelAnchorUsesOnePartOfMultiPolygon() {
+        MultiPolygon multiPolygon = MultiPolygon.fromLngLats(Arrays.asList(
+                Collections.singletonList(ring(0, 0, 2, 0, 2, 2, 0, 2, 0, 0)),
+                Collections.singletonList(ring(10, 10, 14, 10, 14, 14, 10, 14, 10, 10))));
+
+        Point anchor = (Point) labelFor(multiPolygon, new JsonObject()).geometry();
+
+        assertTrue(anchor.longitude() > 10 && anchor.longitude() < 14);
+        assertTrue(anchor.latitude() > 10 && anchor.latitude() < 14);
+    }
+
+    @Test
+    public void degeneratePolygonHasNoLabelAnchor() {
+        Polygon polygon = Polygon.fromLngLats(Collections.singletonList(ring(
+                0, 0, 1, 1, 2, 2, 0, 0)));
+
+        assertTrue(MPLFeaturesUtils.convertToPointFeatures(
+                Collections.singletonList(Feature.fromGeometry(polygon))).isEmpty());
+    }
+
+    private static Feature labelFor(Geometry geometry, JsonObject properties) {
+        List<Feature> labels = MPLFeaturesUtils.convertToPointFeatures(
+                Collections.singletonList(Feature.fromGeometry(geometry, properties)));
+        assertEquals(1, labels.size());
+        return labels.get(0);
+    }
+
+    private static List<Point> ring(double... positions) {
+        List<Point> ring = new java.util.ArrayList<>();
+        for (int i = 0; i < positions.length; i += 2) {
+            ring.add(Point.fromLngLat(positions[i], positions[i + 1]));
+        }
+        return ring;
     }
 
     private static GeoPolygon polygon(boolean close) {

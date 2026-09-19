@@ -76,6 +76,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `FieldStyleRule` / `MplFeatureStyleProps` — rule-based стили: layer defaults и
   merge unset ← «прочие (по умолчанию)» (зум подписей, stops, scale flags,
   opacity); per-feature `labelminzoom`/`labelmaxzoom` через text-opacity gate;
+- `MPLFeaturesUtils.convertToPointFeatures` ставит якорь подписи внутри
+  Polygon, учитывая отверстия; для MultiPolygon выбирает наибольшую пригодную
+  часть. Неполная или вырожденная геометрия без внутренней точки не получает
+  якорь, а свойства подписи сохраняются;
 - `user-location-layer` остаётся служебным верхним overlay независимо от порядка
   пользовательских слоёв; геодезический круг `user-location-accuracy` и сектор
   направления `user-location-heading` лежат непосредственно под ним (роль Polygon
