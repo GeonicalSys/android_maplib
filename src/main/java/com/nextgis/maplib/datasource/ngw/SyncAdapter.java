@@ -56,6 +56,7 @@ import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.ProdLogUtil;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.NgwSyncIo;
 import com.nextgis.maplib.util.NgwSyncRetryPolicy;
 import com.nextgis.maplib.util.SettingsConstants;
 import com.nextgis.maplib.util.SyncResultUtil;
@@ -151,6 +152,7 @@ public class SyncAdapter
         // completePerformSync emits SYNC_FINISH (or SYNC_CANCELED) in the normal/offline-manual paths.
         // Track that so the finally below can broadcast a safety SYNC_FINISH on any early return or
         // uncaught failure — otherwise a UI spinner waiting on finish could hang forever.
+        NgwSyncIo.Session cancellationSession = NgwSyncIo.beginSession();
         boolean finishBroadcast = false;
         try {
             if (gisApp.isLayerFillServiceBusy()) {
@@ -230,6 +232,7 @@ public class SyncAdapter
                 HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH (safety/early-exit) sent");
                 getContext().sendBroadcast(finish);
             }
+            cancellationSession.close();
         }
     }
 
@@ -669,7 +672,7 @@ public class SyncAdapter
 
     public boolean isCanceled()
     {
-        return Thread.currentThread().isInterrupted();
+        return NgwSyncIo.isCancellationRequested();
     }
 
 

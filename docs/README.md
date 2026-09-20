@@ -27,8 +27,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   не кешируется между вызовами, поскольку имена `Field` изменяемы. Поиск имени
   не обращается по индексу к linked schema.
 - Snapshot-соединения, включая HTTPS redirect, имеют connect timeout 45 с и
-  read inactivity timeout 180 с. Отмена сохраняет interrupt-флаг и проверяется
-  между стадиями и объектами; сетевое ожидание может продолжаться до timeout.
+  read inactivity timeout 180 с в штатной работе. Явная отмена повышает
+  generation активных sync-session, закрывает только зарегистрированные
+  read-only GET и проверяется между стадиями и объектами, поэтому зависшее
+  чтение не ждёт timeout. Уже отправленный POST/PUT/DELETE не разрывается:
+  завершается один запрос, после чего следующий change record не начинается.
   `NgwSyncTrace` пишет attempt/stage/elapsed и не чаще раза в 10 с прогресс без
   содержимого объектов. `DatabaseContext` больше не отключает SQLite journal
   и synchronous; целостность bulk apply важнее прежней PRAGMA-оптимизации.
@@ -105,9 +108,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - server attachment metadata сверяется с `FeatureAttachments`, а не с
   необязательными локальными файлами/META: metadata-only pull не создаёт backup,
   и новые server features сразу получают online metadata без скачивания байтов;
-- инкрементальный NGW pull работает как bulk-операция: построчные
-  insert/update/delete broadcast подавлены, после всех SQLite-изменений R-tree
-  перестраивается и карта перезагружается один раз;
+- инкрементальный NGW pull работает как одна атомарная bulk-операция:
+  построчные insert/update/delete broadcast подавлены, interruption откатывает
+  общую SQLite-транзакцию, а после commit R-tree перестраивается и карта
+  перезагружается один раз. Каталоги вложений удалённых объектов очищаются
+  только после commit, поэтому rollback не восстанавливает строку без её файлов;
 - reload выключенного vector layer освобождает прежний GeoJSON, не читая всю
   таблицу; включение использует существующий on-demand reload contract;
 - `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное

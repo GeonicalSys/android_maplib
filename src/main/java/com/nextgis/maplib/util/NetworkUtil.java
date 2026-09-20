@@ -389,23 +389,29 @@ public class NetworkUtil
                 Log.d(TAG, "Error get stream: " + targetURL);
             throw new IOException("Connection is null");
         }
-        int responseCode = conn.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_MOVED_PERM && conn.getURL().getProtocol().equals("http")) {
-            targetURL = targetURL.replace("http", "https");
-            getStream(targetURL, username, password, outputStream);
-            return;
-        }
-        if (responseCode != HttpURLConnection.HTTP_OK) {
-            if(Constants.DEBUG_MODE)
-                Log.d(TAG, "Problem execute getStream: " + targetURL + " HTTP response: " +
-                    responseCode + " username: " + username);
-            throw new IOException("Response code is " + responseCode);
-        }
+        NgwSyncIo.registerReadConnection(conn);
+        try {
+            int responseCode = conn.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_MOVED_PERM && conn.getURL().getProtocol().equals("http")) {
+                targetURL = targetURL.replace("http", "https");
+                getStream(targetURL, username, password, outputStream);
+                return;
+            }
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                if(Constants.DEBUG_MODE)
+                    Log.d(TAG, "Problem execute getStream: " + targetURL + " HTTP response: " +
+                        responseCode + " username: " + username);
+                throw new IOException("Response code is " + responseCode);
+            }
 
-        byte data[] = new byte[Constants.IO_BUFFER_SIZE];
-        InputStream is = conn.getInputStream();
-        FileUtil.copyStream(is, outputStream, data, Constants.IO_BUFFER_SIZE);
-        outputStream.close();
+            byte data[] = new byte[Constants.IO_BUFFER_SIZE];
+            InputStream is = conn.getInputStream();
+            FileUtil.copyStream(is, outputStream, data, Constants.IO_BUFFER_SIZE);
+            outputStream.close();
+        } finally {
+            NgwSyncIo.unregisterReadConnection(conn);
+            conn.disconnect();
+        }
     }
 
     public static HttpResponse getHttpResponse(
@@ -424,7 +430,17 @@ public class NetworkUtil
             }
             String target = conn.getURL().toString().replace("http", "https");
             String auth = conn.getRequestProperty("Authorization");
+            NgwSyncIo.checkInterrupted();
             HttpURLConnection connection = getHttpConnection(conn.getRequestMethod(), target, auth);
+            if (HTTP_GET.equals(method)) {
+                NgwSyncIo.registerReadConnection(connection);
+                try {
+                    return getHttpResponse(connection, readErrorResponseBody);
+                } finally {
+                    NgwSyncIo.unregisterReadConnection(connection);
+                    connection.disconnect();
+                }
+            }
             return getHttpResponse(connection, readErrorResponseBody);
         }
 
@@ -465,7 +481,13 @@ public class NetworkUtil
                 Log.d(TAG, "Error get connection object: " + targetURL);
             return new HttpResponse(ERROR_CONNECT_FAILED);
         }
-        return getHttpResponse(conn, readErrorResponseBody);
+        NgwSyncIo.registerReadConnection(conn);
+        try {
+            return getHttpResponse(conn, readErrorResponseBody);
+        } finally {
+            NgwSyncIo.unregisterReadConnection(conn);
+            conn.disconnect();
+        }
     }
 
 
@@ -506,6 +528,7 @@ public class NetworkUtil
 
         if (response.mResponseCode == HttpURLConnection.HTTP_MOVED_PERM && conn.getURL().getProtocol().equals("http")) {
             targetURL = targetURL.replace("http", "https");
+            NgwSyncIo.checkInterrupted();
             return post(targetURL, payload, username, password, readErrorResponseBody);
         }
         return response;
@@ -557,6 +580,7 @@ public class NetworkUtil
         HttpResponse response = getHttpResponse(conn, readErrorResponseBody);
         if (response.mResponseCode == HttpURLConnection.HTTP_MOVED_PERM && conn.getURL().getProtocol().equals("http")) {
             targetURL = targetURL.replace("http", "https");
+            NgwSyncIo.checkInterrupted();
             return put(targetURL, payload, username, password, readErrorResponseBody);
         }
         return response;
@@ -609,6 +633,9 @@ public class NetworkUtil
             uploader.setChunkSize(10240);
 
             do {
+                // Each TUS chunk is its own completed request. Honor cancellation between
+                // requests, never while one PATCH has an ambiguous server result.
+                NgwSyncIo.checkInterrupted();
                 //long totalBytes = upload.getSize();
                 //long bytesUploaded = uploader.getOffset();
                 //double progress = (double) bytesUploaded / totalBytes * 100;
@@ -700,6 +727,7 @@ public class NetworkUtil
         HttpResponse response = getHttpResponse(conn, readErrorResponseBody);
         if (response.mResponseCode == HttpURLConnection.HTTP_MOVED_PERM && conn.getURL().getProtocol().equals("http")) {
             targetURL = targetURL.replace("http", "https");
+            NgwSyncIo.checkInterrupted();
             return postFileOld(targetURL, fileName, file, fileMime, username, password, readErrorResponseBody);
         }
         return response;
