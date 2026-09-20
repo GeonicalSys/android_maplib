@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-18
+last_verified: 2026-09-20
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -40,6 +40,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Sync state принадлежит работающим потокам адаптера; чужой early finish,
   delayed broadcast и повторное создание Service не снимают чужую активность.
 - `MapDrawable`, `MPLFeaturesUtils`, `VectorLayerRenderCache` — rendering;
+- Для `map_bg=light` `MapDrawable` создаёт нижний MapLibre `BackgroundLayer`
+  со сплошным `background-color: #FFFFFF`. При смене режима слой пересоздаётся,
+  чтобы прежний `background-pattern` не перекрывал цвет; neutral и dark
+  продолжают использовать штатные растровые узоры.
 - MapLibre Android `13.0.2` подключён через явный OpenGL-артефакт
   `android-sdk-opengl`; generic `android-sdk` этой версии использует Vulkan и
   не совместим с частью устройств без рабочего Vulkan-драйвера;
@@ -72,6 +76,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `FieldStyleRule` / `MplFeatureStyleProps` — rule-based стили: layer defaults и
   merge unset ← «прочие (по умолчанию)» (зум подписей, stops, scale flags,
   opacity); per-feature `labelminzoom`/`labelmaxzoom` через text-opacity gate;
+- `MPLFeaturesUtils.convertToPointFeatures` ставит якорь подписи внутри
+  Polygon, учитывая отверстия; для MultiPolygon выбирает наибольшую пригодную
+  часть. Неполная или вырожденная геометрия без внутренней точки не получает
+  якорь, а свойства подписи сохраняются;
 - `user-location-layer` остаётся служебным верхним overlay независимо от порядка
   пользовательских слоёв; геодезический круг `user-location-accuracy` и сектор
   направления `user-location-heading` лежат непосредственно под ним (роль Polygon

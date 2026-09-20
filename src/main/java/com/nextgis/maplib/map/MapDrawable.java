@@ -5176,7 +5176,6 @@ public class MapDrawable
             switch (mSharedPreferences.getString(KEY_PREF_MAP_BG, KEY_PREF_LIGHT)) {
                     case KEY_PREF_LIGHT:
                         solidWhite = true;
-                        namepart = "light_";
                         break;
                     case KEY_PREF_DARK:
                         colorRes = R.drawable.bk_tile_dark;
@@ -5188,22 +5187,19 @@ public class MapDrawable
                         break;
                 }
 
-            Bitmap bitmap;
-            if (solidWhite) {
-                bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
-                bitmap.eraseColor(Color.WHITE);
-            } else {
-                bitmap = BitmapFactory.decodeResource(getContext().getResources(), colorRes);
-            }
-            bgStyle.addImage("bg-pattern" + namepart, bitmap);
-
             BackgroundLayer bgLayer = (BackgroundLayer) bgStyle.getLayer("background");
-            if (bgLayer == null) {
-                bgLayer = new BackgroundLayer("background");
-                bgStyle.addLayerAt(bgLayer, 0);
+            if (bgLayer != null) {
+                bgStyle.removeLayer(bgLayer);
             }
-
-            bgLayer.setProperties(PropertyFactory.backgroundPattern("bg-pattern" + namepart));
+            bgLayer = new BackgroundLayer("background");
+            if (solidWhite) {
+                bgLayer.setProperties(PropertyFactory.backgroundColor("#FFFFFF"));
+            } else {
+                Bitmap bitmap = BitmapFactory.decodeResource(getContext().getResources(), colorRes);
+                bgStyle.addImage("bg-pattern" + namepart, bitmap);
+                bgLayer.setProperties(PropertyFactory.backgroundPattern("bg-pattern" + namepart));
+            }
+            bgStyle.addLayerAt(bgLayer, 0);
         }
     }
 

@@ -98,8 +98,12 @@ import org.maplibre.geojson.MultiPoint;
 import org.maplibre.geojson.MultiPolygon;
 import org.maplibre.geojson.Point;
 import org.maplibre.geojson.Polygon;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LinearRing;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +129,7 @@ import java.util.Map;
 //   textopacity    — label opacity 0–1 (rule-style)
 //   featureid, layerid, order — selection / ordering
 public class MPLFeaturesUtils {
+    private static final GeometryFactory LABEL_GEOMETRY_FACTORY = new GeometryFactory();
 
     static public Number pointRaduis = 8;
     static public Number nextPointRadius = 10;
@@ -1496,58 +1501,108 @@ public class MPLFeaturesUtils {
     }
 
     static  public List<Feature> convertToPointFeatures(List<Feature> layerFeatures) {
-        List<Feature> centroidFeatures = new ArrayList<>();
+        List<Feature> labelFeatures = new ArrayList<>();
 
         for (Feature feature : layerFeatures) {
             Geometry geometry = feature.geometry();
-            Point centroid = null;
+            Point anchor = null;
 
             if (geometry instanceof Polygon) {
-                centroid = calculatePolygonCentroid((Polygon) geometry);
+                anchor = calculateInteriorLabelPoint(
+                        Collections.singletonList(((Polygon) geometry).coordinates()));
             } else if (geometry instanceof MultiPolygon) {
-                centroid = calculateMultiPolygonCentroid((MultiPolygon) geometry);
+                anchor = calculateInteriorLabelPoint(((MultiPolygon) geometry).coordinates());
             }
 
-            if (centroid != null) {
-                Feature centroidFeature = Feature.fromGeometry(
-                        centroid,
+            if (anchor != null) {
+                Feature labelFeature = Feature.fromGeometry(
+                        anchor,
                         feature.properties()
                 );
-                centroidFeatures.add(centroidFeature);
+                labelFeatures.add(labelFeature);
             }
         }
 
-        return centroidFeatures;
+        return labelFeatures;
     }
 
-    static private Point calculatePolygonCentroid(Polygon polygon) {
-        List<Point> points = polygon.coordinates().get(0); // external ring
-        return getAveragePoint(points);
-    }
-
-    static private Point calculateMultiPolygonCentroid(MultiPolygon multiPolygon) {
-        List<Point> allPoints = new ArrayList<>();
-
-        for (List<List<Point>> polygonRings : multiPolygon.coordinates()) {
-            allPoints.addAll(polygonRings.get(0)); //external ring of each poly
+    private static Point calculateInteriorLabelPoint(List<List<List<Point>>> polygonParts) {
+        if (polygonParts == null) {
+            return null;
         }
-
-        return getAveragePoint(allPoints);
-    }
-
-    static  private Point getAveragePoint(List<Point> points) {
-        double sumLon = 0;
-        double sumLat = 0;
-        int count = points.size();
-
-        for (Point point : points) {
-            sumLon += point.longitude();
-            sumLat += point.latitude();
+        // A multipart feature keeps one label on its largest usable polygon.
+        Point bestAnchor = null;
+        double largestArea = 0;
+        for (List<List<Point>> rings : polygonParts) {
+            try {
+                org.locationtech.jts.geom.Polygon polygon = toLabelPolygon(rings);
+                if (polygon == null) {
+                    continue;
+                }
+                double area = polygon.getArea();
+                if (area <= largestArea || Double.isNaN(area) || Double.isInfinite(area)) {
+                    continue;
+                }
+                org.locationtech.jts.geom.Point interior = polygon.getInteriorPoint();
+                if (interior.isEmpty() || !polygon.contains(interior)) {
+                    continue;
+                }
+                bestAnchor = Point.fromLngLat(interior.getX(), interior.getY());
+                largestArea = area;
+            } catch (RuntimeException ignored) {
+                // An incomplete or malformed member has no reliable interior anchor.
+            }
         }
-
-        return Point.fromLngLat(sumLon / count, sumLat / count);
+        return bestAnchor;
     }
 
+    private static org.locationtech.jts.geom.Polygon toLabelPolygon(List<List<Point>> rings) {
+        if (rings == null || rings.isEmpty()) {
+            return null;
+        }
+        LinearRing shell = toLabelRing(rings.get(0));
+        if (shell == null) {
+            return null;
+        }
+        LinearRing[] holes = new LinearRing[rings.size() - 1];
+        for (int i = 1; i < rings.size(); i++) {
+            holes[i - 1] = toLabelRing(rings.get(i));
+            if (holes[i - 1] == null) {
+                return null;
+            }
+        }
+        return LABEL_GEOMETRY_FACTORY.createPolygon(shell, holes);
+    }
+
+    private static LinearRing toLabelRing(List<Point> ring) {
+        if (ring == null) {
+            return null;
+        }
+        List<Coordinate> coordinates = new ArrayList<>(ring.size() + 1);
+        for (Point point : ring) {
+            if (point == null || Double.isNaN(point.longitude())
+                    || Double.isInfinite(point.longitude())
+                    || Double.isNaN(point.latitude())
+                    || Double.isInfinite(point.latitude())) {
+                return null;
+            }
+            Coordinate coordinate = new Coordinate(point.longitude(), point.latitude());
+            if (coordinates.isEmpty()
+                    || !coordinates.get(coordinates.size() - 1).equals2D(coordinate)) {
+                coordinates.add(coordinate);
+            }
+        }
+        if (coordinates.size() < 3) {
+            return null;
+        }
+        if (!coordinates.get(0).equals2D(coordinates.get(coordinates.size() - 1))) {
+            coordinates.add(new Coordinate(coordinates.get(0)));
+        }
+        if (coordinates.size() < 4) {
+            return null;
+        }
+        return LABEL_GEOMETRY_FACTORY.createLinearRing(coordinates.toArray(new Coordinate[0]));
+    }
 
     static public org.maplibre.android.style.layers.Layer getRasterLayer(int layerId, final Style style){
         String currentNamePrefix = namePrefix;
