@@ -640,6 +640,7 @@ public class NetworkUtil
                 //long bytesUploaded = uploader.getOffset();
                 //double progress = (double) bytesUploaded / totalBytes * 100;
                 //System.out.printf("Upload at %06.2f%%.\n", progress);
+                NgwSyncProgress.reportTus(uploader.getOffset(), upload.getSize());
             } while (uploader.uploadChunk() > -1);
             uploader.finish();
             returnUrl = uploader.getUploadURL().toString();

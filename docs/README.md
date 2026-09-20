@@ -96,6 +96,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `Connection`, `SyncAdapter`, `NGWSyncService` — NGW; временно упавшие pull
   векторных слоёв повторяются отдельным проходом после остальных слоёв, а
   process-wide sync state обновляется адаптером напрямую, не только broadcast;
+  `NgwSyncProgress` считает сессию всех account, вес листа по локальным правкам
+  и внутри слоя push/TUS, байты snapshot и apply; неизвестный остаток держит
+  долю, deferred retry не закрывает слой, composition/fill в шкалу не входят;
   destroy bound service не блокирует Android main thread ожиданием worker;
 - schema preflight сравнивает authoritative `resource.cls`/geometry/fields,
   serialized config и physical SQLite affinities: metadata-only drift чинится

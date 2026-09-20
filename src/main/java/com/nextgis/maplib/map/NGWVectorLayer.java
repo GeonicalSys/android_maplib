@@ -60,6 +60,7 @@ import com.nextgis.maplib.util.NgwPullDecision;
 import com.nextgis.maplib.util.NgwSyncNoneReloadDecision;
 import com.nextgis.maplib.util.NgwSnapshotCheckpoint;
 import com.nextgis.maplib.util.NgwSyncIo;
+import com.nextgis.maplib.util.NgwSyncProgress;
 import com.nextgis.maplib.util.NgwSyncTrace;
 import com.nextgis.maplib.util.DistrictFilterUtil;
 import com.nextgis.maplib.util.FeatureAttachments;
@@ -1271,6 +1272,9 @@ public class NGWVectorLayer
         }
 
         boolean isError = false;
+        int pushTotal = changesCount > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) changesCount;
+        int sent = 0;
+        NgwSyncProgress.reportPush(0, pushTotal);
 
         try {
             NgwSyncIo.checkInterrupted();
@@ -1426,6 +1430,8 @@ public class NGWVectorLayer
                         }
                     }
                 }
+                sent++;
+                NgwSyncProgress.reportPush(sent, pushTotal);
             }
 
             // check records count changing
@@ -2187,7 +2193,12 @@ public class NGWVectorLayer
         }
         // Snapshot must hit /feature/ with mServerWhere, not the tracked diff endpoint.
         mTracked = false;
-        getFullSnapshotChangesFromServerStreaming(authority, syncResult);
+        NgwSyncProgress.beginLayer(0);
+        try {
+            getFullSnapshotChangesFromServerStreaming(authority, syncResult);
+        } finally {
+            NgwSyncProgress.completeLayer();
+        }
     }
 
     private String snapshotCheckpointScope() {
@@ -2405,6 +2416,7 @@ public class NGWVectorLayer
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "Got " + features.size() + " feature(s) from server");
         }
+        NgwSyncProgress.reportApply(0, features.size());
 
         try {
             if (!mCacheLoaded) {
@@ -2446,6 +2458,7 @@ public class NGWVectorLayer
                     }
                 }
                 deleteCommittedAttachmentFolders(attachmentCleanupIds);
+                NgwSyncProgress.reportApply(features.size(), features.size());
             } else {
                 remoteIdSet = new HashSet<>(Math.max(16, features.size() * 2));
                 for (Feature f : features) {
@@ -2691,6 +2704,7 @@ public class NGWVectorLayer
             trace.stage("scan");
             FullSnapshotScan scan = scanFullSnapshot(snapshot, changeTableName, trace);
             NgwSyncIo.checkInterrupted();
+            NgwSyncProgress.reportApply(0, Math.max(1, scan.remoteIds.size()));
             trace.stage("backup");
             if (!backupBeforeRemoteDestructiveApply(scan.destructiveIds)) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
@@ -2857,6 +2871,7 @@ public class NGWVectorLayer
             while (reader.hasNext()) {
                 NgwSyncIo.checkInterrupted();
                 trace.progress(++processed, "features");
+                NgwSyncProgress.reportApply(processed, Math.max(processed, scan.remoteIds.size()));
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
                 if (!isFullSnapshotFeatureGeometryUsable(remoteFeature)) {
                     continue;
@@ -3053,9 +3068,11 @@ public class NGWVectorLayer
                             output.write(buffer, 0, read);
                             received += read;
                             trace.progress(received, "bytes");
+                            NgwSyncProgress.reportDownload(received, contentLength);
                         }
                     }
                 }
+                NgwSyncProgress.reportDownloadComplete();
                 return FullSnapshotDownload.success(snapshot, code);
             } catch (MalformedURLException e) {
                 log(e, "downloadFullSnapshot: malformed URL");

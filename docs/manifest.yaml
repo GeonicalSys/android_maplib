@@ -14,6 +14,10 @@ key_components:
     responsibility: Compare mutable field schemas in linear field traversal without indexed LinkedList scans, preserving name, null, numeric, date and geometry equality semantics.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncIo.java
     responsibility: Scope cancellation by sync generation, close active read-only HTTP connections without making remote mutations ambiguous, expose outbound-write state and preserve cancellation through the account adapter.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncProgress.java
+    responsibility: Session-scoped sync progress from weighted leaf layers and real push/download/apply fractions without inventing remaining work or percent text.
+  - path: maplib/src/test/java/com/nextgis/maplib/util/NgwSyncProgressTest.java
+    responsibility: Lock session weights, intra-layer push/download hold, deferred retry, monotonic display, cancel and publish throttle.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncTrace.java
     responsibility: Log bounded payload-free snapshot attempt, stage, elapsed time and progress.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSnapshotCheckpoint.java
