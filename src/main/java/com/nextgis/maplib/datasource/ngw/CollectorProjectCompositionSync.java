@@ -32,6 +32,7 @@ import com.nextgis.maplib.util.LayerFormHashUtil;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.NgwResmetaUtil;
+import com.nextgis.maplib.util.NgwSyncIo;
 import com.nextgis.maplib.util.SettingsConstants;
 
 import org.json.JSONArray;
@@ -444,13 +445,18 @@ public final class CollectorProjectCompositionSync {
             if (conn == null) {
                 return FormHashResult.failure();
             }
+            NgwSyncIo.registerReadConnection(conn);
             int code = conn.getResponseCode();
             if (code == HttpURLConnection.HTTP_MOVED_PERM
                     && "http".equals(conn.getURL().getProtocol())) {
                 String https = conn.getURL().toString().replace("http", "https");
+                NgwSyncIo.unregisterReadConnection(conn);
                 conn.disconnect();
                 conn = NetworkUtil.getHttpConnection(
                         NetworkUtil.HTTP_GET, https, accountData.login, accountData.password);
+                if (conn != null) {
+                    NgwSyncIo.registerReadConnection(conn);
+                }
                 code = conn != null ? conn.getResponseCode() : -1;
             }
             if (code != HttpURLConnection.HTTP_OK) {
@@ -473,6 +479,7 @@ public final class CollectorProjectCompositionSync {
             return FormHashResult.failure();
         } finally {
             if (conn != null) {
+                NgwSyncIo.unregisterReadConnection(conn);
                 conn.disconnect();
             }
         }

@@ -10,8 +10,8 @@ last_verified: 2026-09-20
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.21` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.21`; отдельный Lisa Debug использует `3.1.2.21`. Оба значения проверяются
+Для выпуска `3.1.2.22` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.22`; отдельный Lisa Debug использует `3.1.2.22`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
@@ -27,8 +27,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   не кешируется между вызовами, поскольку имена `Field` изменяемы. Поиск имени
   не обращается по индексу к linked schema.
 - Snapshot-соединения, включая HTTPS redirect, имеют connect timeout 45 с и
-  read inactivity timeout 180 с. Отмена сохраняет interrupt-флаг и проверяется
-  между стадиями и объектами; сетевое ожидание может продолжаться до timeout.
+  read inactivity timeout 180 с в штатной работе. Явная отмена повышает
+  generation активных sync-session, закрывает только зарегистрированные
+  read-only GET и проверяется между стадиями и объектами, поэтому зависшее
+  чтение не ждёт timeout. Уже отправленный POST/PUT/DELETE не разрывается:
+  завершается один запрос, после чего следующий change record не начинается.
   `NgwSyncTrace` пишет attempt/stage/elapsed и не чаще раза в 10 с прогресс без
   содержимого объектов. `DatabaseContext` больше не отключает SQLite journal
   и synchronous; целостность bulk apply важнее прежней PRAGMA-оптимизации.
@@ -93,6 +96,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `Connection`, `SyncAdapter`, `NGWSyncService` — NGW; временно упавшие pull
   векторных слоёв повторяются отдельным проходом после остальных слоёв, а
   process-wide sync state обновляется адаптером напрямую, не только broadcast;
+  `NgwSyncProgress` считает сессию всех account, вес листа по локальным правкам
+  и внутри слоя push/TUS, байты snapshot и apply; неизвестный остаток держит
+  долю, deferred retry не закрывает слой, composition/fill в шкалу не входят;
   destroy bound service не блокирует Android main thread ожиданием worker;
 - schema preflight сравнивает authoritative `resource.cls`/geometry/fields,
   serialized config и physical SQLite affinities: metadata-only drift чинится
@@ -105,9 +111,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - server attachment metadata сверяется с `FeatureAttachments`, а не с
   необязательными локальными файлами/META: metadata-only pull не создаёт backup,
   и новые server features сразу получают online metadata без скачивания байтов;
-- инкрементальный NGW pull работает как bulk-операция: построчные
-  insert/update/delete broadcast подавлены, после всех SQLite-изменений R-tree
-  перестраивается и карта перезагружается один раз;
+- инкрементальный NGW pull работает как одна атомарная bulk-операция:
+  построчные insert/update/delete broadcast подавлены, interruption откатывает
+  общую SQLite-транзакцию, а после commit R-tree перестраивается и карта
+  перезагружается один раз. Каталоги вложений удалённых объектов очищаются
+  только после commit, поэтому rollback не восстанавливает строку без её файлов;
 - reload выключенного vector layer освобождает прежний GeoJSON, не читая всю
   таблицу; включение использует существующий on-demand reload contract;
 - `NGWResourceUrl`, `ResourceGroup.loadTargetResource` — разбор URL и точечное

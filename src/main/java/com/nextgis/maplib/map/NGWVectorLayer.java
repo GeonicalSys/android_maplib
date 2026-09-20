@@ -60,10 +60,12 @@ import com.nextgis.maplib.util.NgwPullDecision;
 import com.nextgis.maplib.util.NgwSyncNoneReloadDecision;
 import com.nextgis.maplib.util.NgwSnapshotCheckpoint;
 import com.nextgis.maplib.util.NgwSyncIo;
+import com.nextgis.maplib.util.NgwSyncProgress;
 import com.nextgis.maplib.util.NgwSyncTrace;
 import com.nextgis.maplib.util.DistrictFilterUtil;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
+import com.nextgis.maplib.util.FileUtil;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.HttpResponse;
 import com.nextgis.maplib.util.NGException;
@@ -92,6 +94,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
@@ -1247,6 +1250,13 @@ public class NGWVectorLayer
 
     public boolean sendLocalChanges(SyncResult syncResult)
     {
+        try (NgwSyncIo.OutboundWrite ignored = NgwSyncIo.beginOutboundWrite()) {
+            return sendLocalChangesInternal(syncResult);
+        }
+    }
+
+    private boolean sendLocalChangesInternal(SyncResult syncResult)
+    {
         HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " sendLocalChanges START" );
 
         String changeTableName = getChangeTableName();
@@ -1262,8 +1272,12 @@ public class NGWVectorLayer
         }
 
         boolean isError = false;
+        int pushTotal = changesCount > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) changesCount;
+        int sent = 0;
+        NgwSyncProgress.reportPush(0, pushTotal);
 
         try {
+            NgwSyncIo.checkInterrupted();
             // get column's IDs, there is at least one entry
             Cursor changeCursor = FeatureChanges.getFirstChangeFromRecordId(changeTableName, 0);
             changeCursor.moveToFirst();
@@ -1281,6 +1295,9 @@ public class NGWVectorLayer
 
             final AccountUtil.AccountData accountData = AccountUtil.getAccountData(mContext, mAccountName);
             while (true) {
+                // Do not start another remote mutation after cancellation. A mutation already
+                // sent is allowed to resolve so its local change record has an unambiguous state.
+                NgwSyncIo.checkInterrupted();
 
                 changeCursor = FeatureChanges.getFirstChangeFromRecordId(changeTableName,
                         nextChangeRecordId);
@@ -1328,8 +1345,10 @@ public class NGWVectorLayer
                             FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
                             FeatureChanges.removeChangesToLast(changeTableName, changeFeatureId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
-                            refreshFeatureFromServerAfterPush(
-                                    pushResult.remoteFeatureId, accountData, "addFeature");
+                            if (!NgwSyncIo.isCancellationRequested()) {
+                                refreshFeatureFromServerAfterPush(
+                                        pushResult.remoteFeatureId, accountData, "addFeature");
+                            }
                         } else {
                             HyperLog.v(Constants.TAG, "NGWVectorLayer: feature add FAILED featureID = "  + changeFeatureId );
 
@@ -1346,8 +1365,10 @@ public class NGWVectorLayer
                             FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
                             FeatureChanges.removeChangesToLast(changeTableName, changeFeatureId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
-                            refreshFeatureFromServerAfterPush(
-                                    changeFeatureId, accountData, "changeFeature");
+                            if (!NgwSyncIo.isCancellationRequested()) {
+                                refreshFeatureFromServerAfterPush(
+                                        changeFeatureId, accountData, "changeFeature");
+                            }
                         } else {
                             HyperLog.v(Constants.TAG, "NGWVectorLayer: feature change FAILED featureID = "  + changeFeatureId );
 
@@ -1409,6 +1430,8 @@ public class NGWVectorLayer
                         }
                     }
                 }
+                sent++;
+                NgwSyncProgress.reportPush(sent, pushTotal);
             }
 
             // check records count changing
@@ -1423,6 +1446,10 @@ public class NGWVectorLayer
                 );
             }
 
+        } catch (InterruptedIOException canceled) {
+            HyperLog.v(Constants.TAG, "NGW sendLocalChanges canceled layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100) + "\"");
+            return false;
         } catch (SQLiteException e) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " SQLiteException " + e.getMessage());
             isError = true;
@@ -1560,6 +1587,7 @@ public class NGWVectorLayer
         boolean fisrtSendPhase = true;
 
         try {
+            NgwSyncIo.checkInterrupted();
             HttpResponse response;
             JSONObject result;
             if (useTus) {
@@ -1570,6 +1598,7 @@ public class NGWVectorLayer
                     return false;
                 }
                 fisrtSendPhase = false;
+                NgwSyncIo.checkInterrupted();
 
                 result = new JSONObject(response.getResponseBody());
                 if (!proceedAttachFromTus(result, syncResult)) {
@@ -1592,6 +1621,7 @@ public class NGWVectorLayer
 
             }
 
+            NgwSyncIo.checkInterrupted();
             response = sendFeatureAttachOnServer(result, featureId, attach);
             if (!response.isOk()) {
                 reportSyncHttpFailure("sendFeatureAttach", featureId, attachId, syncResult, response);
@@ -2163,7 +2193,12 @@ public class NGWVectorLayer
         }
         // Snapshot must hit /feature/ with mServerWhere, not the tracked diff endpoint.
         mTracked = false;
-        getFullSnapshotChangesFromServerStreaming(authority, syncResult);
+        NgwSyncProgress.beginLayer(0);
+        try {
+            getFullSnapshotChangesFromServerStreaming(authority, syncResult);
+        } finally {
+            NgwSyncProgress.completeLayer();
+        }
     }
 
     private String snapshotCheckpointScope() {
@@ -2238,9 +2273,11 @@ public class NGWVectorLayer
                 SyncResultUtil.markConnectFailed(syncResult);
                 return NgwFeatureCountParser.UNKNOWN;
             }
+            NgwSyncIo.registerReadConnection(urlConnection);
             if (urlConnection.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM
                     && urlConnection.getURL().getProtocol().equals("http")) {
                 sURL = sURL.replace("http", "https");
+                NgwSyncIo.unregisterReadConnection(urlConnection);
                 urlConnection.disconnect();
                 urlConnection = NetworkUtil.getHttpConnection(
                         NetworkUtil.HTTP_GET, sURL, accountData.login, accountData.password);
@@ -2248,6 +2285,7 @@ public class NGWVectorLayer
                     SyncResultUtil.markConnectFailed(syncResult);
                     return NgwFeatureCountParser.UNKNOWN;
                 }
+                NgwSyncIo.registerReadConnection(urlConnection);
             }
             int code = urlConnection.getResponseCode();
             if (code < 200 || code >= 300) {
@@ -2261,6 +2299,7 @@ public class NGWVectorLayer
                 reader.beginArray();
                 int count = 0;
                 while (reader.hasNext()) {
+                    NgwSyncIo.checkInterrupted();
                     reader.skipValue();
                     count++;
                 }
@@ -2281,6 +2320,7 @@ public class NGWVectorLayer
             return NgwFeatureCountParser.UNKNOWN;
         } finally {
             if (urlConnection != null) {
+                NgwSyncIo.unregisterReadConnection(urlConnection);
                 urlConnection.disconnect();
             }
         }
@@ -2376,6 +2416,7 @@ public class NGWVectorLayer
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "Got " + features.size() + " feature(s) from server");
         }
+        NgwSyncProgress.reportApply(0, features.size());
 
         try {
             if (!mCacheLoaded) {
@@ -2400,9 +2441,24 @@ public class NGWVectorLayer
                     syncResult.stats.numConflictDetectedExceptions++;
                     return false;
                 }
-                proceedAddedFeatures(added, authority, changeTableName);
-                proceedChangedFeatures(changed, authority, changeTableName);
-                proceedDeletedFeatures(deleted, changeTableName);
+                NgwSyncIo.checkInterrupted();
+                SQLiteDatabase database = DatabaseContext.getDatabaseForLayer(this, false);
+                List<Long> attachmentCleanupIds = new ArrayList<>();
+                database.beginTransaction();
+                try {
+                    proceedAddedFeatures(added, authority, changeTableName);
+                    proceedChangedFeatures(changed, authority, changeTableName);
+                    proceedDeletedFeatures(
+                            deleted, changeTableName, database, attachmentCleanupIds);
+                    NgwSyncIo.checkInterrupted();
+                    database.setTransactionSuccessful();
+                } finally {
+                    if (database.inTransaction()) {
+                        database.endTransaction();
+                    }
+                }
+                deleteCommittedAttachmentFolders(attachmentCleanupIds);
+                NgwSyncProgress.reportApply(features.size(), features.size());
             } else {
                 remoteIdSet = new HashSet<>(Math.max(16, features.size() * 2));
                 for (Feature f : features) {
@@ -2558,6 +2614,10 @@ public class NGWVectorLayer
                     }
                 }
             }
+        } catch (InterruptedIOException canceled) {
+            HyperLog.v(Constants.TAG, "NGWVectorLayer: tracked pull canceled layer=\""
+                    + ProdLogUtil.truncateForLog(getName(), 100) + "\"");
+            return false;
         } catch (SQLiteException | ConcurrentModificationException e) {
             String errMsg = e.getMessage();
             HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " getChangesFromServer Exception " + errMsg);
@@ -2644,6 +2704,7 @@ public class NGWVectorLayer
             trace.stage("scan");
             FullSnapshotScan scan = scanFullSnapshot(snapshot, changeTableName, trace);
             NgwSyncIo.checkInterrupted();
+            NgwSyncProgress.reportApply(0, Math.max(1, scan.remoteIds.size()));
             trace.stage("backup");
             if (!backupBeforeRemoteDestructiveApply(scan.destructiveIds)) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
@@ -2674,6 +2735,7 @@ public class NGWVectorLayer
                 }
             }
             committed = true;
+            deleteCommittedAttachmentFolders(apply.attachmentCleanupIds);
             // Publish evidence only after commit. A failed attempt must not suppress a later retry.
             try {
                 String scope = snapshotCheckpointScope();
@@ -2809,6 +2871,7 @@ public class NGWVectorLayer
             while (reader.hasNext()) {
                 NgwSyncIo.checkInterrupted();
                 trace.progress(++processed, "features");
+                NgwSyncProgress.reportApply(processed, Math.max(processed, scan.remoteIds.size()));
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
                 if (!isFullSnapshotFeatureGeometryUsable(remoteFeature)) {
                     continue;
@@ -2843,7 +2906,10 @@ public class NGWVectorLayer
         trace.stage("delete");
         for (long featureId : scan.deleteIds) {
             NgwSyncIo.checkInterrupted();
-            delete(featureId, Constants.FIELD_ID + " = " + featureId, null);
+            SQLiteDatabase database = DatabaseContext.getDatabaseForLayer(this, false);
+            if (deleteDatabaseRowWithoutAttachmentCleanup(database, featureId) > 0) {
+                apply.attachmentCleanupIds.add(featureId);
+            }
         }
     }
 
@@ -3002,9 +3068,11 @@ public class NGWVectorLayer
                             output.write(buffer, 0, read);
                             received += read;
                             trace.progress(received, "bytes");
+                            NgwSyncProgress.reportDownload(received, contentLength);
                         }
                     }
                 }
+                NgwSyncProgress.reportDownloadComplete();
                 return FullSnapshotDownload.success(snapshot, code);
             } catch (MalformedURLException e) {
                 log(e, "downloadFullSnapshot: malformed URL");
@@ -3018,7 +3086,7 @@ public class NGWVectorLayer
                 if (snapshot != null && snapshot.exists()) {
                     snapshot.delete();
                 }
-                boolean transientFailure = !Thread.currentThread().isInterrupted()
+                boolean transientFailure = !NgwSyncIo.isCancellationRequested()
                         && NetworkUtil.isTransientNetworkFailure(e);
                 if (transientFailure && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
                     sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
@@ -3033,6 +3101,7 @@ public class NGWVectorLayer
                 return FullSnapshotDownload.failed(0);
             } finally {
                 if (connection != null) {
+                    NgwSyncIo.unregisterReadConnection(connection);
                     connection.disconnect();
                 }
             }
@@ -3087,51 +3156,96 @@ public class NGWVectorLayer
     private static final class FullSnapshotApply {
         int updated;
         int created;
+        final List<Long> attachmentCleanupIds = new ArrayList<>();
     }
 
 
-    protected void proceedAddedFeatures(List<Feature> added, String authority, String changeTableName) {
+    protected void proceedAddedFeatures(
+            List<Feature> added,
+            String authority,
+            String changeTableName)
+            throws InterruptedIOException {
         if (added != null) {
             for (Feature remoteFeature : added) {
+                NgwSyncIo.checkInterrupted();
                 Cursor cursor = query(null, Constants.FIELD_ID + " = " + remoteFeature.getId(), null, null, null);
                 boolean hasFeature = false;
                 if (cursor != null) {
-                    if (cursor.moveToFirst()) {
-                        compareFeature(cursor, authority, remoteFeature, changeTableName);
-                        hasFeature = true;
+                    try {
+                        if (cursor.moveToFirst()) {
+                            compareFeature(cursor, authority, remoteFeature, changeTableName);
+                            hasFeature = true;
+                        }
+                    } finally {
+                        cursor.close();
                     }
-                    cursor.close();
                 }
 
-                if (!hasFeature)
-                    createNewFeature(remoteFeature, authority);
+                if (!hasFeature && !createNewFeature(remoteFeature, authority)) {
+                    throw new SQLiteException("tracked added feature insert failed");
+                }
             }
         }
     }
 
 
-    protected void proceedChangedFeatures(List<Feature> changed, String authority, String changeTableName) {
+    protected void proceedChangedFeatures(
+            List<Feature> changed,
+            String authority,
+            String changeTableName)
+            throws InterruptedIOException {
         if (changed != null) {
             for (Feature remoteFeature : changed) {
+                NgwSyncIo.checkInterrupted();
                 Cursor cursor = query(null, Constants.FIELD_ID + " = " + remoteFeature.getId(), null, null, null);
                 if (cursor != null) {
-                    if (cursor.moveToFirst()) {
-                        compareFeature(cursor, authority, remoteFeature, changeTableName);
+                    try {
+                        if (cursor.moveToFirst()) {
+                            compareFeature(cursor, authority, remoteFeature, changeTableName);
+                        } else {
+                            throw new SQLiteException(
+                                    "tracked changed feature is missing locally");
+                        }
+                    } finally {
+                        cursor.close();
                     }
-                    cursor.close();
+                } else {
+                    throw new SQLiteException("tracked changed feature query failed");
                 }
             }
         }
     }
 
 
-    protected void proceedDeletedFeatures(List<Feature> deleted, String changeTableName) {
-        List<Long> deleteItems = new ArrayList<>();
+    protected void proceedDeletedFeatures(
+            List<Feature> deleted,
+            String changeTableName,
+            SQLiteDatabase database,
+            List<Long> attachmentCleanupIds)
+            throws InterruptedIOException {
         if (deleted != null) {
-            for (Feature remoteFeature : deleted)
-                deleteItems.add(remoteFeature.getId());
+            for (Feature remoteFeature : deleted) {
+                NgwSyncIo.checkInterrupted();
+                long itemId = remoteFeature.getId();
+                if (deleteDatabaseRowWithoutAttachmentCleanup(database, itemId) > 0) {
+                    attachmentCleanupIds.add(itemId);
+                }
+            }
+        }
+    }
 
-            deleteFeatures(deleteItems);
+    private int deleteDatabaseRowWithoutAttachmentCleanup(
+            SQLiteDatabase database,
+            long featureId) {
+        return database.delete(
+                mPath.getName(),
+                Constants.FIELD_ID + " = " + featureId,
+                null);
+    }
+
+    private void deleteCommittedAttachmentFolders(List<Long> featureIds) {
+        for (long featureId : featureIds) {
+            FileUtil.deleteRecursive(new File(mPath, String.valueOf(featureId)));
         }
     }
 
@@ -3417,8 +3531,6 @@ public class NGWVectorLayer
                     //delete attachment which not exist on server
                     if (!remoteFeature.getAttachments().containsKey(attachId)) {
                         iterator.remove();
-                        saveAttach("" + currentFeature.getId(),
-                                currentFeature.getAttachments());
 
                     } else { //or change attachment properties
                         AttachItem currentItem =
@@ -3440,8 +3552,6 @@ public class NGWVectorLayer
                                 currentItem.setMimetype(remoteItem.getMimetype());
                                 currentItem.setDisplayName(
                                         remoteItem.getDisplayName());
-                                saveAttach("" + currentFeature.getId(),
-                                        currentFeature.getAttachments());
                             }
                         }
                     }
@@ -3462,7 +3572,8 @@ public class NGWVectorLayer
     protected HttpURLConnection getConnection(AccountUtil.AccountData accountData) throws IOException {
         NgwSyncIo.checkInterrupted();
         URL url = new URL(getFeaturesUrl(accountData));
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        HttpURLConnection connection = NgwSyncIo.registerReadConnection(
+                (HttpURLConnection) url.openConnection());
         try {
             NgwSyncIo.configure(connection);
 
@@ -3471,11 +3582,13 @@ public class NGWVectorLayer
             authenticate(accountData, connection);
 
             if (connection.getResponseCode() == HttpURLConnection.HTTP_MOVED_PERM && url.getProtocol().equals("http")) {
+                NgwSyncIo.unregisterReadConnection(connection);
                 connection.disconnect();
                 NgwSyncIo.checkInterrupted();
                 url = new URL("https" + url.toString().substring(4));
                 configureSSLdefault();
-                connection = (HttpsURLConnection) url.openConnection();
+                connection = NgwSyncIo.registerReadConnection(
+                        (HttpsURLConnection) url.openConnection());
                 NgwSyncIo.configure(connection);
                 connection.setRequestProperty("User-Agent",
                         getUserAgent(Constants.MAPLIB_USER_AGENT_PART));
@@ -3483,6 +3596,7 @@ public class NGWVectorLayer
             }
             return connection;
         } catch (IOException | RuntimeException failure) {
+            NgwSyncIo.unregisterReadConnection(connection);
             connection.disconnect();
             throw failure;
         }
@@ -3569,8 +3683,10 @@ public class NGWVectorLayer
                         switch (name) {
                             case "deleted":
                                 reader.beginArray();
-                                while (reader.hasNext())
+                                while (reader.hasNext()) {
+                                    NgwSyncIo.checkInterrupted();
                                     deleted.add(new Feature(reader.nextLong(), getFields()));
+                                }
                                 reader.endArray();
                                 break;
                             case "added":
@@ -3604,7 +3720,7 @@ public class NGWVectorLayer
                 SyncResultUtil.markConnectFailed(syncResult);
                 return new ExistFeatureResult(null, false, 0);
             } catch (IOException e) {
-                boolean transientNetworkFailure = !Thread.currentThread().isInterrupted()
+                boolean transientNetworkFailure = !NgwSyncIo.isCancellationRequested()
                         && NetworkUtil.isTransientNetworkFailure(e);
                 if (transientNetworkFailure && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
                     sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
@@ -3634,6 +3750,7 @@ public class NGWVectorLayer
                 return new ExistFeatureResult(null, false, 0);
             } finally {
                 if (urlConnection != null) {
+                    NgwSyncIo.unregisterReadConnection(urlConnection);
                     urlConnection.disconnect();
                 }
             }
@@ -3675,6 +3792,7 @@ public class NGWVectorLayer
             NumberFormatException, OutOfMemoryError, NGException {
         reader.beginArray();
         while (reader.hasNext()) {
+            NgwSyncIo.checkInterrupted();
             final Feature feature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
             if (!NgwFeatureGeometryValidator.isValid(feature.getGeometry()))
                 continue;
