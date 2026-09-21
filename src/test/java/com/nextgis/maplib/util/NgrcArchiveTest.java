@@ -24,6 +24,7 @@ public class NgrcArchiveTest {
         NgrcArchive.Source source = () -> new ByteArrayInputStream(bytes);
         NgrcArchive.Info info = NgrcArchive.inspect(source, () -> {});
         assertEquals(UnderlayFiles.sha256(new ByteArrayInputStream(bytes)), info.sha256);
+        assertEquals(1, info.tileCount);
         final int[] count = {0};
         NgrcArchive.convert(source, info, (path, data, scheme) -> {
             assertEquals("3/2/4.tile", path); assertEquals(2, scheme);
@@ -58,6 +59,7 @@ public class NgrcArchiveTest {
                 NgrcArchive.Source source = () -> new ByteArrayInputStream(bytes);
                 NgrcArchive.Info info = NgrcArchive.inspect(source, () -> {});
                 assertEquals("Demo relief", info.config.getString("name"));
+                assertEquals(1, info.tileCount);
                 assertEquals(UnderlayFiles.sha256(new ByteArrayInputStream(bytes)), info.sha256);
                 final int[] count = {0};
                 NgrcArchive.convert(source, info, (path, data, actualScheme) -> {
@@ -93,5 +95,18 @@ public class NgrcArchiveTest {
         }
         try { NgrcArchive.inspect(() -> new ByteArrayInputStream(bytes.toByteArray()), () -> {}); fail(); }
         catch (IOException expected) { assertTrue(expected.getMessage().contains("multiple configurations")); }
+    }
+
+    @Test public void inspectCountsRasterTilesWithoutRetainingThem() throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+            zip.putNextEntry(new ZipEntry("1/0/0.tile")); zip.write(new byte[]{1}); zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("1/0/1.png")); zip.write(new byte[]{2}); zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("config.json"));
+            zip.write("{\"tms_type\":1}".getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
+        }
+        NgrcArchive.Info info = NgrcArchive.inspect(
+                () -> new ByteArrayInputStream(bytes.toByteArray()), () -> {});
+        assertEquals(2, info.tileCount);
     }
 }
