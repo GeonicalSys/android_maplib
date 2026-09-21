@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-20
+last_verified: 2026-09-21
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -409,7 +409,7 @@ GNSS. Пороговые значения и пределы: [GPS pipeline](../.
 
 ## Общее хранилище подложек
 
-SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTiles и тонкими shared_underlay_id ссылками. NgrcArchive читает ZIP двумя потоковыми проходами; RasterMbtilesWriter пишет одну базу без дерева файлов. Legacy migration — rename с журналом, хеширование старых MBTiles отложено. UnderlayWorkspaceIndex меняет закрытые карты без MapBase singleton. Контракт и recovery: [shared-underlays](../../docs/architecture/shared-underlays.md).
+SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTiles и тонкими shared_underlay_id ссылками. NgrcArchive читает ZIP двумя потоковыми проходами и считает тайлы для прогресса импорта; RasterMbtilesWriter пишет одну базу без дерева файлов. Display name документа не берётся из SAF id вида `msf:308`. Legacy migration — rename с журналом, хеширование старых MBTiles отложено. UnderlayWorkspaceIndex меняет закрытые карты без MapBase singleton. Контракт и recovery: [shared-underlays](../../docs/architecture/shared-underlays.md).
 
 При объединении одинакового NGRc в разных форматах `Asset.referenceConfig`
 переносит тип, уровни тайлов и bounds целевого payload, сохраняя проектные

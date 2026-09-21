@@ -26,7 +26,7 @@ package com.nextgis.maplib.util;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
-import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.text.TextUtils;
 import android.util.Log;
 import com.nextgis.maplib.map.TMSLayer;
@@ -207,6 +207,21 @@ public class FileUtil
     }
 
 
+    /**
+     * SAF MediaStore document ids such as {@code msf:308} are not human file names.
+     */
+    public static boolean isUnusableDisplayName(String name) {
+        if (name == null) {
+            return true;
+        }
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            return true;
+        }
+        return trimmed.matches("(?i)^[a-z]{2,}:\\s*\\d+$");
+    }
+
+
     public static String getFileNameByUri(
             final Context context,
             Uri uri,
@@ -214,31 +229,39 @@ public class FileUtil
     {
         String fileName = defaultName;
         try {
-            if (uri.getScheme().compareTo("content") == 0) {
-                Cursor cursor = context.getContentResolver().query(uri, null, null, null, null);
-                if (null != cursor) {
+            if (uri != null && "content".equals(uri.getScheme()) && context != null) {
+                Cursor cursor = null;
+                try {
                     try {
-                        if (cursor.moveToFirst()) {
-                            int column_index =
-                                    cursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME);
-                            fileName = cursor.getString(column_index);
+                        cursor = context.getContentResolver().query(
+                                uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+                    } catch (RuntimeException ignored) {
+                        cursor = context.getContentResolver().query(uri, null, null, null, null);
+                    }
+                    if (cursor != null && cursor.moveToFirst()) {
+                        int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                        if (column >= 0) {
+                            String value = cursor.getString(column);
+                            if (!isUnusableDisplayName(value)) {
+                                fileName = value;
+                            }
                         }
-                    } catch (Exception e) {
-                        //Log.d(TAG, e.getLocalizedMessage());
-                    } finally {
+                    }
+                } finally {
+                    if (cursor != null) {
                         cursor.close();
                     }
                 }
-            } else if (uri.getScheme().compareTo("file") == 0) {
-                fileName = uri.getLastPathSegment();
-            } else {
-                fileName = fileName + "_" + uri.getLastPathSegment();
+            } else if (uri != null && "file".equals(uri.getScheme())) {
+                String last = uri.getLastPathSegment();
+                if (!isUnusableDisplayName(last)) {
+                    fileName = last;
+                }
             }
         } catch (Exception e) {
-            //do nothing, only return default file name;
             Log.d(Constants.TAG, e.getLocalizedMessage());
         }
-        return fileName;
+        return isUnusableDisplayName(fileName) ? defaultName : fileName;
     }
 
 

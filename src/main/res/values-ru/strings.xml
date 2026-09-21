@@ -50,6 +50,8 @@
     <string name="create_features">Create features</string>
     <string name="parse_features">Parse features</string>
     <string name="message_loading">Загрузка…</string>
+    <string name="underlay_import_tiles">Подложка: %1$d из %2$d</string>
+    <string name="underlay_unnamed">Подложка</string>
     <string name="error_layer_create">Не удалось создать слой</string>
     <string name="start_fill_layer">Запуск заполнения слоя данными</string>
     <string name="message_opening">Открывается…</string>

@@ -1,7 +1,10 @@
 package com.nextgis.maplib.util;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
+import android.provider.OpenableColumns;
+import com.nextgis.maplib.R;
 import com.nextgis.maplib.api.IProgressor;
 import com.nextgis.maplib.map.LocalTMSLayer;
 import org.json.JSONException;
@@ -61,6 +64,7 @@ public final class SharedUnderlayStore {
         SharedUnderlayCatalog catalog = catalog(layer.getContext());
         NgrcArchive.Source input = () -> open(layer.getContext(), source);
         NgrcArchive.Progress check = () -> check(progress);
+        beginLoading(progress, layer.getContext());
         NgrcArchive.Info archive = NgrcArchive.inspect(input, check);
         SharedUnderlayCatalog.Asset existing = catalog.find(archive.sha256, null);
         if (existing != null) { layer.setName(existing.name); attach(layer, existing); return; }
@@ -68,8 +72,18 @@ public final class SharedUnderlayStore {
         try {
             File file = new File(new File(stage, "payload"), MbTilesInfo.MBTILES_FILENAME);
             String name = archive.config.optString("name", layer.getName());
+            if (FileUtil.isUnusableDisplayName(name)) {
+                name = layer.getContext().getString(R.string.underlay_unnamed);
+            }
+            reportTiles(progress, layer.getContext(), 0, archive.tileCount);
             try (RasterMbtilesWriter writer = new RasterMbtilesWriter(file, name)) {
-                NgrcArchive.convert(input, archive, writer::addTile, check);
+                final int[] done = {0};
+                NgrcArchive.convert(input, archive, (path, data, scheme) -> {
+                    writer.addTile(path, data, scheme);
+                    done[0]++;
+                    reportTiles(progress, layer.getContext(), done[0], archive.tileCount);
+                    check(progress);
+                }, check);
                 writer.finish();
             }
             sync(file);
@@ -88,6 +102,7 @@ public final class SharedUnderlayStore {
 
     public static void importMbtiles(LocalTMSLayer layer, Uri source, IProgressor progress) throws IOException, NGException {
         SharedUnderlayCatalog catalog = catalog(layer.getContext());
+        beginLoading(progress, layer.getContext());
         String hash;
         try (InputStream input = checked(openMbtiles(layer.getContext(), source), progress)) { hash = UnderlayFiles.sha256(input); }
         SharedUnderlayCatalog.Asset existing = catalog.find(hash, null);
@@ -96,10 +111,17 @@ public final class SharedUnderlayStore {
         try {
             File file = new File(new File(stage, "payload"), MbTilesInfo.MBTILES_FILENAME);
             MessageDigest digest = UnderlayFiles.digest();
+            long total = openableSize(layer.getContext(), source);
+            long copied = 0L;
+            reportBytes(progress, copied, total);
             try (InputStream input = new DigestInputStream(checked(openMbtiles(layer.getContext(), source), progress), digest);
                  FileOutputStream output = new FileOutputStream(file)) {
                 byte[] buffer = new byte[64 * 1024]; int count;
-                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                    copied += count;
+                    reportBytes(progress, copied, total);
+                }
                 output.getFD().sync();
             }
             if (!hash.equals(UnderlayFiles.hex(digest.digest()))) throw new IOException("MBTiles changed during import");
@@ -163,6 +185,46 @@ public final class SharedUnderlayStore {
         if (Thread.currentThread().isInterrupted() || (progress != null && progress.isCanceled()))
             throw new InterruptedIOException("Underlay import cancelled");
     }
+
+    private static void beginLoading(IProgressor progress, Context context) {
+        if (progress == null || context == null) return;
+        progress.setIndeterminate(true);
+        progress.setMessage(context.getString(R.string.message_loading));
+    }
+
+    private static void reportTiles(IProgressor progress, Context context, int value, int max) {
+        if (progress == null || context == null || max <= 0) return;
+        progress.setIndeterminate(false);
+        progress.setMax(max);
+        progress.setValue(value);
+        progress.setMessage(context.getString(R.string.underlay_import_tiles, value, max));
+    }
+
+    private static void reportBytes(IProgressor progress, long copied, long total) {
+        if (progress == null || total <= 0L) return;
+        progress.setIndeterminate(false);
+        int max = total <= Integer.MAX_VALUE ? (int) total : 10000;
+        int value = total <= Integer.MAX_VALUE
+                ? (int) Math.min(copied, total)
+                : (int) Math.min(10000L, copied * 10000L / total);
+        progress.setMax(max);
+        progress.setValue(value);
+    }
+
+    private static long openableSize(Context context, Uri uri) {
+        if (context == null || uri == null) return -1L;
+        try (Cursor cursor = context.getContentResolver().query(
+                uri, new String[]{OpenableColumns.SIZE}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int column = cursor.getColumnIndex(OpenableColumns.SIZE);
+                if (column >= 0 && !cursor.isNull(column)) {
+                    return cursor.getLong(column);
+                }
+            }
+        } catch (RuntimeException ignored) { }
+        return -1L;
+    }
+
     public static void sync(File file) throws IOException {
         try (RandomAccessFile opened = new RandomAccessFile(file, "rw")) { opened.getFD().sync(); }
     }

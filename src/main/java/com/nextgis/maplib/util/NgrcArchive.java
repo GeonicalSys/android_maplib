@@ -21,8 +21,9 @@ public final class NgrcArchive {
         public final JSONObject config;
         public final String sha256;
         public final int scheme;
-        private Info(JSONObject config, String hash) throws IOException {
-            this.config = config; sha256 = hash;
+        public final int tileCount;
+        private Info(JSONObject config, String hash, int tileCount) throws IOException {
+            this.config = config; sha256 = hash; this.tileCount = tileCount;
             scheme = config.optInt("tms_type", -1);
             if (scheme != GeoConstants.TMSTYPE_NORMAL && scheme != GeoConstants.TMSTYPE_OSM)
                 throw new IOException("NGRc must declare its TMS or OSM tile scheme");
@@ -32,28 +33,31 @@ public final class NgrcArchive {
 
     public static Info inspect(Source source, Progress progress) throws IOException {
         final JSONObject[] config = {null};
+        final int[] tiles = {0};
         String hash = scan(source, progress, (path, data) -> {
             if ("config.json".equals(path)) {
                 if (config[0] != null) throw new IOException("NGRc contains multiple configurations");
                 try { config[0] = new JSONObject(new String(data, StandardCharsets.UTF_8)); }
                 catch (JSONException e) { throw new IOException("NGRc configuration is invalid", e); }
             }
-        }, false);
+        }, false, tiles);
         if (config[0] == null) throw new IOException("NGRc configuration is missing");
-        return new Info(config[0], hash);
+        return new Info(config[0], hash, tiles[0]);
     }
 
     public static void convert(Source source, Info info, Tiles tiles, Progress progress) throws IOException {
         final long[] count = {0};
         String hash = scan(source, progress, (path, data) -> {
             if (isTile(path)) { tiles.add(path, data, info.scheme); count[0]++; }
-        }, true);
+        }, true, null);
         if (!info.sha256.equals(hash)) throw new IOException("NGRc changed during import");
         if (count[0] == 0) throw new IOException("NGRc contains no raster tiles");
     }
 
     private interface Entry { void read(String path, byte[] data) throws IOException; }
-    private static String scan(Source source, Progress progress, Entry consumer, boolean tiles) throws IOException {
+    private static String scan(
+            Source source, Progress progress, Entry consumer, boolean tiles, int[] tileCount)
+            throws IOException {
         MessageDigest digest = UnderlayFiles.digest();
         InputStream opened = source.open();
         if (opened == null) throw new IOException("NGRc stream is unavailable");
@@ -64,6 +68,7 @@ public final class NgrcArchive {
                 progress.check();
                 String path = normalized(entry.getName());
                 if (entry.isDirectory()) { zip.closeEntry(); continue; }
+                if (tileCount != null && isTile(path)) tileCount[0]++;
                 boolean retained = (tiles && isTile(path)) || (!tiles && "config.json".equals(path));
                 if (retained) consumer.read(path, UnderlayFiles.readBounded(zip, 16 * 1024 * 1024));
                 else {

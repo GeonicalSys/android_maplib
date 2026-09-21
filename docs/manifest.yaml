@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-09-20
+last_verified: 2026-09-21
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -24,10 +24,16 @@ key_components:
     responsibility: Reuse only committed fully explained missing-invalid counts in the same scope for one hour, with forced recheck support.
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
     responsibility: Durable asset index, publication and move recovery, format-aware dedup, repair of previously mislinked references and payload lifecycle; Asset.referenceConfig preserves project presentation and zoom limits.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
+    responsibility: Stream NGRc/MBTiles into the catalog and report tile or byte import progress without exposing URI or SAF ids.
   - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayKind.java
     responsibility: Classify NGRc, raster MBTiles and ZIP contents before shared-catalog import without extracting a tile tree.
   - path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
-    responsibility: Bounded two-pass NGRc reader with complete source hash, explicit tile scheme, case-insensitive Mapnik.json/config.json and Mapnik raster-path normalization, and ambiguous metadata rejection.
+    responsibility: Bounded two-pass NGRc reader with complete source hash, tile count for import progress, explicit tile scheme, case-insensitive Mapnik.json/config.json and Mapnik raster-path normalization, and ambiguous metadata rejection.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/FileUtil.java
+    responsibility: Resolve a human document display name and reject SAF MediaStore ids such as msf:308.
+  - path: maplib/src/test/java/com/nextgis/maplib/util/FileUtilDisplayNameTest.java
+    responsibility: Lock rejection of empty names and SAF document ids without Android.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
     responsibility: Shared batched raster database writer for NGRc and Debug streams.
   - path: maplib/src/main/java/com/nextgis/maplib/util/CameraZoom.java
