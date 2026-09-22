@@ -10,8 +10,8 @@ last_verified: 2026-09-22
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.25` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.25`; отдельный Lisa Debug использует `3.1.2.22`. Оба значения проверяются
+Для выпуска `3.1.2.26` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.26`; отдельный Lisa Debug использует `3.1.2.22`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
