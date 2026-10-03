@@ -56,8 +56,7 @@ public class GeoLinearRing
             buf.append(" EMPTY");
         } else {
             buf.append("(");
-            for (int i = 0; i < mPoints.size(); i++) {
-                GeoPoint pt = mPoints.get(i);
+            for (GeoPoint pt : mPoints) {
                 buf.append(pt.toWKT(false));
                 buf.append(", ");
             }

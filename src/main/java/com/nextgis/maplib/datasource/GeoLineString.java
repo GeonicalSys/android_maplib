@@ -214,11 +214,12 @@ public class GeoLineString
             buf.append(" EMPTY");
         } else {
             buf.append("(");
-            for (int i = 0; i < mPoints.size(); i++) {
-                if (i > 0) {
+            boolean first = true;
+            for (GeoPoint pt : mPoints) {
+                if (!first) {
                     buf.append(", ");
                 }
-                GeoPoint pt = mPoints.get(i);
+                first = false;
                 buf.append(pt.toWKT(false));
             }
             buf.append(")");

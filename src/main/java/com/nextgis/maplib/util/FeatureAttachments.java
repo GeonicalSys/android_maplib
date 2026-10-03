@@ -220,12 +220,7 @@ public class FeatureAttachments {
 
     public static void delete(SQLiteDatabase db, String tableName)
     {
-        try {
-            String tableDrop = "DROP TABLE IF EXISTS " + tableName;
-            db.execSQL(tableDrop);
-        } catch (SQLiteFullException | SQLiteReadOnlyDatabaseException e) {
-            e.printStackTrace();
-        }
+        db.execSQL("DROP TABLE IF EXISTS " + tableName);
     }
 
 

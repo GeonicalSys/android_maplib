@@ -994,19 +994,19 @@ public class NGWVectorLayer
 
             // if featureId == NOT_FOUND remove all changes for all features
             if (featureId == Constants.NOT_FOUND) {
-                FeatureChanges.removeAllChanges(changeTableName);
+                FeatureChanges.removeAllChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
 
                 // if feature has changes then remove them for the feature
-            } else if (FeatureChanges.isChanges(changeTableName, featureId)) {
+            } else if (FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId)) {
                 // if feature was new then just remove its changes
-                canAddChanges = !FeatureChanges.isChanges(changeTableName, featureId,
+                canAddChanges = !FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId,
                         Constants.CHANGE_OPERATION_NEW);
-                FeatureChanges.removeChanges(changeTableName, featureId);
+                FeatureChanges.removeChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId);
             }
         }
 
         // we are trying to re-create feature - warning
-        if (operation == Constants.CHANGE_OPERATION_NEW && FeatureChanges.isChanges(
+        if (operation == Constants.CHANGE_OPERATION_NEW && FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false),
                 changeTableName, featureId)) {
             Log.w(Constants.TAG, "Something wrong. Should nether get here");
             canAddChanges = false;
@@ -1014,7 +1014,7 @@ public class NGWVectorLayer
 
         // if can then add change
         if (canAddChanges) {
-            FeatureChanges.add(changeTableName, featureId, operation);
+            FeatureChanges.add(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, operation);
         }
     }
 
@@ -1037,28 +1037,28 @@ public class NGWVectorLayer
 
             // if attachId == NOT_FOUND remove all attach changes for the feature
             if (attachId == Constants.NOT_FOUND) {
-                FeatureChanges.removeAllAttachChanges(changeTableName, featureId);
+                FeatureChanges.removeAllAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId);
 
                 // if attachment has changes then remove them for the attachment
-            } else if (FeatureChanges.isAttachChanges(changeTableName, featureId, attachId)) {
+            } else if (FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, attachId)) {
                 // if attachment was new then just remove its changes
                 canAddChanges =
-                        !FeatureChanges.isAttachChanges(changeTableName, featureId, attachId,
+                        !FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, attachId,
                                 Constants.CHANGE_OPERATION_NEW);
-                FeatureChanges.removeAttachChanges(changeTableName, featureId, attachId);
+                FeatureChanges.removeAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, attachId);
             }
         }
 
         // we are trying to re-create the attach - warning
         // TODO: replace to attachOperation == CHANGE_OPERATION_NEW ???
         if (0 != (attachOperation & Constants.CHANGE_OPERATION_NEW)
-                && FeatureChanges.isAttachChanges(changeTableName, featureId, attachId)) {
+                && FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, attachId)) {
             Log.w(Constants.TAG, "Something wrong. Should nether get here");
             canAddChanges = false;
         }
 
         if (canAddChanges) {
-            FeatureChanges.add(changeTableName, featureId, attachId, attachOperation);
+            FeatureChanges.add(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, attachId, attachOperation);
         }
     }
 
@@ -1260,7 +1260,7 @@ public class NGWVectorLayer
         HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " sendLocalChanges START" );
 
         String changeTableName = getChangeTableName();
-        long changesCount = FeatureChanges.getChangeCount(changeTableName);
+        long changesCount = FeatureChanges.getChangeCount(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "sendLocalChanges: " + changesCount);
         }
@@ -1279,7 +1279,7 @@ public class NGWVectorLayer
         try {
             NgwSyncIo.checkInterrupted();
             // get column's IDs, there is at least one entry
-            Cursor changeCursor = FeatureChanges.getFirstChangeFromRecordId(changeTableName, 0);
+            Cursor changeCursor = FeatureChanges.getFirstChangeFromRecordId(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, 0);
             changeCursor.moveToFirst();
 
             int recordIdColumn = changeCursor.getColumnIndex(Constants.FIELD_ID);
@@ -1299,7 +1299,7 @@ public class NGWVectorLayer
                 // sent is allowed to resolve so its local change record has an unambiguous state.
                 NgwSyncIo.checkInterrupted();
 
-                changeCursor = FeatureChanges.getFirstChangeFromRecordId(changeTableName,
+                changeCursor = FeatureChanges.getFirstChangeFromRecordId(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
                         nextChangeRecordId);
 
                 if (null == changeCursor) {
@@ -1322,13 +1322,13 @@ public class NGWVectorLayer
 
                 changeCursor.close();
 
-                long lastChangeRecordId = FeatureChanges.getLastChangeRecordId(changeTableName);
+                long lastChangeRecordId = FeatureChanges.getLastChangeRecordId(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
 
                 if (0 == (changeOperation & Constants.CHANGE_OPERATION_ATTACH)) {
 
                     if (0 != (changeOperation & Constants.CHANGE_OPERATION_DELETE)) {
                         if (deleteFeatureOnServer(changeFeatureId, syncResult)) {
-                            FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
+                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
                         } else {
                             isError = true;
                             if (Constants.DEBUG_MODE) {
@@ -1342,8 +1342,8 @@ public class NGWVectorLayer
                         FeaturePushResult pushResult =
                                 addFeatureOnServer(changeFeatureId, syncResult, accountData);
                         if (pushResult.success) {
-                            FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
-                            FeatureChanges.removeChangesToLast(changeTableName, changeFeatureId,
+                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
+                            FeatureChanges.removeChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeFeatureId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
                             if (!NgwSyncIo.isCancellationRequested()) {
                                 refreshFeatureFromServerAfterPush(
@@ -1362,8 +1362,8 @@ public class NGWVectorLayer
                         HyperLog.v(Constants.TAG, "NGWVectorLayer: feature change start featureID = "  + changeFeatureId );
 
                         if (changeFeatureOnServer(changeFeatureId, syncResult, accountData)) {
-                            FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
-                            FeatureChanges.removeChangesToLast(changeTableName, changeFeatureId,
+                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
+                            FeatureChanges.removeChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeFeatureId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
                             if (!NgwSyncIo.isCancellationRequested()) {
                                 refreshFeatureFromServerAfterPush(
@@ -1387,7 +1387,7 @@ public class NGWVectorLayer
                         HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttacheDelete start");
 
                         if (deleteAttachOnServer(changeFeatureId, changeAttachId, syncResult)) {
-                            FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
+                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
                         } else {
                             HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttacheDelete FAILED");
                             isError = true;
@@ -1401,8 +1401,8 @@ public class NGWVectorLayer
 
                         if (sendAttachOnServer(changeFeatureId, changeAttachId, true, syncResult)) {
 
-                            FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
-                            FeatureChanges.removeAttachChangesToLast(changeTableName,
+                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
+                            FeatureChanges.removeAttachChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
                                     changeFeatureId, changeAttachId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
                         } else {
@@ -1418,7 +1418,7 @@ public class NGWVectorLayer
                         HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachChange start with Fid =" + changeFeatureId + " attachId= "+ changeAttachId);
 
                         if (changeAttachOnServer(changeFeatureId, changeAttachId, syncResult)) {
-                            FeatureChanges.removeAttachChangesToLast(changeTableName,
+                            FeatureChanges.removeAttachChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
                                     changeFeatureId, changeAttachId,
                                     Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
                         } else {
@@ -1435,7 +1435,7 @@ public class NGWVectorLayer
             }
 
             // check records count changing
-            if (changesCount != FeatureChanges.getChangeCount(changeTableName)) {
+            if (changesCount != FeatureChanges.getChangeCount(DatabaseContext.getDatabaseForLayer(this, false), changeTableName)) {
 //                mCache.save(new File(mPath, RTREE));  // useless due to save in notifyUpdate
 //                if (DEBUG_MODE)
 //                    Log.d(Constants.TAG, "mCache: saving sendLocalChanges");
@@ -1463,7 +1463,7 @@ public class NGWVectorLayer
         if (isError) {
             HyperLog.w(Constants.TAG, "NGW sendLocalChanges incomplete layer=\""
                     + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
-                    + " pendingChanges=" + FeatureChanges.getChangeCount(changeTableName));
+                    + " pendingChanges=" + FeatureChanges.getChangeCount(DatabaseContext.getDatabaseForLayer(this, false), changeTableName));
         }
 
         return !isError;
@@ -1644,7 +1644,7 @@ public class NGWVectorLayer
 
             // Keep local file under server attach id and register online metadata so
             // identification works without waiting for a second pull.
-            FeatureChanges.removeAttachChanges(getChangeTableName(), featureId, attachId);
+            FeatureChanges.removeAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
             long newAttachId = result.getLong(Constants.JSON_ID_KEY);
             setNewAttachId(String.valueOf(featureId), attach, String.valueOf(newAttachId));
             try {
@@ -1919,7 +1919,7 @@ public class NGWVectorLayer
         if (photoFolder.exists()) {
             if (photoFolder.renameTo(new File(mPath, "" + newFeatureId))) {
 
-                int chRes = FeatureChanges.changeFeatureIdForAttaches(getChangeTableName(),
+                int chRes = FeatureChanges.changeFeatureIdForAttaches(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(),
                         oldFeatureId, newFeatureId);
                 if (chRes <= 0) {
                     if (Constants.DEBUG_MODE) {
@@ -2470,9 +2470,9 @@ public class NGWVectorLayer
                 try {
                     for (Long featureId : queryAllFeatureIdsFromDb()) {
                         boolean bDeleteFeature = !remoteIdSet.contains(featureId)
-                                && !FeatureChanges.isChanges(changeTableName, featureId,
+                                && !FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId,
                                         Constants.CHANGE_OPERATION_NEW)
-                                && !FeatureChanges.hasFeatureFlags(changeTableName, featureId);
+                                && !FeatureChanges.hasFeatureFlags(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId);
                         if (bDeleteFeature) {
                             destructiveIds.add(featureId);
                             deleteItems.add(featureId);
@@ -2506,7 +2506,7 @@ public class NGWVectorLayer
                             missingLocalRowCount++;
                             //if we have changes (delete) not create new feature
                             boolean createNewFeature =
-                                    !FeatureChanges.isChanges(changeTableName, remoteFeature.getId());
+                                    !FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, remoteFeature.getId());
 
                             if (!createNewFeature) {
                                 skippedCreateDueToPendingChange++;
@@ -2555,7 +2555,7 @@ public class NGWVectorLayer
             }
 
             if (!mTracked) {
-                Cursor changeCursor = FeatureChanges.getChanges(changeTableName);
+                Cursor changeCursor = FeatureChanges.getChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
                 HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " changeCursorSize is " + changeCursor.getCount());
                 // remove changes already applied on server (delete already deleted id or add already added)
                 if (null != changeCursor) {
@@ -2579,7 +2579,7 @@ public class NGWVectorLayer
                                 if (remoteIdSet != null && remoteIdSet.contains(changeFeatureId)) {
                                     if (0 != (changeOperation & Constants.CHANGE_OPERATION_NEW)) {
                                         // if feature already exist, just change it
-                                        FeatureChanges.setOperation(changeTableName, changeRecordId,
+                                        FeatureChanges.setOperation(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId,
                                                 Constants.CHANGE_OPERATION_CHANGED);
                                     }
                                     bDeleteChange = false; // in other cases just apply
@@ -2601,7 +2601,7 @@ public class NGWVectorLayer
                                                         attachChangeOperation);
                                     }
                                     // TODO: analise for operation, remove all equal
-                                    FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
+                                    FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
                                 }
 
                             } while (changeCursor.moveToNext());
@@ -2847,9 +2847,9 @@ public class NGWVectorLayer
         for (Long featureId : queryAllFeatureIdsFromDb()) {
             NgwSyncIo.checkInterrupted();
             boolean deleteFeature = !scan.remoteIds.contains(featureId)
-                    && !FeatureChanges.isChanges(
+                    && !FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false),
                             changeTableName, featureId, Constants.CHANGE_OPERATION_NEW)
-                    && !FeatureChanges.hasFeatureFlags(changeTableName, featureId);
+                    && !FeatureChanges.hasFeatureFlags(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId);
             if (deleteFeature) {
                 scan.deleteIds.add(featureId);
                 scan.destructiveIds.add(featureId);
@@ -2884,7 +2884,7 @@ public class NGWVectorLayer
                         null);
                 try {
                     if (cursor == null || cursor.getCount() == 0) {
-                        if (!FeatureChanges.isChanges(changeTableName, remoteFeature.getId())) {
+                        if (!FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, remoteFeature.getId())) {
                             if (!createNewFeature(remoteFeature, authority)) {
                                 throw new SQLiteException(
                                         "streamed snapshot feature insert failed");
@@ -2950,7 +2950,7 @@ public class NGWVectorLayer
     private void reconcileFullSnapshotChangeRecords(
             String changeTableName,
             Set<Long> remoteIds) throws IOException {
-        Cursor changeCursor = FeatureChanges.getChanges(changeTableName);
+        Cursor changeCursor = FeatureChanges.getChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
         if (changeCursor == null) {
             return;
         }
@@ -2973,7 +2973,7 @@ public class NGWVectorLayer
                 boolean deleteChange = true;
                 if (remoteIds.contains(changeFeatureId)) {
                     if (0 != (changeOperation & Constants.CHANGE_OPERATION_NEW)) {
-                        FeatureChanges.setOperation(
+                        FeatureChanges.setOperation(DatabaseContext.getDatabaseForLayer(this, false),
                                 changeTableName,
                                 changeRecordId,
                                 Constants.CHANGE_OPERATION_CHANGED);
@@ -2986,7 +2986,7 @@ public class NGWVectorLayer
                     deleteChange = false;
                 }
                 if (deleteChange) {
-                    FeatureChanges.removeChangeRecord(changeTableName, changeRecordId);
+                    FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
                 }
             } while (changeCursor.moveToNext());
         } finally {
@@ -3383,7 +3383,7 @@ public class NGWVectorLayer
             boolean eqData = remoteFeature.equalsData(currentFeature);
             return RemoteAttachmentSyncPolicy.remoteApplyRequiresBackup(
                     eqData,
-                    FeatureChanges.isChanges(changeTableName, remoteFeature.getId()));
+                    FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, remoteFeature.getId()));
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -3468,19 +3468,19 @@ public class NGWVectorLayer
         //process data
         if (eqData) {
             //remove from changes
-            if (FeatureChanges.isChanges(changeTableName, remoteFeature.getId())) {
-                if (eqAttach && !FeatureChanges.isAttachesForDelete(
+            if (FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, remoteFeature.getId())) {
+                if (eqAttach && !FeatureChanges.isAttachesForDelete(DatabaseContext.getDatabaseForLayer(this, false),
                         changeTableName, remoteFeature.getId())
-                        || !FeatureChanges.isAttachChanges(
+                        || !FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false),
                         changeTableName, remoteFeature.getId())) {
 
-                    FeatureChanges.removeChanges(
+                    FeatureChanges.removeChanges(DatabaseContext.getDatabaseForLayer(this, false),
                             changeTableName, remoteFeature.getId());
                 }
             }
         } else {
             // we have local changes ready for sent to server
-            boolean isChangedLocal = FeatureChanges.isChanges(changeTableName,
+            boolean isChangedLocal = FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
                     remoteFeature.getId());
 
             //no local changes - update local feature
@@ -3504,8 +3504,8 @@ public class NGWVectorLayer
 
         //process attachments
         if (eqAttach) {
-            if (FeatureChanges.isChanges(changeTableName, remoteFeature.getId())
-                    && (eqData || FeatureChanges.isAttachChanges(
+            if (FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, remoteFeature.getId())
+                    && (eqData || FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false),
                     changeTableName, remoteFeature.getId()))) {
 
                 if (Constants.DEBUG_MODE) {
@@ -3513,12 +3513,12 @@ public class NGWVectorLayer
                             " already changed on server. Remove changes for it");
                 }
 
-                FeatureChanges.removeChanges(
+                FeatureChanges.removeChanges(DatabaseContext.getDatabaseForLayer(this, false),
                         changeTableName, remoteFeature.getId());
             }
 
         } else {
-            boolean isChangedLocal = FeatureChanges.isAttachChanges(changeTableName,
+            boolean isChangedLocal = FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
                     remoteFeature.getId());
 
             if (!isChangedLocal) {
@@ -3543,7 +3543,7 @@ public class NGWVectorLayer
                             long attachIdL =
                                     Long.parseLong(remoteItem.getAttachId());
                             boolean changeOnServer =
-                                    !FeatureChanges.isAttachChanges(changeTableName,
+                                    !FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
                                             remoteFeature.getId(), attachIdL);
 
                             if (changeOnServer) {
@@ -3833,8 +3833,9 @@ public class NGWVectorLayer
 
         Cursor cursor = query(uri, null, null, null, "_id", null);
         if (null == cursor) {
-            logBuggyChangeDrop("addFeatureOnServer (null cursor)", featureId);
-            return FeaturePushResult.handledWithoutRemoteId(); //just remove buggy data
+            Log.e(Constants.TAG, "Cannot read feature for upload: " + featureId);
+            syncResult.databaseError = true;
+            return FeaturePushResult.failed();
         }
 
         try {
@@ -3968,8 +3969,9 @@ public class NGWVectorLayer
         // get it's cursor
         Cursor cursor = query(uri, null, null, null, null, null);
         if (null == cursor) {
-            logBuggyChangeDrop("changeFeatureOnServer (null cursor)", featureId);
-            return true; //just remove buggy data
+            Log.e(Constants.TAG, "Cannot read feature for update: " + featureId);
+            syncResult.databaseError = true;
+            return false;
         }
 
         try {
@@ -4145,11 +4147,11 @@ public class NGWVectorLayer
     }
 
     private boolean hasPendingFeatureDataChanges(String changeTableName, long featureId) {
-        if (FeatureChanges.hasFeatureFlags(changeTableName, featureId)) {
+        if (FeatureChanges.hasFeatureFlags(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId)) {
             return true;
         }
 
-        Cursor cursor = FeatureChanges.getChanges(changeTableName, featureId);
+        Cursor cursor = FeatureChanges.getChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId);
         if (cursor == null) {
             return true;
         }
@@ -4334,7 +4336,7 @@ public class NGWVectorLayer
     protected synchronized void applySync(int syncType)
     {
         if (syncType == Constants.SYNC_NONE) {
-            FeatureChanges.removeAllChanges(getChangeTableName());
+            FeatureChanges.removeAllChanges(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName());
         } else {
             if (mTracked)
                 return;
@@ -4398,15 +4400,10 @@ public class NGWVectorLayer
 
 
     @Override
-    public boolean delete(boolean keepTrack)
-            throws SQLiteException
-    {
-        if (isReservedForWalk()) return false;
-        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+    protected void dropLayerTables(SQLiteDatabase db) {
         FeatureChanges.delete(db, getChangeTableName());
         FeatureAttachments.delete(db, getAttachmentsTableName());
-
-        return super.delete(keepTrack);
+        super.dropLayerTables(db);
     }
 
 
@@ -4450,7 +4447,7 @@ public class NGWVectorLayer
 
         switch (uriType) {
             case TYPE_CHANGES_TABLE: {
-                return FeatureChanges.query(
+                return FeatureChanges.query(DatabaseContext.getDatabaseForLayer(this, false),
                         changeTableName, projection, selection, selectionArgs, sortOrder, limit);
             }
 
@@ -4465,7 +4462,7 @@ public class NGWVectorLayer
                     selection += " AND " + changeSel;
                 }
 
-                return FeatureChanges.query(
+                return FeatureChanges.query(DatabaseContext.getDatabaseForLayer(this, false),
                         changeTableName, projection, selection, selectionArgs, sortOrder, limit);
             }
 
@@ -4482,7 +4479,7 @@ public class NGWVectorLayer
                     selection += " AND " + changeSel;
                 }
 
-                return FeatureChanges.query(
+                return FeatureChanges.query(DatabaseContext.getDatabaseForLayer(this, false),
                         changeTableName, projection, selection, selectionArgs, sortOrder, limit);
             }
 
@@ -4501,7 +4498,7 @@ public class NGWVectorLayer
                     selection += " AND " + changeSel;
                 }
 
-                return FeatureChanges.query(
+                return FeatureChanges.query(DatabaseContext.getDatabaseForLayer(this, false),
                         changeTableName, projection, selection, selectionArgs, sortOrder, limit);
             }
 
@@ -4529,7 +4526,7 @@ public class NGWVectorLayer
         switch (uriType) {
 
             case TYPE_CHANGES_TABLE: {
-                return FeatureChanges.delete(changeTableName, selection, selectionArgs);
+                return FeatureChanges.delete(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, selection, selectionArgs);
             }
 
             case TYPE_CHANGES_FEATURE: {
@@ -4543,7 +4540,7 @@ public class NGWVectorLayer
                     selection += " AND " + changeSel;
                 }
 
-                return FeatureChanges.delete(changeTableName, selection, selectionArgs);
+                return FeatureChanges.delete(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, selection, selectionArgs);
             }
 
             case TYPE_CHANGES_ATTACH: {
@@ -4559,7 +4556,7 @@ public class NGWVectorLayer
                     selection += " AND " + changeSel;
                 }
 
-                return FeatureChanges.delete(changeTableName, selection, selectionArgs);
+                return FeatureChanges.delete(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, selection, selectionArgs);
             }
 
             case TYPE_CHANGES_ATTACH_ID: {
@@ -4577,7 +4574,7 @@ public class NGWVectorLayer
                     selection += " AND " + changeSel;
                 }
 
-                return FeatureChanges.delete(changeTableName, selection, selectionArgs);
+                return FeatureChanges.delete(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, selection, selectionArgs);
             }
 
             default: {
@@ -4590,21 +4587,26 @@ public class NGWVectorLayer
     @Override
     public boolean isChanges()
     {
-        return FeatureChanges.isChanges(getChangeTableName());
+        try {
+            return FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName());
+        } catch (RuntimeException error) {
+            Log.w(Constants.TAG, "Cannot determine pending layer changes", error);
+            return true; // fail closed for UI/deletion gates
+        }
     }
 
 
     @Override
     protected boolean haveFeaturesNotSyncFlag()
     {
-        return FeatureChanges.haveFeaturesNotSyncFlag(getChangeTableName());
+        return FeatureChanges.haveFeaturesNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName());
     }
 
 
     @Override
     protected boolean hasFeatureChanges(long featureId)
     {
-        return FeatureChanges.isChanges(getChangeTableName(), featureId);
+        return FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
     }
 
 
@@ -4613,7 +4615,7 @@ public class NGWVectorLayer
             long featureId,
             long attachId)
     {
-        return FeatureChanges.isAttachChanges(getChangeTableName(), featureId, attachId);
+        return FeatureChanges.isAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
     }
 
 
@@ -4624,7 +4626,7 @@ public class NGWVectorLayer
         String selection = "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
         Cursor cursor =
-                FeatureChanges.query(getChangeTableName(), selection, FIELD_ID + " ASC", "1");
+                FeatureChanges.query(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), selection, FIELD_ID + " ASC", "1");
 
         if (null != cursor) {
 
@@ -4648,7 +4650,7 @@ public class NGWVectorLayer
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
         Cursor cursor =
-                FeatureChanges.query(getChangeTableName(), selection, FIELD_ID + " ASC", "1");
+                FeatureChanges.query(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), selection, FIELD_ID + " ASC", "1");
 
         if (null != cursor) {
 
@@ -4667,14 +4669,14 @@ public class NGWVectorLayer
     public boolean hasFeatureTempFlag(long featureId)
     {
         // TODO: move work with temp features into VectorLayer
-        return FeatureChanges.hasFeatureTempFlag(getChangeTableName(), featureId);
+        return FeatureChanges.hasFeatureTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
     }
 
 
     @Override
     public boolean hasFeatureNotSyncFlag(long featureId)
     {
-        return FeatureChanges.hasFeatureNotSyncFlag(getChangeTableName(), featureId);
+        return FeatureChanges.hasFeatureNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
     }
 
 
@@ -4684,7 +4686,7 @@ public class NGWVectorLayer
             long attachId)
     {
         // TODO: move work with temp features into VectorLayer
-        return FeatureChanges.hasAttachTempFlag(getChangeTableName(), featureId, attachId);
+        return FeatureChanges.hasAttachTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
     }
 
 
@@ -4693,7 +4695,7 @@ public class NGWVectorLayer
             long featureId,
             long attachId)
     {
-        return FeatureChanges.hasAttachNotSyncFlag(getChangeTableName(), featureId, attachId);
+        return FeatureChanges.hasAttachNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
     }
 
 
@@ -4704,9 +4706,9 @@ public class NGWVectorLayer
     {
         // TODO: move work with temp features into VectorLayer
         if (flag) {
-            return FeatureChanges.setFeatureTempFlag(getChangeTableName(), featureId);
+            return FeatureChanges.setFeatureTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
         } else {
-            return FeatureChanges.deleteFeatureTempFlag(getChangeTableName(), featureId);
+            return FeatureChanges.deleteFeatureTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
         }
     }
 
@@ -4717,9 +4719,9 @@ public class NGWVectorLayer
             boolean flag)
     {
         if (flag) {
-            return FeatureChanges.setFeatureNotSyncFlag(getChangeTableName(), featureId);
+            return FeatureChanges.setFeatureNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
         } else {
-            return FeatureChanges.deleteFeatureNotSyncFlag(getChangeTableName(), featureId);
+            return FeatureChanges.deleteFeatureNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
         }
     }
 
@@ -4732,9 +4734,9 @@ public class NGWVectorLayer
     {
         // TODO: move work with temp features into VectorLayer
         if (flag) {
-            return FeatureChanges.setAttachTempFlag(getChangeTableName(), featureId, attachId);
+            return FeatureChanges.setAttachTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
         } else {
-            return FeatureChanges.deleteAttachTempFlag(getChangeTableName(), featureId, attachId);
+            return FeatureChanges.deleteAttachTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
         }
     }
 
@@ -4746,9 +4748,9 @@ public class NGWVectorLayer
             boolean flag)
     {
         if (flag) {
-            return FeatureChanges.setAttachNotSyncFlag(getChangeTableName(), featureId, attachId);
+            return FeatureChanges.setAttachNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
         } else {
-            return FeatureChanges.deleteAttachNotSyncFlag(
+            return FeatureChanges.deleteAttachNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false),
                     getChangeTableName(), featureId, attachId);
         }
     }
@@ -4760,7 +4762,7 @@ public class NGWVectorLayer
         // TODO: move work with temp features into VectorLayer
         String selection = "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
-        return FeatureChanges.delete(getChangeTableName(), selection);
+        return FeatureChanges.delete(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), selection);
     }
 
 
@@ -4772,6 +4774,6 @@ public class NGWVectorLayer
                 " ) ) AND " +
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
-        return FeatureChanges.delete(getChangeTableName(), selection);
+        return FeatureChanges.delete(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), selection);
     }
 }

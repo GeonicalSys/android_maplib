@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-22
+last_verified: 2026-10-03
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -427,3 +427,25 @@ SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTil
 реестров на main thread, сохраняя синхронный вызов из UI. Это устраняет
 `CalledFromWorkerThreadException` в cleanup; ошибка самого импорта остаётся
 доступна диагностике.
+
+## Надёжность локальной записи — 2026-10-03
+
+Изменение feature и NGW outbox фиксируются одной транзакцией в базе карты,
+которой принадлежит слой. Ошибка чтения outbox не означает отсутствие правок.
+Уведомления, удаление файлов feature/NGW-вложений и поколение данных публикуются
+после commit. `FeatureSaveJournal` закрепляет повторный insert за UUID операции;
+`PendingTrackPoints` хранит ограниченную упорядоченную очередь и подтверждает
+точку только после идемпотентной записи в owning `TrackLayer`.
+
+`MapTapGesture` отделяет микросмещение короткого тапа от drag/long press/pinch;
+`MaplibreMapInteraction.isTapPlacementActive()` включает согласованный допуск
+для инструментов. `AuthInterceptorNG` читает неизменяемый снимок реквизитов,
+сопоставляет origin, префикс сервера и точный resource id.
+Обход связного списка при WKT-сериализации последовательный; формат не изменён.
+
+Реальный SQLite проверяется Robolectric на API26/36 и native AndroidTest из app.
+Новые storage/API contracts требуют совместимых maplibui/app commits; порядок
+merge: maplib → maplibui → app. См.
+[контракт хранения](../../docs/architecture/ngw-sync-and-storage.md),
+[восстановление](../../docs/architecture/crash-recovery.md) и
+[аудит](../../docs/reference/mobile-reliability-audit.md).

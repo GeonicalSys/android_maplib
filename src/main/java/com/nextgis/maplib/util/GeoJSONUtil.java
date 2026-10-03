@@ -219,7 +219,7 @@ public class GeoJSONUtil {
 
                     final long fillStartMs = Constants.DEBUG_MODE ? SystemClock.elapsedRealtime() : 0L;
                     layer.beginBulkImport();
-                    dbTx.beginTransaction();
+                    LayerDatabaseTransaction.Scope transaction = LayerDatabaseTransaction.begin(dbTx);
                     try {
                         long lastProgressElapsedMs = 0L;
                         int sqlTxFeatureCount = 0;
@@ -236,9 +236,9 @@ public class GeoJSONUtil {
                                     layer.createFeatureBatch(feature, db, true);
                                     sqlTxFeatureCount++;
                                     if (sqlTxFeatureCount >= GEOJSON_FILL_SQL_TX_BATCH) {
-                                        dbTx.setTransactionSuccessful();
-                                        dbTx.endTransaction();
-                                        dbTx.beginTransaction();
+                                        transaction.setSuccessful();
+                                        transaction.close();
+                                        transaction = LayerDatabaseTransaction.begin(dbTx);
                                         sqlTxFeatureCount = 0;
                                     }
                                     if(null != progressor){
@@ -261,10 +261,10 @@ public class GeoJSONUtil {
                                 }
                             }
                         }
-                        dbTx.setTransactionSuccessful();
+                        transaction.setSuccessful();
                     } finally {
                         if (dbTx.inTransaction()) {
-                            dbTx.endTransaction();
+                            transaction.close();
                         }
                         layer.endBulkImport();
                     }
@@ -320,7 +320,7 @@ public class GeoJSONUtil {
 
                     final long fillStartMs = Constants.DEBUG_MODE ? SystemClock.elapsedRealtime() : 0L;
                     layer.beginBulkImport();
-                    dbTx.beginTransaction();
+                    LayerDatabaseTransaction.Scope transaction = LayerDatabaseTransaction.begin(dbTx);
                     try {
                         long lastProgressElapsedMs = 0L;
                         int sqlTxFeatureCount = 0;
@@ -337,9 +337,9 @@ public class GeoJSONUtil {
                                     layer.createFeatureBatch(feature, db, true);
                                     sqlTxFeatureCount++;
                                     if (sqlTxFeatureCount >= GEOJSON_FILL_SQL_TX_BATCH) {
-                                        dbTx.setTransactionSuccessful();
-                                        dbTx.endTransaction();
-                                        dbTx.beginTransaction();
+                                        transaction.setSuccessful();
+                                        transaction.close();
+                                        transaction = LayerDatabaseTransaction.begin(dbTx);
                                         sqlTxFeatureCount = 0;
                                     }
                                     if(null != progressor){
@@ -362,10 +362,10 @@ public class GeoJSONUtil {
                                 }
                             }
                         }
-                        dbTx.setTransactionSuccessful();
+                        transaction.setSuccessful();
                     } finally {
                         if (dbTx.inTransaction()) {
-                            dbTx.endTransaction();
+                            transaction.close();
                         }
                         layer.endBulkImport();
                     }

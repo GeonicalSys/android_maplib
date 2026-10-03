@@ -15,6 +15,11 @@ public interface MaplibreMapInteraction {
 
     public boolean processMapClick(float x, float y);
 
+    /** Allow small finger drift while placing sketch, ruler or azimuth points. */
+    default boolean isTapPlacementActive() {
+        return false;
+    }
+
     public void setHasEdit();
 
     public void updateGeometryFromMaplibre(org.maplibre.geojson.Feature feature, Feature originalSelectedFeaturem, MLGeometryEditClass editObject );
