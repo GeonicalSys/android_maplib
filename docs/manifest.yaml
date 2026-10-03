@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-03
+last_verified: 2026-10-04
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -70,6 +70,8 @@ key_components:
     responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop; mock GNSS is sampled no coarser than 2 s / 1 m.
   - path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
     responsibility: Keep mock GPS Connector extras exclusive of the 47 m placeholder and phone chip; native NMEA uses the same dense 2 s / 1 m sampling.
+  - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssTransport.java
+    responsibility: Byte source and optional command sink; ComNav binary initialization capability defaults to false for unrelated transports.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaParser.java
     responsibility: Talker-agnostic GGA/GST/GSA/RMC and ComNav/NovAtel BESTPOSA parsing with checksum, RTK quality and GST centimetre accuracy.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaLineBuffer.java
@@ -79,15 +81,15 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/CnbBestPos.java
     responsibility: Parse BESTPOSB message 42 into WGS84 GnssFix (фикс/плав/авто).
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/ComNavAsciiCommands.java
-    responsibility: Optional CRLF log gpgga/gst/gsa/rmc commands, each at most 20 bytes, without unlogall.
+    responsibility: Optional GGA/GST/GSA/RMC logs and additive BESTPOSB initialization for an identified silent ComNav/Pigo UART, without unlogall or correction/configuration changes; longer BESTPOSB command requires sequential ATT fragments.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/BluetoothLeTransport.java
-    responsibility: Nordic UART notify TX and write RX (6E400002) or writable notify; MTU request; WRITE with response; no arbitrary writable GATT fallback.
+    responsibility: Pair Nordic, HM-10 or identified ComNav/Pigo 3A20 (write 3A21, notify 3A22); validate CCCD success, receive notification snapshots and serialize writes with a five-second timeout; reject unrelated writable GATT fallback and stale callbacks, survive Bluetooth permission revocation.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/ExternalGnssSession.java
-    responsibility: Own one GNSS transport, parse CNB BESTPOSB first, optionally request ASCII NMEA, reconnect, and publish Location without Mock Location while a configured external endpoint remains selected, independent of map listeners.
+    responsibility: Own and fence one GNSS transport, parse CNB BESTPOSB, initialize a silent identified Pigo without altering a live stream, optionally request ASCII from other mixed receivers, reset stale quality after eight seconds, reconnect and publish Location without Mock Location independently of map listeners.
   - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
     responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle
-    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.26 and debug VERSION_NAME 3.1.2.22 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
+    responsibility: Keep pending release diagnostic VERSION_NAME 3.1.2.27 and debug VERSION_NAME 3.1.2.22 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java

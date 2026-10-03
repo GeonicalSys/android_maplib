@@ -10,6 +10,9 @@ import android.util.Log;
 
 import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.DiagnosticLog;
+import com.nextgis.maplib.util.LocationFixPolicy;
+
+import java.util.function.Supplier;
 
 /**
  * Owns one external GNSS transport, reconnects while consumers remain, and
@@ -32,6 +35,7 @@ public final class ExternalGnssSession {
 
     private final Context context;
     private final SharedPreferences prefs;
+    private final Supplier<GnssTransport> transportFactory;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final NmeaParser parser = new NmeaParser();
     private final NmeaLineBuffer lines = new NmeaLineBuffer();
@@ -39,19 +43,27 @@ public final class ExternalGnssSession {
     private final CnbFrameBuffer frames = new CnbFrameBuffer();
     private final Runnable requestNmea = this::requestNmeaIfNeeded;
     private final Runnable sendNextCommand = this::sendNextCommand;
+    private final Runnable reconnect = this::ensureStarted;
+    private final Runnable expireFix = () -> publishFix(new GnssFix());
     private Callback callback;
     private GnssTransport transport;
     private boolean wanted;
     private boolean asciiSeen;
     private boolean commandsSent;
+    private boolean bestPosSeen;
     private int commandIndex;
     private int attempt;
     private String status = STATUS_IDLE;
     private GnssFix lastFix;
 
     public ExternalGnssSession(Context context, SharedPreferences prefs) {
+        this(context, prefs, () -> GnssTransportFactory.create(context.getApplicationContext(), prefs));
+    }
+
+    ExternalGnssSession(Context context, SharedPreferences prefs, Supplier<GnssTransport> transportFactory) {
         this.context = context.getApplicationContext();
         this.prefs = prefs;
+        this.transportFactory = transportFactory;
     }
 
     public void setCallback(Callback callback) {
@@ -72,6 +84,7 @@ public final class ExternalGnssSession {
             handler.removeCallbacksAndMessages(null);
             closeTransport();
             resetParsers();
+            publishFix(new GnssFix());
             lastFix = null;
             setStatus(STATUS_IDLE);
             return;
@@ -80,9 +93,10 @@ public final class ExternalGnssSession {
     }
 
     public void restart() {
+        handler.removeCallbacks(reconnect);
         closeTransport();
         resetParsers();
-        lastFix = null;
+        publishFix(new GnssFix());
         attempt = 0;
         if (wanted) {
             ensureStarted();
@@ -90,12 +104,16 @@ public final class ExternalGnssSession {
     }
 
     private void resetParsers() {
+        handler.removeCallbacks(requestNmea);
+        handler.removeCallbacks(sendNextCommand);
+        handler.removeCallbacks(expireFix);
         parser.reset();
         lines.reset();
         cnb.reset();
         frames.reset();
         asciiSeen = false;
         commandsSent = false;
+        bestPosSeen = false;
         commandIndex = 0;
     }
 
@@ -112,36 +130,53 @@ public final class ExternalGnssSession {
             return;
         }
         setStatus(STATUS_CONNECTING);
-        asciiSeen = false;
-        commandsSent = false;
-        commandIndex = 0;
-        cnb.reset();
-        frames.reset();
-        transport = GnssTransportFactory.create(context, prefs);
-        transport.open(new GnssTransport.Listener() {
-            @Override
-            public void onOpened() {
-                handler.post(() -> {
-                    attempt = 0;
-                    setStatus(STATUS_CONNECTED);
-                    handler.removeCallbacks(requestNmea);
-                    if (!commandsSent && !asciiSeen) {
-                        handler.postDelayed(requestNmea, ASCII_WAIT_MS);
+        resetParsers();
+        final GnssTransport openedTransport;
+        try {
+            openedTransport = transportFactory.get();
+            transport = openedTransport;
+            openedTransport.open(new GnssTransport.Listener() {
+                @Override
+                public void onOpened() {
+                    handler.post(() -> {
+                        if (!wanted || transport != openedTransport || STATUS_CONNECTED.equals(status)) {
+                            return;
+                        }
+                        attempt = 0;
+                        setStatus(STATUS_CONNECTED);
+                        handler.removeCallbacks(requestNmea);
+                        if (!commandsSent && !asciiSeen) {
+                            handler.postDelayed(requestNmea, ASCII_WAIT_MS);
+                        }
+                    });
+                }
+
+                @Override
+                public void onBytes(byte[] data, int length) {
+                    if (data == null || length <= 0) {
+                        return;
                     }
-                });
-            }
+                    final byte[] copy = java.util.Arrays.copyOf(data, Math.min(length, data.length));
+                    handler.post(() -> {
+                        if (wanted && transport == openedTransport) {
+                            consume(copy, copy.length);
+                        }
+                    });
+                }
 
-            @Override
-            public void onBytes(byte[] data, int length) {
-                final byte[] copy = java.util.Arrays.copyOf(data, length);
-                handler.post(() -> consume(copy, copy.length));
-            }
-
-            @Override
-            public void onClosed(String reason) {
-                handler.post(() -> onTransportClosed(reason));
-            }
-        });
+                @Override
+                public void onClosed(String reason) {
+                    handler.post(() -> {
+                        if (transport == openedTransport) {
+                            onTransportClosed(reason);
+                        }
+                    });
+                }
+            });
+        } catch (RuntimeException exception) {
+            Log.w(Constants.TAG, "External GNSS open failed", exception);
+            onTransportClosed("open failed");
+        }
     }
 
     private void consume(byte[] data, int length) {
@@ -152,10 +187,10 @@ public final class ExternalGnssSession {
             handler.removeCallbacks(sendNextCommand);
             sendNextCommand();
         }
+        frames.append(data, length, this::onCnbFrame);
         if (!asciiSeen && !commandsSent && cnb.accept(data, length)) {
             requestNmeaIfNeeded();
         }
-        frames.append(data, length, this::onCnbFrame);
         lines.append(data, length, this::onAsciiLine);
     }
 
@@ -164,11 +199,9 @@ public final class ExternalGnssSession {
         if (fromCnb == null) {
             return;
         }
-        lastFix = fromCnb;
+        bestPosSeen = true;
+        publishFix(fromCnb);
         Callback local = callback;
-        if (local != null) {
-            local.onExternalFix(fromCnb);
-        }
         boolean ready = fromCnb.hasFix();
         DiagnosticLog.v("CNB BESTPOSB q=" + fromCnb.quality
                 + " sats=" + fromCnb.satellites
@@ -185,17 +218,17 @@ public final class ExternalGnssSession {
     }
 
     private void onAsciiLine(String line) {
-        if (!isAsciiGnss(line)) {
+        if (!isAsciiGnss(line) || !NmeaParser.checksumOk(line)) {
             return;
         }
         asciiSeen = true;
         boolean ready = parser.accept(line);
         GnssFix snapshot = parser.snapshot();
-        lastFix = snapshot;
-        Callback local = callback;
-        if (local != null) {
-            local.onExternalFix(snapshot);
+        if (!ready && snapshot.hasFix()) {
+            return;
         }
+        publishFix(snapshot);
+        Callback local = callback;
         DiagnosticLog.v("NMEA q=" + snapshot.quality
                 + " sats=" + snapshot.satellites
                 + " hdop=" + snapshot.hdop
@@ -213,13 +246,21 @@ public final class ExternalGnssSession {
     }
 
     private void requestNmeaIfNeeded() {
-        if (!wanted || transport == null || commandsSent || asciiSeen) {
+        if (!wanted || transport == null || !STATUS_CONNECTED.equals(status) || commandsSent || asciiSeen) {
             return;
         }
         commandsSent = true;
         commandIndex = 0;
         handler.removeCallbacks(requestNmea);
         handler.removeCallbacks(sendNextCommand);
+        if (transport.usesComNavBinary()) {
+            // An existing BESTPOSB stream already has its own cadence. Do not replace it.
+            if (!bestPosSeen) {
+                boolean queued = transport.write(ComNavAsciiCommands.bestPosEnable());
+                DiagnosticLog.v("External GNSS BESTPOSB initialization queued=" + queued);
+            }
+            return;
+        }
         sendNextCommand();
     }
 
@@ -276,6 +317,8 @@ public final class ExternalGnssSession {
         Log.i(Constants.TAG, "External GNSS closed: " + reason);
         DiagnosticLog.v("External GNSS closed: " + reason);
         closeTransport();
+        resetParsers();
+        publishFix(new GnssFix());
         if (!wanted) {
             setStatus(STATUS_IDLE);
             return;
@@ -283,14 +326,34 @@ public final class ExternalGnssSession {
         setStatus(STATUS_CONNECTING);
         long delay = Math.min(30_000L, 2_000L * (1L << Math.min(attempt, 4)));
         attempt++;
-        handler.postDelayed(this::ensureStarted, delay);
+        handler.removeCallbacks(reconnect);
+        handler.postDelayed(reconnect, delay);
     }
 
     private void closeTransport() {
+        handler.removeCallbacks(requestNmea);
+        handler.removeCallbacks(sendNextCommand);
+        handler.removeCallbacks(expireFix);
         GnssTransport local = transport;
         transport = null;
         if (local != null) {
-            local.close();
+            try {
+                local.close();
+            } catch (RuntimeException exception) {
+                Log.w(Constants.TAG, "External GNSS close failed", exception);
+            }
+        }
+    }
+
+    private void publishFix(GnssFix fix) {
+        handler.removeCallbacks(expireFix);
+        lastFix = fix;
+        if (fix.hasFix()) {
+            handler.postDelayed(expireFix, LocationFixPolicy.FRESHNESS_MS + 1L);
+        }
+        Callback local = callback;
+        if (local != null) {
+            local.onExternalFix(fix.copy());
         }
     }
 

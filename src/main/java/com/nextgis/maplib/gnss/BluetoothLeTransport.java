@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothStatusCodes;
 import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
@@ -18,11 +19,13 @@ import com.nextgis.maplib.util.Constants;
 import com.nextgis.maplib.util.DiagnosticLog;
 
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * NMEA over common UART GATT profiles (Nordic UART and HM-10 FFE0).
- * Commands are written to Nordic RX or the same notify characteristic if writable.
+ * GNSS over Nordic UART, HM-10 FFE0 or the ComNav/PiGO 3A20 UART service.
+ * A write channel must belong to the selected UART profile; unrelated GATT
+ * characteristics are never used for receiver commands.
  */
 public final class BluetoothLeTransport implements GnssTransport {
     static final UUID NORDIC_UART_SERVICE =
@@ -35,6 +38,12 @@ public final class BluetoothLeTransport implements GnssTransport {
             UUID.fromString("0000FFE0-0000-1000-8000-00805F9B34FB");
     static final UUID HM10_CHAR =
             UUID.fromString("0000FFE1-0000-1000-8000-00805F9B34FB");
+    static final UUID COMNAV_SERVICE =
+            UUID.fromString("00003A20-0000-1000-8000-00805F9B34FB");
+    static final UUID COMNAV_RX =
+            UUID.fromString("00003A21-0000-1000-8000-00805F9B34FB");
+    static final UUID COMNAV_TX =
+            UUID.fromString("00003A22-0000-1000-8000-00805F9B34FB");
     static final UUID CCCD =
             UUID.fromString("00002902-0000-1000-8000-00805F9B34FB");
     static final int ATT_PAYLOAD = 20;
@@ -48,11 +57,14 @@ public final class BluetoothLeTransport implements GnssTransport {
     private final Object writeLock = new Object();
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic writeChar;
+    private BluetoothGattCharacteristic notifyChar;
     private Listener listener;
     private boolean writing;
     private boolean discovering;
+    private boolean opened;
     private int attPayload = ATT_PAYLOAD;
     private final Runnable discoverFallback = this::discoverIfNeeded;
+    private final Runnable writeTimeout = () -> notifyClosed("write timeout");
 
     public BluetoothLeTransport(Context context, BluetoothAdapter adapter, String address) {
         this.context = context.getApplicationContext();
@@ -79,15 +91,24 @@ public final class BluetoothLeTransport implements GnssTransport {
     private final BluetoothGattCallback callback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            if (gatt != BluetoothLeTransport.this.gatt) return;
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                notifyClosed("connection failed status=" + status);
+                return;
+            }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 discovering = false;
                 handler.removeCallbacks(discoverFallback);
                 handler.postDelayed(discoverFallback, 1500);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
-                        && gatt.requestMtu(REQUEST_MTU)) {
-                    return;
+                try {
+                    if (gatt.requestMtu(REQUEST_MTU)) {
+                        return;
+                    }
+                    startDiscovery(gatt);
+                } catch (RuntimeException exception) {
+                    Log.w(Constants.TAG, "BLE GNSS negotiation failed", exception);
+                    notifyClosed("negotiation failed");
                 }
-                startDiscovery(gatt);
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 notifyClosed("disconnected");
             }
@@ -95,44 +116,73 @@ public final class BluetoothLeTransport implements GnssTransport {
 
         @Override
         public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
-            attPayload = Math.max(ATT_PAYLOAD, mtu - 3);
+            if (gatt != BluetoothLeTransport.this.gatt) return;
+            attPayload = status == BluetoothGatt.GATT_SUCCESS
+                    ? Math.max(ATT_PAYLOAD, mtu - 3) : ATT_PAYLOAD;
             DiagnosticLog.v("BLE GNSS MTU=" + mtu + " status=" + status);
             startDiscovery(gatt);
         }
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-            BluetoothGattCharacteristic notify = findNotifyCharacteristic(gatt);
-            if (notify == null) {
-                notifyClosed("no uart characteristic");
+            if (gatt != BluetoothLeTransport.this.gatt || opened) return;
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                notifyClosed("service discovery failed status=" + status);
                 return;
             }
-            writeChar = findWriteCharacteristic(gatt, notify);
-            DiagnosticLog.v("BLE GNSS rx="
-                    + (writeChar == null ? "none" : writeChar.getUuid())
-                    + " tx=" + notify.getUuid());
-            if (!gatt.setCharacteristicNotification(notify, true)) {
-                notifyClosed("notify failed");
-                return;
-            }
-            BluetoothGattDescriptor cccd = notify.getDescriptor(CCCD);
-            if (cccd != null) {
-                cccd.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                if (gatt.writeDescriptor(cccd)) {
+            try {
+                BluetoothGattCharacteristic notify = findNotifyCharacteristic(gatt);
+                if (notify == null) {
+                    notifyClosed("no uart characteristic");
                     return;
                 }
+                writeChar = findWriteCharacteristic(gatt, notify);
+                notifyChar = notify;
+                DiagnosticLog.v("BLE GNSS rx="
+                        + (writeChar == null ? "none" : writeChar.getUuid())
+                        + " tx=" + notify.getUuid());
+                if (!gatt.setCharacteristicNotification(notify, true)) {
+                    notifyClosed("notify failed");
+                    return;
+                }
+                BluetoothGattDescriptor cccd = notify.getDescriptor(CCCD);
+                if (cccd != null) {
+                    cccd.setValue(notificationValue(notify.getProperties()));
+                    if (gatt.writeDescriptor(cccd)) {
+                        return;
+                    }
+                }
+                notifyClosed("notification subscription failed");
+            } catch (RuntimeException exception) {
+                Log.w(Constants.TAG, "BLE GNSS subscription failed", exception);
+                notifyClosed("notification subscription failed");
             }
-            notifyOpened();
         }
 
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            if (gatt != BluetoothLeTransport.this.gatt || notifyChar == null
+                    || descriptor.getCharacteristic() != notifyChar || !CCCD.equals(descriptor.getUuid())) return;
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                notifyClosed("notification subscription failed status=" + status);
+                return;
+            }
             notifyOpened();
         }
 
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-            byte[] value = characteristic.getValue();
+            receive(gatt, characteristic, characteristic.getValue());
+        }
+
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
+                byte[] value) {
+            receive(gatt, characteristic, value);
+        }
+
+        private void receive(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
+            if (gatt != BluetoothLeTransport.this.gatt || characteristic != notifyChar) return;
             if (value != null && value.length > 0 && listener != null) {
                 listener.onBytes(value, value.length);
             }
@@ -141,11 +191,17 @@ public final class BluetoothLeTransport implements GnssTransport {
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
                 int status) {
+            if (gatt != BluetoothLeTransport.this.gatt || characteristic != writeChar) return;
             DiagnosticLog.v("BLE GNSS write status=" + status);
+            handler.removeCallbacks(writeTimeout);
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                notifyClosed("write failed status=" + status);
+                return;
+            }
             synchronized (writeLock) {
                 writing = false;
             }
-            pumpWrite();
+            handler.post(BluetoothLeTransport.this::pumpWrite);
         }
     };
 
@@ -162,22 +218,36 @@ public final class BluetoothLeTransport implements GnssTransport {
         }
         discovering = true;
         handler.removeCallbacks(discoverFallback);
-        gatt.discoverServices();
+        try {
+            if (!gatt.discoverServices()) {
+                notifyClosed("service discovery rejected");
+            }
+        } catch (RuntimeException exception) {
+            Log.w(Constants.TAG, "BLE GNSS discovery failed", exception);
+            notifyClosed("service discovery failed");
+        }
     }
 
     static BluetoothGattCharacteristic findNotifyCharacteristic(BluetoothGatt gatt) {
-        BluetoothGattCharacteristic nordic = characteristic(gatt, NORDIC_UART_SERVICE, NORDIC_UART_TX);
-        if (nordic != null) {
+        return findNotifyCharacteristic(gatt.getServices());
+    }
+
+    static BluetoothGattCharacteristic findNotifyCharacteristic(List<BluetoothGattService> services) {
+        BluetoothGattCharacteristic nordic = characteristic(services, NORDIC_UART_SERVICE, NORDIC_UART_TX);
+        if (notifiable(nordic)) {
             return nordic;
         }
-        BluetoothGattCharacteristic hm10 = characteristic(gatt, HM10_SERVICE, HM10_CHAR);
-        if (hm10 != null) {
+        BluetoothGattCharacteristic comnav = characteristic(services, COMNAV_SERVICE, COMNAV_TX);
+        if (notifiable(comnav)) {
+            return comnav;
+        }
+        BluetoothGattCharacteristic hm10 = characteristic(services, HM10_SERVICE, HM10_CHAR);
+        if (notifiable(hm10)) {
             return hm10;
         }
-        for (BluetoothGattService service : gatt.getServices()) {
+        for (BluetoothGattService service : services) {
             for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-                int props = characteristic.getProperties();
-                if ((props & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0) {
+                if (notifiable(characteristic)) {
                     return characteristic;
                 }
             }
@@ -187,9 +257,17 @@ public final class BluetoothLeTransport implements GnssTransport {
 
     static BluetoothGattCharacteristic findWriteCharacteristic(
             BluetoothGatt gatt, BluetoothGattCharacteristic notify) {
-        BluetoothGattCharacteristic nordicRx = characteristic(gatt, NORDIC_UART_SERVICE, NORDIC_UART_RX);
-        if (writable(nordicRx)) {
-            return nordicRx;
+        return findWriteCharacteristic(gatt.getServices(), notify);
+    }
+
+    static BluetoothGattCharacteristic findWriteCharacteristic(
+            List<BluetoothGattService> services, BluetoothGattCharacteristic notify) {
+        if (belongsTo(notify, NORDIC_UART_SERVICE, NORDIC_UART_TX)) {
+            BluetoothGattCharacteristic rx = characteristic(services, NORDIC_UART_SERVICE, NORDIC_UART_RX);
+            if (writable(rx)) return rx;
+        } else if (belongsTo(notify, COMNAV_SERVICE, COMNAV_TX)) {
+            BluetoothGattCharacteristic rx = characteristic(services, COMNAV_SERVICE, COMNAV_RX);
+            if (writable(rx)) return rx;
         }
         if (writable(notify)) {
             return notify;
@@ -206,13 +284,38 @@ public final class BluetoothLeTransport implements GnssTransport {
                 || (props & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0;
     }
 
+    static boolean notifiable(BluetoothGattCharacteristic characteristic) {
+        return characteristic != null && (characteristic.getProperties()
+                & (BluetoothGattCharacteristic.PROPERTY_NOTIFY | BluetoothGattCharacteristic.PROPERTY_INDICATE)) != 0;
+    }
+
+    static byte[] notificationValue(int properties) {
+        return (properties & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0
+                ? BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                : BluetoothGattDescriptor.ENABLE_INDICATION_VALUE;
+    }
+
+    private static boolean belongsTo(BluetoothGattCharacteristic characteristic, UUID service, UUID id) {
+        return characteristic != null && id.equals(characteristic.getUuid())
+                && characteristic.getService() != null && service.equals(characteristic.getService().getUuid());
+    }
+
+    @Override
+    public boolean usesComNavBinary() {
+        return belongsTo(notifyChar, COMNAV_SERVICE, COMNAV_TX);
+    }
+
     private static BluetoothGattCharacteristic characteristic(
-            BluetoothGatt gatt, UUID serviceUuid, UUID charUuid) {
-        BluetoothGattService service = gatt.getService(serviceUuid);
-        return service == null ? null : service.getCharacteristic(charUuid);
+            List<BluetoothGattService> services, UUID serviceUuid, UUID charUuid) {
+        for (BluetoothGattService service : services) {
+            if (serviceUuid.equals(service.getUuid())) return service.getCharacteristic(charUuid);
+        }
+        return null;
     }
 
     private void notifyOpened() {
+        if (opened) return;
+        opened = true;
         Listener local = listener;
         if (local != null) {
             local.onOpened();
@@ -225,7 +328,7 @@ public final class BluetoothLeTransport implements GnssTransport {
             return false;
         }
         synchronized (writeLock) {
-            if (gatt == null || writeChar == null) {
+            if (gatt == null || writeChar == null || !opened) {
                 return false;
             }
             int payload = Math.max(ATT_PAYLOAD, attPayload);
@@ -257,24 +360,28 @@ public final class BluetoothLeTransport implements GnssTransport {
             writing = true;
             int props = localChar.getProperties();
             withResponse = (props & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0;
-            localChar.setWriteType(withResponse
-                    ? BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    : BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-            localChar.setValue(chunk);
         }
-        boolean accepted = localGatt.writeCharacteristic(localChar);
-        if (!accepted) {
-            DiagnosticLog.v("BLE GNSS writeCharacteristic=false");
-            synchronized (writeLock) {
-                writing = false;
+        int writeType = withResponse ? BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                : BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
+        handler.removeCallbacks(writeTimeout);
+        handler.postDelayed(writeTimeout, 5_000L);
+        boolean accepted;
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                accepted = localGatt.writeCharacteristic(localChar, chunk, writeType) == BluetoothStatusCodes.SUCCESS;
+            } else {
+                localChar.setWriteType(writeType);
+                localChar.setValue(chunk);
+                accepted = localGatt.writeCharacteristic(localChar);
             }
+        } catch (RuntimeException exception) {
+            Log.w(Constants.TAG, "BLE GNSS write failed", exception);
+            notifyClosed("write failed");
             return;
         }
-        if (!withResponse) {
-            synchronized (writeLock) {
-                writing = false;
-            }
-            pumpWrite();
+        if (!accepted) {
+            DiagnosticLog.v("BLE GNSS writeCharacteristic=false");
+            notifyClosed("write rejected");
         }
     }
 
@@ -295,10 +402,13 @@ public final class BluetoothLeTransport implements GnssTransport {
 
     private void closeGatt() {
         handler.removeCallbacks(discoverFallback);
+        handler.removeCallbacks(writeTimeout);
         synchronized (writeLock) {
             writeQueue.clear();
             writing = false;
             writeChar = null;
+            notifyChar = null;
+            opened = false;
             attPayload = ATT_PAYLOAD;
             discovering = false;
         }
@@ -309,9 +419,14 @@ public final class BluetoothLeTransport implements GnssTransport {
         }
         try {
             local.disconnect();
-            local.close();
         } catch (RuntimeException exception) {
             Log.w(Constants.TAG, "BLE GNSS close failed", exception);
+        } finally {
+            try {
+                local.close();
+            } catch (RuntimeException exception) {
+                Log.w(Constants.TAG, "BLE GNSS release failed", exception);
+            }
         }
     }
 }
