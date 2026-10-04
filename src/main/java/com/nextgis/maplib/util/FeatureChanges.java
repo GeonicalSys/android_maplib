@@ -42,8 +42,7 @@ public class FeatureChanges
 {
     public static void initialize(String tableName)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        initialize(map.getDatabase(false), tableName);
+        initialize(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
     }
 
     public static void initialize(SQLiteDatabase db, String tableName)
@@ -75,16 +74,18 @@ public class FeatureChanges
             String limit)
 
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(true);
+        return query(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, projection, selection, selectionArgs, sortOrder, limit);
+    }
 
-        try {
-            return db.query(
-                    tableName, projection, selection, selectionArgs, null, null, sortOrder, limit);
-        } catch (SQLiteException e) {
-            Log.d(TAG, e.getLocalizedMessage());
-            return null;
-        }
+    public static Cursor query(SQLiteDatabase db, String tableName,
+            String[] projection,
+            String selection,
+            String[] selectionArgs,
+            String sortOrder,
+            String limit)
+    {
+
+        return db.query(tableName, projection, selection, selectionArgs, null, null, sortOrder, limit);
     }
 
 
@@ -94,7 +95,15 @@ public class FeatureChanges
             String sortOrder,
             String limit)
     {
-        return query(tableName, null, selection, null, sortOrder, limit);
+        return query(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, selection, sortOrder, limit);
+    }
+
+    public static Cursor query(SQLiteDatabase db, String tableName,
+            String selection,
+            String sortOrder,
+            String limit)
+    {
+        return query(db, tableName, null, selection, null, sortOrder, limit);
     }
 
 
@@ -102,14 +111,24 @@ public class FeatureChanges
             String tableName,
             ContentValues values)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(false);
-        return db.insert(tableName, null, values);
+        return insert(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, values);
+    }
+
+    public static long insert(SQLiteDatabase db, String tableName,
+            ContentValues values)
+    {
+        return db.insertOrThrow(tableName, null, values);
     }
 
 
     public static long replace(
             String tableName,
+            ContentValues values)
+    {
+        return replace(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, values);
+    }
+
+    public static long replace(SQLiteDatabase db, String tableName,
             ContentValues values)
     {
         long featureId = values.getAsLong(FIELD_FEATURE_ID);
@@ -122,7 +141,7 @@ public class FeatureChanges
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 FIELD_ATTACH_OPERATION + " = " + attachOperation;
 
-        Cursor cursor = query(tableName, selection, null, "1");
+        Cursor cursor = query(db, tableName, selection, null, "1");
         long res = 0;
 
         if (null != cursor) {
@@ -134,7 +153,7 @@ public class FeatureChanges
             return res;
         }
 
-        return insert(tableName, values);
+        return insert(db, tableName, values);
     }
 
 
@@ -144,8 +163,14 @@ public class FeatureChanges
             String selection,
             String[] selectionArgs)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(true);
+        return update(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, values, selection, selectionArgs);
+    }
+
+    public static int update(SQLiteDatabase db, String tableName,
+            ContentValues values,
+            String selection,
+            String[] selectionArgs)
+    {
         return db.update(tableName, values, selection, selectionArgs);
     }
 
@@ -155,16 +180,14 @@ public class FeatureChanges
             String selection,
             String[] selectionArgs)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(true);
-        int retResult = 0;
-        try {
-            retResult = db.delete(tableName, selection, selectionArgs);
-        } catch (SQLiteException e) {
-            e.printStackTrace();
-            Log.d(TAG, e.getLocalizedMessage());
-        }
-        return retResult;
+        return delete(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, selection, selectionArgs);
+    }
+
+    public static int delete(SQLiteDatabase db, String tableName,
+            String selection,
+            String[] selectionArgs)
+    {
+        return db.delete(tableName, selection, selectionArgs);
     }
 
 
@@ -172,24 +195,24 @@ public class FeatureChanges
             String tableName,
             String selection)
     {
-        return delete(tableName, selection, null);
+        return delete(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, selection);
+    }
+
+    public static int delete(SQLiteDatabase db, String tableName,
+            String selection)
+    {
+        return delete(db, tableName, selection, null);
     }
 
 
     public static void delete(String tableName)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        delete(map.getDatabase(false), tableName);
+        delete(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
     }
 
     public static void delete(SQLiteDatabase db, String tableName)
     {
-        try {
-            String tableDrop = "DROP TABLE IF EXISTS " + tableName;
-            db.execSQL(tableDrop);
-        } catch (SQLiteFullException | SQLiteReadOnlyDatabaseException e) {
-            e.printStackTrace();
-        }
+        db.execSQL("DROP TABLE IF EXISTS " + tableName);
     }
 
 
@@ -197,7 +220,15 @@ public class FeatureChanges
             String tableName,
             String selection)
     {
-        Cursor cursor = query(tableName, selection, null, "1");
+        return isRecords(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, selection);
+    }
+
+    public static boolean isRecords(SQLiteDatabase db, String tableName,
+            String selection)
+    {
+        if (db == null) throw new SQLiteException("Missing layer database");
+        Cursor cursor = query(db, tableName, selection, null, "1");
+        if (cursor == null) throw new SQLiteException("Cannot read layer changes");
         boolean ret = false;
 
         if (null != cursor) {
@@ -213,16 +244,12 @@ public class FeatureChanges
 
     public static long getEntriesCount(String tableName)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(true);
+        return getEntriesCount(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
+    }
 
-        try {
-            return DatabaseUtils.queryNumEntries(db, tableName);
-        } catch (SQLiteException e) {
-            e.printStackTrace();
-            Log.d(TAG, e.getLocalizedMessage());
-            return 0;
-        }
+    public static long getEntriesCount(SQLiteDatabase db, String tableName)
+    {
+        return DatabaseUtils.queryNumEntries(db, tableName);
     }
 
 
@@ -250,19 +277,15 @@ public class FeatureChanges
 
     public static long getChangeCount(String tableName)
     {
-        String selection = getSelectionForSync();
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
-        SQLiteDatabase db = map.getDatabase(true);
+        return getChangeCount(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
+    }
 
-        try {
-            // From sources of DatabaseUtils.queryNumEntries()
-            String s = (!TextUtils.isEmpty(selection)) ? " where " + selection : "";
-            return DatabaseUtils.longForQuery(db, "select count(*) from " + tableName + s, null);
-        } catch (SQLiteException e) {
-            e.printStackTrace();
-            Log.d(TAG, e.getLocalizedMessage());
-            return 0;
-        }
+    public static long getChangeCount(SQLiteDatabase db, String tableName)
+    {
+        String selection = getSelectionForSync();
+
+        String s = (!TextUtils.isEmpty(selection)) ? " where " + selection : "";
+        return DatabaseUtils.longForQuery(db, "select count(*) from " + tableName + s, null);
     }
 
 
@@ -270,17 +293,28 @@ public class FeatureChanges
             String tableName,
             long recordId)
     {
+        return getFirstChangeFromRecordId(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, recordId);
+    }
+
+    public static Cursor getFirstChangeFromRecordId(SQLiteDatabase db, String tableName,
+            long recordId)
+    {
         String sortOrder = FIELD_ID + " ASC";
         String selection = FIELD_ID + " >= " + recordId + " AND " + getSelectionForSync();
-        return query(tableName, selection, sortOrder, "1");
+        return query(db, tableName, selection, sortOrder, "1");
     }
 
 
     public static long getLastChangeRecordId(String tableName)
     {
+        return getLastChangeRecordId(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
+    }
+
+    public static long getLastChangeRecordId(SQLiteDatabase db, String tableName)
+    {
         String sortOrder = FIELD_ID + " DESC";
         String selection = getSelectionForSync();
-        Cursor cursor = query(tableName, selection, sortOrder, "1");
+        Cursor cursor = query(db, tableName, selection, sortOrder, "1");
         long ret = NOT_FOUND;
 
         if (null == cursor) {
@@ -303,16 +337,30 @@ public class FeatureChanges
 
     public static Cursor getChanges(String tableName)
     {
+        return getChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
+    }
+
+    public static Cursor getChanges(SQLiteDatabase db, String tableName)
+    {
         String sortOrder = FIELD_ID + " ASC";
         String selection = getSelectionForSync();
-        return query(tableName, selection, sortOrder, null);
+        return query(db, tableName, selection, sortOrder, null);
     }
 
 
     public static boolean isChanges(String tableName)
     {
+        try { return isChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName); }
+        catch (RuntimeException error) {
+            Log.w(TAG, "Cannot read pending changes; preserving the layer", error);
+            return true;
+        }
+    }
+
+    public static boolean isChanges(SQLiteDatabase db, String tableName)
+    {
         String selection = getSelectionForSync();
-        return isRecords(tableName, selection);
+        return isRecords(db, tableName, selection);
     }
 
 
@@ -320,9 +368,15 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return getChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static Cursor getChanges(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String sortOrder = FIELD_ID + " ASC";
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " + getSelectionForSync();
-        return query(tableName, selection, sortOrder, null);
+        return query(db, tableName, selection, sortOrder, null);
     }
 
 
@@ -330,8 +384,18 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        try { return isChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId); }
+        catch (RuntimeException error) {
+            Log.w(TAG, "Cannot read pending changes; preserving the layer", error);
+            return true;
+        }
+    }
+
+    public static boolean isChanges(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " + getSelectionForSync();
-        return isRecords(tableName, selection);
+        return isRecords(db, tableName, selection);
     }
 
 
@@ -340,12 +404,19 @@ public class FeatureChanges
             long featureId,
             int operation)
     {
+        return getChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, operation);
+    }
+
+    public static Cursor getChanges(SQLiteDatabase db, String tableName,
+            long featureId,
+            int operation)
+    {
         String sortOrder = FIELD_ID + " ASC";
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + operation + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return query(tableName, selection, sortOrder, null);
+        return query(db, tableName, selection, sortOrder, null);
     }
 
 
@@ -354,11 +425,22 @@ public class FeatureChanges
             long featureId,
             int operation)
     {
+        try { return isChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, operation); }
+        catch (RuntimeException error) {
+            Log.w(TAG, "Cannot read pending changes; preserving the layer", error);
+            return true;
+        }
+    }
+
+    public static boolean isChanges(SQLiteDatabase db, String tableName,
+            long featureId,
+            int operation)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + operation + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return isRecords(tableName, selection);
+        return isRecords(db, tableName, selection);
     }
 
 
@@ -366,12 +448,18 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return getAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static Cursor getAttachChanges(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String sortOrder = FIELD_ID + " ASC";
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return query(tableName, selection, sortOrder, null);
+        return query(db, tableName, selection, sortOrder, null);
     }
 
 
@@ -379,16 +467,29 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return isAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static boolean isAttachChanges(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return isRecords(tableName, selection);
+        return isRecords(db, tableName, selection);
     }
 
 
     public static Cursor getAttachChanges(
             String tableName,
+            long featureId,
+            long attachId)
+    {
+        return getAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static Cursor getAttachChanges(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId)
     {
@@ -399,12 +500,19 @@ public class FeatureChanges
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 getSelectionForSync();
 
-        return query(tableName, selection, sortOrder, null);
+        return query(db, tableName, selection, sortOrder, null);
     }
 
 
     public static boolean isAttachChanges(
             String tableName,
+            long featureId,
+            long attachId)
+    {
+        return isAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static boolean isAttachChanges(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId)
     {
@@ -414,12 +522,20 @@ public class FeatureChanges
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 getSelectionForSync();
 
-        return isRecords(tableName, selection);
+        return isRecords(db, tableName, selection);
     }
 
 
     public static Cursor getAttachChanges(
             String tableName,
+            long featureId,
+            long attachId,
+            int attachOperation)
+    {
+        return getAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId, attachOperation);
+    }
+
+    public static Cursor getAttachChanges(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId,
             int attachOperation)
@@ -432,12 +548,20 @@ public class FeatureChanges
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + attachOperation + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return query(tableName, selection, sortOrder, null);
+        return query(db, tableName, selection, sortOrder, null);
     }
 
 
     public static boolean isAttachChanges(
             String tableName,
+            long featureId,
+            long attachId,
+            int attachOperation)
+    {
+        return isAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId, attachOperation);
+    }
+
+    public static boolean isAttachChanges(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId,
             int attachOperation)
@@ -449,12 +573,18 @@ public class FeatureChanges
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + attachOperation + " ) )" + " AND " +
                 getSelectionForSync();
 
-        return isRecords(tableName, selection);
+        return isRecords(db, tableName, selection);
     }
 
 
     public static boolean isAttachesForDelete(
             String tableName,
+            long featureId)
+    {
+        return isAttachesForDelete(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static boolean isAttachesForDelete(SQLiteDatabase db, String tableName,
             long featureId)
     {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
@@ -464,12 +594,19 @@ public class FeatureChanges
                 " ) )" + " AND " +
                 getSelectionForSync();
 
-        return isRecords(tableName, selection);
+        return isRecords(db, tableName, selection);
     }
 
 
     public static long add(
             String tableName,
+            long featureId,
+            int operation)
+    {
+        return add(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, operation);
+    }
+
+    public static long add(SQLiteDatabase db, String tableName,
             long featureId,
             int operation)
     {
@@ -479,12 +616,20 @@ public class FeatureChanges
         values.put(FIELD_ATTACH_ID, NOT_FOUND);
         values.put(FIELD_ATTACH_OPERATION, 0);
 
-        return insert(tableName, values);
+        return insert(db, tableName, values);
     }
 
 
     public static long add(
             String tableName,
+            long featureId,
+            long attachId,
+            int attachOperation)
+    {
+        return add(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId, attachOperation);
+    }
+
+    public static long add(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId,
             int attachOperation)
@@ -495,7 +640,7 @@ public class FeatureChanges
         values.put(FIELD_ATTACH_ID, attachId);
         values.put(FIELD_ATTACH_OPERATION, attachOperation);
 
-        return insert(tableName, values);
+        return insert(db, tableName, values);
     }
 
 
@@ -504,17 +649,33 @@ public class FeatureChanges
             long recordId,
             int operation)
     {
+        return setOperation(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, recordId, operation);
+    }
+
+    public static int setOperation(SQLiteDatabase db, String tableName,
+            long recordId,
+            int operation)
+    {
         String selection = FIELD_ID + " = " + recordId;
 
         ContentValues values = new ContentValues();
         values.put(FIELD_OPERATION, operation);
 
-        return update(tableName, values, selection, null);
+        return update(db, tableName, values, selection, null);
     }
 
 
     public static int setOperation(
             String tableName,
+            long recordId,
+            long featureId,
+            long attachId,
+            int attachOperation)
+    {
+        return setOperation(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, recordId, featureId, attachId, attachOperation);
+    }
+
+    public static int setOperation(SQLiteDatabase db, String tableName,
             long recordId,
             long featureId,
             long attachId,
@@ -527,7 +688,7 @@ public class FeatureChanges
         ContentValues values = new ContentValues();
         values.put(FIELD_ATTACH_OPERATION, attachOperation);
 
-        return update(tableName, values, selection, null);
+        return update(db, tableName, values, selection, null);
     }
 
 
@@ -536,17 +697,31 @@ public class FeatureChanges
             long oldFeatureId,
             long newFeatureId)
     {
+        return changeFeatureId(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, oldFeatureId, newFeatureId);
+    }
+
+    public static int changeFeatureId(SQLiteDatabase db, String tableName,
+            long oldFeatureId,
+            long newFeatureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + oldFeatureId;
 
         ContentValues values = new ContentValues();
         values.put(FIELD_FEATURE_ID, newFeatureId);
 
-        return update(tableName, values, selection, null);
+        return update(db, tableName, values, selection, null);
     }
 
 
     public static int changeFeatureIdForAttaches(
             String tableName,
+            long oldFeatureId,
+            long newFeatureId)
+    {
+        return changeFeatureIdForAttaches(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, oldFeatureId, newFeatureId);
+    }
+
+    public static int changeFeatureIdForAttaches(SQLiteDatabase db, String tableName,
             long oldFeatureId,
             long newFeatureId)
     {
@@ -557,14 +732,19 @@ public class FeatureChanges
         ContentValues values = new ContentValues();
         values.put(FIELD_FEATURE_ID, newFeatureId);
 
-        return update(tableName, values, selection, null);
+        return update(db, tableName, values, selection, null);
     }
 
 
     public static int removeAllChanges(String tableName)
     {
+        return removeAllChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
+    }
+
+    public static int removeAllChanges(SQLiteDatabase db, String tableName)
+    {
         String selection = getSelectionForSync();
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -572,8 +752,14 @@ public class FeatureChanges
             String tableName,
             long lastRecordId)
     {
+        return removeAllChangesToLast(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, lastRecordId);
+    }
+
+    public static int removeAllChangesToLast(SQLiteDatabase db, String tableName,
+            long lastRecordId)
+    {
         String selection = FIELD_ID + " <= " + lastRecordId + " AND " + getSelectionForSync();
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -581,8 +767,14 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return removeChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static int removeChanges(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " + getSelectionForSync();
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -591,11 +783,18 @@ public class FeatureChanges
             long featureId,
             long lastRecordId)
     {
+        return removeChangesToLast(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, lastRecordId);
+    }
+
+    public static int removeChangesToLast(SQLiteDatabase db, String tableName,
+            long featureId,
+            long lastRecordId)
+    {
         String selection = FIELD_ID + " <= " + lastRecordId + " AND " +
                 FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -604,11 +803,18 @@ public class FeatureChanges
             long featureId,
             int operation)
     {
+        return removeChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, operation);
+    }
+
+    public static int removeChanges(SQLiteDatabase db, String tableName,
+            long featureId,
+            int operation)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + operation + " ) )" + " AND " +
                 getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -618,12 +824,20 @@ public class FeatureChanges
             int operation,
             long lastRecordId)
     {
+        return removeChangesToLast(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, operation, lastRecordId);
+    }
+
+    public static int removeChangesToLast(SQLiteDatabase db, String tableName,
+            long featureId,
+            int operation,
+            long lastRecordId)
+    {
         String selection = FIELD_ID + " <= " + lastRecordId + " AND " +
                 FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + operation + " ) )" + " AND " +
                 getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -631,11 +845,17 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return removeAllAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static int removeAllAttachChanges(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -644,17 +864,31 @@ public class FeatureChanges
             long featureId,
             long lastRecordId)
     {
+        return removeAllAttachChangesToLast(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, lastRecordId);
+    }
+
+    public static int removeAllAttachChangesToLast(SQLiteDatabase db, String tableName,
+            long featureId,
+            long lastRecordId)
+    {
         String selection = FIELD_ID + " <= " + lastRecordId + " AND " +
                 FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
     public static int removeAttachChanges(
             String tableName,
+            long featureId,
+            long attachId)
+    {
+        return removeAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static int removeAttachChanges(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId)
     {
@@ -664,12 +898,20 @@ public class FeatureChanges
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
     public static int removeAttachChangesToLast(
             String tableName,
+            long featureId,
+            long attachId,
+            long lastRecordId)
+    {
+        return removeAttachChangesToLast(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId, lastRecordId);
+    }
+
+    public static int removeAttachChangesToLast(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId,
             long lastRecordId)
@@ -681,12 +923,20 @@ public class FeatureChanges
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
     public static int removeAttachChanges(
             String tableName,
+            long featureId,
+            long attachId,
+            int attachOperation)
+    {
+        return removeAttachChanges(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId, attachOperation);
+    }
+
+    public static int removeAttachChanges(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId,
             int attachOperation)
@@ -698,12 +948,21 @@ public class FeatureChanges
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + attachOperation + " ) )" + " AND "
                 + getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
     public static int removeAttachChangesToLast(
             String tableName,
+            long featureId,
+            long attachId,
+            int attachOperation,
+            long lastRecordId)
+    {
+        return removeAttachChangesToLast(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId, attachOperation, lastRecordId);
+    }
+
+    public static int removeAttachChangesToLast(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId,
             int attachOperation,
@@ -717,7 +976,7 @@ public class FeatureChanges
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + attachOperation + " ) )" + " AND " +
                 getSelectionForSync();
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -725,8 +984,14 @@ public class FeatureChanges
             String tableName,
             long recordId)
     {
+        return removeChangeRecord(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, recordId);
+    }
+
+    public static int removeChangeRecord(SQLiteDatabase db, String tableName,
+            long recordId)
+    {
         String selection = FIELD_ID + " = " + recordId + " AND " + getSelectionForSync();
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -734,8 +999,14 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
-        return hasFeatureTempFlag(tableName, featureId)
-                || hasFeatureNotSyncFlag(tableName, featureId);
+        return hasFeatureFlags(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static boolean hasFeatureFlags(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
+        return hasFeatureTempFlag(db, tableName, featureId)
+                || hasFeatureNotSyncFlag(db, tableName, featureId);
     }
 
 
@@ -744,8 +1015,15 @@ public class FeatureChanges
             long featureId,
             long attachId)
     {
-        return hasAttachTempFlag(tableName, featureId, attachId)
-                || hasAttachNotSyncFlag(tableName, featureId, attachId);
+        return hasAttachFlags(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static boolean hasAttachFlags(SQLiteDatabase db, String tableName,
+            long featureId,
+            long attachId)
+    {
+        return hasAttachTempFlag(db, tableName, featureId, attachId)
+                || hasAttachNotSyncFlag(db, tableName, featureId, attachId);
     }
 
 
@@ -753,10 +1031,16 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return hasFeatureTempFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static boolean hasFeatureTempFlag(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
-        Cursor changesCursor = query(tableName, selection, null, "1");
+        Cursor changesCursor = query(db, tableName, selection, null, "1");
 
         boolean res = false;
         if (null != changesCursor) {
@@ -770,10 +1054,15 @@ public class FeatureChanges
 
     public static boolean haveFeaturesNotSyncFlag(String tableName)
     {
+        return haveFeaturesNotSyncFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
+    }
+
+    public static boolean haveFeaturesNotSyncFlag(SQLiteDatabase db, String tableName)
+    {
         String selection =
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_NOT_SYNC + " ) )";
 
-        Cursor changesCursor = query(tableName, selection, null, "1");
+        Cursor changesCursor = query(db, tableName, selection, null, "1");
 
         boolean res = false;
         if (null != changesCursor) {
@@ -789,10 +1078,16 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return hasFeatureNotSyncFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static boolean hasFeatureNotSyncFlag(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_NOT_SYNC + " ) )";
 
-        Cursor changesCursor = query(tableName, selection, null, "1");
+        Cursor changesCursor = query(db, tableName, selection, null, "1");
 
         boolean res = false;
         if (null != changesCursor) {
@@ -809,13 +1104,20 @@ public class FeatureChanges
             long featureId,
             long attachId)
     {
+        return hasAttachTempFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static boolean hasAttachTempFlag(SQLiteDatabase db, String tableName,
+            long featureId,
+            long attachId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH +
                 " ) ) AND " +
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
-        Cursor changesCursor = query(tableName, selection, null, "1");
+        Cursor changesCursor = query(db, tableName, selection, null, "1");
 
         boolean res = false;
         if (null != changesCursor) {
@@ -832,13 +1134,20 @@ public class FeatureChanges
             long featureId,
             long attachId)
     {
+        return hasAttachNotSyncFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static boolean hasAttachNotSyncFlag(SQLiteDatabase db, String tableName,
+            long featureId,
+            long attachId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH +
                 " ) ) AND " +
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + CHANGE_OPERATION_NOT_SYNC + " ) )";
 
-        Cursor changesCursor = query(tableName, selection, null, "1");
+        Cursor changesCursor = query(db, tableName, selection, null, "1");
 
         boolean res = false;
         if (null != changesCursor) {
@@ -854,18 +1163,30 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return setFeatureTempFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static long setFeatureTempFlag(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         ContentValues values = new ContentValues();
         values.put(FIELD_FEATURE_ID, featureId);
         values.put(FIELD_OPERATION, CHANGE_OPERATION_TEMP);
         values.put(FIELD_ATTACH_ID, NOT_FOUND);
         values.put(FIELD_ATTACH_OPERATION, 0);
 
-        return replace(tableName, values);
+        return replace(db, tableName, values);
     }
 
 
     public static long setFeatureNotSyncFlag(
             String tableName,
+            long featureId)
+    {
+        return setFeatureNotSyncFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static long setFeatureNotSyncFlag(SQLiteDatabase db, String tableName,
             long featureId)
     {
         ContentValues values = new ContentValues();
@@ -874,12 +1195,19 @@ public class FeatureChanges
         values.put(FIELD_ATTACH_ID, NOT_FOUND);
         values.put(FIELD_ATTACH_OPERATION, 0);
 
-        return replace(tableName, values);
+        return replace(db, tableName, values);
     }
 
 
     public static long setAttachTempFlag(
             String tableName,
+            long featureId,
+            long attachId)
+    {
+        return setAttachTempFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static long setAttachTempFlag(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId)
     {
@@ -889,12 +1217,19 @@ public class FeatureChanges
         values.put(FIELD_ATTACH_ID, attachId);
         values.put(FIELD_ATTACH_OPERATION, CHANGE_OPERATION_TEMP);
 
-        return replace(tableName, values);
+        return replace(db, tableName, values);
     }
 
 
     public static long setAttachNotSyncFlag(
             String tableName,
+            long featureId,
+            long attachId)
+    {
+        return setAttachNotSyncFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static long setAttachNotSyncFlag(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId)
     {
@@ -904,7 +1239,7 @@ public class FeatureChanges
         values.put(FIELD_ATTACH_ID, attachId);
         values.put(FIELD_ATTACH_OPERATION, CHANGE_OPERATION_NOT_SYNC);
 
-        return replace(tableName, values);
+        return replace(db, tableName, values);
     }
 
 
@@ -912,10 +1247,16 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return deleteFeatureTempFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static int deleteFeatureTempFlag(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
@@ -923,15 +1264,28 @@ public class FeatureChanges
             String tableName,
             long featureId)
     {
+        return deleteFeatureNotSyncFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId);
+    }
+
+    public static int deleteFeatureNotSyncFlag(SQLiteDatabase db, String tableName,
+            long featureId)
+    {
         String selection = FIELD_FEATURE_ID + " = " + featureId + " AND " +
                 "( 0 != ( " + FIELD_OPERATION + " & " + CHANGE_OPERATION_NOT_SYNC + " ) )";
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
     public static int deleteAttachTempFlag(
             String tableName,
+            long featureId,
+            long attachId)
+    {
+        return deleteAttachTempFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static int deleteAttachTempFlag(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId)
     {
@@ -941,12 +1295,19 @@ public class FeatureChanges
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + CHANGE_OPERATION_TEMP + " ) )";
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 
 
     public static int deleteAttachNotSyncFlag(
             String tableName,
+            long featureId,
+            long attachId)
+    {
+        return deleteAttachNotSyncFlag(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName, featureId, attachId);
+    }
+
+    public static int deleteAttachNotSyncFlag(SQLiteDatabase db, String tableName,
             long featureId,
             long attachId)
     {
@@ -956,6 +1317,6 @@ public class FeatureChanges
                 FIELD_ATTACH_ID + " = " + attachId + " AND " +
                 "( 0 != ( " + FIELD_ATTACH_OPERATION + " & " + CHANGE_OPERATION_NOT_SYNC + " ) )";
 
-        return delete(tableName, selection);
+        return delete(db, tableName, selection);
     }
 }

@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-09-22
+last_verified: 2026-10-04
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -10,8 +10,8 @@ last_verified: 2026-09-22
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для выпуска `3.1.2.26` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.26`; отдельный Lisa Debug использует `3.1.2.22`. Оба значения проверяются
+Для подготовленного выпуска `3.1.2.27` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.27`; отдельный Lisa Debug использует `3.1.2.22`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
@@ -202,6 +202,14 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   Двоичный ComNav CNB (`AA 44 12`, как у PiGoLite) даёт координаты из BESTPOSB
   (сообщение 42); `$`/`#` внутри кадра не начинают NMEA. `unlogall` не пишется;
   при отсутствии ASCII сессия может по одной команде добавить `log gpgga/gst/gsa/rmc`.
+  Для Pigo с service `3A20` transport выбирает write `3A21` / notify `3A22`.
+  Тихому приёмнику добавляется только BESTPOSB; живой binary stream не
+  перенастраивается. CCCD и каждый write подтверждаются, ошибки/таймаут
+  запускают reconnect без crash при отозванном permission. Старые callbacks
+  не затрагивают новый transport, качество сбрасывается через 8 с тишины.
+  Профиль/запись/ошибки и сессия проверяются `BluetoothLeProfileTest`,
+  `BluetoothLeTransportTest`, `ExternalGnssSessionTest` на API 26/36;
+  реальный холодный старт Pigo/PiRat остаётся device smoke.
   `AdaptiveLocationFilterCore` сглаживает шум чипа, удерживает остановку, проверяет
   выбросы и учитывает автомобильные повороты; mock и native NMEA пишутся как есть.
   `LocationRecordingSampler`
@@ -427,3 +435,25 @@ SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTil
 реестров на main thread, сохраняя синхронный вызов из UI. Это устраняет
 `CalledFromWorkerThreadException` в cleanup; ошибка самого импорта остаётся
 доступна диагностике.
+
+## Надёжность локальной записи — 2026-10-03
+
+Изменение feature и NGW outbox фиксируются одной транзакцией в базе карты,
+которой принадлежит слой. Ошибка чтения outbox не означает отсутствие правок.
+Уведомления, удаление файлов feature/NGW-вложений и поколение данных публикуются
+после commit. `FeatureSaveJournal` закрепляет повторный insert за UUID операции;
+`PendingTrackPoints` хранит ограниченную упорядоченную очередь и подтверждает
+точку только после идемпотентной записи в owning `TrackLayer`.
+
+`MapTapGesture` отделяет микросмещение короткого тапа от drag/long press/pinch;
+`MaplibreMapInteraction.isTapPlacementActive()` включает согласованный допуск
+для инструментов. `AuthInterceptorNG` читает неизменяемый снимок реквизитов,
+сопоставляет origin, префикс сервера и точный resource id.
+Обход связного списка при WKT-сериализации последовательный; формат не изменён.
+
+Реальный SQLite проверяется Robolectric на API26/36 и native AndroidTest из app.
+Новые storage/API contracts требуют совместимых maplibui/app commits; порядок
+merge: maplib → maplibui → app. См.
+[контракт хранения](../../docs/architecture/ngw-sync-and-storage.md),
+[восстановление](../../docs/architecture/crash-recovery.md) и
+[аудит](../../docs/reference/mobile-reliability-audit.md).

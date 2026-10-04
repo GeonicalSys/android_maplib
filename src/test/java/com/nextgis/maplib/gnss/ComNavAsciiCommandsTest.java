@@ -9,6 +9,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ComNavAsciiCommandsTest {
+    @Test public void bestPosInitializationOnlyAddsThePositionLog() {
+        assertEquals("log bestposb ontime 1\r\n",
+                new String(ComNavAsciiCommands.bestPosEnable(), StandardCharsets.US_ASCII));
+    }
     @Test public void nmeaEnableHasNoUnlogallAndFitsBleAtt() {
         String text = new String(ComNavAsciiCommands.nmeaEnable(), StandardCharsets.US_ASCII);
         assertFalse(text.contains("unlogall"));

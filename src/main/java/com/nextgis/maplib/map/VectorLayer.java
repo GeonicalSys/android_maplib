@@ -251,6 +251,15 @@ public class VectorLayer
     protected IGeometryCache mCache;
     protected List<Long>     mIgnoreFeatures;
     final IGISApplication application;
+    private final java.util.concurrent.atomic.AtomicLong mDataGeneration =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    public long getDataGeneration() { return mDataGeneration.get(); }
+
+    private void dataCommitted(SQLiteDatabase db) {
+        com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                mDataGeneration::incrementAndGet);
+    }
 
     public VectorLayer(
             Context context,
@@ -1050,16 +1059,19 @@ public class VectorLayer
             throws SQLiteException
     {
         if (isReservedForWalk()) return false;
-        try {
-            //drop table
-            SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
-            String tableDrop = "DROP TABLE IF EXISTS " + mPath.getName();
-            db.execSQL(tableDrop);
-        } catch (SQLiteFullException e) {
-            e.printStackTrace();
-        }
-
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        // Files cannot be rolled back with an outer caller's transaction.
+        if (db.inTransaction()) throw new SQLiteException("Layer deletion requires its own transaction");
+        com.nextgis.maplib.util.LayerDatabaseTransaction.run(db, () -> {
+            dropLayerTables(db);
+            com.nextgis.maplib.util.FeatureSaveJournal.deleteLayerEntries(db, mPath.getName());
+            return null;
+        });
         return super.delete(keepTrack);
+    }
+
+    protected void dropLayerTables(SQLiteDatabase db) {
+        db.execSQL("DROP TABLE IF EXISTS " + mPath.getName());
     }
 
 
@@ -1087,7 +1099,7 @@ public class VectorLayer
             String sortOrder,
             String limit)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
         if (null == map) {
             Log.d(TAG, "The map should extends MapContentProviderHelper or inherited");
             throw new IllegalArgumentException(
@@ -1436,11 +1448,12 @@ public class VectorLayer
      */
     public long insertAddChanges(ContentValues contentValues)
     {
-        long rowId = insert(contentValues);
-        if (rowId != NOT_FOUND) {
-            addChange(rowId, CHANGE_OPERATION_NEW);
-        }
-        return rowId;
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
+                DatabaseContext.getDatabaseForLayer(this, false), () -> {
+                    long rowId = insert(contentValues);
+                    if (rowId != NOT_FOUND) addChange(rowId, CHANGE_OPERATION_NEW);
+                    return rowId;
+                });
     }
 
 
@@ -1489,6 +1502,7 @@ public class VectorLayer
             logFeatureInsertFailure("SQL insert failed", contentValues, e);
             return Constants.NOT_FOUND;
         }
+        dataCommitted(db);
 
         if (rowId == Constants.NOT_FOUND) {
             logFeatureInsertFailure("SQL insert returned NOT_FOUND", contentValues, null);
@@ -1500,7 +1514,8 @@ public class VectorLayer
             notify.putExtra(FIELD_ID, rowId);
             notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
             notify.setPackage(getContext().getPackageName());
-            getContext().sendBroadcast(notify);
+            com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                    () -> getContext().sendBroadcast(notify));
         }
 
         updateUniqId(rowId);
@@ -1529,16 +1544,20 @@ public class VectorLayer
         Log.d("SSQL", sql);
         Log.d("SSQL", "args " + summarizeBindArgs(args));
 
-        db.execSQL(sql, args.toArray());
-
-        Cursor c = db.rawQuery("SELECT last_insert_rowid()", null);
-        long id = -1;
-
-        if (c.moveToFirst()) {
-            id = c.getLong(0);
+        try (android.database.sqlite.SQLiteStatement statement = db.compileStatement(sql)) {
+            for (int i = 0; i < args.size(); i++) {
+                Object arg = args.get(i);
+                int index = i + 1;
+                if (arg == null) statement.bindNull(index);
+                else if (arg instanceof byte[]) statement.bindBlob(index, (byte[]) arg);
+                else if (arg instanceof Float || arg instanceof Double)
+                    statement.bindDouble(index, ((Number) arg).doubleValue());
+                else if (arg instanceof Number) statement.bindLong(index, ((Number) arg).longValue());
+                else if (arg instanceof Boolean) statement.bindLong(index, (Boolean) arg ? 1 : 0);
+                else statement.bindString(index, arg.toString());
+            }
+            return statement.executeInsert();
         }
-        c.close();
-        return id;
     }
 
     private void logFeatureInsertFailure(String reason, ContentValues contentValues, Exception error) {
@@ -1632,7 +1651,7 @@ public class VectorLayer
             }
         }
 
-        SQLiteStatement stmt = db.compileStatement(sql.toString());
+        try (SQLiteStatement stmt = db.compileStatement(sql.toString())) {
 
         // bind args
         for (int i = 0; i < bindArgs.size(); i++) {
@@ -1645,6 +1664,8 @@ public class VectorLayer
                 stmt.bindBlob(index, (byte[]) arg);
             } else if (arg instanceof Float || arg instanceof Double) {
                 stmt.bindDouble(index, ((Number) arg).doubleValue());
+            } else if (arg instanceof Boolean) {
+                stmt.bindLong(index, (Boolean) arg ? 1 : 0);
             } else if (arg instanceof Number) {
                 stmt.bindLong(index, ((Number) arg).longValue());
             } else {
@@ -1652,7 +1673,8 @@ public class VectorLayer
             }
         }
 
-        return stmt.executeUpdateDelete(); // 🔥 return num of  updated rows
+        return stmt.executeUpdateDelete();
+        }
     }
 
 
@@ -1670,7 +1692,9 @@ public class VectorLayer
                     if (attachFile.getName().equals(META)) {
                         continue;
                     }
-                    long val = Long.parseLong(attachFile.getName());
+                    long val;
+                    try { val = Long.parseLong(attachFile.getName()); }
+                    catch (NumberFormatException ignored) { continue; } // AtomicFile sidecars.
                     if (val >= maxId) {
                         maxId = val + 1;
                     }
@@ -1713,7 +1737,23 @@ public class VectorLayer
     }
 
 
-    public Uri insert(
+    private void notifyCommitted(Uri uri, boolean syncToNetwork) {
+        com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(
+                DatabaseContext.getDatabaseForLayer(this, false),
+                () -> getContext().getContentResolver().notifyChange(uri, null, syncToNetwork));
+    }
+
+    public Uri insert(Uri uri, ContentValues contentValues) {
+        int type = mUriMatcher.match(uri);
+        if (type != TYPE_TABLE && uri.getQueryParameter(
+                com.nextgis.maplib.util.FeatureSaveJournal.URI_PARAMETER) == null)
+            return insertInTransaction(uri, contentValues);
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
+                DatabaseContext.getDatabaseForLayer(this, false),
+                () -> insertInTransaction(uri, contentValues));
+    }
+
+    public Uri insertInTransaction(
             Uri uri,
             ContentValues contentValues)
     {
@@ -1734,14 +1774,30 @@ public class VectorLayer
         switch (uriType) {
 
             case TYPE_TABLE:
+                SQLiteDatabase saveDb = DatabaseContext.getDatabaseForLayer(this, false);
+                String saveOperation = uri.getQueryParameter(
+                        com.nextgis.maplib.util.FeatureSaveJournal.URI_PARAMETER);
+                long alreadySaved = com.nextgis.maplib.util.FeatureSaveJournal.find(
+                        saveDb, mPath.getName(), saveOperation);
+                if (alreadySaved != NOT_FOUND) {
+                    try (Cursor saved = saveDb.query(mPath.getName(), new String[]{FIELD_ID},
+                            FIELD_ID + "=?", new String[]{Long.toString(alreadySaved)},
+                            null, null, null)) {
+                        if (!saved.moveToFirst()) throw new android.database.sqlite.SQLiteException(
+                                "Previously saved feature is missing");
+                    }
+                    return ContentUris.withAppendedId(getContentUri(), alreadySaved);
+                }
                 long rowID = hasNotFlags ? insert(contentValues) : insertInternal(contentValues);
 
                 if (rowID != Constants.NOT_FOUND) {
+                    com.nextgis.maplib.util.FeatureSaveJournal.record(
+                            saveDb, mPath.getName(), saveOperation, rowID);
                     Uri resultUri = ContentUris.withAppendedId(getContentUri(), rowID);
                     String fragment = uri.getFragment();
                     boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                     if (bFromNetwork) {
-                        getContext().getContentResolver().notifyChange(resultUri, null, false);
+                        notifyCommitted(resultUri, false);
 
                     } else {
                         if (null != tempFlag) {
@@ -1756,7 +1812,7 @@ public class VectorLayer
                             addChange(rowID, CHANGE_OPERATION_NEW);
                         }
 
-                        getContext().getContentResolver().notifyChange(resultUri, null, false);
+                        notifyCommitted(resultUri, false);
                     }
                     return resultUri;
                 }
@@ -1780,13 +1836,22 @@ public class VectorLayer
                 } else {
                     List<String> pathSegments = uri.getPathSegments();
                     String featureId = pathSegments.get(pathSegments.size() - 2);
+                    SQLiteDatabase attachDb = DatabaseContext.getDatabaseForLayer(this, false);
+                    String attachOperation = uri.getQueryParameter(
+                            com.nextgis.maplib.util.FeatureSaveJournal.URI_PARAMETER);
+                    String attachJournalLayer = mPath.getName() + "/" + featureId + "/attach";
+                    long savedAttach = com.nextgis.maplib.util.FeatureSaveJournal.find(
+                            attachDb, attachJournalLayer, attachOperation);
+                    if (savedAttach != NOT_FOUND) return ContentUris.withAppendedId(uri, savedAttach);
                     long attachIdL = insertAttach(featureId, contentValues);
                     if (attachIdL != NOT_FOUND) {
+                        com.nextgis.maplib.util.FeatureSaveJournal.record(
+                                attachDb, attachJournalLayer, attachOperation, attachIdL);
                         Uri resultUri = ContentUris.withAppendedId(uri, attachIdL);
                         String fragment = uri.getFragment();
                         boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                         if (bFromNetwork) {
-                            getContext().getContentResolver().notifyChange(resultUri, null, false);
+                            notifyCommitted(resultUri, false);
                         } else {
                             long featureIdL = Long.parseLong(featureId);
                             if (null != tempFlag) {
@@ -1798,7 +1863,7 @@ public class VectorLayer
                             if (hasNotFlags) {
                                 addChange(featureIdL, attachIdL, CHANGE_OPERATION_NEW);
                             }
-                            getContext().getContentResolver().notifyChange(resultUri, null, false);
+                            notifyCommitted(resultUri, false);
                         }
                         return resultUri;
                     }
@@ -1821,7 +1886,13 @@ public class VectorLayer
      *
      * @return Count of deleted features
      */
-    public int deleteAddChanges(long id)
+    public int deleteAddChanges(long id) {
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
+                DatabaseContext.getDatabaseForLayer(this, false),
+                () -> deleteAddChangesInTransaction(id));
+    }
+
+    public int deleteAddChangesInTransaction(long id)
     {
         int result;
         if (id == Constants.NOT_FOUND) {
@@ -1843,7 +1914,7 @@ public class VectorLayer
             String selection,
             String[] selectionArgs)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
         if (null == map) {
             throw new IllegalArgumentException(
                     "The map should extends MapContentProviderHelper or inherited");
@@ -1852,9 +1923,11 @@ public class VectorLayer
         SQLiteDatabase db = map.getDatabase(false);
         int result = db.delete(mPath.getName(), selection, selectionArgs);
         if (result > 0) {
+            dataCommitted(db);
             if (rowId != Constants.NOT_FOUND) {
                 File attachFolder = new File(mPath, String.valueOf(rowId));
-                FileUtil.deleteRecursive(attachFolder);
+                com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                        () -> FileUtil.deleteRecursive(attachFolder));
             }
 
             if (!mBulkImportMode) {
@@ -1872,7 +1945,9 @@ public class VectorLayer
                 }
                 notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
                 notify.setPackage(getContext().getPackageName());
-                getContext().sendBroadcast(notify);
+                Intent committedNotify = notify;
+                com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                        () -> getContext().sendBroadcast(committedNotify));
             }
         }
         return result;
@@ -1885,7 +1960,13 @@ public class VectorLayer
             String[] selectionArgs)
     {
         int uriType = mUriMatcher.match(uri);
-        return deleteInternal(uri, uriType, selection, selectionArgs);
+        boolean syncAttachment = this instanceof NGWVectorLayer
+                && (uriType == TYPE_ATTACH || uriType == TYPE_ATTACH_ID);
+        if (uriType != TYPE_TABLE && uriType != TYPE_FEATURE && !syncAttachment)
+            return deleteInternal(uri, uriType, selection, selectionArgs);
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
+                DatabaseContext.getDatabaseForLayer(this, false),
+                () -> deleteInternal(uri, uriType, selection, selectionArgs));
     }
 
 
@@ -1916,7 +1997,7 @@ public class VectorLayer
                     String fragment = uri.getFragment();
                     boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                     if (bFromNetwork) {
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
                     } else {
                         if (null != tempFlag) {
                             // setFeatureTempFlag(featureIdL, false); // TODO for table
@@ -1929,7 +2010,7 @@ public class VectorLayer
                         if (hasNotFlags) {
                             addChange(NOT_FOUND, CHANGE_OPERATION_DELETE);
                         }
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
                     }
                 }
                 return result;
@@ -1951,7 +2032,7 @@ public class VectorLayer
                     String fragment = uri.getFragment();
                     boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                     if (bFromNetwork) {
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
                     } else {
                         if (null != tempFlag) {
                             setFeatureTempFlag(featureIdL, false);
@@ -1965,7 +2046,7 @@ public class VectorLayer
                             addChange(featureIdL, CHANGE_OPERATION_DELETE);
                         }
 
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
                     }
                 }
                 return result;
@@ -1978,21 +2059,34 @@ public class VectorLayer
                 File attachFolder =
                         new File(mPath, featureId); //the attach store in id folder in layer folder
                 if (attachFolder.exists()) {
-                    for (File attachFile : attachFolder.listFiles()) {
-                        if (attachFile.delete()) {
-                            result++;
+                    File[] files = attachFolder.listFiles();
+                    if (files == null) throw new IllegalStateException("Cannot read attachment folder");
+                    if (this instanceof NGWVectorLayer) {
+                        // An outbox failure must leave both the photos and their JSON metadata.
+                        result = files.length;
+                    } else {
+                        for (File attachFile : files) {
+                            if (attachFile.delete()) result++;
                         }
                     }
                 }
 
                 if (result > 0) {
 
-                    deleteAttaches(featureId);
+                    if (this instanceof NGWVectorLayer) {
+                        String committedFeatureId = featureId;
+                        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+                        com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                                () -> deleteAttaches(committedFeatureId));
+                        dataCommitted(db);
+                    } else {
+                        deleteAttaches(featureId);
+                    }
 
                     String fragment = uri.getFragment();
                     boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                     if (bFromNetwork) {
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
                     } else {
                         featureIdL = Long.parseLong(featureId);
                         if (null != tempFlag) {
@@ -2007,7 +2101,7 @@ public class VectorLayer
                             addChange(featureIdL, NOT_FOUND, CHANGE_OPERATION_DELETE);
                         }
 
-                        getContext().getContentResolver().notifyChange(uri, null);
+                        notifyCommitted(uri, true);
                     }
                 }
                 return result;
@@ -2020,15 +2114,27 @@ public class VectorLayer
 
                 //get attach path
                 File attachFile = new File(mPath, featureId + File.separator + attachId);
-                if (attachFile.exists() && !attachFile.delete())
-                    return 0;
-
-                deleteAttach(featureId, attachId);
+                if (this instanceof NGWVectorLayer) {
+                    String committedFeatureId = featureId;
+                    String committedAttachId = attachId;
+                    SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+                    com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db, () -> {
+                        if (attachFile.exists() && !attachFile.delete()) {
+                            Log.w(Constants.TAG, "Cannot remove committed attachment file");
+                            return; // Keep metadata so the retained file is still recoverable.
+                        }
+                        deleteAttach(committedFeatureId, committedAttachId);
+                    });
+                    dataCommitted(db);
+                } else {
+                    if (attachFile.exists() && !attachFile.delete()) return 0;
+                    deleteAttach(featureId, attachId);
+                }
 
                 String fragment = uri.getFragment();
                 boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                 if (bFromNetwork) {
-                    getContext().getContentResolver().notifyChange(uri, null, false);
+                    notifyCommitted(uri, false);
                 } else {
 
                     if (null != tempFlag) {
@@ -2042,7 +2148,7 @@ public class VectorLayer
                     if (hasNotFlags) {
                         addChange(featureIdL, attachIdL, CHANGE_OPERATION_DELETE);
                     }
-                    getContext().getContentResolver().notifyChange(uri, null);
+                    notifyCommitted(uri, true);
                 }
                 return 1;
             default:
@@ -2061,7 +2167,13 @@ public class VectorLayer
      *
      * @return Count of changed features
      */
-    public int updateAddChanges(
+    public int updateAddChanges(ContentValues values, long id) {
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
+                DatabaseContext.getDatabaseForLayer(this, false),
+                () -> updateAddChangesInTransaction(values, id));
+    }
+
+    public int updateAddChangesInTransaction(
             ContentValues values,
             long id)
     {
@@ -2083,7 +2195,7 @@ public class VectorLayer
             return 0;
         }
 
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
         if (null == map) {
             throw new IllegalArgumentException(
                     "The map should extends MapContentProviderHelper or inherited");
@@ -2095,7 +2207,8 @@ public class VectorLayer
 //                mCache.removeItem(rowId);
                 prepareGeometry(values);
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                logFeatureInsertFailure("update geometry preparation failed", values, e);
+                return 0;
             }
         }
 
@@ -2103,7 +2216,10 @@ public class VectorLayer
         //int result = db.update(mPath.getName(), values, selection, selectionArgs);
         int result = updateViaSql(db, mPath.getName(), values, selection, selectionArgs);
         if (result > 0) {
+            dataCommitted(db);
             if (values.containsKey(Constants.FIELD_ID)) {
+                com.nextgis.maplib.util.FeatureSaveJournal.changeFeatureId(
+                        db, mPath.getName(), rowId, values.getAsLong(Constants.FIELD_ID));
                 updateUniqId(values.getAsLong(Constants.FIELD_ID));
             }
             if (!mBulkImportMode) {
@@ -2114,7 +2230,9 @@ public class VectorLayer
                         notify.putExtra(
                                 Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
                         notify.setPackage(getContext().getPackageName());
-                        getContext().sendBroadcast(notify);
+                        Intent committedNotify = notify;
+                com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                        () -> getContext().sendBroadcast(committedNotify));
                     }
                 } else if (values.containsKey(Constants.FIELD_GEOM) || values.containsKey(
                         Constants.FIELD_ID)) {
@@ -2136,7 +2254,9 @@ public class VectorLayer
                         notify.putExtra(
                                 Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
                         notify.setPackage(getContext().getPackageName());
-                        getContext().sendBroadcast(notify);
+                        Intent committedNotify = notify;
+                com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                        () -> getContext().sendBroadcast(committedNotify));
                     }
 
                 } else {
@@ -2146,7 +2266,9 @@ public class VectorLayer
                     notify.putExtra(
                             Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
                     notify.setPackage(getContext().getPackageName());
-                    getContext().sendBroadcast(notify);
+                    Intent committedNotify = notify;
+                com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
+                        () -> getContext().sendBroadcast(committedNotify));
                 }
             }
         }
@@ -2154,7 +2276,16 @@ public class VectorLayer
     }
 
 
-    public int update(
+    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+        int type = mUriMatcher.match(uri);
+        if (type != TYPE_TABLE && type != TYPE_FEATURE)
+            return updateInTransaction(uri, values, selection, selectionArgs);
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
+                DatabaseContext.getDatabaseForLayer(this, false),
+                () -> updateInTransaction(uri, values, selection, selectionArgs));
+    }
+
+    public int updateInTransaction(
             Uri uri,
             ContentValues values,
             String selection,
@@ -2191,7 +2322,7 @@ public class VectorLayer
                     String fragment = uri.getFragment();
                     boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                     if (bFromNetwork) {
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
 
                     } else {
 
@@ -2211,7 +2342,7 @@ public class VectorLayer
                             addChange(Constants.NOT_FOUND, CHANGE_OPERATION_CHANGED);
                         }
 
-                        getContext().getContentResolver().notifyChange(uri, null);
+                        notifyCommitted(uri, true);
                     }
                 }
 
@@ -2233,7 +2364,7 @@ public class VectorLayer
                     String fragment = uri.getFragment();
                     boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                     if (bFromNetwork) {
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
 
                     } else {
                         if (null != tempFlag) {
@@ -2252,7 +2383,7 @@ public class VectorLayer
                             addChange(featureIdL, CHANGE_OPERATION_CHANGED);
                         }
 
-                        getContext().getContentResolver().notifyChange(uri, null);
+                        notifyCommitted(uri, true);
                     }
                 }
                 return result;
@@ -2343,7 +2474,7 @@ public class VectorLayer
                     String fragment = uri.getFragment();
                     boolean bFromNetwork = null != fragment && fragment.equals(NO_SYNC);
                     if (bFromNetwork) {
-                        getContext().getContentResolver().notifyChange(uri, null, false);
+                        notifyCommitted(uri, false);
                     } else {
 
                         if (null != tempFlag) {
@@ -2362,7 +2493,7 @@ public class VectorLayer
                             addChange(featureIdL, attachIdL, CHANGE_OPERATION_CHANGED);
                         }
 
-                        getContext().getContentResolver().notifyChange(uri, null);
+                        notifyCommitted(uri, true);
                     }
                     return 1;
                 }
@@ -3197,7 +3328,7 @@ public class VectorLayer
 
 
         public GeoGeometry getLargeGeometryForId(long rowId) {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
         if (null == map) {
             throw new IllegalArgumentException(
                     "The map should extends MapContentProviderHelper or inherited");
@@ -3218,7 +3349,7 @@ public class VectorLayer
 
         public GeoGeometry getGeometryForId(long rowId)
     {
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
         if (null == map) {
             throw new IllegalArgumentException(
                     "The map should extends MapContentProviderHelper or inherited");
@@ -3294,7 +3425,7 @@ public class VectorLayer
 //            return getGeometryForId(rowId);
 //        }
 //
-//        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+//        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
 //        if (null == map) {
 //            throw new IllegalArgumentException(
 //                    "The map should extends MapContentProviderHelper or inherited");
@@ -3572,7 +3703,7 @@ public class VectorLayer
             return featureListMap;
         }
 
-        MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+        MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
         if (null == map) {
             Log.d(TAG, "The map should extends MapContentProviderHelper or inherited");
             throw new IllegalArgumentException(
@@ -3691,7 +3822,7 @@ public class VectorLayer
 
         if (cursor.moveToFirst()) {
 
-            MapContentProviderHelper map = (MapContentProviderHelper) MapBase.getInstance();
+            MapContentProviderHelper map = DatabaseContext.getMapForLayer(this);
             if (null == map) {
                 Log.d(TAG, "The map should extends MapContentProviderHelper or inherited");
                 throw new IllegalArgumentException(

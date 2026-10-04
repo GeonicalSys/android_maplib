@@ -18,5 +18,10 @@ public interface GnssTransport {
      */
     boolean write(byte[] data);
 
+    /** True only for an identified ComNav UART profile, never an arbitrary BLE device. */
+    default boolean usesComNavBinary() {
+        return false;
+    }
+
     void close();
 }

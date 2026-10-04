@@ -347,7 +347,9 @@ public class MapDrawable
 
     List<org.maplibre.geojson.Feature> polygonFeatures = new ArrayList<org.maplibre.geojson.Feature>();  //
 
-    PointF clickPoint = null;
+    private final MapTapGesture mTapGesture = new MapTapGesture();
+    private WeakReference<MapLibreMap> mGestureThresholdMap = new WeakReference<>(null);
+    private float mOriginalMoveThreshold;
 
     public Feature  originalSelectedFeature = null;            // original who edit
 
@@ -361,7 +363,7 @@ public class MapDrawable
 
     private boolean isDragging = false;
     private boolean isSwitchVertex = false;
-    private MotionEvent startEvent = null;
+    private PointF dragStartPoint = null;
     private PointF deltaPoint = null;
 
     public float zoomSaved = 1.0f; // one time used zoom after map start
@@ -2653,16 +2655,35 @@ public class MapDrawable
             isSwitchVertex = false;
             clearAzimuthDragState();
             deltaPoint = null;
-            startEvent = null;
-            clickPoint = null;
+            dragStartPoint = null;
+            mTapGesture.cancel();
             return false;
         }
 
         android.graphics.PointF screenPoint = new android.graphics.PointF(event.getX(), event.getY());
-        switch (event.getAction()) {
+        if (event.getPointerCount() != 1) mTapGesture.cancel();
+        switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN: {
+                isDragging = false;
+                isSwitchVertex = false;
+                deltaPoint = null;
+                dragStartPoint = null;
                 activeMapContext.setLongLongClickProcesses(false);
-                clickPoint = new PointF(event.getX(), event.getY());
+                boolean placingPoints = activeMapContext.isTapPlacementActive();
+                float tolerance = MapTapGesture.tolerance(getContext().getResources()
+                                .getDisplayMetrics().density,
+                        android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop(),
+                        placingPoints);
+                mTapGesture.begin(event.getX(), event.getY(), event.getEventTime(), tolerance,
+                        android.view.ViewConfiguration.getLongPressTimeout());
+                if (mGestureThresholdMap.get() != activeMap) {
+                    mGestureThresholdMap = new WeakReference<>(activeMap);
+                    mOriginalMoveThreshold = activeMap.getGesturesManager()
+                            .getMoveGestureDetector().getMoveThreshold();
+                }
+                activeMap.getGesturesManager().getMoveGestureDetector().setMoveThreshold(
+                        placingPoints ? Math.max(mOriginalMoveThreshold, tolerance)
+                                : mOriginalMoveThreshold);
                 if (beginAzimuthMeasurementDrag(activeMap, screenPoint)) {
                     return true;
                 }
@@ -2672,7 +2693,7 @@ public class MapDrawable
                 if (!featuresMarker.isEmpty()){
                     // press marker - lock for future move
                     isDragging = true;
-                    startEvent = event;
+                    dragStartPoint = new PointF(event.getX(), event.getY());
                     return true;
                 }
                 // no marker  - check vertex press
@@ -2731,6 +2752,10 @@ public class MapDrawable
             }
 
             case MotionEvent.ACTION_MOVE: {
+                for (int i = 0; i < event.getHistorySize(); i++) {
+                    mTapGesture.move(event.getHistoricalX(i), event.getHistoricalY(i));
+                }
+                mTapGesture.move(event.getX(), event.getY());
                 if (draggedAzimuthRole != null) {
                     updateDraggedAzimuthPoint(activeMap, activeMapContext, screenPoint, false);
                     return true;
@@ -2743,14 +2768,14 @@ public class MapDrawable
                     if (!hasEditeometry) {
                         hasEditeometry = true;
                     }
-                    if(deltaPoint == null && startEvent != null){
+                    if(deltaPoint == null && dragStartPoint != null){
                         if (editingObject != null){
                             LatLng latLng = editingObject.getSelectedPoint();
                             if (latLng != null) {
 
                                 PointF vertex = activeMap.getProjection().toScreenLocation(latLng);
-                                float dx = startEvent.getX() - vertex.x;
-                                float dy = startEvent.getY() - vertex.y;
+                                float dx = dragStartPoint.x - vertex.x;
+                                float dy = dragStartPoint.y - vertex.y;
                                 deltaPoint = new PointF(dx, dy);
                             }
                         }
@@ -2775,24 +2800,28 @@ public class MapDrawable
             }
 
             case MotionEvent.ACTION_UP: {
+                boolean tap = mTapGesture.finish(event.getX(), event.getY(), event.getEventTime());
                 if (draggedAzimuthRole != null) {
                     updateDraggedAzimuthPoint(activeMap, activeMapContext, screenPoint, true);
                     clearAzimuthDragState();
-                    clickPoint = null;
+                    isDragging = false;
+                    isSwitchVertex = false;
+                    deltaPoint = null;
+                    dragStartPoint = null;
                     return true;
                 }
                 if (activeMapContext.getLongLongClickProcesses()){
                     activeMapContext.setLongLongClickProcesses(false);
+                    isDragging = false;
+                    isSwitchVertex = false;
+                    deltaPoint = null;
+                    dragStartPoint = null;
                     return false;
                 }
 
-                float deltaX = clickPoint.x - event.getX();
-                float deltaY = clickPoint.y - event.getY();
-                float distance = (float) Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
                 {
                     if (!isDragging && !isSwitchVertex)
-                        if (distance < 5) {
+                        if (tap) {
                             if (editingObject != null && editingObject instanceof MeasurmentLine){
                                 if (!isMeasurmentChangeVertex) {
                                     android.graphics.PointF touchscreenPoint = new android.graphics.PointF(event.getX(), event.getY());
@@ -2809,7 +2838,6 @@ public class MapDrawable
                             } else
                                 activeMapContext.processMapClick(screenPoint.x, screenPoint.y);
                         }
-                    clickPoint = null;
 
                     if (isDragging || isSwitchVertex) {
                         if (editingObject != null) {
@@ -2832,16 +2860,22 @@ public class MapDrawable
                 isDragging = false;
                 isSwitchVertex = false;
                 deltaPoint = null;
-                startEvent = null;
+                dragStartPoint = null;
                 return false;
             }
 
+            case MotionEvent.ACTION_POINTER_DOWN:
             case MotionEvent.ACTION_CANCEL: {
+                mTapGesture.cancel();
+                isDragging = false;
+                isSwitchVertex = false;
+                isMeasurmentChangeVertex = false;
+                deltaPoint = null;
+                dragStartPoint = null;
                 if (draggedAzimuthRole != null) {
                     updateDraggedAzimuthPoint(activeMap, activeMapContext, screenPoint, true);
                     clearAzimuthDragState();
-                    clickPoint = null;
-                    return true;
+                    return event.getActionMasked() == MotionEvent.ACTION_CANCEL;
                 }
                 break;
             }

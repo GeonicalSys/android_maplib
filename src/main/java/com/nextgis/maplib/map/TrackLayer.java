@@ -196,23 +196,11 @@ public class TrackLayer
                 FIELD_VISIBLE + " = 1 AND " + FIELD_END + " IS NOT NULL AND " + FIELD_END +
                 " != ''";
 
-        mCursor = mContext.getContentResolver().query(mContentUriTracks, proj, selection, null, null);
-
-        if (null == mCursor) {
-            return;
-        }
-
         List<Integer> trackIds = new ArrayList<>();
-
-        if (mCursor.moveToFirst()) {
-            do {
-                int trackId = mCursor.getInt(mCursor.getColumnIndex(TrackLayer.FIELD_ID));
-                trackIds.add(trackId);
-            } while (mCursor.moveToNext());
-
+        try (Cursor cursor = mMap.getDatabase(true).query(TABLE_TRACKS, proj,
+                selection, null, null, null, null)) {
+            while (cursor.moveToNext()) trackIds.add(cursor.getInt(0));
         }
-
-        mCursor.close();
 
         switch (mode) {
             case UPDATE:
@@ -289,14 +277,10 @@ public class TrackLayer
 
     private Cursor getTrack(int id)
     {
-        if (mCursor == null) {
-            throw new RuntimeException("Tracks' cursor is null");
-        }
-
         String[] proj = new String[] {FIELD_LON, FIELD_LAT, FIELD_SEGMENT};
-
-        return mContext.getContentResolver().query(
-                Uri.withAppendedPath(mContentUriTracks, id + ""), proj, null, null, POINT_ORDER);
+        return mMap.getDatabase(true).query(TABLE_TRACKPOINTS, proj,
+                FIELD_SESSION + " = ?", new String[]{Integer.toString(id)},
+                null, null, POINT_ORDER);
     }
 
 
@@ -359,7 +343,7 @@ public class TrackLayer
             String sortOrder,
             String limit) throws SQLException, IllegalArgumentException
     {
-        mSQLiteDatabase = mMap.getDatabase(true);
+        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(true);
         Cursor cursor;
 
         switch (mUriMatcher.match(uri)) {
@@ -399,7 +383,7 @@ public class TrackLayer
             Uri uri,
             ContentValues values)
     {
-        mSQLiteDatabase = mMap.getDatabase(false);
+        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(false);
         long id;
         Uri inserted;
 
@@ -407,11 +391,27 @@ public class TrackLayer
             case TYPE_SINGLE_TRACK:
                 values.remove(FIELD_ID);
             case TYPE_TRACKS:
-                id = mSQLiteDatabase.insert(TABLE_TRACKS, null, values);
+                id = mSQLiteDatabase.insertOrThrow(TABLE_TRACKS, null, values);
                 inserted = ContentUris.withAppendedId(mContentUriTracks, id);
                 break;
             case TYPE_TRACKPOINTS:
-                id = mSQLiteDatabase.insert(TABLE_TRACKPOINTS, null, values);
+                id = com.nextgis.maplib.util.LayerDatabaseTransaction.run(mSQLiteDatabase, () -> {
+                    String operation = uri.getQueryParameter(
+                            com.nextgis.maplib.util.FeatureSaveJournal.URI_PARAMETER);
+                    long saved = com.nextgis.maplib.util.FeatureSaveJournal.find(
+                            mSQLiteDatabase, TABLE_TRACKPOINTS, operation);
+                    if (saved != NOT_FOUND) return saved;
+                    try (Cursor session = mSQLiteDatabase.query(TABLE_TRACKS,
+                            new String[]{FIELD_ID}, FIELD_ID + " = ?",
+                            new String[]{values.getAsString(FIELD_SESSION)}, null, null, null)) {
+                        if (!session.moveToFirst())
+                            throw new android.database.sqlite.SQLiteException("Track session is missing");
+                    }
+                    long row = mSQLiteDatabase.insertOrThrow(TABLE_TRACKPOINTS, null, values);
+                    com.nextgis.maplib.util.FeatureSaveJournal.record(
+                            mSQLiteDatabase, TABLE_TRACKPOINTS, operation, row);
+                    return row;
+                });
                 inserted = ContentUris.withAppendedId(mContentUriTrackpoints, id);
                 break;
             default:
@@ -420,8 +420,8 @@ public class TrackLayer
 
         if (id != NOT_FOUND) {
 //            notifyLayerChanged();
-            reloadTracks(INSERT);
-            getContext().getContentResolver().notifyChange(inserted, null);
+            publishCommittedChange(mSQLiteDatabase, inserted, INSERT,
+                    mUriMatcher.match(uri) != TYPE_TRACKPOINTS);
         }
 
         return inserted;
@@ -433,7 +433,7 @@ public class TrackLayer
             String selection,
             String[] selectionArgs)
     {
-        mSQLiteDatabase = mMap.getDatabase(false);
+        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(false);
 
         switch (mUriMatcher.match(uri)) {
             case TYPE_TRACKS:
@@ -468,7 +468,7 @@ public class TrackLayer
             String selection,
             String[] selectionArgs)
     {
-        mSQLiteDatabase = mMap.getDatabase(false);
+        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(false);
         int updated;
         String table = TABLE_TRACKS;
 
@@ -482,7 +482,6 @@ public class TrackLayer
                     selection = selection + " AND " + FIELD_ID + " = " + id;
                 }
             case TYPE_TRACKS:
-                mMap.onLayerChanged(this);
 //                notifyLayerChanged();
                 break;
             case TYPE_TRACKPOINTS:
@@ -496,11 +495,29 @@ public class TrackLayer
         updated = mSQLiteDatabase.update(table, values, selection, selectionArgs);
 
         if (updated > 0) {
-            reloadTracks(UPDATE);
-            getContext().getContentResolver().notifyChange(uri, null);
+            publishCommittedChange(mSQLiteDatabase, uri, UPDATE,
+                    mUriMatcher.match(uri) != TYPE_TRACKPOINTS);
         }
 
         return updated;
+    }
+
+    private void publishCommittedChange(SQLiteDatabase db, Uri uri, int mode, boolean refresh) {
+        com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db, () -> {
+            Runnable notification = () -> {
+                try {
+                    if (refresh) {
+                        reloadTracks(mode);
+                        mMap.onLayerChanged(this);
+                    }
+                    getContext().getContentResolver().notifyChange(uri, null);
+                } catch (RuntimeException error) {
+                    android.util.Log.w(Constants.TAG, "Track notification failed after commit", error);
+                }
+            };
+            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) notification.run();
+            else new android.os.Handler(android.os.Looper.getMainLooper()).post(notification);
+        });
     }
 
 

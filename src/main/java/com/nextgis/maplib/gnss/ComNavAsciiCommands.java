@@ -26,6 +26,11 @@ public final class ComNavAsciiCommands {
         return commands;
     }
 
+    /** Add the position log without stopping other logs or changing correction inputs. */
+    public static byte[] bestPosEnable() {
+        return "log bestposb ontime 1\r\n".getBytes(StandardCharsets.US_ASCII);
+    }
+
     public static byte[] nmeaEnable() {
         StringBuilder text = new StringBuilder();
         for (String line : NMEA_ENABLE_LINES) {
