@@ -472,6 +472,7 @@ public class GpsEventSource {
                 + " maxRawAccuracyM=" + diagnosticMaxAccuracy + " lastRawAgeMs=" + age
                 + " lastRawAccuracyM=" + (rawGps == null ? -1 : rawGps.getAccuracy())
                 + " motion=" + motionMonitor.stateAt(SystemClock.elapsedRealtimeNanos())
+                + " " + LocationPowerPolicy.diagnostics(context)
                 + " " + getRecordingDiagnostics());
         diagnosticScreenOn = screenOn;
         lastDiagnosticAt = now;

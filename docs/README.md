@@ -16,6 +16,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 ## Критичные области
 
+- `LocationPowerPolicy` отделяет глобальное ограничение GPS в Battery Saver
+  от Doze exemption приложения: предупреждает для system GPS при mode 1/2/4,
+  для API 26–27 — при включённом Battery Saver; mode 0/3 и native external
+  GNSS исключены. GPS health пишет powerSave/locationPowerSaveMode/batteryExempt/deviceIdle.
+
 - `GnssDeviceScanner` передаёт nullable RSSI в `GnssDevice`: BLE из ScanResult,
   Classic из discovery только для сопряжённых адресов. `GnssDeviceScanResults`
   обновляет по transport/id, сохраняя порядок строк и разделяя одинаковые имена.

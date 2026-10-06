@@ -8,6 +8,8 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/location/LocationPowerPolicy.java
+    responsibility: Detect screen-off system GPS restrictions independently of Doze exemption, exclude native external GNSS and report actual power policy in GPS diagnostics.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDevice.java
     responsibility: Keep endpoint identity independent from optional, non-persisted scan RSSI in dBm.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDeviceScanner.java
