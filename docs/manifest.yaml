@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-04
+last_verified: 2026-10-06
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
@@ -67,7 +67,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/api/ExternalGnssKeepAliveHost.java
     responsibility: Let the application host start a connected-device foreground service without maplib depending on maplibui.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSampler.java
-    responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop; mock GNSS is sampled no coarser than 2 s / 1 m.
+    responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop; track-only mode gating belongs to the maplibui consumer before this sampler; mock GNSS is sampled no coarser than 2 s / 1 m.
   - path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
     responsibility: Keep mock GPS Connector extras exclusive of the 47 m placeholder and phone chip; native NMEA uses the same dense 2 s / 1 m sampling.
   - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssTransport.java

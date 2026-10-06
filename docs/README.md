@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-04
+last_verified: 2026-10-06
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -15,6 +15,11 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
+
+- Общий GNSS-поток и sampler сохраняют поддержку ходьбы и автомобиля.
+  Режим «Пешеход» ограничивается только consumer `maplibui.TrackerService`
+  до sampler/queue; пропущенная поездка использует существующий номер сегмента.
+  Курсор карты и обход не наследуют ограничение скорости трека; схема БД не меняется.
 
 - GPS-triggered обновление текущего трека и явный reload истории читают SQLite
   в фоне из захваченной карты, не через переключаемый ContentProvider и не через
