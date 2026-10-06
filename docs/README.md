@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-04
+last_verified: 2026-10-06
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -11,10 +11,21 @@ last_verified: 2026-10-04
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 Для подготовленного выпуска `3.1.2.27` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.27`; отдельный Lisa Debug использует `3.1.2.22`. Оба значения проверяются
+`3.1.2.27`; отдельный Lisa Debug использует `3.1.2.23`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
+
+- `GnssDeviceScanner` передаёт nullable RSSI в `GnssDevice`: BLE из ScanResult,
+  Classic из discovery только для сопряжённых адресов. `GnssDeviceScanResults`
+  обновляет по transport/id, сохраняя порядок строк и разделяя одинаковые имена.
+  RSSI живёт только в текущем поиске. Stop/new scan отсекает прежние callbacks;
+  имя и id подключения не содержат уровень сигнала.
+
+- Общий GNSS-поток и sampler сохраняют поддержку ходьбы и автомобиля.
+  Режим «Пешеход» ограничивается только consumer `maplibui.TrackerService`
+  до sampler/queue; пропущенная поездка использует существующий номер сегмента.
+  Курсор карты и обход не наследуют ограничение скорости трека; схема БД не меняется.
 
 - GPS-triggered обновление текущего трека и явный reload истории читают SQLite
   в фоне из захваченной карты, не через переключаемый ContentProvider и не через
