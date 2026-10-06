@@ -16,6 +16,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 ## Критичные области
 
+- `GnssDeviceScanner` передаёт nullable RSSI в `GnssDevice`: BLE из ScanResult,
+  Classic из discovery только для сопряжённых адресов. `GnssDeviceScanResults`
+  обновляет по transport/id, сохраняя порядок строк и разделяя одинаковые имена.
+  RSSI живёт только в текущем поиске. Stop/new scan отсекает прежние callbacks;
+  имя и id подключения не содержат уровень сигнала.
+
 - Общий GNSS-поток и sampler сохраняют поддержку ходьбы и автомобиля.
   Режим «Пешеход» ограничивается только consumer `maplibui.TrackerService`
   до sampler/queue; пропущенная поездка использует существующий номер сегмента.
