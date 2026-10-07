@@ -23,5 +23,9 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <application/>
+    <application>
+        <service android:name="com.nextgis.maplib.scripts.ProjectScriptService"
+            android:process=":project_scripts" android:isolatedProcess="true"
+            android:exported="false" android:stopWithTask="true" />
+    </application>
 </manifest>

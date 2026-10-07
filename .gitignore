@@ -1,6 +1,7 @@
 # Android studio
 .idea/
 .gradle/
+.cxx/
 build/
 local.properties
 captures/

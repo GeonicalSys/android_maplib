@@ -35,3 +35,13 @@ Draft PR без отдельных подтверждений каждого ш�
 разрешают. Direct push в `master`, force push, tag/release и merge запрещены без
 явного намерения пользователя завершить выпуск. PR библиотеки сливается через
 Merge Commit; связанный root PR обновляет submodule pointer после merge.
+
+## Project scripts
+
+Владеет форматом пакета/ссылки, private project cache, isolated QuickJS JNI/service и read-only host broker. `gis.query` и `time.monthWindow` встроены; spatial/расчётные/table API пока не реализованы.
+
+Перед доработкой читать `../docs/architecture/project-scripts.md` и пользовательское
+руководство. Новый host API добавлять с capability/grants/типами/бюджетами/тестами
+сначала в APK. Не поставлять arbitrary SQL, Java reflection, сеть или GIS-движок
+внешним JS. Старые пакеты сохранять для pin черновиков. Cross-repo schema/API
+обновлять одновременно с stand_project и central registries.

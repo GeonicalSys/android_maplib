@@ -51,6 +51,7 @@ public class CollectorResource extends Resource {
     private final List<CollectorProjectItem> mProjectItems = new ArrayList<>();
     private final Set<Long> mResolvedLayerRemoteIds = new HashSet<>();
     private String mProjectDistrict;
+    private String mMobileJsonConfig;
     private boolean mSnapshotComplete = true;
     private String mSnapshotError;
 
@@ -102,6 +103,7 @@ public class CollectorResource extends Resource {
         mProjectDistrict = in.readString();
         mSnapshotComplete = in.readByte() != 0;
         mSnapshotError = in.readString();
+        mMobileJsonConfig = in.readString();
     }
 
     public static final Parcelable.Creator<CollectorResource> CREATOR =
@@ -132,6 +134,7 @@ public class CollectorResource extends Resource {
         parcel.writeString(mProjectDistrict);
         parcel.writeByte((byte) (mSnapshotComplete ? 1 : 0));
         parcel.writeString(mSnapshotError);
+        parcel.writeString(mMobileJsonConfig);
     }
 
     /**
@@ -156,6 +159,11 @@ public class CollectorResource extends Resource {
      */
     public String getProjectDistrict() {
         return mProjectDistrict;
+    }
+
+    public JSONObject getMobileJsonConfig() {
+        try { return mMobileJsonConfig == null ? null : new JSONObject(mMobileJsonConfig); }
+        catch (JSONException invalid) { return null; }
     }
 
     /** True only when the complete project tree and every referenced vector resource were resolved. */
@@ -220,6 +228,8 @@ public class CollectorResource extends Resource {
     }
 
     private void parseCollectorProject(JSONObject collectorProject) throws JSONException {
+        JSONObject mobileConfig = collectorProject.optJSONObject("mobile_json_config");
+        mMobileJsonConfig = mobileConfig == null ? null : mobileConfig.toString();
         mLayers.clear();
         mProjectItems.clear();
         mResolvedLayerRemoteIds.clear();
