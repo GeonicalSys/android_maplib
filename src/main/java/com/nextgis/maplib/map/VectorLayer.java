@@ -2892,7 +2892,7 @@ public class VectorLayer
         for (Field source : fields) {
             String normalizedName = LayerUtil.normalizeFieldName(source.getName());
             repaired.put(normalizedName, new Field(
-                    source.getType(), normalizedName, source.getAlias()));
+                    source.getType(), normalizedName, source.getAlias(), source.isRequired()));
         }
 
         LinkedHashMap<String, Field> previous = mFields;

@@ -515,7 +515,8 @@ public class NGWUtil
 
             int nType = LayerUtil.stringToType(type);
             if (Constants.NOT_FOUND != nType) {
-                fields.add(new Field(nType, name, alias));
+                fields.add(new Field(nType, name, alias,
+                        fieldJSONObject.optBoolean("required", false)));
             }
         }
         return fields;

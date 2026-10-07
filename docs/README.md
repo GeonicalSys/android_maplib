@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-06
+last_verified: 2026-10-07
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -15,6 +15,13 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
+
+- Field.isRequired() хранит штатный NGW feature_layer.fields[].required в
+  локальном JSON и Parcel; старое описание без флага означает false.
+  Изменение обязательности или подписи чинит только metadata после проверки
+  физической схемы. SQLite, объекты и outbox не пересоздаются; fingerprint
+  разрушительного rebuild не зависит от обязательности. Проверку пользовательского
+  ввода выполняет maplibui, а не низкоуровневые операции синхронизации.
 
 - `LocationPowerPolicy` отделяет глобальное ограничение GPS в Battery Saver
   от Doze exemption приложения: предупреждает для system GPS при mode 1/2/4,

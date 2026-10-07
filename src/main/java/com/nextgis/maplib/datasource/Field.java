@@ -39,14 +39,21 @@ public class Field implements IJSONStore, Parcelable {
     protected int mType;
     protected String mName;
     protected String mAlias;
+    protected boolean mRequired;
 
     protected static final String JSON_ALIAS_KEY = "alias";
+    protected static final String JSON_REQUIRED_KEY = "required";
 
     public Field() { }
 
     public Field(int type, String name, String alias) {
+        this(type, name, alias, false);
+    }
+
+    public Field(int type, String name, String alias, boolean required) {
         mType = type;
         mName = name;
+        mRequired = required;
         if (alias == null || alias.length() == 0) {
             mAlias = mName;
         } else {
@@ -59,6 +66,7 @@ public class Field implements IJSONStore, Parcelable {
         mType = in.readInt();
         mName = in.readString();
         mAlias = in.readString();
+        mRequired = in.readInt() != 0;
     }
 
     @Override
@@ -67,6 +75,7 @@ public class Field implements IJSONStore, Parcelable {
         rootObject.put(Constants.JSON_TYPE_KEY, mType);
         rootObject.put(Constants.JSON_NAME_KEY, mName);
         rootObject.put(JSON_ALIAS_KEY, mAlias);
+        rootObject.put(JSON_REQUIRED_KEY, mRequired);
         return rootObject;
     }
 
@@ -74,6 +83,7 @@ public class Field implements IJSONStore, Parcelable {
     public void fromJSON(JSONObject jsonObject) throws JSONException {
         mType = jsonObject.getInt(Constants.JSON_TYPE_KEY);
         mName = jsonObject.getString(Constants.JSON_NAME_KEY);
+        mRequired = jsonObject.optBoolean(JSON_REQUIRED_KEY, false);
         if (jsonObject.has(JSON_ALIAS_KEY)) {
             mAlias = jsonObject.getString(JSON_ALIAS_KEY);
         }
@@ -89,6 +99,10 @@ public class Field implements IJSONStore, Parcelable {
 
     public String getAlias() {
         return mAlias;
+    }
+
+    public boolean isRequired() {
+        return mRequired;
     }
 
     public void setName(String name) {
@@ -121,5 +135,6 @@ public class Field implements IJSONStore, Parcelable {
         parcel.writeInt(mType);
         parcel.writeString(mName);
         parcel.writeString(mAlias);
+        parcel.writeInt(mRequired ? 1 : 0);
     }
 }
