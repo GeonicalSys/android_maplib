@@ -8,6 +8,12 @@ last_verified: 2026-10-07
 
 ## Назначение
 
+`forms/CascadingLists` разбирает NGFP `lisa_form_dependencies`: общие таблицы,
+устойчивые key/value/label, AND-фильтры и ациклический граф произвольной глубины.
+Восстанавливает состояние без автоматического выбора и проверяет принадлежность;
+исторические значения допускаются только с неизменными исходными предками.
+Контракт: consuming root `docs/architecture/cascading-form-lists.md`.
+
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 Для подготовленного выпуска `3.1.2.27` диагностический release `BuildConfig.VERSION_NAME` равен

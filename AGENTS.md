@@ -38,6 +38,10 @@ Merge Commit; связанный root PR обновляет submodule pointer п
 
 ## Project scripts
 
+Зависимые списки: `forms/CascadingLists` владеет чистым parser/state engine;
+читать `../docs/architecture/cascading-form-lists.md`. Не добавлять UI/JS или
+Access-specific правила в parser; циклы/неверные варианты проверяются нативно.
+
 Владеет форматом пакета/ссылки, private project cache, isolated QuickJS JNI/service и read-only host broker. `gis.query` и `time.monthWindow` встроены; spatial/расчётные/table API пока не реализованы.
 
 Перед доработкой читать `../docs/architecture/project-scripts.md` и пользовательское

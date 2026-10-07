@@ -9,6 +9,8 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/forms/CascadingLists.java
+    responsibility: Parse declarative NGFP relation tables, sort an acyclic dependency graph, filter by stable parent keys and preserve unchanged historical tuples.
   - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
     responsibility: Bounded QuickJS Binder service under an isolated Android UID.
   - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java
