@@ -179,9 +179,11 @@ public final class NGWLayerSchemaCompat {
                     || expectedResourceCls.equals(actualResourceCls));
 
             Map<String, Integer> localTypeByNorm = new HashMap<>();
+            Map<String, Field> localFieldsByNorm = new HashMap<>();
             for (Field f : local.getFields()) {
                 String key = LayerUtil.normalizeFieldName(unwrapQuotation(f.getName()));
                 localTypeByNorm.put(key, f.getType());
+                localFieldsByNorm.put(key, f);
             }
 
             Map<String, Integer> remoteTypeByNorm = new HashMap<>();
@@ -191,6 +193,17 @@ public final class NGWLayerSchemaCompat {
             }
 
             boolean serializedFieldsMatch = localTypeByNorm.equals(remoteTypeByNorm);
+            if (serializedFieldsMatch) {
+                for (Field remote : remoteFields) {
+                    String key = LayerUtil.normalizeFieldName(unwrapQuotation(remote.getName()));
+                    Field current = localFieldsByNorm.get(key);
+                    if (current.isRequired() != remote.isRequired()
+                            || !java.util.Objects.equals(current.getAlias(), remote.getAlias())) {
+                        serializedFieldsMatch = false;
+                        break;
+                    }
+                }
+            }
             boolean sqliteFieldsMatch = local
                     .validateSqliteSchemaAgainstFields(remoteFields).isEmpty();
             return new SchemaComparison(
