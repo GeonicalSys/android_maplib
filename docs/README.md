@@ -8,6 +8,11 @@ last_verified: 2026-10-07
 
 ## Назначение
 
+`forms/ConditionalRequiredRules` разбирает независимый NGFP `lisa_form_rules`:
+условная обязательность по scalar значениям, all/any/not, равенство, списки
+значений и пустота. Parser ограничивает размер/глубину и не исполняет код.
+Контракт: consuming root `docs/architecture/conditional-form-rules.md`.
+
 `forms/CascadingLists` разбирает NGFP `lisa_form_dependencies`: общие таблицы,
 устойчивые key/value/label, AND-фильтры и ациклический граф произвольной глубины.
 Восстанавливает состояние без автоматического выбора и проверяет принадлежность;

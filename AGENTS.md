@@ -38,6 +38,11 @@ Merge Commit; связанный root PR обновляет submodule pointer п
 
 ## Project scripts
 
+`forms/ConditionalRequiredRules` — чистый типизированный parser/evaluator
+`meta.json.lisa_form_rules`; читать `../docs/architecture/conditional-form-rules.md`.
+Не смешивать с JS, каскадами, GIS-запросами или UI. Соблюдать пределы формата,
+missing-семантику и числовые 0/1 для checkbox; static required не ослаблять.
+
 Зависимые списки: `forms/CascadingLists` владеет чистым parser/state engine;
 читать `../docs/architecture/cascading-form-lists.md`. Не добавлять UI/JS или
 Access-specific правила в parser; циклы/неверные варианты проверяются нативно.
