@@ -27,7 +27,15 @@ def productionVersionName = '3.1.2.27'
 def debugVersionName = '3.1.2.23'
 
 android {
+    ndkVersion '28.2.13676358'
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
     defaultConfig {
+        consumerProguardFiles 'consumer-rules.pro'
         minSdkVersion 26
         compileSdk 36
         versionName productionVersionName
@@ -53,6 +61,7 @@ android {
         enabled = true
     }
     buildFeatures {
+        aidl = true
         viewBinding = true
         buildConfig = true
     }

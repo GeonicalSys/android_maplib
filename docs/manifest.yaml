@@ -8,6 +8,14 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
+    responsibility: Bounded QuickJS Binder service under an isolated Android UID.
+  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java
+    responsibility: Read-only owning-project GIS broker with independent grants and SQL budgets.
+  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptSync.java
+    responsibility: Verified Collector package activation with previous-version retention.
+  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ScriptPackage.java
+    responsibility: Source-only ZIP/API/hash and manifest validation.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/Field.java
     responsibility: Preserve optional NGW required metadata through JSON and Parcel, defaulting legacy fields to false.
   - path: maplib/src/test/java/com/nextgis/maplib/util/FieldMetadataTest.java

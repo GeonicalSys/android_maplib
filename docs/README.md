@@ -480,3 +480,10 @@ merge: maplib → maplibui → app. См.
 [контракт хранения](../../docs/architecture/ngw-sync-and-storage.md),
 [восстановление](../../docs/architecture/crash-recovery.md) и
 [аудит](../../docs/reference/mobile-reliability-audit.md).
+
+## Project scripts
+
+Владеет форматом пакета/ссылки, private project cache, isolated QuickJS JNI/service и read-only host broker. `gis.query` и `time.monthWindow` встроены; spatial/расчётные/table API пока не реализованы.
+
+[Архитектура](../../docs/architecture/project-scripts.md),
+[руководство](../../docs/guides/project-scripts-user-guide.md).

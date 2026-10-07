@@ -46,6 +46,9 @@ public class CollectorProjectMetadata {
     private String mLastCompositionSummary;
     private boolean mLastCompositionIncomplete;
     private String mLastCompositionError;
+    private String mScriptsExpected;
+    private String mScriptsActive;
+    private String mScriptsStatus;
 
     public static String buildProjectUid(String accountName, long projectRemoteId) {
         if (TextUtils.isEmpty(accountName) || projectRemoteId <= 0L) {
@@ -85,6 +88,9 @@ public class CollectorProjectMetadata {
         metadata.mLastCompositionSummary = json.optString(JSON_LAST_COMPOSITION_SUMMARY, null);
         metadata.mLastCompositionIncomplete = json.optBoolean(JSON_LAST_COMPOSITION_INCOMPLETE, false);
         metadata.mLastCompositionError = json.optString(JSON_LAST_COMPOSITION_ERROR, null);
+        metadata.mScriptsExpected = json.optString("scripts_expected", null);
+        metadata.mScriptsActive = json.optString("scripts_active", null);
+        metadata.mScriptsStatus = json.optString("scripts_status", null);
         if (TextUtils.isEmpty(metadata.mProjectUid)) {
             metadata.mProjectUid = buildProjectUid(metadata.mAccountName, metadata.mProjectRemoteId);
         }
@@ -106,6 +112,9 @@ public class CollectorProjectMetadata {
         json.put(JSON_PROJECT_UID, mProjectUid);
         json.put(JSON_ACCOUNT, mAccountName);
         json.put(JSON_PROJECT_REMOTE_ID, mProjectRemoteId);
+        json.put("scripts_expected", mScriptsExpected);
+        json.put("scripts_active", mScriptsActive);
+        json.put("scripts_status", mScriptsStatus);
         if (!TextUtils.isEmpty(mName)) {
             json.put(JSON_NAME, mName);
         }
@@ -139,6 +148,15 @@ public class CollectorProjectMetadata {
 
     public String getProjectUid() {
         return mProjectUid;
+    }
+
+    public String getScriptsExpected() { return mScriptsExpected; }
+    public String getScriptsActive() { return mScriptsActive; }
+    public String getScriptsStatus() { return mScriptsStatus; }
+    public void setScriptsState(String expected, String active, String status) {
+        mScriptsExpected = expected;
+        mScriptsActive = active;
+        mScriptsStatus = status;
     }
 
     public String getAccountName() {

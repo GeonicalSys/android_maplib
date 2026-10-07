@@ -155,6 +155,8 @@ public final class CollectorProjectCompositionSync {
                     diff.isUnsafe() ? "local_identity_conflict" : null);
             if (apply) {
                 applyDiff(context, projectGroup, metadata, remote, diff);
+                if (!diff.isUnsafe()) com.nextgis.maplib.scripts.ProjectScriptSync.update(
+                        context, projectGroup, remote.mMobileJsonConfig, remote.getRemoteIdsInOrder());
             }
         }
     }
@@ -233,6 +235,7 @@ public final class CollectorProjectCompositionSync {
                     readProjectName(root, metadata.getName()),
                     readProjectDistrict(root, metadata.getDistrict()));
             JSONObject rootItem = collectorProject.optJSONObject("root_item");
+            snapshot.mMobileJsonConfig = collectorProject.optJSONObject("mobile_json_config");
             JSONArray children = rootItem != null ? rootItem.optJSONArray("children") : null;
             if (children == null) {
                 HyperLog.w(Constants.TAG, LOG_PREFIX + ": collector_project has no root children "
@@ -919,6 +922,7 @@ public final class CollectorProjectCompositionSync {
     }
 
     private static final class CollectorProjectSnapshot {
+        private JSONObject mMobileJsonConfig;
         private final String mProjectUid;
         private final String mAccountName;
         private final long mProjectRemoteId;
