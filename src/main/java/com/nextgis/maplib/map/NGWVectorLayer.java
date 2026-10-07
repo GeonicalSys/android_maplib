@@ -1912,7 +1912,7 @@ public class NGWVectorLayer
         notify.putExtra(Constants.ATTRIBUTES_ONLY, true);
         notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName());
         notify.setPackage(getContext().getPackageName());
-        getContext().sendBroadcast(notify);
+        sendWorkspaceNotification(notify);
 
         //rename photo id folder if exist
         File photoFolder = new File(mPath, "" + oldFeatureId);

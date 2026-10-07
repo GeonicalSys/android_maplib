@@ -27,9 +27,18 @@ public final class NgwSyncIo {
      */
     public static Session beginSession() {
         Long previous = SESSION_GENERATION.get();
-        long generation = CANCELLATION_GENERATION.get();
+        long generation = previous != null ? previous : CANCELLATION_GENERATION.get();
         SESSION_GENERATION.set(generation);
         return new Session(previous, generation);
+    }
+
+    public static long captureGeneration() { return CANCELLATION_GENERATION.get(); }
+
+    /** Propagate the original cancellation generation to an explicitly owned async child. */
+    public static Session inheritSession(long generation) {
+        Long previous=SESSION_GENERATION.get();
+        SESSION_GENERATION.set(generation);
+        return new Session(previous,generation);
     }
 
     /**

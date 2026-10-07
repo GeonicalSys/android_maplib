@@ -91,6 +91,9 @@ public class LayerContentProvider
             return null;
         }
 
+        if (com.nextgis.maplib.util.SyncWorkspaceSession.current() != null)
+            activeMap = MapBase.getActiveInstance();
+
         if (!(activeMap instanceof MapContentProviderHelper)) {
             logAccessFailure("active map is unavailable", null, null);
             return null;
@@ -110,7 +113,12 @@ public class LayerContentProvider
 
     protected Layer getLayerByUri(Uri uri)
     {
-        MapContentProviderHelper activeMap = getActiveMap();
+        String token = uri == null ? null : uri.getQueryParameter(
+                com.nextgis.maplib.util.SyncWorkspaceSession.URI_TOKEN);
+        com.nextgis.maplib.util.SyncWorkspaceSession session =
+                com.nextgis.maplib.util.SyncWorkspaceSession.resolve(token);
+        MapContentProviderHelper activeMap = token == null ? getActiveMap()
+                : session == null ? null : session.getMap();
         if (activeMap == null || uri == null || uri.getPathSegments().isEmpty()) {
             logAccessFailure("layer lookup has no active map or path", uri, null);
             return null;

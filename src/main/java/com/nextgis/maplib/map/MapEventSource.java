@@ -71,7 +71,7 @@ public class MapEventSource
     protected final static int    EVENT_onLayerChangedFeatureID      = 8;
     protected final static int    EVENT_onLayerVisibleChanged      = 9;
     protected        List<MapEventListener> mListeners;
-    protected static Handler                mHandler;
+    protected Handler                       mHandler;
     protected        boolean                mFreeze;
 
     protected Map<Integer, Long> mLastMessages;
@@ -83,7 +83,12 @@ public class MapEventSource
             File mapPath,
             LayerFactory layerFactory)
     {
-        super(context, mapPath, layerFactory);
+        this(context, mapPath, layerFactory, true);
+    }
+
+    public MapEventSource(Context context, File mapPath, LayerFactory layerFactory, boolean activate)
+    {
+        super(context, mapPath, layerFactory, activate);
         mListeners = new CopyOnWriteArrayList<>();
         mFreeze = false;
         mLastMessages = new HashMap<>();
@@ -141,6 +146,7 @@ public class MapEventSource
     {
 
         super.onLayerAdded(layer);
+        if (this != MapBase.getActiveInstance()) return;
 
         if (mListeners == null) {
             return;
@@ -243,6 +249,7 @@ public class MapEventSource
     @Override
     protected void onLayerDeleted(int id)
     {
+        if (this != MapBase.getActiveInstance()) return;
         super.onLayerDeleted(id);
         if (mListeners == null) {
             return;
@@ -356,7 +363,7 @@ public class MapEventSource
      */
     protected void createHandler()
     {
-        mHandler = new Handler()
+        mHandler = new Handler(Looper.getMainLooper())
         {
             public void handleMessage(Message msg)
             {

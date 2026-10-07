@@ -401,7 +401,13 @@ public class MapDrawable
             Context context,
             File mapPath,
             LayerFactory layerFactory) {
-        super(context, mapPath, layerFactory);
+        this(backgroundTile, context, mapPath, layerFactory, true);
+    }
+
+    /** Load a complete map model for sync without activating it or attaching a renderer. */
+    public MapDrawable(Bitmap backgroundTile, Context context, File mapPath,
+                       LayerFactory layerFactory, boolean activate) {
+        super(context, mapPath, layerFactory, activate);
 
         //initialise display
         mDisplay = new GISDisplay(backgroundTile);

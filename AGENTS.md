@@ -54,3 +54,18 @@ Access-specific правила в parser; циклы/неверные вариа
 сначала в APK. Не поставлять arbitrary SQL, Java reflection, сеть или GIS-движок
 внешним JS. Старые пакеты сохранять для pin черновиков. Cross-repo schema/API
 обновлять одновременно с stand_project и central registries.
+
+## Общая синхронизация проектов
+
+Читать consuming root docs/architecture/ngw-sync-and-storage.md и
+docs/guides/project-synchronization-user-guide.md. sync_all_projects по умолчанию true;
+ручной и scheduled account запуск используют ProjectSyncRunner. Не переключать
+mMap/active prefs ради фонового проекта. Владельца переносить через
+SyncWorkspaceSession во все async callbacks, service tickets и provider URI;
+untagged UI URI всегда относится к активной карте, expired token не имеет fallback.
+Очередь держит глобальный lease до завершения дочерних работ и mutating HTTP.
+Полный pending project/account план сохраняется до первого прохода; Collector
+journals разделены по canonical map path. Проверять cancellation, equal layer/group
+IDs, сохранность draft и реальный fill на изолированном эмуляторе.
+Подписи разделённых double_combobox брать из meta.fields keyname/display_name,
+затем layer alias; field key используется только при отсутствии обоих.

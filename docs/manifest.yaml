@@ -9,6 +9,8 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/util/SyncWorkspaceSession.java
+    responsibility: Hold explicit map/project ownership through tracked threads, callbacks and live service/provider tokens; inherit cancellation and refuse closing a map with pending work.
   - path: maplib/src/main/java/com/nextgis/maplib/forms/ConditionalRequiredRules.java
     responsibility: Bounded native conditions for field requirements, scalar comparisons and all/any/not groups without scripts or writes.
   - path: maplib/src/main/java/com/nextgis/maplib/forms/CascadingLists.java
@@ -234,6 +236,10 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapTapGesture.java
     responsibility: Density-aware short tap slop with cancellation of drag, long press and multitouch.
 public_contracts:
+  - id: sync-workspace-session
+    symbol: SyncWorkspaceSession.enter, post, execute, start, bindUri and external delivery tickets
+    path: maplib/src/main/java/com/nextgis/maplib/util/SyncWorkspaceSession.java
+    consumers: [app, maplibui]
   - id: project-script-host-api
     symbol: ScriptReference, ScriptPackage and ProjectScriptHost API v1
     path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java
@@ -304,6 +310,7 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
 invariant_refs: [INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE]
 global_docs:
+  - docs/guides/project-synchronization-user-guide.md
   - docs/architecture/conditional-form-rules.md
   - docs/guides/form-behavior-user-guide.md
   - docs/architecture/project-scripts.md

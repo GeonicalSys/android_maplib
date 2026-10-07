@@ -47,10 +47,15 @@ public class MapBase
             final File path,
             final LayerFactory layerFactory)
     {
+        this(context, path, layerFactory, true);
+    }
+
+    public MapBase(Context context, File path, LayerFactory layerFactory, boolean activate)
+    {
         super(context, path.getParentFile(), layerFactory);
         mNewId = 0;
         mId = path.hashCode() & 0x7FFFFFFF; // hash of path
-        mInstance = this;
+        if (activate) mInstance = this;
         mFileName = path.getName();
     }
 
@@ -77,12 +82,17 @@ public class MapBase
 
     public static MapBase getInstance()
     {
+        MapBase scoped = com.nextgis.maplib.util.SyncWorkspaceSession.currentMap();
+        if (scoped != null) return scoped;
         if (mInstance == null) {
             throw new IllegalArgumentException(
                     "Impossible to get the instance. This class must be initialized before");
         }
         return mInstance;
     }
+
+    /** UI identity, unaffected by a background sync scope on the calling thread. */
+    public static MapBase getActiveInstance() { return mInstance; }
 
 
     public ILayer getLastLayer()
