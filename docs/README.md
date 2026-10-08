@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-07
+last_verified: 2026-10-08
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -9,8 +9,9 @@ last_verified: 2026-10-07
 ## Назначение
 
 `forms/ConditionalRequiredRules` разбирает независимый NGFP `lisa_form_rules`:
-условная обязательность по scalar значениям, all/any/not, равенство, списки
-значений и пустота. Parser ограничивает размер/глубину и не исполняет код.
+v1/v2 условная обязательность и v2 видимость поля/элемента по scalar значениям,
+all/any/not, равенству, спискам значений и пустоте. Обе коллекции делят лимиты;
+неизвестные версии, ключи и неоднозначные цели отклоняются. Parser ограничивает размер/глубину и не исполняет код.
 Контракт: consuming root `docs/architecture/conditional-form-rules.md`.
 
 `forms/CascadingLists` разбирает NGFP `lisa_form_dependencies`: общие таблицы,
@@ -498,3 +499,14 @@ merge: maplib → maplibui → app. См.
 
 [Архитектура](../../docs/architecture/project-scripts.md),
 [руководство](../../docs/guides/project-scripts-user-guide.md).
+
+## Изоляция общей синхронизации
+
+Настройка sync_all_projects включена по умолчанию. ProjectSyncRunner сериализует
+project/account passes, а SyncWorkspaceSession связывает owning map с каждым
+callback, provider URI и service ticket до фактического завершения. Закрытая карта
+не активируется; открытая форма/черновик и preferences остаются прежними.
+Полный контракт: consuming root docs/architecture/ngw-sync-and-storage.md;
+пользовательская инструкция: docs/guides/project-synchronization-user-guide.md.
+Перед изменениями читать оба документа. Нельзя заменить изоляцию временным
+переключением глобальной карты или prefs, либо закрыть БД по timeout при живом child.

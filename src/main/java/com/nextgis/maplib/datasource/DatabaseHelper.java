@@ -39,6 +39,9 @@ import java.io.File;
 public class DatabaseHelper
         extends SQLiteOpenHelper
 {
+    private MapBase owner;
+
+    public void setOwner(MapBase owner) { this.owner = owner; }
 
     public DatabaseHelper(
             Context context,
@@ -85,7 +88,7 @@ public class DatabaseHelper
     @Override
     public void onUpgrade(SQLiteDatabase sqLiteDatabase, int oldVersion, int newVersion)
     {
-        MapBase map = MapBase.getInstance();
+        MapBase map = owner != null ? owner : MapBase.getInstance();
         map.onUpgrade(sqLiteDatabase, oldVersion, newVersion);
     }
 }

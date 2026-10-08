@@ -50,6 +50,7 @@ public class MapContentProviderHelper
         extends MapBase
 {
     protected DatabaseHelper mDatabaseHelper;
+    private VectorLayerNotifyReceiver mNotifyReceiver;
 
     protected static final String DBNAME           = "layers";
     protected static final int    DATABASE_VERSION = 6;
@@ -60,7 +61,13 @@ public class MapContentProviderHelper
             File path,
             LayerFactory layerFactory)
     {
-        super(context, path, layerFactory);
+        this(context, path, layerFactory, true);
+    }
+
+    public MapContentProviderHelper(Context context, File path, LayerFactory layerFactory,
+                                    boolean activate)
+    {
+        super(context, path, layerFactory, activate);
 
         /*
          * The database belongs to the map path passed to this instance. Reading the current
@@ -75,6 +82,7 @@ public class MapContentProviderHelper
                 null,             // uses the default SQLite cursor
                 DATABASE_VERSION  // the version number
         );
+        mDatabaseHelper.setOwner(this);
 
         // register events from layers modify in services or other applications
         IntentFilter intentFilter = new IntentFilter();
@@ -86,11 +94,27 @@ public class MapContentProviderHelper
         intentFilter.addAction(NOTIFY_UPDATE_FIELDS);
         intentFilter.addAction(NOTIFY_FEATURE_ID_CHANGE);
 
+        mNotifyReceiver = new VectorLayerNotifyReceiver();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(new VectorLayerNotifyReceiver(), intentFilter, Context.RECEIVER_NOT_EXPORTED);
+            context.registerReceiver(mNotifyReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
-            context.registerReceiver(new VectorLayerNotifyReceiver(), intentFilter);
+            context.registerReceiver(mNotifyReceiver, intentFilter);
         }
+    }
+
+    /** Only for a non-active map after every scoped callback/service task has completed. */
+    public void closeSyncWorkspace() {
+        if (this == MapBase.getActiveInstance()) throw new IllegalStateException("Cannot close active map");
+        if (mNotifyReceiver != null) {
+            getContext().unregisterReceiver(mNotifyReceiver);
+            mNotifyReceiver = null;
+        }
+        mDatabaseHelper.close();
+    }
+
+    void dispatchWorkspaceNotification(Intent intent) {
+        if (mNotifyReceiver == null) throw new IllegalStateException("Workspace is closed");
+        mNotifyReceiver.onReceive(getContext(), intent);
     }
 
     static File resolveDatabaseFile(File mapFile, File fallbackDatabaseFile)
@@ -234,6 +258,10 @@ public class MapContentProviderHelper
 
             if(!intent.hasExtra(Constants.NOTIFY_LAYER_NAME))
                 return;
+
+            String ownerPath = intent.getStringExtra(com.nextgis.maplib.util.SyncWorkspaceSession.EXTRA_MAP_PATH);
+            if (ownerPath != null ? !getPath().getAbsolutePath().equals(ownerPath)
+                    : MapContentProviderHelper.this != MapBase.getActiveInstance()) return;
 
             ILayer layer = getVectorLayerByPath(MapContentProviderHelper.this,
                     intent.getStringExtra(Constants.NOTIFY_LAYER_NAME));

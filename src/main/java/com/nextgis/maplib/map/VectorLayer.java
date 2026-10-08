@@ -329,9 +329,21 @@ public class VectorLayer
     }
 
 
+    protected void sendWorkspaceNotification(Intent intent) {
+        MapContentProviderHelper owner = DatabaseContext.getMapForLayer(this);
+        com.nextgis.maplib.util.SyncWorkspaceSession.bindNotification(this, intent);
+        if (owner != MapBase.getActiveInstance()
+                || com.nextgis.maplib.util.SyncWorkspaceSession.current() != null) {
+            // Apply spatial/cache updates before closing a headless map. A fire-and-forget broadcast
+            // could otherwise arrive after its database had been closed or after a project switch.
+            owner.dispatchWorkspaceNotification(intent);
+        } else getContext().sendBroadcast(intent);
+    }
+
     protected Uri getContentUri()
     {
-        return Uri.parse("content://" + mAuthority + "/" + mPath.getName());
+        return com.nextgis.maplib.util.SyncWorkspaceSession.bindUri(this,
+                Uri.parse("content://" + mAuthority + "/" + mPath.getName()));
     }
 
 
@@ -1515,7 +1527,7 @@ public class VectorLayer
             notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName()); // if we need mAuthority?
             notify.setPackage(getContext().getPackageName());
             com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
-                    () -> getContext().sendBroadcast(notify));
+                    () -> sendWorkspaceNotification(notify));
         }
 
         updateUniqId(rowId);
@@ -1738,6 +1750,7 @@ public class VectorLayer
 
 
     private void notifyCommitted(Uri uri, boolean syncToNetwork) {
+        if (DatabaseContext.getMapForLayer(this) != MapBase.getActiveInstance()) return;
         com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(
                 DatabaseContext.getDatabaseForLayer(this, false),
                 () -> getContext().getContentResolver().notifyChange(uri, null, syncToNetwork));
@@ -1947,7 +1960,7 @@ public class VectorLayer
                 notify.setPackage(getContext().getPackageName());
                 Intent committedNotify = notify;
                 com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
-                        () -> getContext().sendBroadcast(committedNotify));
+                        () -> sendWorkspaceNotification(committedNotify));
             }
         }
         return result;
@@ -2232,7 +2245,7 @@ public class VectorLayer
                         notify.setPackage(getContext().getPackageName());
                         Intent committedNotify = notify;
                 com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
-                        () -> getContext().sendBroadcast(committedNotify));
+                        () -> sendWorkspaceNotification(committedNotify));
                     }
                 } else if (values.containsKey(Constants.FIELD_GEOM) || values.containsKey(
                         Constants.FIELD_ID)) {
@@ -2256,7 +2269,7 @@ public class VectorLayer
                         notify.setPackage(getContext().getPackageName());
                         Intent committedNotify = notify;
                 com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
-                        () -> getContext().sendBroadcast(committedNotify));
+                        () -> sendWorkspaceNotification(committedNotify));
                     }
 
                 } else {
@@ -2268,7 +2281,7 @@ public class VectorLayer
                     notify.setPackage(getContext().getPackageName());
                     Intent committedNotify = notify;
                 com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db,
-                        () -> getContext().sendBroadcast(committedNotify));
+                        () -> sendWorkspaceNotification(committedNotify));
                 }
             }
         }
@@ -3919,7 +3932,8 @@ public class VectorLayer
         Uri uri = Uri.parse("content://" + mAuthority + "/" + mPath.getName() +
                 "/" + featureId + "/" + Constants.URI_ATTACH + "/" + attachId);
         try {
-            OutputStream attachOutStream = mContext.getContentResolver().openOutputStream(uri);
+            OutputStream attachOutStream = mContext.getContentResolver().openOutputStream(
+                    com.nextgis.maplib.util.SyncWorkspaceSession.bindUri(this, uri));
             if (attachOutStream != null) {
                 FileUtil.copy(inputStream, attachOutStream);
                 attachOutStream.close();

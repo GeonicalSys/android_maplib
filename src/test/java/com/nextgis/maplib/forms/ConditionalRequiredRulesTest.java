@@ -59,7 +59,7 @@ public class ConditionalRequiredRulesTest {
         try { rules(deep);fail("Deep condition accepted"); } catch (JSONException expected) { }
     }
     @Test public void unknownVersionAndDuplicateTargetsAreRejected() throws Exception {
-        for (String definition:new String[]{"{\"schema_version\":2,\"required\":[]}","""
+        for (String definition:new String[]{"{\"schema_version\":3,\"required\":[]}","""
             {"schema_version":1,"required":[
               {"field":"c","when":{"field":"p","op":"is_empty"}},
               {"field":"c","when":{"field":"q","op":"is_empty"}}]}
@@ -78,5 +78,77 @@ public class ConditionalRequiredRulesTest {
             json.getJSONArray("required").getJSONObject(0).put("label",invalid);
             try {new ConditionalRequiredRules(json);fail("Invalid label accepted");} catch (JSONException expected) { }
         }
+    }
+    @Test public void versionTwoSharesTypedConditionsForRequiredFieldsAndVisibility() throws Exception {
+        ConditionalRequiredRules rules = new ConditionalRequiredRules(new JSONObject("""
+            {"schema_version":2,
+              "required":[{"field":"comment","when":{"field":"check","op":"eq","value":false}}],
+              "visible":[
+                {"field":"comment","when":{"field":"check","op":"eq","value":false}},
+                {"element":"explanation","when":{"all":[
+                  {"field":"status","op":"in","value":["risk","stopped"]},
+                  {"field":"owner","op":"is_not_empty"}]}}]}
+            """));
+        Map<String,Object> values = new HashMap<>(); values.put("check", 1);
+        assertEquals(Map.of("comment", false), rules.visibleFields(values::get));
+        assertEquals(Map.of("explanation", false), rules.visibleElements(values::get));
+        values.put("check", 0); values.put("status", "risk"); values.put("owner", "не применимо");
+        assertEquals(Set.of("comment"), rules.required(values::get));
+        assertEquals(Map.of("comment", true), rules.visibleFields(values::get));
+        assertEquals(Map.of("explanation", true), rules.visibleElements(values::get));
+        assertEquals(Set.of("check", "status", "owner"), rules.references());
+        assertEquals(Set.of("comment"), rules.visibilityFields());
+        assertEquals(Set.of("explanation"), rules.visibilityElements());
+        assertEquals("не применимо", values.get("owner"));
+    }
+    @Test public void visibilityOnlyAndMutualValueReferencesHaveNoRecursiveState() throws Exception {
+        ConditionalRequiredRules rules = new ConditionalRequiredRules(new JSONObject("""
+            {"schema_version":2,"visible":[
+              {"field":"a","when":{"field":"b","op":"eq","value":"yes"}},
+              {"field":"b","when":{"field":"a","op":"is_not_empty"}}]}
+            """));
+        assertTrue(rules.required(field -> null).isEmpty());
+        assertEquals(Map.of("a", false, "b", false), rules.visibleFields(field -> null));
+        assertEquals(Map.of("a", true, "b", true), rules.visibleFields(field -> "yes"));
+        assertTrue(new ConditionalRequiredRules(new JSONObject("{\"schema_version\":1,\"required\":[]}"))
+                .visibleFields(field -> null).isEmpty());
+    }
+    @Test public void ambiguousUnknownAndDuplicateVisibilityRulesAreRejected() throws Exception {
+        for (String definition : new String[]{
+                "{\"schema_version\":1,\"required\":[],\"visible\":[]}",
+                "{\"schema_version\":2,\"visible_if\":[]}",
+                "{\"schema_version\":\"2\",\"visible\":[]}",
+                "{\"schema_version\":2,\"visible\":null}",
+                """
+                {"schema_version":2,"visible":[{"field":"c","element":"x","when":{"field":"p","op":"is_empty"}}]}
+                """,
+                """
+                {"schema_version":2,"visible":[{"field":123,"when":{"field":"p","op":"is_empty"}}]}
+                """,
+                """
+                {"schema_version":2,"visible":[{"element":" ","when":{"field":"p","op":"is_empty"}}]}
+                """,
+                """
+                {"schema_version":2,"visible":[{"element":"hint_933","when":{"field":"p","op":"is_empty"}}]}
+                """,
+                """
+                {"schema_version":2,"visible":[
+                  {"field":"c","when":{"field":"p","op":"is_empty"}},
+                  {"field":"c","when":{"field":"q","op":"is_empty"}}]}
+                """}) {
+            try { new ConditionalRequiredRules(new JSONObject(definition)); fail("Invalid visibility accepted: " + definition); }
+            catch (JSONException expected) { }
+        }
+    }
+    @Test public void limitsApplyToBothRuleCollectionsAndUtf8Bytes() throws Exception {
+        JSONObject definition = new JSONObject("{\"schema_version\":2,\"required\":[],\"visible\":[]}");
+        for (int i=0; i<513; i++) definition.getJSONArray(i%2==0 ? "required" : "visible").put(new JSONObject()
+                .put("field", "field"+i).put("when", new JSONObject().put("field","p").put("op","is_empty")));
+        try { new ConditionalRequiredRules(definition); fail("Total target limit ignored"); } catch (JSONException expected) { }
+        definition = new JSONObject("{\"schema_version\":2,\"required\":[]}");
+        for (int i=0; i<280; i++) definition.getJSONArray("required").put(new JSONObject().put("field","field"+i)
+                .put("label", "Я".repeat(500)).put("when", new JSONObject().put("field","p").put("op","is_empty")));
+        assertTrue(definition.toString().length() < ConditionalRequiredRules.MAX_BYTES);
+        try { new ConditionalRequiredRules(definition); fail("UTF-8 byte limit ignored"); } catch (JSONException expected) { }
     }
 }

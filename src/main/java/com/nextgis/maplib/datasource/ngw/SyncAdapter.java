@@ -101,6 +101,8 @@ public class SyncAdapter
 
 
     public static final String ACTION_LPATH = "com.nextgis.mobile.util.action.LPATH";
+    public static final String EXTRA_QUEUE_OWNS_LIFECYCLE = "ngw_queue_owns_lifecycle";
+    private boolean mQueueOwnsLifecycle;
 
     public static final String EXCEPTION = "exception";
     protected String mError;
@@ -148,6 +150,8 @@ public class SyncAdapter
             SyncResult syncResult)
     {
         IGISApplication gisApp = (IGISApplication) getContext().getApplicationContext();
+        mQueueOwnsLifecycle = bundle != null && bundle.getBoolean(EXTRA_QUEUE_OWNS_LIFECYCLE, false)
+                && com.nextgis.maplib.util.SyncWorkspaceSession.current() != null;
         Log.d("SSYNC", "super.onPerformSync for " + account.name);
         gisApp.setError(null, null, 0);
 
@@ -170,16 +174,17 @@ public class SyncAdapter
             if (!networkUtil.isNetworkAvailable()) {
                 HyperLog.v(Constants.TAG, "SyncAdapter: aborted — network unavailable, manual=" + manualSync);
                 if (!manualSync) {
+                    SyncResultUtil.markNetworkUnavailable(syncResult);
                     return;
                 }
                 SyncResultUtil.beginSync();
                 try {
                     gisApp.stopHandler();
-                    NGWSyncService.markSyncStarted();
+                    if (!mQueueOwnsLifecycle) NGWSyncService.markSyncStarted();
                     ownsProgressSession = NgwSyncProgress.ensureSession(getContext(), 1);
                     NgwSyncProgress.beginAccount();
                     progressStarted = true;
-                    getContext().sendBroadcast(
+                    if (!mQueueOwnsLifecycle) getContext().sendBroadcast(
                             (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
                     SyncResultUtil.markNetworkUnavailable(syncResult);
                     completePerformSync(account, syncResult, (MapContentProviderHelper) MapBase.getInstance(), true);
@@ -198,10 +203,10 @@ public class SyncAdapter
             try {
                 MapContentProviderHelper mapContentProviderHelper = (MapContentProviderHelper) MapBase.getInstance();
 
-                NGWSyncService.markSyncStarted();
+                if (!mQueueOwnsLifecycle) NGWSyncService.markSyncStarted();
                 ownsProgressSession = NgwSyncProgress.ensureSession(getContext(), 1);
                 progressStarted = true;
-                getContext().sendBroadcast(
+                if (!mQueueOwnsLifecycle) getContext().sendBroadcast(
                         (new Intent(SYNC_START)).setPackage(getContext().getPackageName()));
 
                 mVersions = new HashMap<>();
@@ -235,8 +240,8 @@ public class SyncAdapter
             HyperLog.w(Constants.TAG, "SyncAdapter.onPerformSync uncaught for " + account.name, t);
             syncResult.stats.numIoExceptions++;
         } finally {
-            NGWSyncService.markSyncFinished();
-            if (!finishBroadcast) {
+            if (!mQueueOwnsLifecycle) NGWSyncService.markSyncFinished();
+            if (!finishBroadcast && !mQueueOwnsLifecycle) {
                 Intent finish = new Intent(SYNC_FINISH).setPackage(getContext().getPackageName());
                 HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_FINISH (safety/early-exit) sent");
                 getContext().sendBroadcast(finish);
@@ -317,6 +322,7 @@ public class SyncAdapter
             boolean manualSync)
     {
         if (isCanceled()) {
+            if (mQueueOwnsLifecycle) return;
             Log.d(Constants.TAG, "onPerformSync - SYNC_CANCELED is sent");
             HyperLog.v(Constants.TAG, "SyncAdapter: SYNC_CANCELED is sent");
             NGWSyncService.markSyncFinished();
@@ -354,6 +360,7 @@ public class SyncAdapter
         Log.d("SSYNC", "onPerformSync END account - " + account.name);
         Log.d("SSYNC", "onPerformSync END error - " + mError);
 
+        if (mQueueOwnsLifecycle) return;
         Intent finish = new Intent(SYNC_FINISH);
         if (!TextUtils.isEmpty(mError)) {
             finish.putExtra(EXCEPTION, mError);
