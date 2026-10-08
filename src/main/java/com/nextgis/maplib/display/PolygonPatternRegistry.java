@@ -185,6 +185,12 @@ public final class PolygonPatternRegistry {
         return !ruleStyling && defaultPattern > FILL_PATTERN_NONE;
     }
 
+    /** Same immutable pattern pixels for a category legend and the MapLibre fill. */
+    public static Bitmap previewPattern(int pattern, String imageName) {
+        Bitmap custom = imageName == null ? null : CUSTOM_PATTERN_IMAGES.get(imageName);
+        return custom != null ? custom : createPatternBitmap(pattern);
+    }
+
     private static Bitmap createPatternBitmap(int pattern) {
         Bitmap custom = CUSTOM_PATTERN_BITMAPS.get(pattern);
         if (custom != null) {

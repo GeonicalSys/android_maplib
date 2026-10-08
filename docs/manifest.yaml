@@ -14,7 +14,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/forms/ConditionalRequiredRules.java
     responsibility: Bounded v1/v2 native requirements and v2 field/element visibility with shared typed conditions, portable element IDs and common limits; never changes values or executes scripts.
   - path: maplib/src/main/java/com/nextgis/maplib/forms/CascadingLists.java
-    responsibility: Parse declarative NGFP relation tables, sort an acyclic dependency graph, filter by stable parent keys and preserve unchanged historical tuples.
+    responsibility: Parse declarative NGFP relation tables, sort an acyclic graph, filter by stable parent keys, resolve all valid ancestor tuples for explicit style-category defaults and preserve unchanged historical tuples.
   - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
     responsibility: Bounded QuickJS Binder service under an isolated Android UID.
   - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java

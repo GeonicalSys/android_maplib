@@ -8,6 +8,12 @@ last_verified: 2026-10-08
 
 ## Назначение
 
+CascadingLists.initialSelections восстанавливает допустимые цепочки родителей
+по значению категории стиля, используя стабильные keys и AND-фильтры. Метод
+не меняет текущий сеанс и возвращает все различимые цепочки без выбора первой.
+PolygonPatternRegistry.previewPattern переиспользует штатные pixels для legend.
+Контракт: consuming root docs/architecture/feature-type-creation.md.
+
 `forms/ConditionalRequiredRules` разбирает независимый NGFP `lisa_form_rules`:
 v1/v2 условная обязательность и v2 видимость поля/элемента по scalar значениям,
 all/any/not, равенству, спискам значений и пустоте. Обе коллекции делят лимиты;

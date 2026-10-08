@@ -11,6 +11,39 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.*;
 
 public class CascadingListsTest {
+    @Test public void styleValueResolvesAllParentsByKeysWithoutChangingSession() throws Exception {
+        CascadingLists model = new CascadingLists(definition());
+        List<CascadingLists.InitialSelection> choices = model.initialSelections("employee1", " bOb ", true);
+        assertEquals(1, choices.size());
+        CascadingLists.InitialSelection selected = choices.get(0);
+        assertEquals(Map.of("contractor", "c2", "position1", "p1", "employee1", "e2"), selected.keys);
+        assertEquals("Company B", selected.values.get("contractor"));
+        assertEquals("Driver", selected.values.get("position1"));
+        assertEquals("Bob", selected.values.get("employee1"));
+        assertNull(model.value("employee1"));
+        model.restore(selected.values, selected.keys, Collections.emptyMap());
+        assertTrue(model.invalidFields().isEmpty());
+        assertNull(model.value("employee2"));
+        model.select("contractor", "c1");
+        assertNull(model.value("employee1"));
+    }
+
+    @Test public void ambiguousStyleValueOffersBothParentTuplesInsteadOfPickingFirst() throws Exception {
+        CascadingLists model = new CascadingLists(definition());
+        List<CascadingLists.InitialSelection> choices = model.initialSelections("position1", "Driver", false);
+        assertEquals(2, choices.size());
+        assertEquals(List.of("Company A", "Company B"), choices.stream()
+                .map(choice -> choice.values.get("contractor")).collect(Collectors.toList()));
+        assertTrue(model.initialSelections("employee1", "deleted type", false).isEmpty());
+    }
+
+    @Test public void backwardsResolutionRejectsInconsistentSharedAncestors() throws Exception {
+        JSONObject json = definition();
+        json.getJSONObject("tables").getJSONArray("employees").put(new JSONObject()
+                .put("id", "e4").put("contractor_id", "missing").put("position_id", "p1")
+                .put("position", "Driver").put("name", "Invalid"));
+        assertTrue(new CascadingLists(json).initialSelections("employee1", "Invalid", false).isEmpty());
+    }
     private static JSONObject rule(String field, String table, String key, String value,
                                     String... parents) throws Exception {
         JSONArray filters = new JSONArray();
