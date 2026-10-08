@@ -41,7 +41,10 @@ Merge Commit; связанный root PR обновляет submodule pointer п
 `forms/ConditionalRequiredRules` — чистый типизированный parser/evaluator
 `meta.json.lisa_form_rules`; читать `../docs/architecture/conditional-form-rules.md`.
 Не смешивать с JS, каскадами, GIS-запросами или UI. Соблюдать пределы формата,
-missing-семантику и числовые 0/1 для checkbox; static required не ослаблять.
+missing-семантику и числовые 0/1 для checkbox; static required сохранять для видимых полей. V2 visible не меняет
+значения/схему; hidden scope и Save eligibility определяет UI по тем же conditions.
+V1 остаётся совместимым. Обе коллекции делят budget, лишние ключи и ошибки
+типов отклоняются. Element ID — переносимое буквенное имя без цифр.
 
 Зависимые списки: `forms/CascadingLists` владеет чистым parser/state engine;
 читать `../docs/architecture/cascading-form-lists.md`. Не добавлять UI/JS или

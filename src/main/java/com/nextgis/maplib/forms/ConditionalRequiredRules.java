@@ -12,22 +12,37 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-/** Bounded, offline, declarative requirements. Conditions never execute code or change values. */
+/** Bounded, offline form conditions. Visibility never clears values or changes layer metadata. */
 public final class ConditionalRequiredRules {
     public static final String META_KEY = "lisa_form_rules";
     public static final int MAX_BYTES = 256 * 1024;
     private final Map<String, Condition> rules = new LinkedHashMap<>();
     private final Map<String, String> labels = new LinkedHashMap<>();
+    private final Map<String, Condition> visibleFields = new LinkedHashMap<>();
+    private final Map<String, Condition> visibleElements = new LinkedHashMap<>();
     private final Set<String> references = new LinkedHashSet<>();
     private int nodes;
     private interface Condition { boolean matches(Function<String, Object> values); }
 
     public ConditionalRequiredRules(JSONObject definition) throws JSONException {
-        if (definition.getInt("schema_version") != 1) throw new JSONException("Unknown form rules version");
-        JSONArray required = definition.getJSONArray("required");
+        if (definition.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_BYTES)
+            throw new JSONException("Form rules exceed byte limit");
+        Object version = definition.get("schema_version");
+        if (!(version instanceof Integer) || ((Integer) version != 1 && (Integer) version != 2))
+            throw new JSONException("Unknown form rules version");
+        boolean visibility = (Integer) version == 2;
+        java.util.Iterator<String> keys = definition.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            if (!key.equals("schema_version") && !key.equals("required") && !(visibility && key.equals("visible")))
+                throw new JSONException("Unknown form rules property: " + key);
+        }
+        JSONArray required = definition.has("required") ? definition.getJSONArray("required") : new JSONArray();
+        if (!visibility && !definition.has("required")) throw new JSONException("Missing required rules");
         if (required.length() > 512) throw new JSONException("Too many required rules");
         for (int i = 0; i < required.length(); i++) {
             JSONObject rule = required.getJSONObject(i);
+            if (rule.length() != (rule.has("label") ? 3 : 2)) throw new JSONException("Invalid required rule");
             String field = name(rule, "field");
             if (rule.has("label")) {
                 Object label = rule.get("label");
@@ -38,11 +53,36 @@ public final class ConditionalRequiredRules {
             if (rules.put(field, parse(rule.getJSONObject("when"), 0)) != null)
                 throw new JSONException("Repeated required target: " + field);
         }
+        if (visibility && definition.has("visible")) {
+            JSONArray visible = definition.getJSONArray("visible");
+            if (required.length() + visible.length() > 512) throw new JSONException("Too many form rules");
+            for (int i = 0; i < visible.length(); i++) {
+                JSONObject rule = visible.getJSONObject(i);
+                if (rule.length() != 2 || rule.has("field") == rule.has("element"))
+                    throw new JSONException("Visibility needs one field or element target");
+                String target = name(rule, rule.has("field") ? "field" : "element");
+                if (rule.has("element") && !validElementId(target)) throw new JSONException("Invalid portable element ID");
+                Map<String, Condition> targets = rule.has("field") ? visibleFields : visibleElements;
+                if (targets.put(target, parse(rule.getJSONObject("when"), 0)) != null)
+                    throw new JSONException("Repeated visibility target: " + target);
+            }
+        }
     }
 
     public Set<String> targets() { return Collections.unmodifiableSet(rules.keySet()); }
     public Set<String> references() { return Collections.unmodifiableSet(references); }
+    public Set<String> visibilityFields() { return Collections.unmodifiableSet(visibleFields.keySet()); }
+    public Set<String> visibilityElements() { return Collections.unmodifiableSet(visibleElements.keySet()); }
+    public Map<String, Boolean> visibleFields(Function<String, Object> values) { return evaluate(visibleFields, values); }
+    public Map<String, Boolean> visibleElements(Function<String, Object> values) { return evaluate(visibleElements, values); }
+    private static Map<String, Boolean> evaluate(Map<String, Condition> rules, Function<String, Object> values) {
+        Map<String, Boolean> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Condition> rule : rules.entrySet()) result.put(rule.getKey(), rule.getValue().matches(values));
+        return Collections.unmodifiableMap(result);
+    }
     public String label(String field, String fallback) { return labels.getOrDefault(field, fallback); }
+    /** Alphabetic stable names survive legacy NGFP cloning that substitutes numeric resource IDs. */
+    public static boolean validElementId(String id) { return id != null && id.matches("[A-Za-z][A-Za-z_-]{0,127}"); }
     public Set<String> required(Function<String, Object> values) {
         Set<String> required = new LinkedHashSet<>();
         for (Map.Entry<String, Condition> rule : rules.entrySet())
@@ -103,8 +143,10 @@ public final class ConditionalRequiredRules {
     }
 
     private static String name(JSONObject json, String key) throws JSONException {
-        String name = json.getString(key);
-        if (name.isEmpty() || name.length() > 256) throw new JSONException("Invalid field name");
+        Object raw = json.get(key);
+        if (!(raw instanceof String)) throw new JSONException("Invalid target name");
+        String name = (String) raw;
+        if (name.trim().isEmpty() || name.length() > 256) throw new JSONException("Invalid field name");
         return name;
     }
     private static Object scalar(Object value) throws JSONException {

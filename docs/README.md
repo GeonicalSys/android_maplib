@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-07
+last_verified: 2026-10-08
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -9,8 +9,9 @@ last_verified: 2026-10-07
 ## Назначение
 
 `forms/ConditionalRequiredRules` разбирает независимый NGFP `lisa_form_rules`:
-условная обязательность по scalar значениям, all/any/not, равенство, списки
-значений и пустота. Parser ограничивает размер/глубину и не исполняет код.
+v1/v2 условная обязательность и v2 видимость поля/элемента по scalar значениям,
+all/any/not, равенству, спискам значений и пустоте. Обе коллекции делят лимиты;
+неизвестные версии, ключи и неоднозначные цели отклоняются. Parser ограничивает размер/глубину и не исполняет код.
 Контракт: consuming root `docs/architecture/conditional-form-rules.md`.
 
 `forms/CascadingLists` разбирает NGFP `lisa_form_dependencies`: общие таблицы,
