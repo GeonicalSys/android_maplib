@@ -1,12 +1,16 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-08
+last_verified: 2026-10-09
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
 
 ## Назначение
+
+TrackSendSettings хранит независимое намерение отправки трека: default=true,
+однократная миграция старой выключенной галочки и сохранение последующего opt-out.
+Контракт: consuming root docs/architecture/ngw-sync-and-storage.md.
 
 CascadingLists.initialSelections восстанавливает допустимые цепочки родителей
 по значению категории стиля, используя стабильные keys и AND-фильтры. Метод
