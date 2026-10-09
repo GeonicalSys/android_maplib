@@ -10,6 +10,8 @@ last_verified: 2026-10-09
 
 TrackSendSettings хранит независимое намерение отправки трека: default=true,
 однократная миграция старой выключенной галочки и сохранение последующего opt-out.
+Готовность сервера и отметки не выводятся из этой галочки: maplibui отдельно
+подтверждает регистрацию пары сервер/UID; app учитывает оба условия.
 Контракт: consuming root docs/architecture/ngw-sync-and-storage.md.
 
 CascadingLists.initialSelections восстанавливает допустимые цепочки родителей

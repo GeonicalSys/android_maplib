@@ -10,7 +10,7 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/TrackSendSettings.java
-    responsibility: Keep upload intent enabled by default independently of tracker registration, migrate legacy registration-disabled flags once and preserve later explicit opt-out.
+    responsibility: Keep upload intent enabled by default independently of tracker registration, migrate legacy registration-disabled flags once and preserve later explicit opt-out; consumers separately require confirmed server/UID registration for pending track badges.
   - path: maplib/src/test/java/com/nextgis/maplib/util/TrackSendSettingsTest.java
     responsibility: Verify fresh default, one-time legacy migration and durable opt-out on Android 26 and 36.
   - path: maplib/src/main/java/com/nextgis/maplib/util/SyncWorkspaceSession.java
