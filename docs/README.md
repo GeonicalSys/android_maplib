@@ -1,12 +1,25 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-08
+last_verified: 2026-10-10
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
 
 ## Назначение
+
+`LocalLogInitializer` выполняет один local-only HyperLog initialize на процесс,
+мигрируя устаревший `HyperLog/URL` до чтения библиотекой. Локальная база и формат
+сохраняются; последующие app/GIS вызовы не запускают подготовку remote uploads.
+`LayerFormHashUtil` канонизирует form/meta JSON: порядок ключей/пробелы не меняют
+hash, но значения, идентичности, правила и порядок массивов остаются значимыми.
+Это сохраняет snapshot/download/staging guard без ложных mismatches между NGW workers.
+
+TrackSendSettings хранит независимое намерение отправки трека: default=true,
+однократная миграция старой выключенной галочки и сохранение последующего opt-out.
+Готовность сервера и отметки не выводятся из этой галочки: maplibui отдельно
+подтверждает регистрацию пары сервер/UID; app учитывает оба условия.
+Контракт: consuming root docs/architecture/ngw-sync-and-storage.md.
 
 CascadingLists.initialSelections восстанавливает допустимые цепочки родителей
 по значению категории стиля, используя стабильные keys и AND-фильтры. Метод

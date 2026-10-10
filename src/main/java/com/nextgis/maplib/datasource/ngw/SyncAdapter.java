@@ -399,7 +399,7 @@ public class SyncAdapter
 
         String name = getContext().getPackageName() + "_preferences";
         SharedPreferences mSharedPreferences = getContext().getSharedPreferences(name, MODE_MULTI_PROCESS);
-        boolean trackSync = mSharedPreferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, false);
+        boolean trackSync = mSharedPreferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, true);
 
         MapContentProviderHelper layerGroup =(MapContentProviderHelper) MapBase.getInstance();
         if (layerGroup == null) {
@@ -580,7 +580,7 @@ public class SyncAdapter
 
         String name = getContext().getPackageName() + "_preferences";
         SharedPreferences preferences = getContext().getSharedPreferences(name, MODE_MULTI_PROCESS);
-        boolean trackSync = preferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, false);
+        boolean trackSync = preferences.getBoolean(SettingsConstants.KEY_PREF_TRACK_SEND, true);
         for (int i = 0; i < layerGroup.getLayerCount(); i++) {
             ILayer layer = layerGroup.getLayer(i);
             if (layer instanceof INGWLayer && !account.name.equals(((INGWLayer) layer).getAccountName())) {

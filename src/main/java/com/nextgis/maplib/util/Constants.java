@@ -51,7 +51,7 @@ public interface Constants
 
     /**
      * Cold-start UX extras: timing logs in {@code MapDrawable.loadLayersToMaplibreMap}, default progress
-     * caption in {@code MapFragment}, placeholder {@code HyperLog.setURL} in app/GISApplication.
+     * caption in {@code MapFragment}.
      */
     boolean MAP_STARTUP_UX_EXTRAS_ENABLED = VECTOR_RENDER_DISK_CACHE_ENABLED
             || MAP_STARTUP_PARALLEL_VECTOR_PREP;

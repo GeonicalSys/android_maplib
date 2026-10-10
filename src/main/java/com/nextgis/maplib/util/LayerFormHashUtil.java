@@ -6,7 +6,9 @@
 package com.nextgis.maplib.util;
 
 import org.json.JSONException;
+import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -16,6 +18,8 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
+import java.util.Iterator;
+import java.util.TreeSet;
 import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -134,16 +138,58 @@ public final class LayerFormHashUtil {
     }
 
     private static byte[] normalizePartBytes(String canonicalName, byte[] bytes) {
-        if (!FILE_META_ZIP.equals(canonicalName) || bytes == null || bytes.length == 0) {
+        if (bytes == null || bytes.length == 0) {
             return bytes;
         }
         try {
             String raw = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            JSONObject json = new JSONObject(raw);
-            json.remove(JSON_NGW_CONNECTION);
-            return json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            JSONTokener tokener = new JSONTokener(raw);
+            Object json = tokener.nextValue();
+            if (tokener.nextClean() != 0) return bytes;
+            if (!(json instanceof JSONObject) && !(json instanceof JSONArray)) return bytes;
+            if (FILE_META_ZIP.equals(canonicalName) && json instanceof JSONObject) {
+                ((JSONObject) json).remove(JSON_NGW_CONNECTION);
+            }
+            // NGW's legacy exporter can emit object attributes in different orders per worker.
+            // Canonicalize both parts, retaining every value and the order of all JSON arrays.
+            StringBuilder canonical = new StringBuilder();
+            appendCanonicalJson(canonical, json);
+            return canonical.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
         } catch (JSONException e) {
             return bytes;
+        }
+    }
+
+    private static void appendCanonicalJson(StringBuilder out, Object value) throws JSONException {
+        if (value instanceof JSONObject) {
+            JSONObject object = (JSONObject) value;
+            TreeSet<String> keys = new TreeSet<>();
+            for (Iterator<String> iterator = object.keys(); iterator.hasNext();) keys.add(iterator.next());
+            out.append('{');
+            boolean first = true;
+            for (String key : keys) {
+                if (!first) out.append(',');
+                first = false;
+                out.append(JSONObject.quote(key)).append(':');
+                appendCanonicalJson(out, object.get(key));
+            }
+            out.append('}');
+        } else if (value instanceof JSONArray) {
+            JSONArray array = (JSONArray) value;
+            out.append('[');
+            for (int i = 0; i < array.length(); i++) {
+                if (i > 0) out.append(',');
+                appendCanonicalJson(out, array.get(i));
+            }
+            out.append(']');
+        } else if (value == null || value == JSONObject.NULL) {
+            out.append("null");
+        } else if (value instanceof Number) {
+            out.append(JSONObject.numberToString((Number) value));
+        } else if (value instanceof Boolean) {
+            out.append(value);
+        } else {
+            out.append(JSONObject.quote(value.toString()));
         }
     }
 
