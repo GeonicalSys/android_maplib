@@ -4606,16 +4606,15 @@ public class MapDrawable
         syncUserLocationSourceFromStyle(map.getStyle());
         if (locationSource == null) return;
         locationSource.setGeoJson(FeatureCollection.fromFeatures(
-                UserLocationGeometry.overlayFeatures(
+                UserLocationGeometry.overlayFeaturesForScale(
                         lastUserLocationPoint,
                         lastUserLocationStanding,
                         lastUserLocationBearing,
                         lastUserLocationAccuracyMeters,
                         lastUserHeadingTrueDegrees,
                         lastUserHeadingHalfAngleDegrees,
-                        UserLocationGeometry.coneRadiusForScale(
-                                map.getProjection().getMetersPerPixelAtLatitude(
-                                        lastUserLocationPoint.latitude())))));
+                        map.getProjection().getMetersPerPixelAtLatitude(
+                                lastUserLocationPoint.latitude()))));
         ensureUserLocationLayerOnTop(map.getStyle());
     }
 
