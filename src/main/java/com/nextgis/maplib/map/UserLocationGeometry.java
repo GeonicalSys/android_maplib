@@ -23,6 +23,9 @@ public final class UserLocationGeometry {
     public static final int SECTOR_ARC_STEPS = 32;
     public static final float CONE_METERS = 8f;
     public static final float CONE_SCREEN_PIXELS = 56f;
+    public static final float CENTER_HOLE_SCREEN_PIXELS = 10.5f;
+    // Hide the inner sector contour beneath the opaque ring, including its 2.8 px halo.
+    private static final float HEADING_INNER_SCREEN_PIXELS = 13f;
     public static final float MIN_HALF_ANGLE_DEGREES = 5f;
     public static final float MAX_HALF_ANGLE_DEGREES = 90f;
 
@@ -83,16 +86,44 @@ public final class UserLocationGeometry {
             float headingTrueDegrees,
             float headingHalfAngleDegrees,
             float headingRadiusMeters) {
+        return overlayFeatures(point, isStanding, bearing, accuracyMeters, headingTrueDegrees,
+                headingHalfAngleDegrees, headingRadiusMeters, 0f, 0f);
+    }
+
+    /** Leave the Orbit opening clear of both translucent location overlays. */
+    public static List<Feature> overlayFeaturesForScale(
+            Point point, boolean isStanding, float bearing, float accuracyMeters,
+            float headingTrueDegrees, float headingHalfAngleDegrees, double metersPerPixel) {
+        float radius = coneRadiusForScale(metersPerPixel);
+        return overlayFeatures(point, isStanding, bearing, accuracyMeters, headingTrueDegrees,
+                headingHalfAngleDegrees, radius,
+                radius * CENTER_HOLE_SCREEN_PIXELS / CONE_SCREEN_PIXELS,
+                radius * HEADING_INNER_SCREEN_PIXELS / CONE_SCREEN_PIXELS);
+    }
+
+    private static List<Feature> overlayFeatures(
+            Point point, boolean isStanding, float bearing, float accuracyMeters,
+            float headingTrueDegrees, float headingHalfAngleDegrees, float headingRadiusMeters,
+            float centerHoleMeters, float headingInnerMeters) {
         List<Feature> features = new ArrayList<>();
-        if (Float.isFinite(accuracyMeters) && accuracyMeters > 0f) {
-            features.add(polygon(accuracyRing(point, accuracyMeters), ROLE_ACCURACY));
+        if (Float.isFinite(accuracyMeters) && accuracyMeters > centerHoleMeters) {
+            List<List<Point>> rings = new ArrayList<>();
+            rings.add(accuracyRing(point, accuracyMeters));
+            if (centerHoleMeters > 0f) {
+                List<Point> hole = accuracyRing(point, centerHoleMeters);
+                Collections.reverse(hole);
+                rings.add(hole);
+            }
+            Feature accuracy = Feature.fromGeometry(Polygon.fromLngLats(rings));
+            accuracy.addStringProperty(ROLE_PROPERTY, ROLE_ACCURACY);
+            features.add(accuracy);
         }
         if (hasHeadingSector(headingTrueDegrees, headingHalfAngleDegrees)) {
             List<Point> sector = headingSector(
                     point,
                     headingRadiusMeters,
                     headingTrueDegrees,
-                    clampHalfAngleDegrees(headingHalfAngleDegrees));
+                    clampHalfAngleDegrees(headingHalfAngleDegrees), headingInnerMeters);
             if (sector.size() >= 4) {
                 features.add(polygon(sector, ROLE_HEADING));
             }
@@ -122,6 +153,12 @@ public final class UserLocationGeometry {
             double meters,
             double headingTrueDegrees,
             double halfAngleDegrees) {
+        return headingSector(center, meters, headingTrueDegrees, halfAngleDegrees, 0d);
+    }
+
+    private static List<Point> headingSector(
+            Point center, double meters, double headingTrueDegrees,
+            double halfAngleDegrees, double innerMeters) {
         if (!(halfAngleDegrees > 0) || !Double.isFinite(headingTrueDegrees)
                 || !Double.isFinite(halfAngleDegrees) || !Double.isFinite(meters) || meters <= 0) {
             return Collections.emptyList();
@@ -129,13 +166,21 @@ public final class UserLocationGeometry {
         double half = Math.min(MAX_HALF_ANGLE_DEGREES, Math.max(MIN_HALF_ANGLE_DEGREES, halfAngleDegrees));
         double radius = Math.min(meters / EARTH_RADIUS_METERS, Math.PI / 2);
         List<Point> ring = new ArrayList<>(SECTOR_ARC_STEPS + 3);
-        ring.add(center);
+        if (innerMeters <= 0d) ring.add(center);
         for (int i = 0; i <= SECTOR_ARC_STEPS; i++) {
             double azimuth = headingTrueDegrees - half
                     + (2 * half) * i / (double) SECTOR_ARC_STEPS;
             ring.add(destination(center, radius, Math.toRadians(azimuth)));
         }
-        ring.add(center);
+        if (innerMeters > 0d) {
+            double innerRadius = Math.min(innerMeters / EARTH_RADIUS_METERS, Math.PI / 2);
+            for (int i = SECTOR_ARC_STEPS; i >= 0; i--) {
+                double azimuth = headingTrueDegrees - half
+                        + (2 * half) * i / (double) SECTOR_ARC_STEPS;
+                ring.add(destination(center, innerRadius, Math.toRadians(azimuth)));
+            }
+            ring.add(ring.get(0));
+        } else ring.add(center);
         return ring;
     }
 

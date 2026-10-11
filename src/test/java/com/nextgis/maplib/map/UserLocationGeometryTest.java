@@ -187,4 +187,45 @@ public class UserLocationGeometryTest {
         assertEquals(8f, UserLocationGeometry.coneRadiusForScale(Double.NaN), 0f);
         assertEquals(8f, UserLocationGeometry.coneRadiusForScale(0d), 0f);
     }
+
+    @Test
+    public void ringWindowKeepsUnderlyingFeaturesClearWhilePreservingOuterAccuracyAndHeading() {
+        for (double metersPerPixel : new double[]{0.05, 1.2, 12d}) {
+            float accuracyMeters = (float) (100d * metersPerPixel);
+            List<Feature> features = UserLocationGeometry.overlayFeaturesForScale(
+                    CENTER, true, 140f, accuracyMeters, 0f, 30f, metersPerPixel);
+            Polygon accuracy = (Polygon) features.get(0).geometry();
+            assertEquals(2, accuracy.coordinates().size());
+            assertEquals(accuracyMeters, northMeters(accuracy.coordinates().get(0).get(0)), 0.001);
+            List<Point> hole = accuracy.coordinates().get(1);
+            assertEquals(UserLocationGeometry.CIRCLE_STEPS + 1, hole.size());
+            assertEquals(10.5, northMeters(hole.get(0)) / metersPerPixel, 0.001);
+            assertTrue("The hole winds opposite to the outer accuracy ring",
+                    hole.get(1).longitude() < CENTER.longitude());
+            Polygon heading = (Polygon) features.get(1).geometry();
+            List<Point> sector = heading.coordinates().get(0);
+            assertEquals(2 * (UserLocationGeometry.SECTOR_ARC_STEPS + 1) + 1, sector.size());
+            assertEquals(56, northMeters(sector.get(UserLocationGeometry.SECTOR_ARC_STEPS / 2))
+                    / metersPerPixel, 0.001);
+            assertEquals(13, northMeters(sector.get(UserLocationGeometry.SECTOR_ARC_STEPS + 1
+                    + UserLocationGeometry.SECTOR_ARC_STEPS / 2)) / metersPerPixel, 0.001);
+            assertEquals(sector.get(0), sector.get(sector.size() - 1));
+            Feature marker = features.get(2);
+            assertTrue(marker.getBooleanProperty(UserLocationGeometry.HAS_DIRECTION_PROPERTY));
+            assertEquals(0, marker.getNumberProperty("bearing").floatValue(), 0f);
+        }
+    }
+
+    @Test
+    public void anAccuracyCircleCoveredByTheWindowDoesNotProduceAnInvalidHole() {
+        List<Feature> features = UserLocationGeometry.overlayFeaturesForScale(
+                CENTER, false, 80f, 5f, Float.NaN, Float.NaN, 1d);
+        assertEquals(1, features.size());
+        assertEquals(80f, features.get(0).getNumberProperty("bearing").floatValue(), 0f);
+        assertTrue(features.get(0).getBooleanProperty(UserLocationGeometry.HAS_DIRECTION_PROPERTY));
+    }
+
+    private static double northMeters(Point point) {
+        return Math.toRadians(point.latitude() - CENTER.latitude()) * UserLocationGeometry.EARTH_RADIUS_METERS;
+    }
 }

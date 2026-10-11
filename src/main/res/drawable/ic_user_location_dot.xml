@@ -4,11 +4,16 @@
     android:height="72dp"
     android:viewportWidth="72"
     android:viewportHeight="72">
-    <!-- Same centred canvas as the orbital pointer; the white halo has a dark outer edge. -->
-    <path android:fillColor="#FFFFFF" android:strokeColor="#16364E" android:strokeWidth="0.7"
-        android:pathData="M36,20.8 A15.2,15.2 0,1 1,36,51.2 A15.2,15.2 0,1 1,36,20.8" />
-    <path android:fillColor="#0872E8" android:strokeColor="#FFFFFF" android:strokeWidth="0.5"
-        android:pathData="M36,24 A12,12 0,1 1,36,48 A12,12 0,1 1,36,24" />
+    <!-- Keep the 10.5 dp opening and outer footprint; grow blue outward into the white rim. -->
+    <!-- Opposite inner winding keeps the opening transparent on every vector renderer. -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M36,33.8 A2.2,2.2 0,1 1,36,38.2 A2.2,2.2 0,1 1,36,33.8" />
+        android:pathData="M36,20.8 A15.2,15.2 0,1 1,36,51.2 A15.2,15.2 0,1 1,36,20.8 Z M36,25.5 A10.5,10.5 0,1 0,36,46.5 A10.5,10.5 0,1 0,36,25.5 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#16364E" android:strokeWidth="0.7"
+        android:pathData="M36,20.8 A15.2,15.2 0,1 1,36,51.2 A15.2,15.2 0,1 1,36,20.8 Z" />
+    <path android:fillColor="#0872E8"
+        android:pathData="M36,23 A13,13 0,1 1,36,49 A13,13 0,1 1,36,23 Z M36,25.5 A10.5,10.5 0,1 0,36,46.5 A10.5,10.5 0,1 0,36,25.5 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="0.5"
+        android:pathData="M36,23 A13,13 0,1 1,36,49 A13,13 0,1 1,36,23 Z" />
+    <path android:fillColor="#0872E8"
+        android:pathData="M36,33 A3,3 0,1 1,36,39 A3,3 0,1 1,36,33" />
 </vector>
