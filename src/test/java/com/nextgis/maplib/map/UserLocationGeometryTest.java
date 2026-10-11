@@ -171,7 +171,7 @@ public class UserLocationGeometryTest {
     public void compassSectorKeepsItsScreenLengthWhileGpsAccuracyRemainsMetric() {
         for (double metersPerPixel : new double[]{0.05, 1.2, 12d}) {
             float radius = UserLocationGeometry.coneRadiusForScale(metersPerPixel);
-            assertEquals(36d, radius / metersPerPixel, 1e-5);
+            assertEquals(56d, radius / metersPerPixel, 1e-5);
             List<Feature> features = UserLocationGeometry.overlayFeatures(
                     CENTER, true, 0f, 12f, 0f, 30f, radius);
             Polygon cone = (Polygon) features.get(1).geometry();

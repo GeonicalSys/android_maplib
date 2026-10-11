@@ -138,8 +138,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   часть. Неполная или вырожденная геометрия без внутренней точки не получает
   якорь, а свойства подписи сохраняются;
 - `user-location-layer` остаётся служебным верхним overlay независимо от порядка
-  пользовательских слоёв; геодезический круг `user-location-accuracy` и сектор
-  направления `user-location-heading` лежат непосредственно под ним (роль Polygon
+  пользовательских слоёв; геодезический круг `user-location-accuracy`, сектор
+  направления `user-location-heading` и его контуры `user-location-heading-halo` /
+  `user-location-heading-outline` лежат непосредственно под ним (роль Polygon
   `accuracy`/`heading`); непостоянные `azimuth-measurement-*` line/point layers
   для измерения свободных точек восстанавливаются при full/lite reload строго под ним,
   не входят в `LayerGroup`, не сохраняются как прикладные данные и передают drag
@@ -246,9 +247,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `GpsEventSource` владеет общим потоком позиции и отдельным GNSS-only выходом
   записи. Карта получает свежий GPS (чип или mock) и Network только без GPS,
   метрический круг accuracy и
-  геодезический сектор точности компаса (`UserLocationGeometry`) длиной 36
-  логических пикселей при текущем zoom. Центрированные векторные ресурсы
-  «Орбиты» сохраняют круг на фиксе при вращении треугольника. Компас приоритетен
+  геодезический сектор точности компаса (`UserLocationGeometry`) длиной 56
+  логических пикселей при текущем zoom. Заливка сектора 0.24 дополнена белым
+  контуром 2.8 px с синим контуром 1.2 px поверх него. «Контрастная орбита»
+  использует плотный синий диск 24 dp, белую обводку с тонкой тёмной кромкой
+  и увеличенный треугольник 16 × 14 dp. Общий canvas 72 dp центрирован на фиксе
+  и содержит треугольник при любом повороте. Компас приоритетен
   даже на остановке, при его недоступности — курс движущегося фикса; без обоих
   направлений остаётся круг. Legacy type=stand/go сохранён, has_direction
   выбирает ресурс, bearing — вычисленное направление. Host обновляет сектор
@@ -359,6 +363,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   (на other или унаследованный); data-driven scale — outer switchCase.
 - Курсор перекрывается треком/вектором: проверить, что `user-location-layer`
   последний в live style после cold/lite/hot reload, а под ним
+  `user-location-heading-outline`, `user-location-heading-halo`,
   `user-location-heading` и `user-location-accuracy`.
 - Объект после cold form recovery выбирается, но не виден до restart: проверить
   `MapLibre feature missing after form Save` и следующий полный data reload слоя.
