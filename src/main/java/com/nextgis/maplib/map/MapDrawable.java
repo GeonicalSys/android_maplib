@@ -317,6 +317,8 @@ public class MapDrawable
     private static final String USER_LOCATION_SOURCE_ID = "user-location-source";
     private static final String USER_ACCURACY_LAYER_ID = "user-location-accuracy";
     private static final String USER_HEADING_LAYER_ID = "user-location-heading";
+    private static final String USER_HEADING_HALO_LAYER_ID = "user-location-heading-halo";
+    private static final String USER_HEADING_OUTLINE_LAYER_ID = "user-location-heading-outline";
     private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
     private static final String WALK_PREVIEW_SOURCE = "walk-preview-source";
     private FeatureCollection walkPreview = FeatureCollection.fromFeatures(new ArrayList<>());
@@ -464,20 +466,24 @@ public class MapDrawable
 
     /**
      * Keeps the location cursor outside the user {@link LayerGroup} order and above every rendered
-     * map object. MapLibre paints style layers bottom-to-top, so the stack is accuracy fill, heading
-     * sector, then the cursor as the last layer. Re-adding a removed {@link Layer} is supported by
+     * map object. MapLibre paints style layers bottom-to-top: accuracy fill, heading fill, white
+     * heading halo, blue heading outline, then the cursor. Re-adding a removed {@link Layer} is supported by
      * MapLibre and preserves its properties.
      */
     private void ensureUserLocationLayerOnTop(@Nullable Style style) {
         if (style == null || style.getSource(USER_LOCATION_SOURCE_ID) == null) return;
         List<Layer> layers = style.getLayers();
         int n = layers.size();
-        if (n >= 3
+        if (n >= 5
                 && USER_LOCATION_LAYER_ID.equals(layers.get(n - 1).getId())
-                && USER_HEADING_LAYER_ID.equals(layers.get(n - 2).getId())
-                && USER_ACCURACY_LAYER_ID.equals(layers.get(n - 3).getId())) return;
+                && USER_HEADING_OUTLINE_LAYER_ID.equals(layers.get(n - 2).getId())
+                && USER_HEADING_HALO_LAYER_ID.equals(layers.get(n - 3).getId())
+                && USER_HEADING_LAYER_ID.equals(layers.get(n - 4).getId())
+                && USER_ACCURACY_LAYER_ID.equals(layers.get(n - 5).getId())) return;
         Layer accuracy = style.getLayer(USER_ACCURACY_LAYER_ID);
         Layer heading = style.getLayer(USER_HEADING_LAYER_ID);
+        Layer headingHalo = style.getLayer(USER_HEADING_HALO_LAYER_ID);
+        Layer headingOutline = style.getLayer(USER_HEADING_OUTLINE_LAYER_ID);
         Layer location = style.getLayer(USER_LOCATION_LAYER_ID);
         if (accuracy == null) {
             accuracy = createUserAccuracyLayer();
@@ -493,10 +499,26 @@ public class MapDrawable
         } else if (heading instanceof FillLayer) {
             ((FillLayer) heading).setFilter(userLocationHeadingFilter());
         }
+        if (headingHalo == null) {
+            headingHalo = createUserHeadingOutlineLayer(true);
+        } else if (!style.removeLayer(headingHalo)) {
+            return;
+        } else if (headingHalo instanceof LineLayer) {
+            ((LineLayer) headingHalo).setFilter(userLocationHeadingFilter());
+        }
+        if (headingOutline == null) {
+            headingOutline = createUserHeadingOutlineLayer(false);
+        } else if (!style.removeLayer(headingOutline)) {
+            return;
+        } else if (headingOutline instanceof LineLayer) {
+            ((LineLayer) headingOutline).setFilter(userLocationHeadingFilter());
+        }
         if (location == null) location = createUserLocationLayer();
         else if (!style.removeLayer(location)) return;
         style.addLayer(accuracy);
         style.addLayer(heading);
+        style.addLayer(headingHalo);
+        style.addLayer(headingOutline);
         style.addLayer(location);
     }
 
@@ -511,9 +533,18 @@ public class MapDrawable
     private static FillLayer createUserHeadingLayer() {
         return new FillLayer(USER_HEADING_LAYER_ID, USER_LOCATION_SOURCE_ID)
                 .withFilter(userLocationHeadingFilter())
-                .withProperties(PropertyFactory.fillColor("#3189D6"),
-                        PropertyFactory.fillOpacity(0.18f),
-                        PropertyFactory.fillOutlineColor("#3189D6"));
+                .withProperties(PropertyFactory.fillColor("#137DE8"),
+                        PropertyFactory.fillOpacity(0.24f));
+    }
+
+    private static LineLayer createUserHeadingOutlineLayer(boolean halo) {
+        return new LineLayer(halo ? USER_HEADING_HALO_LAYER_ID : USER_HEADING_OUTLINE_LAYER_ID,
+                USER_LOCATION_SOURCE_ID)
+                .withFilter(userLocationHeadingFilter())
+                .withProperties(PropertyFactory.lineColor(halo ? "#FFFFFF" : "#137DE8"),
+                        PropertyFactory.lineOpacity(halo ? 0.75f : 0.85f),
+                        PropertyFactory.lineWidth(halo ? 2.8f : 1.2f),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND));
     }
 
     private static Expression userLocationAccuracyFilter() {
