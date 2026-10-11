@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -246,8 +246,14 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - `GpsEventSource` владеет общим потоком позиции и отдельным GNSS-only выходом
   записи. Карта получает свежий GPS (чип или mock) и Network только без GPS,
   метрический круг accuracy и
-  геодезический сектор направления (`UserLocationGeometry`); host обновляет
-  сектор при повороте телефона без нового GPS. Источник очищает устаревшую
+  геодезический сектор точности компаса (`UserLocationGeometry`) длиной 36
+  логических пикселей при текущем zoom. Центрированные векторные ресурсы
+  «Орбиты» сохраняют круг на фиксе при вращении треугольника. Компас приоритетен
+  даже на остановке, при его недоступности — курс движущегося фикса; без обоих
+  направлений остаётся круг. Legacy type=stand/go сохранён, has_direction
+  выбирает ресурс, bearing — вычисленное направление. Host обновляет сектор
+  и треугольник без нового GPS, в том числе при expiry компаса и смене камеры.
+  GPS bearing не создаёт сектор компаса. Источник очищает устаревшую
   позицию по монотонному времени, в том числе после сна.
   `ExternalGnssFixPolicy` отбрасывает заглушку GPS Connector без extras и чип
   при живом mock или native NMEA; сам NMEA не считается чипом. `gnss_input=external` читает NMEA напрямую (Bluetooth Classic/LE,

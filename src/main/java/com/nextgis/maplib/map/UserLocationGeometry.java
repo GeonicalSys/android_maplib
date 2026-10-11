@@ -16,19 +16,42 @@ public final class UserLocationGeometry {
     public static final String ROLE_PROPERTY = "role";
     public static final String ROLE_ACCURACY = "accuracy";
     public static final String ROLE_HEADING = "heading";
+    public static final String HAS_DIRECTION_PROPERTY = "has_direction";
 
     public static final double EARTH_RADIUS_METERS = 6371008.8;
     public static final int CIRCLE_STEPS = 64;
     public static final int SECTOR_ARC_STEPS = 32;
     public static final float CONE_METERS = 8f;
+    public static final float CONE_SCREEN_PIXELS = 36f;
     public static final float MIN_HALF_ANGLE_DEGREES = 5f;
     public static final float MAX_HALF_ANGLE_DEGREES = 90f;
 
     private UserLocationGeometry() { }
 
-    /** Heading cone length is fixed in metres and does not follow GPS accuracy. */
+    /** Legacy metric radius for geometry-only consumers; map rendering uses coneRadiusForScale. */
     public static float coneRadiusMeters(float accuracyMeters) {
         return CONE_METERS;
+    }
+
+    /** Compass uncertainty is angular: keep its sector readable independently of zoom/GPS error. */
+    public static float coneRadiusForScale(double metersPerPixel) {
+        if (!Double.isFinite(metersPerPixel) || metersPerPixel <= 0d) return CONE_METERS;
+        return (float) Math.min(CONE_SCREEN_PIXELS * metersPerPixel,
+                Math.PI * EARTH_RADIUS_METERS / 2d);
+    }
+
+    /** Compass wins even at rest; only a moving fix can supply the fallback course. */
+    public static float markerBearing(boolean isStanding, float movementBearing,
+            float compassBearing, float compassHalfAngle) {
+        if (hasHeadingSector(compassBearing, compassHalfAngle)) {
+            float normalized = compassBearing % 360f;
+            return normalized < 0f ? normalized + 360f : normalized;
+        }
+        if (!isStanding && Float.isFinite(movementBearing)
+                && movementBearing >= 0f && movementBearing < 360f) {
+            return movementBearing;
+        }
+        return Float.NaN;
     }
 
     public static float clampHalfAngleDegrees(float halfAngleDegrees) {
@@ -48,6 +71,18 @@ public final class UserLocationGeometry {
             float accuracyMeters,
             float headingTrueDegrees,
             float headingHalfAngleDegrees) {
+        return overlayFeatures(point, isStanding, bearing, accuracyMeters, headingTrueDegrees,
+                headingHalfAngleDegrees, CONE_METERS);
+    }
+
+    public static List<Feature> overlayFeatures(
+            Point point,
+            boolean isStanding,
+            float bearing,
+            float accuracyMeters,
+            float headingTrueDegrees,
+            float headingHalfAngleDegrees,
+            float headingRadiusMeters) {
         List<Feature> features = new ArrayList<>();
         if (Float.isFinite(accuracyMeters) && accuracyMeters > 0f) {
             features.add(polygon(accuracyRing(point, accuracyMeters), ROLE_ACCURACY));
@@ -55,7 +90,7 @@ public final class UserLocationGeometry {
         if (hasHeadingSector(headingTrueDegrees, headingHalfAngleDegrees)) {
             List<Point> sector = headingSector(
                     point,
-                    coneRadiusMeters(accuracyMeters),
+                    headingRadiusMeters,
                     headingTrueDegrees,
                     clampHalfAngleDegrees(headingHalfAngleDegrees));
             if (sector.size() >= 4) {
@@ -64,7 +99,9 @@ public final class UserLocationGeometry {
         }
         Feature marker = Feature.fromGeometry(point);
         marker.addStringProperty("type", isStanding ? "stand" : "go");
-        marker.addNumberProperty("bearing", isStanding ? 0f : bearing);
+        float direction = markerBearing(isStanding, bearing, headingTrueDegrees, headingHalfAngleDegrees);
+        marker.addBooleanProperty(HAS_DIRECTION_PROPERTY, Float.isFinite(direction));
+        marker.addNumberProperty("bearing", Float.isFinite(direction) ? direction : 0f);
         features.add(marker);
         return features;
     }

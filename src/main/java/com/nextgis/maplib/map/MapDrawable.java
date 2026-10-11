@@ -512,7 +512,7 @@ public class MapDrawable
         return new FillLayer(USER_HEADING_LAYER_ID, USER_LOCATION_SOURCE_ID)
                 .withFilter(userLocationHeadingFilter())
                 .withProperties(PropertyFactory.fillColor("#3189D6"),
-                        PropertyFactory.fillOpacity(0.32f),
+                        PropertyFactory.fillOpacity(0.18f),
                         PropertyFactory.fillOutlineColor("#3189D6"));
     }
 
@@ -536,11 +536,12 @@ public class MapDrawable
                 .withProperties(
                         PropertyFactory.iconImage(
                                 Expression.switchCase(
-                                        Expression.eq(Expression.get("type"), Expression.literal("stand")), Expression.literal(USER_LOCATION_STANDING_ICON_ID),
-                                        Expression.eq(Expression.get("type"), Expression.literal("go")), Expression.literal(USER_LOCATION_MOVING_ICON_ID),
+                                        Expression.eq(Expression.get(UserLocationGeometry.HAS_DIRECTION_PROPERTY), Expression.literal(true)), Expression.literal(USER_LOCATION_MOVING_ICON_ID),
                                         Expression.literal(USER_LOCATION_STANDING_ICON_ID))),
                         PropertyFactory.iconRotate(Expression.get("bearing")),
                         PropertyFactory.iconSize(1.0f),
+                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
+                        PropertyFactory.iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
                         PropertyFactory.iconAllowOverlap(true),
                         PropertyFactory.iconIgnorePlacement(true),
                         PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP));
@@ -2150,11 +2151,11 @@ public class MapDrawable
 
 
 
-                        final Drawable drawableStand = getContext().getResources().getDrawable( R.drawable.ic_location_standing);
+                        final Drawable drawableStand = getContext().getResources().getDrawable( R.drawable.ic_user_location_dot);
                         final Bitmap bitmapStand = drawableToBitmap(drawableStand);
                         style.addImage(USER_LOCATION_STANDING_ICON_ID, bitmapStand);
 
-                        final Drawable drawableGo = getContext().getResources().getDrawable( R.drawable.ic_location_moving);
+                        final Drawable drawableGo = getContext().getResources().getDrawable( R.drawable.ic_user_location_orbit);
                         final Bitmap bitmapGo = drawableToBitmap(drawableGo);
                         style.addImage(USER_LOCATION_MOVING_ICON_ID, bitmapGo);
 
@@ -2442,11 +2443,11 @@ public class MapDrawable
 
         style.addLayer(vertexFillLayer);
 
-        final Drawable drawableStand = getContext().getResources().getDrawable( R.drawable.ic_location_standing);
+        final Drawable drawableStand = getContext().getResources().getDrawable( R.drawable.ic_user_location_dot);
         final Bitmap bitmapStand = drawableToBitmap(drawableStand);
         style.addImage(USER_LOCATION_STANDING_ICON_ID, bitmapStand);
 
-        final Drawable drawableGo = getContext().getResources().getDrawable( R.drawable.ic_location_moving);
+        final Drawable drawableGo = getContext().getResources().getDrawable( R.drawable.ic_user_location_orbit);
         final Bitmap bitmapGo = drawableToBitmap(drawableGo);
         style.addImage(USER_LOCATION_MOVING_ICON_ID, bitmapGo);
 
@@ -4524,7 +4525,8 @@ public class MapDrawable
     }
 
     /**
-     * Rebuilds the heading sector from the last GPS fix without changing the puck or accuracy circle.
+     * Rebuilds the compass sector and orbital pointer from the last GPS fix. Missing compass
+     * heading restores the movement course, or the plain dot while standing.
      */
     public void updateLocationHeading(
             @Nullable Float headingTrueDegrees,
@@ -4579,7 +4581,10 @@ public class MapDrawable
                         lastUserLocationBearing,
                         lastUserLocationAccuracyMeters,
                         lastUserHeadingTrueDegrees,
-                        lastUserHeadingHalfAngleDegrees)));
+                        lastUserHeadingHalfAngleDegrees,
+                        UserLocationGeometry.coneRadiusForScale(
+                                map.getProjection().getMetersPerPixelAtLatitude(
+                                        lastUserLocationPoint.latitude())))));
         ensureUserLocationLayerOnTop(map.getStyle());
     }
 

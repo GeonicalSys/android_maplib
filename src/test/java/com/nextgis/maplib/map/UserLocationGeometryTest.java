@@ -118,5 +118,73 @@ public class UserLocationGeometryTest {
                 UserLocationGeometry.ROLE_PROPERTY));
         assertEquals("go", features.get(1).getStringProperty("type"));
         assertEquals(80f, features.get(1).getNumberProperty("bearing").floatValue(), 0f);
+        assertTrue(features.get(1).getBooleanProperty(UserLocationGeometry.HAS_DIRECTION_PROPERTY));
+    }
+
+    @Test
+    public void compassOverridesTheMovementCourseAndRotatesTheStandingMarker() {
+        for (boolean standing : new boolean[]{true, false}) {
+            List<Feature> features = UserLocationGeometry.overlayFeatures(
+                    CENTER, standing, 140f, 12f, 350f, 25f, 36f);
+            Feature marker = features.get(features.size() - 1);
+            assertTrue(marker.getBooleanProperty(UserLocationGeometry.HAS_DIRECTION_PROPERTY));
+            assertEquals(350f, marker.getNumberProperty("bearing").floatValue(), 0f);
+            Polygon cone = (Polygon) features.get(1).geometry();
+            Point midpoint = cone.coordinates().get(0).get(1 + UserLocationGeometry.SECTOR_ARC_STEPS / 2);
+            assertTrue(midpoint.longitude() < CENTER.longitude());
+            assertTrue(midpoint.latitude() > CENTER.latitude());
+        }
+    }
+
+    @Test
+    public void noCompassAndNoMovementShowsOnlyTheCircleAndPlainDot() {
+        List<Feature> features = UserLocationGeometry.overlayFeatures(
+                CENTER, true, 140f, 12f, Float.NaN, Float.NaN);
+        assertEquals(2, features.size());
+        Feature marker = features.get(1);
+        assertFalse(marker.getBooleanProperty(UserLocationGeometry.HAS_DIRECTION_PROPERTY));
+        assertEquals(0f, marker.getNumberProperty("bearing").floatValue(), 0f);
+    }
+
+    @Test
+    public void invalidCompassFallsBackToNorthwardMovementWithoutInventingACone() {
+        List<Feature> features = UserLocationGeometry.overlayFeatures(
+                CENTER, false, 0f, 12f, 80f, Float.NaN);
+        assertEquals(2, features.size());
+        assertTrue(features.get(1).getBooleanProperty(UserLocationGeometry.HAS_DIRECTION_PROPERTY));
+        assertEquals(0f, features.get(1).getNumberProperty("bearing").floatValue(), 0f);
+    }
+
+    @Test
+    public void invalidMovementBearingsCannotProduceAnOrbitalPointer() {
+        for (float bearing : new float[]{Float.NaN, Float.POSITIVE_INFINITY, -1f, 360f}) {
+            List<Feature> features = UserLocationGeometry.overlayFeatures(
+                    CENTER, false, bearing, 0f, Float.NaN, Float.NaN);
+            assertEquals(1, features.size());
+            assertFalse(features.get(0).getBooleanProperty(UserLocationGeometry.HAS_DIRECTION_PROPERTY));
+            assertEquals(0f, features.get(0).getNumberProperty("bearing").floatValue(), 0f);
+        }
+        assertEquals(350f, UserLocationGeometry.markerBearing(true, 0f, -10f, 20f), 0f);
+    }
+
+    @Test
+    public void compassSectorKeepsItsScreenLengthWhileGpsAccuracyRemainsMetric() {
+        for (double metersPerPixel : new double[]{0.05, 1.2, 12d}) {
+            float radius = UserLocationGeometry.coneRadiusForScale(metersPerPixel);
+            assertEquals(36d, radius / metersPerPixel, 1e-5);
+            List<Feature> features = UserLocationGeometry.overlayFeatures(
+                    CENTER, true, 0f, 12f, 0f, 30f, radius);
+            Polygon cone = (Polygon) features.get(1).geometry();
+            Point midpoint = cone.coordinates().get(0).get(1 + UserLocationGeometry.SECTOR_ARC_STEPS / 2);
+            double meters = Math.toRadians(midpoint.latitude() - CENTER.latitude())
+                    * UserLocationGeometry.EARTH_RADIUS_METERS;
+            assertEquals(radius, meters, 0.001);
+            Polygon circle = (Polygon) features.get(0).geometry();
+            double gpsMeters = Math.toRadians(circle.coordinates().get(0).get(0).latitude() - CENTER.latitude())
+                    * UserLocationGeometry.EARTH_RADIUS_METERS;
+            assertEquals(12d, gpsMeters, 0.001);
+        }
+        assertEquals(8f, UserLocationGeometry.coneRadiusForScale(Double.NaN), 0f);
+        assertEquals(8f, UserLocationGeometry.coneRadiusForScale(0d), 0f);
     }
 }

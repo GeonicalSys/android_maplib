@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Circle centre is the coordinate; the north-facing triangle orbits that same anchor. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M24,2 L17.5,13 L30.5,13 Z" />
+    <path android:fillColor="#3189D6" android:pathData="M24,4 L20,11 L28,11 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M24,13.5 A10.5,10.5 0,1 1,24,34.5 A10.5,10.5 0,1 1,24,13.5" />
+    <path android:fillColor="#3189D6" android:pathData="M24,15 A9,9 0,1 1,24,33 A9,9 0,1 1,24,15" />
+    <path android:fillColor="#FFFFFF" android:pathData="M24,16.5 A7.5,7.5 0,1 1,24,31.5 A7.5,7.5 0,1 1,24,16.5" />
+    <path android:fillColor="#3189D6" android:pathData="M24,21.5 A2.5,2.5 0,1 1,24,26.5 A2.5,2.5 0,1 1,24,21.5" />
+</vector>
