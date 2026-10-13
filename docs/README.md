@@ -1,12 +1,21 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-11
+last_verified: 2026-10-13
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
 
 ## Назначение
+
+MapRuntimeDiagnostics отслеживает длительные touch queries и local tile work
+без вызовов SDK/SQLite из watchdog: trace stages, heap/queue/workers, cached
+frame/lifecycle/scene state, bounded caller Java stack. Observer работает отдельно
+от bounded writer, быстрые успехи не логируются, повторы считают suppression.
+Private journal до 16 KiB связывается с событием по времени и сохраняет identity
+прежнего процесса. Local 503 содержит точную причину queue_full/heap_headroom
+и request id; ограничения ресурсов и содержимое тайлов не меняются.
+Контракт: consuming root docs/architecture/error-reporting.md.
 
 `LocalLogInitializer` выполняет один local-only HyperLog initialize на процесс,
 мигрируя устаревший `HyperLog/URL` до чтения библиотекой. Локальная база и формат

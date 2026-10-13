@@ -9,6 +9,7 @@ import android.util.Log;
 
 import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.MapRuntimeDiagnostics;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -41,7 +42,6 @@ public final class LocalVectorTileServer {
     private static final LocalVectorTileServer INSTANCE = new LocalVectorTileServer();
     private static final Pattern TILE_PATH = Pattern.compile(
             "^/tiles/(\\d+)/(\\d+)/(\\d+)/(\\d+)\\.pbf$");
-    private static final long RESOURCE_WARNING_INTERVAL_MS = 10_000L;
 
     private final Map<Integer, VectorLayer> mLayers = new ConcurrentHashMap<>();
     private final Map<Integer, Object> mLayerBuildLocks = new ConcurrentHashMap<>();
@@ -51,7 +51,6 @@ public final class LocalVectorTileServer {
     private volatile ServerSocket mServerSocket;
     private volatile int mPort = -1;
     private volatile boolean mRunning;
-    private volatile long mLastResourceWarningMs;
 
     private LocalVectorTileServer() {
     }
@@ -129,9 +128,9 @@ public final class LocalVectorTileServer {
                 try {
                     mExecutor.execute(request);
                 } catch (RejectedExecutionException rejected) {
+                    MapRuntimeDiagnostics.tileRejected(request.mRequestId, "queue_full",
+                            mExecutor.getActiveCount(), mExecutor.getQueue().size(), null);
                     request.rejectOverload();
-                    logResourceWarning("queue full active=" + mExecutor.getActiveCount()
-                            + " queued=" + mExecutor.getQueue().size());
                 }
             } catch (IOException e) {
                 if (mRunning) {
@@ -141,8 +140,11 @@ public final class LocalVectorTileServer {
         }
     }
 
-    private void handle(Socket socket, long generation) {
+    private void handle(Socket socket, long generation, MapRuntimeDiagnostics.Trace trace) {
+        String failure = null;
+        int bytes = -1;
         try (Socket s = socket) {
+            trace.phase("request_read");
             if (generation != mLayerGeneration.get()) {
                 return;
             }
@@ -157,14 +159,21 @@ public final class LocalVectorTileServer {
             while ((line = reader.readLine()) != null && line.length() > 0) {
                 // Drain headers; keep-alive is deliberately ignored.
             }
-            Response response = route(requestLine, generation);
+            Response response = route(requestLine, generation, trace);
+            trace.put("status", response.status);
+            if (response.status == 500) failure = "tile_error";
+            bytes = response.body == null ? 0 : response.body.length;
+            trace.phase("write_response");
             writeResponse(s.getOutputStream(), response);
         } catch (Exception e) {
+            failure = e.getClass().getSimpleName();
             Log.w(TAG, "request failed", e);
+        } finally {
+            trace.finish(bytes, failure);
         }
     }
 
-    private Response route(String requestLine, long generation) {
+    private Response route(String requestLine, long generation, MapRuntimeDiagnostics.Trace trace) {
         try {
             String[] parts = requestLine.split(" ");
             if (parts.length < 2 || !"GET".equals(parts[0].toUpperCase(Locale.ROOT))) {
@@ -183,6 +192,7 @@ public final class LocalVectorTileServer {
             int z = Integer.parseInt(matcher.group(2));
             int x = Integer.parseInt(matcher.group(3));
             int y = Integer.parseInt(matcher.group(4));
+            trace.put("layer_id", layerId); trace.put("z", z); trace.put("x", x); trace.put("y", y);
             VectorLayer layer = mLayers.get(layerId);
             if (layer == null) {
                 return Response.text(404, "Layer Not Registered");
@@ -190,21 +200,22 @@ public final class LocalVectorTileServer {
             Runtime runtime = Runtime.getRuntime();
             if (!LocalVectorTileRequestPolicy.hasHeapHeadroom(
                     runtime.maxMemory(), runtime.totalMemory(), runtime.freeMemory())) {
-                logResourceWarning("heap headroom below "
-                        + (LocalVectorTileRequestPolicy.MIN_HEAP_HEADROOM_BYTES / 1024L / 1024L)
-                        + " MiB");
-                return Response.text(503, "Tile Server Busy");
+                MapRuntimeDiagnostics.tileRejected(trace.id(), "heap_headroom",
+                        mExecutor.getActiveCount(), mExecutor.getQueue().size(), trace);
+                return Response.busy("heap_headroom", trace.id());
             }
             Object buildLock = mLayerBuildLocks.computeIfAbsent(layerId, ignored -> new Object());
             byte[] tile;
+            trace.phase("wait_layer_lock");
             synchronized (buildLock) {
                 if (generation != mLayerGeneration.get() || mLayers.get(layerId) != layer) {
                     return Response.text(404, "Layer Not Registered");
                 }
-                tile = LocalVectorTileProvider.buildTile(layer, z, x, y);
+                tile = LocalVectorTileProvider.buildTile(layer, z, x, y, trace);
             }
             return new Response(200, "application/x-protobuf", tile);
         } catch (Exception e) {
+            trace.put("error_type", e.getClass().getSimpleName());
             HyperLog.w(Constants.TAG, "Local vector tile request failed: "
                     + e.getMessage(), e);
             return Response.text(500, "Tile Error");
@@ -221,18 +232,11 @@ public final class LocalVectorTileServer {
         }
     }
 
-    private void logResourceWarning(String detail) {
-        long now = System.currentTimeMillis();
-        if (now - mLastResourceWarningMs < RESOURCE_WARNING_INTERVAL_MS) {
-            return;
-        }
-        mLastResourceWarningMs = now;
-        HyperLog.w(Constants.TAG, "Local vector tile request throttled: " + detail);
-    }
-
     private final class RequestTask implements Runnable {
         private final Socket mSocket;
         private final long mGeneration;
+        private final long mRequestId = MapRuntimeDiagnostics.nextRequestId();
+        private final long mAcceptedAt = MapRuntimeDiagnostics.now();
 
         RequestTask(Socket socket, long generation) {
             mSocket = socket;
@@ -241,12 +245,17 @@ public final class LocalVectorTileServer {
 
         @Override
         public void run() {
-            handle(mSocket, mGeneration);
+            MapRuntimeDiagnostics.tileLoad(mExecutor.getActiveCount(), mExecutor.getQueue().size());
+            try {
+                handle(mSocket, mGeneration, MapRuntimeDiagnostics.beginTile(mRequestId, mAcceptedAt));
+            } finally {
+                MapRuntimeDiagnostics.tileLoad(Math.max(0, mExecutor.getActiveCount() - 1), mExecutor.getQueue().size());
+            }
         }
 
         void rejectOverload() {
             try (Socket socket = mSocket) {
-                writeResponse(socket.getOutputStream(), Response.text(503, "Tile Server Busy"));
+                writeResponse(socket.getOutputStream(), Response.busy("queue_full", mRequestId));
             } catch (IOException ignored) {
                 // The MapLibre client may already have abandoned this request.
             }
@@ -268,6 +277,9 @@ public final class LocalVectorTileServer {
                 + "Content-Length: " + body.length + "\r\n"
                 + "Cache-Control: no-cache\r\n"
                 + "Connection: close\r\n"
+                + (response.diagnosticReason == null ? "" : MapRuntimeDiagnostics.REASON_HEADER + ": "
+                    + response.diagnosticReason + "\r\n" + MapRuntimeDiagnostics.REQUEST_HEADER + ": "
+                    + response.requestId + "\r\n")
                 + "\r\n";
         out.write(headers.getBytes(StandardCharsets.US_ASCII));
         out.write(body);
@@ -278,6 +290,8 @@ public final class LocalVectorTileServer {
         final int status;
         final String contentType;
         final byte[] body;
+        String diagnosticReason;
+        long requestId;
 
         Response(int status, String contentType, byte[] body) {
             this.status = status;
@@ -290,6 +304,13 @@ public final class LocalVectorTileServer {
                     status,
                     "text/plain; charset=utf-8",
                     text.getBytes(StandardCharsets.UTF_8));
+        }
+
+        static Response busy(String reason, long requestId) {
+            Response response = text(503, "Tile Server Busy");
+            response.diagnosticReason = reason;
+            response.requestId = requestId;
+            return response;
         }
 
         String reason() {
