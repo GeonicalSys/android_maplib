@@ -50,8 +50,8 @@ all/any/not, равенству, спискам значений и пустот
 
 Нижняя библиотека проекта: GIS layer/data model, локальное хранение, NGW
 protocol/sync decisions, MapLibre style/rendering и shared application APIs.
-Для подготовленного выпуска `3.1.2.28` диагностический release `BuildConfig.VERSION_NAME` равен
-`3.1.2.28`; отдельный Lisa Debug использует `3.1.2.23`. Оба значения проверяются
+Для подготовленного выпуска `3.1.2.29` диагностический release `BuildConfig.VERSION_NAME` равен
+`3.1.2.29`; отдельный Lisa Debug использует `3.1.2.23`. Оба значения проверяются
 вместе с соответствующим APK consuming app.
 
 ## Критичные области
