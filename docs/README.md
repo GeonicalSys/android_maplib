@@ -1,10 +1,25 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-13
+last_verified: 2026-10-14
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## Автоматический background lease и display-only Network
+
+`GpsEventSource.acquireBackgroundUpdates/releaseBackgroundUpdates` добавляют
+независимого владельца общего GPS/Network и partial wake lock. Снятие map listener
+при таком владельце не прерывает acquisition или фильтр; release не трогает
+recorders и precision leases. `getLastDisplayLocation` удерживает последнюю
+отображённую сетевую точку с исходным timestamp/accuracy и округлённым возрастом.
+`getLastKnownLocation`, запись и точные инструменты сохраняют прежнюю свежесть;
+скрытая сетевая точка старше последнего GPS не используется после потери GPS.
+`GpsRecoveryPolicy` даёт bounded snapshot после 30 s начального ожидания / 15 s
+повторного восстановления, не чаще одного раза в 10 min. Provider-off и permission
+loss тихие. Consuming app доставляет snapshot через свой diagnostics transport.
+Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.
+
 
 ## Назначение
 

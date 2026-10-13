@@ -2,13 +2,17 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-13
+last_verified: 2026-10-14
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/location/GpsRecoveryPolicy.java
+    responsibility: Rate-limit acquisition/reacquisition snapshots without reporting expected provider-off or permission-denied states.
+  - path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
+    responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
     responsibility: Observe stalled render queries and tile stages independently of the UI, bound writer/log repetitions, persist a 16 KiB operation snapshot with process/version identity and match it to live or historical event timestamps without business storage reads.
   - path: maplib/src/test/java/com/nextgis/maplib/util/MapRuntimeDiagnosticsTest.java
@@ -287,7 +291,7 @@ public_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
     consumers: [app]
   - id: current-location-recording
-    symbol: GpsEventSource.RecordingListener and GpsEventListener.onLocationUnavailable
+    symbol: GpsEventSource.RecordingListener, acquireBackgroundUpdates/releaseBackgroundUpdates, getLastDisplayLocation, setRecoveryReporter and GpsEventListener.onLocationUnavailable
     path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
     consumers: [app, maplibui]
   - id: segmented-tracks
