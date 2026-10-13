@@ -2683,6 +2683,24 @@ public class MapDrawable
         }
     }
 
+    private List<org.maplibre.geojson.Feature> queryTouchFeatures(MapLibreMap map, android.graphics.RectF rect,
+                                                                String target, MaplibreMapInteraction interaction) {
+        com.nextgis.maplib.util.MapRuntimeDiagnostics.Trace trace = com.nextgis.maplib.util.MapRuntimeDiagnostics
+                .beginQuery(target, interaction == null ? null : interaction.getMode());
+        int count = -1;
+        String error = null;
+        try {
+            List<org.maplibre.geojson.Feature> result = map.queryRenderedFeatures(rect, target);
+            count = result == null ? -1 : result.size();
+            return result;
+        } catch (RuntimeException failure) {
+            error = failure.getClass().getSimpleName();
+            throw failure;
+        } finally {
+            trace.finish(count, error);
+        }
+    }
+
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         MapLibreMap activeMap = maplibreMap.get();
@@ -2726,7 +2744,7 @@ public class MapDrawable
                     return true;
                 }
                 android.graphics.RectF rect = new android.graphics.RectF(event.getX() - 20,event.getY() - 20,event.getX() + 20,event.getY() + 20);
-                List<org.maplibre.geojson.Feature> featuresMarker = activeMap.queryRenderedFeatures(rect, "marker-layer");
+                List<org.maplibre.geojson.Feature> featuresMarker = queryTouchFeatures(activeMap, rect, "marker-layer", activeMapContext);
 
                 if (!featuresMarker.isEmpty()){
                     // press marker - lock for future move
@@ -2736,7 +2754,7 @@ public class MapDrawable
                 }
                 // no marker  - check vertex press
                 android.graphics.RectF rectVertex = new android.graphics.RectF(event.getX() - 30,event.getY() - 30,event.getX() + 30,event.getY() + 30);
-                List<org.maplibre.geojson.Feature> features = activeMap.queryRenderedFeatures(rectVertex, "vertex-layer");
+                List<org.maplibre.geojson.Feature> features = queryTouchFeatures(activeMap, rectVertex, "vertex-layer", activeMapContext);
 
                 if (!features.isEmpty()) {
                     org.maplibre.geojson.Feature clickedFeature = null;
@@ -4791,12 +4809,12 @@ public class MapDrawable
         Point selectedPoint = null;
         if (azimuthMeasurementTargetEditable
                 && azimuthMeasurementTarget != null
-                && !map.queryRenderedFeatures(hitArea, AZIMUTH_TARGET_LAYER_ID).isEmpty()) {
+                && !queryTouchFeatures(map, hitArea, AZIMUTH_TARGET_LAYER_ID, mapContext.get()).isEmpty()) {
             draggedAzimuthRole = AZIMUTH_ROLE_TARGET;
             selectedPoint = azimuthMeasurementTarget;
         } else if (azimuthMeasurementStartEditable
                 && azimuthMeasurementStart != null
-                && !map.queryRenderedFeatures(hitArea, AZIMUTH_START_LAYER_ID).isEmpty()) {
+                && !queryTouchFeatures(map, hitArea, AZIMUTH_START_LAYER_ID, mapContext.get()).isEmpty()) {
             draggedAzimuthRole = AZIMUTH_ROLE_START;
             selectedPoint = azimuthMeasurementStart;
         }

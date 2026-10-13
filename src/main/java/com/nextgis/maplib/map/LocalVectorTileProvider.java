@@ -24,6 +24,7 @@ import com.nextgis.maplib.display.RuleFeatureRenderer;
 import com.nextgis.maplib.display.SimpleMarkerStyle;
 import com.nextgis.maplib.display.Style;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.MapRuntimeDiagnostics;
 import com.nextgis.maplib.util.GeoConstants;
 
 import java.util.ArrayList;
@@ -50,6 +51,10 @@ final class LocalVectorTileProvider {
     }
 
     static byte[] buildTile(VectorLayer layer, int z, int x, int y) throws Exception {
+        return buildTile(layer, z, x, y, null);
+    }
+
+    static byte[] buildTile(VectorLayer layer, int z, int x, int y, MapRuntimeDiagnostics.Trace trace) throws Exception {
         if (layer == null || z < 0 || x < 0 || y < 0) {
             return new byte[0];
         }
@@ -62,8 +67,11 @@ final class LocalVectorTileProvider {
 
         LocalVectorTileEncoder.TileBounds bounds = tileBounds(z, x, y);
         GeoEnvelope queryEnvelope = queryEnvelope(bounds);
+        if (trace != null) trace.phase("query_ids");
         List<Long> ids = layer.query(queryEnvelope);
+        if (trace != null) trace.put("candidates", ids == null ? 0 : ids.size());
         if (ids == null || ids.isEmpty()) {
+            if (trace != null) trace.phase("mvt_encode");
             return encodeTile(
                     geometryType, new ArrayList<>(), bounds, layer.getId(), null, null);
         }
@@ -73,11 +81,13 @@ final class LocalVectorTileProvider {
         String commonLabel = style instanceof ITextStyle ? ((ITextStyle) style).getText() : null;
 
         List<Feature> tileFeatures = new ArrayList<>();
+        if (trace != null) trace.phase("feature_read_clip");
         for (Long id : ids) {
             if (id == null || layer.isFeatureHidden(id)) {
                 continue;
             }
             Feature feature = layer.getFeature(id);
+            if (trace != null) trace.featureRead();
             if (feature == null) {
                 continue;
             }
@@ -90,6 +100,7 @@ final class LocalVectorTileProvider {
                 tileFeatures.add(clippedFeature);
             }
         }
+        if (trace != null) { trace.put("encoded_features", tileFeatures.size()); trace.phase("mvt_encode"); }
         byte[] tile = encodeTile(
                 geometryType,
                 tileFeatures,
