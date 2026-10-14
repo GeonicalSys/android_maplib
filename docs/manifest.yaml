@@ -2,13 +2,33 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-13
+last_verified: 2026-10-14
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/display/MarkerIconRegistry.java
+    responsibility: Register bundled marker images with the native SDF edge and distance range so thin strokes remain visible at the requested size.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/RuleLabelLayouts.java
+    responsibility: Apply classic symbol data-constant settings using filtered layout groups, preserve logical visibility and remove obsolete groups on restyle or deletion.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/RuleGeometryLayouts.java
+    responsibility: Bind constant icon collision, line layout and polygon translation by rule category, preserving paint/layout routing, native filters and logical layer lifecycle.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/SharedTrackStore.java
+    responsibility: Own the installation track database and transactional read-only legacy migration, replay, source provenance and stable point IDs.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/SharedTrackStoreTest.java
+    responsibility: Verify collisions, source preservation, rollback, lost replies, old schemas and bootstrap copy provenance.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/ProjectSyncState.java
+    responsibility: Persist verified full completion independently for canonical workspace paths without trusting old global clocks.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureChanges.java
+    responsibility: Exclude separate feature and attachment Save flags when counting or selecting ready outbound changes.
+  - path: maplib/src/test/java/com/nextgis/maplib/reliability/LocalChangesCommitTest.java
+    responsibility: Verify committed owning-map callbacks, rollback silence and draft Save scheduling with real SQLite.
+  - path: maplib/src/main/java/com/nextgis/maplib/location/GpsRecoveryPolicy.java
+    responsibility: Rate-limit acquisition/reacquisition snapshots without reporting expected provider-off or permission-denied states.
+  - path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
+    responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
     responsibility: Observe stalled render queries and tile stages independently of the UI, bound writer/log repetitions, persist a 16 KiB operation snapshot with process/version identity and match it to live or historical event timestamps without business storage reads.
   - path: maplib/src/test/java/com/nextgis/maplib/util/MapRuntimeDiagnosticsTest.java
@@ -102,7 +122,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSamplerCore.java
     responsibility: Buffer tentative GNSS departures per recorder, backfill confirmed movement with original times and corners, and correct one stop vertex without inventing travelled distance.
   - path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
-    responsibility: Store trackpoints.segment in database v6 and expose each track as GeoMultiLineString without connecting gaps.
+    responsibility: Route provider writes, queries and revision-aware snapshots to SharedTrackStore; retain trackpoint segments and expose GeoMultiLineString without connecting gaps, with one common visibility preference.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationFixPolicy.java
     responsibility: Monotonic freshness with a one-second future tolerance, optional max-age windows, position validity and GPS-first display (Network only when GPS is absent or stale).
   - path: maplib/src/main/java/com/nextgis/maplib/util/DiagnosticLog.java
@@ -287,7 +307,7 @@ public_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
     consumers: [app]
   - id: current-location-recording
-    symbol: GpsEventSource.RecordingListener and GpsEventListener.onLocationUnavailable
+    symbol: GpsEventSource.RecordingListener, acquireBackgroundUpdates/releaseBackgroundUpdates, getLastDisplayLocation, setRecoveryReporter and GpsEventListener.onLocationUnavailable
     path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
     consumers: [app, maplibui]
   - id: segmented-tracks
@@ -348,3 +368,5 @@ global_docs:
   - docs/reference/flavors-and-versioning.md
 smoke_tests: [SMOKE-MAP-RUNTIME-DIAGNOSTICS, SMOKE-TRACK-DELIVERY, SMOKE-FORM-APPEARANCE, SMOKE-CONDITIONAL-REQUIRED, SMOKE-FORM-NAVIGATION, SMOKE-PROJECT-SCRIPTS, SMOKE-REQUIRED-FIELDS, AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-POLYGON-LABEL-ANCHOR, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-MAP-SURFACE-LIFECYCLE, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCAL-VECTOR-TILE-STRESS, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-UNDERLAY-DISPLAY, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-DEBUG-UNDERLAY-MIGRATION, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-SYNC-INTERRUPT-ACTION, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT, AUTO-RELIABILITY-NATIVE, SMOKE-RELIABILITY-FAILURES, SMOKE-TOOL-TAP, SMOKE-NGID-AND-RESOURCE-ICONS]
 upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, RASTER-MBTILES, MAP-HOST, MAPLIBRE-BACKEND, COLLECTOR-RESOURCE]
+
+# Consumer verification preserves library identities, version mapping and GIS contracts; see docs/runbooks/automated-tests.md.

@@ -44,7 +44,9 @@ public abstract class Style implements IJSONStore, Cloneable {
     protected int mOuterAlpha = 255;
     protected int mInnerAlpha = 255;
     protected boolean mScaleSizeWithZoom;
+    private boolean mScaleSizeWithZoomExplicit;
     protected String mSizeZoomScaleStops;
+    private boolean mSizeZoomScaleStopsExplicit;
 
     public Style() {
         mWidth = 3;
@@ -108,11 +110,11 @@ public abstract class Style implements IJSONStore, Cloneable {
         rootConfig.put(JSON_OUTCOLOR_KEY, mOutColor);
         rootConfig.put(JSON_ALPHA_KEY, mInnerAlpha);
         rootConfig.put(JSON_OUTALPHA_KEY, mOuterAlpha);
-        if (mScaleSizeWithZoom) {
-            rootConfig.put(JSON_SCALE_SIZE_WITH_ZOOM_KEY, true);
+        if (mScaleSizeWithZoom || mScaleSizeWithZoomExplicit) {
+            rootConfig.put(JSON_SCALE_SIZE_WITH_ZOOM_KEY, mScaleSizeWithZoom);
         }
-        if (mSizeZoomScaleStops != null && !mSizeZoomScaleStops.trim().isEmpty()) {
-            rootConfig.put(JSON_SIZE_ZOOM_STOPS_KEY, mSizeZoomScaleStops);
+        if (mSizeZoomScaleStopsExplicit || mSizeZoomScaleStops != null && !mSizeZoomScaleStops.trim().isEmpty()) {
+            rootConfig.put(JSON_SIZE_ZOOM_STOPS_KEY, mSizeZoomScaleStops == null ? JSONObject.NULL : mSizeZoomScaleStops);
         }
         return rootConfig;
     }
@@ -125,7 +127,9 @@ public abstract class Style implements IJSONStore, Cloneable {
         mInnerAlpha = jsonObject.optInt(JSON_ALPHA_KEY, 255);
         mOuterAlpha = jsonObject.optInt(JSON_OUTALPHA_KEY, 255);
         mScaleSizeWithZoom = jsonObject.optBoolean(JSON_SCALE_SIZE_WITH_ZOOM_KEY, false);
-        mSizeZoomScaleStops = jsonObject.optString(JSON_SIZE_ZOOM_STOPS_KEY, null);
+        mScaleSizeWithZoomExplicit = jsonObject.has(JSON_SCALE_SIZE_WITH_ZOOM_KEY);
+        mSizeZoomScaleStops = jsonObject.isNull(JSON_SIZE_ZOOM_STOPS_KEY) ? null : jsonObject.optString(JSON_SIZE_ZOOM_STOPS_KEY, null);
+        mSizeZoomScaleStopsExplicit = jsonObject.has(JSON_SIZE_ZOOM_STOPS_KEY);
         if (mSizeZoomScaleStops != null && mSizeZoomScaleStops.trim().isEmpty()) {
             mSizeZoomScaleStops = null;
         }
@@ -151,15 +155,20 @@ public abstract class Style implements IJSONStore, Cloneable {
         return mScaleSizeWithZoom;
     }
 
+    public boolean hasExplicitScaleSizeWithZoom() { return mScaleSizeWithZoomExplicit; }
+
     public void setScaleSizeWithZoom(boolean scaleSizeWithZoom) {
+        mScaleSizeWithZoomExplicit = true;
         mScaleSizeWithZoom = scaleSizeWithZoom;
     }
 
     public String getSizeZoomScaleStops() {
         return mSizeZoomScaleStops;
     }
+    public boolean hasExplicitSizeZoomScaleStops() { return mSizeZoomScaleStopsExplicit; }
 
     public void setSizeZoomScaleStops(String sizeZoomScaleStops) {
+        mSizeZoomScaleStopsExplicit = true;
         mSizeZoomScaleStops = sizeZoomScaleStops != null && !sizeZoomScaleStops.trim().isEmpty()
                 ? sizeZoomScaleStops.trim()
                 : null;

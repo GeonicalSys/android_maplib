@@ -1,10 +1,45 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-13
+last_verified: 2026-10-14
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## Общая история треков и проверки обычных стилей
+
+SharedTrackStore owns one private track database and durable spool per installation.
+Legacy read-only migration preserves all registered histories and rollback sources;
+MapDrawable/TrackLayer use shared snapshots. LabelAttributes preserves explicit
+optional presence, including false/default, and inherits all unset label settings.
+Contracts: consuming root docs/architecture/shared-tracks.md and classic-style-verification.md.
+
+## Готовые изменения и подтверждение полного проекта
+
+NGWVectorLayer публикует owning-map onLocalChangesCommitted только после commit,
+включая снятие TEMP/NOT_SYNC после Save. Нижняя библиотека не зависит от scheduler
+maplibui. Готовая выборка FeatureChanges исключает отдельные Save-флаги всего
+feature/attachment; остальные записи не отправляются до сохранения. Rollback
+не вызывает callback. ProjectSyncState хранит отдельный full completion clock
+canonical workspace; библиотечный account adapter не пишет общий UI timestamp,
+а при queue-owned lifecycle передаёт право подтверждения верхней очереди.
+Tracked URL читает часы своего проекта, с since=0 для неизвестного подтверждения.
+Регрессии: LocalChangesCommitTest и ProjectSyncStateTest, native consumer tests.
+
+## Автоматический background lease и display-only Network
+
+`GpsEventSource.acquireBackgroundUpdates/releaseBackgroundUpdates` добавляют
+независимого владельца общего GPS/Network и partial wake lock. Снятие map listener
+при таком владельце не прерывает acquisition или фильтр; release не трогает
+recorders и precision leases. `getLastDisplayLocation` удерживает последнюю
+отображённую сетевую точку с исходным timestamp/accuracy и округлённым возрастом.
+`getLastKnownLocation`, запись и точные инструменты сохраняют прежнюю свежесть;
+скрытая сетевая точка старше последнего GPS не используется после потери GPS.
+`GpsRecoveryPolicy` даёт bounded snapshot после 30 s начального ожидания / 15 s
+повторного восстановления, не чаще одного раза в 10 min. Provider-off и permission
+loss тихие. Consuming app доставляет snapshot через свой diagnostics transport.
+Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.
+
 
 ## Назначение
 
@@ -371,9 +406,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   `android-sdk-opengl` и не должен инициализировать Vulkan surface.
 - Rule-based подписи игнорируют зум/opacity/scale: проверить, что слойные
   дефолты взяты из «прочих», props после merge, и SymbolLayer min/max сброшены;
-  пустой зум/scale=false/opacity=255 в категории наследуются из other.
-- Zoom-stops «не действуют»: кривая слоя общая из other; нужен флаг scale
-  (на other или унаследованный); data-driven scale — outer switchCase.
+  только отсутствующие ключи наследуются из other; явно заданные false/255/default сохраняются.
+- Zoom-stops «не действуют»: проверить effective category curve и флаг scale
+  (на other или в категории); обычный GeoJSON renderer объединяет stops разных
+  category curves в top-level interpolate и выбирает multiplier по props.
 - Курсор перекрывается треком/вектором: проверить, что `user-location-layer`
   последний в live style после cold/lite/hot reload, а под ним
   `user-location-heading-outline`, `user-location-heading-halo`,
@@ -553,3 +589,10 @@ callback, provider URI и service ticket до фактического заве�
 пользовательская инструкция: docs/guides/project-synchronization-user-guide.md.
 Перед изменениями читать оба документа. Нельзя заменить изоляцию временным
 переключением глобальной карты или prefs, либо закрыть БД по timeout при живом child.
+
+## Профиль полной приёмки consumer
+
+Opt-in verification APK app имеет отдельные IDs/storage и использует существующий
+maplib без изменения GIS/sync API. Полная приёмка consumer выполняет maplib unit
+tests, simulated location/track cases на эмуляторе и статические сценарии на
+смартфоне: [автотесты](../../docs/runbooks/automated-tests.md).

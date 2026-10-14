@@ -57,9 +57,7 @@ public final class PolygonLayerFactory {
         Expression fillOpacityExpr = MplStyleMapper.fillOpacityExpression(
                 MplFeatureStyleProps.OPACITY, vars.fillOpacity, ctx.layerOpacityFactor);
         Expression fillSortKeyExpr = Expression.toNumber(Expression.get(MplFeatureStyleProps.ORDER));
-        Expression fillTranslate = Expression.coalesce(
-                Expression.get(MplFeatureStyleProps.FILL_TRANSLATE),
-                Expression.literal(new Float[]{vars.fillTranslateX, vars.fillTranslateY}));
+        Float[] fillTranslate = new Float[]{vars.fillTranslateX, vars.fillTranslateY};
 
         String polyPatternId = polyMainId + pattern_namepart;
         FillLayer patternFillLayer = null;
@@ -145,7 +143,7 @@ public final class PolygonLayerFactory {
                         Expression.coalesce(
                                 Expression.get(MplFeatureStyleProps.COLOR_STROKE),
                                 Expression.literal(getColorName(vars.outlineColor)))),
-                PropertyFactory.lineWidth(MplStyleMapper.zoomScaleExpression(
+                PropertyFactory.lineWidth(ctx.scaleSize(
                         Expression.coalesce(
                                 Expression.get(MplFeatureStyleProps.THICKNESS),
                                 Expression.literal(getMPLThinkness(vars.thickness))),

@@ -568,9 +568,12 @@ public class NGWVectorLayer
     // for overriding in the subclasses
     protected String getFeaturesUrl(AccountUtil.AccountData accountData)
     {
-        if (mTracked)
-            return NGWUtil.getTrackedFeaturesUrl(accountData.url, mRemoteId, getPreferences().getLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP, 0));
-        else
+        if (mTracked) {
+            MapBase owner = DatabaseContext.getMapForLayer(this);
+            long since = com.nextgis.maplib.util.ProjectSyncState.lastComplete(getContext(),
+                    owner == null ? null : owner.getPath().getAbsolutePath());
+            return NGWUtil.getTrackedFeaturesUrl(accountData.url, mRemoteId, since);
+        } else
             return NGWUtil.getFeaturesUrl(accountData.url, mRemoteId, mServerWhere);
     }
 
@@ -1015,6 +1018,7 @@ public class NGWVectorLayer
         // if can then add change
         if (canAddChanges) {
             FeatureChanges.add(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, operation);
+            notifyLocalChangesCommitted();
         }
     }
 
@@ -1059,7 +1063,18 @@ public class NGWVectorLayer
 
         if (canAddChanges) {
             FeatureChanges.add(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId, attachId, attachOperation);
+            notifyLocalChangesCommitted();
         }
+    }
+
+    private void notifyLocalChangesCommitted() {
+        if (isRemoteReadOnly() || !isRemoteSendAllowed() || (mSyncType & Constants.SYNC_NONE) != 0) return;
+        MapBase owner = DatabaseContext.getMapForLayer(this);
+        Object application = getContext().getApplicationContext();
+        if (owner == null || !(application instanceof IGISApplication)) return;
+        com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(
+                DatabaseContext.getDatabaseForLayer(this, false),
+                () -> ((IGISApplication) application).onLocalChangesCommitted(owner));
     }
 
 
@@ -1211,7 +1226,7 @@ public class NGWVectorLayer
         return (mSyncDirection & DIRECTION_FROM) != 0;
     }
 
-    private boolean isRemoteSendAllowed() {
+    public boolean isRemoteSendAllowed() {
         return (mSyncDirection & DIRECTION_TO) != 0;
     }
 
@@ -4708,7 +4723,9 @@ public class NGWVectorLayer
         if (flag) {
             return FeatureChanges.setFeatureTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
         } else {
-            return FeatureChanges.deleteFeatureTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
+            long changed = FeatureChanges.deleteFeatureTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
+            if (changed > 0) notifyLocalChangesCommitted();
+            return changed;
         }
     }
 
@@ -4721,7 +4738,9 @@ public class NGWVectorLayer
         if (flag) {
             return FeatureChanges.setFeatureNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
         } else {
-            return FeatureChanges.deleteFeatureNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
+            long changed = FeatureChanges.deleteFeatureNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId);
+            if (changed > 0) notifyLocalChangesCommitted();
+            return changed;
         }
     }
 
@@ -4736,7 +4755,9 @@ public class NGWVectorLayer
         if (flag) {
             return FeatureChanges.setAttachTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
         } else {
-            return FeatureChanges.deleteAttachTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
+            long changed = FeatureChanges.deleteAttachTempFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
+            if (changed > 0) notifyLocalChangesCommitted();
+            return changed;
         }
     }
 
@@ -4750,8 +4771,10 @@ public class NGWVectorLayer
         if (flag) {
             return FeatureChanges.setAttachNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
         } else {
-            return FeatureChanges.deleteAttachNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false),
+            long changed = FeatureChanges.deleteAttachNotSyncFlag(DatabaseContext.getDatabaseForLayer(this, false),
                     getChangeTableName(), featureId, attachId);
+            if (changed > 0) notifyLocalChangesCommitted();
+            return changed;
         }
     }
 

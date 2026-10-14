@@ -282,7 +282,7 @@ public class FeatureChanges
 
     public static long getChangeCount(SQLiteDatabase db, String tableName)
     {
-        String selection = getSelectionForSync();
+        String selection = getReadySelectionForSync(tableName);
 
         String s = (!TextUtils.isEmpty(selection)) ? " where " + selection : "";
         return DatabaseUtils.longForQuery(db, "select count(*) from " + tableName + s, null);
@@ -300,8 +300,24 @@ public class FeatureChanges
             long recordId)
     {
         String sortOrder = FIELD_ID + " ASC";
-        String selection = FIELD_ID + " >= " + recordId + " AND " + getSelectionForSync();
+        String selection = FIELD_ID + " >= " + recordId + " AND " + getReadySelectionForSync(tableName);
         return query(db, tableName, selection, sortOrder, "1");
+    }
+
+    /** Save flags live in separate rows: exclude every edit belonging to a held feature/attachment. */
+    private static String getReadySelectionForSync(String tableName) {
+        String table = "\"" + tableName.replace("\"", "\"\"") + "\"";
+        int held = CHANGE_OPERATION_TEMP | CHANGE_OPERATION_NOT_SYNC;
+        return getSelectionForSync()
+                + " AND NOT EXISTS (SELECT 1 FROM " + table + " AS held_feature WHERE held_feature."
+                + FIELD_FEATURE_ID + " = " + table + "." + FIELD_FEATURE_ID
+                + " AND (held_feature." + FIELD_OPERATION + " & " + held + ") != 0)"
+                + " AND ((" + table + "." + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH + ") = 0"
+                + " OR NOT EXISTS (SELECT 1 FROM " + table + " AS held_attach WHERE held_attach."
+                + FIELD_FEATURE_ID + " = " + table + "." + FIELD_FEATURE_ID
+                + " AND held_attach." + FIELD_ATTACH_ID + " = " + table + "." + FIELD_ATTACH_ID
+                + " AND (held_attach." + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH + ") != 0"
+                + " AND (held_attach." + FIELD_ATTACH_OPERATION + " & " + held + ") != 0))";
     }
 
 

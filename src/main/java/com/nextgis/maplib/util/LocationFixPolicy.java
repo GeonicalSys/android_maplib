@@ -22,6 +22,12 @@ public final class LocationFixPolicy {
         return (nowNanos - fixNanos) / 1_000_000L;
     }
 
+    /** A last network position may remain visible, but is never promoted to a fresh fix. */
+    public static boolean canRetainNetworkDisplay(long fixNanos, long nowNanos) {
+        return fixNanos > 0L && nowNanos > 0L
+                && ageMs(fixNanos, nowNanos) >= -FUTURE_TOLERANCE_MS;
+    }
+
     public static boolean validPosition(double latitude, double longitude, float accuracy) {
         return Double.isFinite(latitude) && Math.abs(latitude) <= 90
                 && Double.isFinite(longitude) && Math.abs(longitude) <= 180

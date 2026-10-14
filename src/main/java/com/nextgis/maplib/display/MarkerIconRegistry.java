@@ -356,7 +356,10 @@ public final class MarkerIconRegistry {
         }
 
         Bitmap sdf = Bitmap.createBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888);
-        float alphaScale = 127f / SDF_SPREAD;
+        // MapLibre's SDF shader places the edge at 0.75, with eight pixels per
+        // full byte range. Centering at 0.5 erodes shapes by four pixels and
+        // completely removes thin strokes such as the cross marker.
+        float alphaScale = 255f / SDF_SPREAD;
         for (int y = 0; y < ICON_PX; y++) {
             for (int x = 0; x < ICON_PX; x++) {
                 boolean currentInside = inside[y * ICON_PX + x];
@@ -380,12 +383,13 @@ public final class MarkerIconRegistry {
                         }
                     }
                 }
-                float signedDistance = (float) Math.sqrt(bestSq);
+                // The boundary lies halfway between inside and outside pixels.
+                float signedDistance = (float) Math.sqrt(bestSq) - 0.5f;
                 if (!currentInside) {
                     signedDistance = -signedDistance;
                 }
                 int alpha = Math.max(0, Math.min(255,
-                        Math.round(128f + signedDistance * alphaScale)));
+                        Math.round(191.25f + signedDistance * alphaScale)));
                 sdf.setPixel(x, y, (alpha << 24) | 0x00FFFFFF);
             }
         }

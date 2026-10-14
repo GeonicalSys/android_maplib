@@ -147,10 +147,10 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
         if (target == null || source == null) {
             return;
         }
-        if (isBlank(target.getSizeZoomScaleStops()) && !isBlank(source.getSizeZoomScaleStops())) {
+        if (!target.hasExplicitSizeZoomScaleStops() && isBlank(target.getSizeZoomScaleStops()) && !isBlank(source.getSizeZoomScaleStops())) {
             target.setSizeZoomScaleStops(source.getSizeZoomScaleStops());
         }
-        if (!target.isScaleSizeWithZoom() && source.isScaleSizeWithZoom()) {
+        if (!target.hasExplicitScaleSizeWithZoom() && !target.isScaleSizeWithZoom() && source.isScaleSizeWithZoom()) {
             target.setScaleSizeWithZoom(true);
         }
         if (target instanceof SimpleMarkerStyle && source instanceof SimpleMarkerStyle) {

@@ -1670,9 +1670,11 @@ public class MPLFeaturesUtils {
             String last = null;
             for (org.maplibre.android.style.layers.Layer l : style.getLayers()) {
                 String id = l.getId();
-                if (id.equals(sym) || id.equals(base) || id.equals(outline) || id.equals(markerIcon)
+                if (id.equals(sym) || id.startsWith(sym + "-layout-") || id.equals(base)
+                        || id.startsWith(base + "-layout-") || id.equals(outline) || id.startsWith(outline + "-layout-")
+                        || id.equals(markerIcon) || id.startsWith(markerIcon + "-layout-")
                         || id.startsWith(base + dash_namepart)
-                        || id.equals(base + pattern_namepart)) {
+                        || id.equals(base + pattern_namepart) || id.startsWith(base + pattern_namepart + "-layout-")) {
                     last = id;
                 }
             }
@@ -1954,6 +1956,11 @@ public class MPLFeaturesUtils {
 
         String currentNamePrefixSymbol = "symbol-" + namePrefix;
 
+        String geometryId = namePrefix + layer_namepart + layerId;
+        for (String baseId : new String[]{geometryId, geometryId + outline_namepart,
+                geometryId + pattern_namepart, geometryId + PointLayerFactory.MARKER_ICON_LAYER_SUFFIX})
+            RuleLabelLayouts.remove(style, baseId);
+
         MplLayerStyleVars styleVars;
         LabelAttributes layerLabelAttributes;
 
@@ -2105,6 +2112,10 @@ public class MPLFeaturesUtils {
 
                     Expression textSizeExpression = buildTextSizeExpression(
                             textSize, layerLabelAttributes, ruleStyling);
+                    if (ruleStyling) textSizeExpression = buildContext.scaleText(
+                            Expression.coalesce(Expression.get(MplFeatureStyleProps.TEXT_SIZE), Expression.literal((textSize + 3) * 3)),
+                            Expression.get(prop_text_scale_with_zoom), layerLabelAttributes.isTextScaleWithZoom(),
+                            layerLabelAttributes.getTextZoomScaleStops());
                     float defaultTextOpacity = layerLabelAttributes != null
                             ? layerLabelAttributes.textOpacityFloat()
                             : 1f;
@@ -2134,9 +2145,7 @@ public class MPLFeaturesUtils {
 
                             PropertyFactory.textOpacity(textOpacityExpression),
 
-                            PropertyFactory.symbolSpacing(Expression.coalesce(
-                                    Expression.get(prop_symbol_spacing),
-                                    Expression.literal((double) symbolSpacing))),
+                            PropertyFactory.symbolSpacing(symbolSpacing),
 
                             PropertyFactory.textColor(Expression.coalesce(
                                     Expression.get(prop_text_color), // rule
@@ -2159,29 +2168,21 @@ public class MPLFeaturesUtils {
                                     Expression.get(prop_text_textanchor), // rule
                                     Expression.literal(anchor)  // def value
                             )),
-                            PropertyFactory.symbolPlacement(Expression.coalesce(
-                                    Expression.get(prop_symbol_placement),
-                                    Expression.literal(defaultPlacement))),
+                            PropertyFactory.symbolPlacement(defaultPlacement),
 
-                            PropertyFactory.textRotationAlignment(Expression.coalesce(
-                                    Expression.get(prop_text_rotation_alignment),
-                                    Expression.literal(defaultTextRotationAlignment))),
+                            PropertyFactory.textRotationAlignment(defaultTextRotationAlignment),
 
                             PropertyFactory.textOffset(Expression.coalesce(
                                     Expression.get(prop_text_textoffsets), // rule
                                     Expression.literal(offsets)  // def value
                             )),
 
-                            PropertyFactory.textAllowOverlap(textAllowOverlapExpression),
-                            PropertyFactory.textOptional(textOptionalExpression),
-                            PropertyFactory.textIgnorePlacement(textIgnorePlacementExpression),
+                            PropertyFactory.textAllowOverlap(allowOverlap),
+                            PropertyFactory.textOptional(textOptional),
+                            PropertyFactory.textIgnorePlacement(allowOverlap && !textOptional),
                             PropertyFactory.symbolSortKey(Expression.toNumber(Expression.get(prop_order))),
-                            PropertyFactory.textFont(Expression.coalesce(
-                                    Expression.get(prop_text_font),
-                                    Expression.literal(font))),
-                            PropertyFactory.textLineHeight(Expression.coalesce(
-                                    Expression.get(prop_text_line_height),
-                                    Expression.literal((double) layerLabelAttributes.getTextLineHeight()))),
+                            PropertyFactory.textFont(font),
+                            PropertyFactory.textLineHeight(layerLabelAttributes.getTextLineHeight()),
                             PropertyFactory.textLetterSpacing(Expression.coalesce(
                                     Expression.get(prop_text_letter_spacing),
                                     Expression.literal((double) layerLabelAttributes.getTextLetterSpacing()))),
@@ -2191,16 +2192,9 @@ public class MPLFeaturesUtils {
                             PropertyFactory.textTransform(Expression.coalesce(
                                     Expression.get(prop_text_transform),
                                     Expression.literal(layerLabelAttributes.getTextTransform()))),
-                            PropertyFactory.textPadding(Expression.coalesce(
-                                    Expression.get(prop_text_padding),
-                                    Expression.literal((double) layerLabelAttributes.getTextPadding()))),
-                            PropertyFactory.textKeepUpright(Expression.coalesce(
-                                    Expression.get(prop_text_keep_upright),
-                                    Expression.literal(layerLabelAttributes.getTextKeepUpright() == null
-                                            || layerLabelAttributes.getTextKeepUpright()))),
-                            PropertyFactory.textMaxAngle(Expression.coalesce(
-                                    Expression.get(prop_text_max_angle),
-                                    Expression.literal((double) layerLabelAttributes.getTextMaxAngle()))),
+                            PropertyFactory.textPadding(layerLabelAttributes.getTextPadding()),
+                            PropertyFactory.textKeepUpright(layerLabelAttributes.getTextKeepUpright() == null || layerLabelAttributes.getTextKeepUpright()),
+                            PropertyFactory.textMaxAngle(layerLabelAttributes.getTextMaxAngle()),
                             PropertyFactory.textMaxWidth(Expression.coalesce(
                                     Expression.get(prop_text_max_width_prop),
                                     Expression.literal((double) (textMaxWidth > 0f ? textMaxWidth : 0f)))));
@@ -2318,14 +2312,14 @@ public class MPLFeaturesUtils {
                     ? layerLabelAttributes.getLabelMinZoom() : -1f;
             float labelMaxZoom = layerLabelAttributes != null
                     ? layerLabelAttributes.getLabelMaxZoom() : -1f;
-            if (labelMinZoom >= 0f) {
+            if (!ruleStyling && labelMinZoom >= 0f) {
                 simbolLayer.setMinZoom(labelMinZoom);
             } else if (minZoom != -1) {
                 simbolLayer.setMinZoom(minZoom);
             } else {
                 simbolLayer.setMinZoom(0f);
             }
-            if (labelMaxZoom >= 0f) {
+            if (!ruleStyling && labelMaxZoom >= 0f) {
                 simbolLayer.setMaxZoom(labelMaxZoom);
             } else if (maxZoom != -1) {
                 simbolLayer.setMaxZoom(maxZoom);
@@ -2333,6 +2327,17 @@ public class MPLFeaturesUtils {
                 simbolLayer.setMaxZoom(24f);
             }
         }
+        String labelId = "symbol-" + namePrefix + layer_namepart + layerId;
+        FieldStyleRule rules = ruleStyling && iLayer instanceof VectorLayer
+                && ((RuleFeatureRenderer) ((VectorLayer) iLayer).getRenderer()).getStyleRule() instanceof FieldStyleRule
+                ? (FieldStyleRule) ((RuleFeatureRenderer) ((VectorLayer) iLayer).getRenderer()).getStyleRule() : null;
+        RuleGeometryLayouts.sync(style, newLayer, rules, layerDefaultsStyle);
+        RuleGeometryLayouts.sync(style, newLayer2, rules, layerDefaultsStyle);
+        RuleGeometryLayouts.sync(style, patternFillLayer, rules, layerDefaultsStyle);
+        RuleGeometryLayouts.sync(style, markerIconLayer, rules, layerDefaultsStyle);
+        if (simbolLayer instanceof SymbolLayer) {
+            RuleLabelLayouts.sync(style, (SymbolLayer) simbolLayer, rules, layerDefaultsStyle, layerType);
+        } else RuleLabelLayouts.remove(style, labelId);
     }
 
     public static String getColorName(int color) {

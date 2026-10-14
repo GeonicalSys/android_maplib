@@ -51,7 +51,7 @@ public interface GpsEventListener
      */
     void onGpsStatusChanged(int event);
 
-    /** There is no fresh display fix; consumers must remove any current-position indicator. */
+    /** No display estimate remains, including retained network fallback; clear the indicator. */
     default void onLocationUnavailable() { }
 
     /** Native NMEA HUD snapshot; may lack a position when the receiver has no fix. */

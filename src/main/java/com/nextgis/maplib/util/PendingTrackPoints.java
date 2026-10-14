@@ -17,7 +17,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
-/** Small ordered write-ahead spool, owned by one map. Failed entries stay available for retry. */
+/** Small ordered write-ahead spool. Failed entries stay available for retry. */
 public final class PendingTrackPoints {
     public static final int CAPACITY = 2048;
     private final File directory;
@@ -99,6 +99,17 @@ public final class PendingTrackPoints {
     }
 
     public synchronized int size() { return pending.size(); }
+
+    public interface ReplayWriter { long insert(String operation, ContentValues values); }
+
+    /** Migration reads the durable tail without acknowledging or deleting its rollback source. */
+    public synchronized void replay(ReplayWriter writer) throws IOException {
+        for (Entry entry : pending) {
+            if (!entry.durable) throw new IOException("Pending track point is not durable");
+            if (writer.insert(entry.operation, new ContentValues(entry.values)) < 0)
+                throw new IOException("Migrated track point was not acknowledged");
+        }
+    }
 
     /** On a disk error the entry remains in RAM; the caller must show failure and retry. */
     public synchronized void append(ContentValues values) throws IOException {

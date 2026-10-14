@@ -48,6 +48,8 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     public static final float DEFAULT_TEXT_PADDING = 2f;
     public static final float DEFAULT_TEXT_MAX_ANGLE = 45f;
 
+    private java.util.Set<String> mExplicitKeys = new java.util.HashSet<>();
+
     protected int mTextHaloColor = DEFAULT_HALO_COLOR;
     protected float mTextHaloWidth = DEFAULT_HALO_WIDTH;
     protected float mTextHaloBlur;
@@ -92,6 +94,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     @Override
     public LabelAttributes clone() throws CloneNotSupportedException {
         LabelAttributes copy = (LabelAttributes) super.clone();
+        copy.mExplicitKeys = new java.util.HashSet<>(mExplicitKeys);
         copy.mTextHaloColor = mTextHaloColor;
         copy.mTextHaloWidth = mTextHaloWidth;
         copy.mTextHaloBlur = mTextHaloBlur;
@@ -123,6 +126,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextHaloColor(int textHaloColor) {
+        mExplicitKeys.add(JSON_LABEL_HALO_COLOR_KEY);
         mTextHaloColor = textHaloColor;
     }
 
@@ -131,6 +135,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextHaloWidth(float textHaloWidth) {
+        mExplicitKeys.add(JSON_LABEL_HALO_WIDTH_KEY);
         mTextHaloWidth = textHaloWidth;
     }
 
@@ -139,6 +144,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextHaloBlur(float textHaloBlur) {
+        mExplicitKeys.add(JSON_LABEL_HALO_BLUR_KEY);
         mTextHaloBlur = textHaloBlur;
     }
 
@@ -147,6 +153,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextOpacity(int textOpacity) {
+        mExplicitKeys.add(JSON_LABEL_TEXT_OPACITY_KEY);
         mTextOpacity = Math.max(0, Math.min(255, textOpacity));
     }
 
@@ -159,6 +166,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextScaleWithZoom(boolean textScaleWithZoom) {
+        mExplicitKeys.add(JSON_LABEL_SCALE_WITH_ZOOM_KEY);
         mTextScaleWithZoom = textScaleWithZoom;
     }
 
@@ -167,6 +175,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextZoomScaleStops(String textZoomScaleStops) {
+        mExplicitKeys.add(JSON_LABEL_ZOOM_STOPS_KEY);
         mTextZoomScaleStops = textZoomScaleStops != null && !textZoomScaleStops.trim().isEmpty()
                 ? textZoomScaleStops.trim()
                 : null;
@@ -177,6 +186,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextAllowOverlap(Boolean textAllowOverlap) {
+        mExplicitKeys.add(JSON_LABEL_ALLOW_OVERLAP_KEY);
         mTextAllowOverlap = textAllowOverlap;
     }
 
@@ -185,6 +195,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextOptional(boolean textOptional) {
+        mExplicitKeys.add(JSON_LABEL_OPTIONAL_KEY);
         mTextOptional = textOptional;
     }
 
@@ -193,6 +204,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setSymbolSpacing(float symbolSpacing) {
+        mExplicitKeys.add(JSON_LABEL_SPACING_KEY);
         mSymbolSpacing = symbolSpacing;
     }
 
@@ -201,6 +213,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextMaxWidth(float textMaxWidth) {
+        mExplicitKeys.add(JSON_TEXT_MAX_WIDTH_KEY);
         mTextMaxWidth = textMaxWidth;
     }
 
@@ -211,6 +224,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextFont(String textFont) {
+        mExplicitKeys.add(JSON_LABEL_FONT_KEY);
         mTextFont = textFont != null && !textFont.trim().isEmpty()
                 ? textFont.trim()
                 : DEFAULT_TEXT_FONT;
@@ -233,6 +247,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextJustify(String textJustify) {
+        mExplicitKeys.add(JSON_LABEL_JUSTIFY_KEY);
         mTextJustify = normalizeTextChoice(textJustify, DEFAULT_TEXT_JUSTIFY);
     }
 
@@ -241,6 +256,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextTransform(String textTransform) {
+        mExplicitKeys.add(JSON_LABEL_TRANSFORM_KEY);
         mTextTransform = normalizeTextChoice(textTransform, DEFAULT_TEXT_TRANSFORM);
     }
 
@@ -249,6 +265,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextLetterSpacing(float textLetterSpacing) {
+        mExplicitKeys.add(JSON_LABEL_LETTER_SPACING_KEY);
         mTextLetterSpacing = textLetterSpacing;
     }
 
@@ -257,6 +274,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextLineHeight(float textLineHeight) {
+        mExplicitKeys.add(JSON_LABEL_LINE_HEIGHT_KEY);
         mTextLineHeight = textLineHeight > 0f ? textLineHeight : DEFAULT_TEXT_LINE_HEIGHT;
     }
 
@@ -265,6 +283,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextPadding(float textPadding) {
+        mExplicitKeys.add(JSON_LABEL_PADDING_KEY);
         mTextPadding = Math.max(0f, textPadding);
     }
 
@@ -273,6 +292,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextKeepUpright(Boolean textKeepUpright) {
+        mExplicitKeys.add(JSON_LABEL_KEEP_UPRIGHT_KEY);
         mTextKeepUpright = textKeepUpright;
     }
 
@@ -281,6 +301,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setTextMaxAngle(float textMaxAngle) {
+        mExplicitKeys.add(JSON_LABEL_MAX_ANGLE_KEY);
         mTextMaxAngle = textMaxAngle > 0f ? textMaxAngle : DEFAULT_TEXT_MAX_ANGLE;
     }
 
@@ -289,6 +310,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setLabelTemplate(String labelTemplate) {
+        mExplicitKeys.add(JSON_LABEL_TEMPLATE_KEY);
         mLabelTemplate = labelTemplate;
     }
 
@@ -297,6 +319,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setLabelMinZoom(float labelMinZoom) {
+        mExplicitKeys.add(JSON_LABEL_MIN_ZOOM_KEY);
         mLabelMinZoom = labelMinZoom;
     }
 
@@ -305,6 +328,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setLabelMaxZoom(float labelMaxZoom) {
+        mExplicitKeys.add(JSON_LABEL_MAX_ZOOM_KEY);
         mLabelMaxZoom = labelMaxZoom;
     }
 
@@ -313,6 +337,7 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setLineLabelRepeat(boolean lineLabelRepeat) {
+        mExplicitKeys.add(JSON_LINE_LABEL_REPEAT_KEY);
         mLineLabelRepeat = lineLabelRepeat;
     }
 
@@ -321,42 +346,107 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void setLineLabelHorizontal(boolean lineLabelHorizontal) {
+        mExplicitKeys.add(JSON_LINE_LABEL_HORIZONTAL_KEY);
         mLineLabelHorizontal = lineLabelHorizontal;
     }
 
     /**
      * Fills unset optional fields from {@code other}. Does not overwrite values already set on this
-     * instance (sentinel/empty checks per FieldStyleRule merge contract).
+     * instance (explicit JSON/setter presence is retained, including false and type-default values).
      */
     public void fillUnsetFrom(LabelAttributes other) {
-        if (other == null) {
-            return;
+        if (other == null) return;
+        if (!mExplicitKeys.contains(JSON_LABEL_HALO_COLOR_KEY)) {
+            mTextHaloColor = other.mTextHaloColor;
+            if (other.mExplicitKeys.contains(JSON_LABEL_HALO_COLOR_KEY)) mExplicitKeys.add(JSON_LABEL_HALO_COLOR_KEY);
         }
-        if (mLabelMinZoom < 0f && other.mLabelMinZoom >= 0f) {
-            mLabelMinZoom = other.mLabelMinZoom;
+        if (!mExplicitKeys.contains(JSON_LABEL_HALO_WIDTH_KEY)) {
+            mTextHaloWidth = other.mTextHaloWidth;
+            if (other.mExplicitKeys.contains(JSON_LABEL_HALO_WIDTH_KEY)) mExplicitKeys.add(JSON_LABEL_HALO_WIDTH_KEY);
         }
-        if (mLabelMaxZoom < 0f && other.mLabelMaxZoom >= 0f) {
-            mLabelMaxZoom = other.mLabelMaxZoom;
+        if (!mExplicitKeys.contains(JSON_LABEL_HALO_BLUR_KEY)) {
+            mTextHaloBlur = other.mTextHaloBlur;
+            if (other.mExplicitKeys.contains(JSON_LABEL_HALO_BLUR_KEY)) mExplicitKeys.add(JSON_LABEL_HALO_BLUR_KEY);
         }
-        if (isBlank(mTextZoomScaleStops) && !isBlank(other.mTextZoomScaleStops)) {
-            mTextZoomScaleStops = other.mTextZoomScaleStops;
-        }
-        if (isBlank(mLabelTemplate) && !isBlank(other.mLabelTemplate)) {
-            mLabelTemplate = other.mLabelTemplate;
-        }
-        if (mTextAllowOverlap == null && other.mTextAllowOverlap != null) {
-            mTextAllowOverlap = other.mTextAllowOverlap;
-        }
-        if (mTextKeepUpright == null && other.mTextKeepUpright != null) {
-            mTextKeepUpright = other.mTextKeepUpright;
-        }
-        // false / DEFAULT opacity are type-defaults (same as mergeInto omit rules)
-        if (!mTextScaleWithZoom && other.mTextScaleWithZoom) {
-            mTextScaleWithZoom = true;
-        }
-        if (mTextOpacity == DEFAULT_TEXT_OPACITY
-                && other.mTextOpacity != DEFAULT_TEXT_OPACITY) {
+        if (!mExplicitKeys.contains(JSON_LABEL_TEXT_OPACITY_KEY)) {
             mTextOpacity = other.mTextOpacity;
+            if (other.mExplicitKeys.contains(JSON_LABEL_TEXT_OPACITY_KEY)) mExplicitKeys.add(JSON_LABEL_TEXT_OPACITY_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_SCALE_WITH_ZOOM_KEY)) {
+            mTextScaleWithZoom = other.mTextScaleWithZoom;
+            if (other.mExplicitKeys.contains(JSON_LABEL_SCALE_WITH_ZOOM_KEY)) mExplicitKeys.add(JSON_LABEL_SCALE_WITH_ZOOM_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_ZOOM_STOPS_KEY)) {
+            mTextZoomScaleStops = other.mTextZoomScaleStops;
+            if (other.mExplicitKeys.contains(JSON_LABEL_ZOOM_STOPS_KEY)) mExplicitKeys.add(JSON_LABEL_ZOOM_STOPS_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_ALLOW_OVERLAP_KEY)) {
+            mTextAllowOverlap = other.mTextAllowOverlap;
+            if (other.mExplicitKeys.contains(JSON_LABEL_ALLOW_OVERLAP_KEY)) mExplicitKeys.add(JSON_LABEL_ALLOW_OVERLAP_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_OPTIONAL_KEY)) {
+            mTextOptional = other.mTextOptional;
+            if (other.mExplicitKeys.contains(JSON_LABEL_OPTIONAL_KEY)) mExplicitKeys.add(JSON_LABEL_OPTIONAL_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_SPACING_KEY)) {
+            mSymbolSpacing = other.mSymbolSpacing;
+            if (other.mExplicitKeys.contains(JSON_LABEL_SPACING_KEY)) mExplicitKeys.add(JSON_LABEL_SPACING_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_TEXT_MAX_WIDTH_KEY)) {
+            mTextMaxWidth = other.mTextMaxWidth;
+            if (other.mExplicitKeys.contains(JSON_TEXT_MAX_WIDTH_KEY)) mExplicitKeys.add(JSON_TEXT_MAX_WIDTH_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_FONT_KEY)) {
+            mTextFont = other.mTextFont;
+            if (other.mExplicitKeys.contains(JSON_LABEL_FONT_KEY)) mExplicitKeys.add(JSON_LABEL_FONT_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_JUSTIFY_KEY)) {
+            mTextJustify = other.mTextJustify;
+            if (other.mExplicitKeys.contains(JSON_LABEL_JUSTIFY_KEY)) mExplicitKeys.add(JSON_LABEL_JUSTIFY_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_TRANSFORM_KEY)) {
+            mTextTransform = other.mTextTransform;
+            if (other.mExplicitKeys.contains(JSON_LABEL_TRANSFORM_KEY)) mExplicitKeys.add(JSON_LABEL_TRANSFORM_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_LETTER_SPACING_KEY)) {
+            mTextLetterSpacing = other.mTextLetterSpacing;
+            if (other.mExplicitKeys.contains(JSON_LABEL_LETTER_SPACING_KEY)) mExplicitKeys.add(JSON_LABEL_LETTER_SPACING_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_LINE_HEIGHT_KEY)) {
+            mTextLineHeight = other.mTextLineHeight;
+            if (other.mExplicitKeys.contains(JSON_LABEL_LINE_HEIGHT_KEY)) mExplicitKeys.add(JSON_LABEL_LINE_HEIGHT_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_PADDING_KEY)) {
+            mTextPadding = other.mTextPadding;
+            if (other.mExplicitKeys.contains(JSON_LABEL_PADDING_KEY)) mExplicitKeys.add(JSON_LABEL_PADDING_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_KEEP_UPRIGHT_KEY)) {
+            mTextKeepUpright = other.mTextKeepUpright;
+            if (other.mExplicitKeys.contains(JSON_LABEL_KEEP_UPRIGHT_KEY)) mExplicitKeys.add(JSON_LABEL_KEEP_UPRIGHT_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_MAX_ANGLE_KEY)) {
+            mTextMaxAngle = other.mTextMaxAngle;
+            if (other.mExplicitKeys.contains(JSON_LABEL_MAX_ANGLE_KEY)) mExplicitKeys.add(JSON_LABEL_MAX_ANGLE_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_TEMPLATE_KEY)) {
+            mLabelTemplate = other.mLabelTemplate;
+            if (other.mExplicitKeys.contains(JSON_LABEL_TEMPLATE_KEY)) mExplicitKeys.add(JSON_LABEL_TEMPLATE_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_MIN_ZOOM_KEY)) {
+            mLabelMinZoom = other.mLabelMinZoom;
+            if (other.mExplicitKeys.contains(JSON_LABEL_MIN_ZOOM_KEY)) mExplicitKeys.add(JSON_LABEL_MIN_ZOOM_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LABEL_MAX_ZOOM_KEY)) {
+            mLabelMaxZoom = other.mLabelMaxZoom;
+            if (other.mExplicitKeys.contains(JSON_LABEL_MAX_ZOOM_KEY)) mExplicitKeys.add(JSON_LABEL_MAX_ZOOM_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LINE_LABEL_REPEAT_KEY)) {
+            mLineLabelRepeat = other.mLineLabelRepeat;
+            if (other.mExplicitKeys.contains(JSON_LINE_LABEL_REPEAT_KEY)) mExplicitKeys.add(JSON_LINE_LABEL_REPEAT_KEY);
+        }
+        if (!mExplicitKeys.contains(JSON_LINE_LABEL_HORIZONTAL_KEY)) {
+            mLineLabelHorizontal = other.mLineLabelHorizontal;
+            if (other.mExplicitKeys.contains(JSON_LINE_LABEL_HORIZONTAL_KEY)) mExplicitKeys.add(JSON_LINE_LABEL_HORIZONTAL_KEY);
         }
     }
 
@@ -365,74 +455,74 @@ public class LabelAttributes implements IJSONStore, Cloneable {
     }
 
     public void mergeInto(JSONObject rootConfig) throws JSONException {
-        if (mTextHaloColor != DEFAULT_HALO_COLOR) {
+        if (mExplicitKeys.contains(JSON_LABEL_HALO_COLOR_KEY) || (mTextHaloColor != DEFAULT_HALO_COLOR)) {
             rootConfig.put(JSON_LABEL_HALO_COLOR_KEY, mTextHaloColor);
         }
-        if (mTextHaloWidth != DEFAULT_HALO_WIDTH) {
+        if (mExplicitKeys.contains(JSON_LABEL_HALO_WIDTH_KEY) || (mTextHaloWidth != DEFAULT_HALO_WIDTH)) {
             rootConfig.put(JSON_LABEL_HALO_WIDTH_KEY, mTextHaloWidth);
         }
-        if (mTextHaloBlur > 0f) {
+        if (mExplicitKeys.contains(JSON_LABEL_HALO_BLUR_KEY) || (mTextHaloBlur > 0f)) {
             rootConfig.put(JSON_LABEL_HALO_BLUR_KEY, mTextHaloBlur);
         }
-        if (mTextOpacity != DEFAULT_TEXT_OPACITY) {
+        if (mExplicitKeys.contains(JSON_LABEL_TEXT_OPACITY_KEY) || (mTextOpacity != DEFAULT_TEXT_OPACITY)) {
             rootConfig.put(JSON_LABEL_TEXT_OPACITY_KEY, mTextOpacity);
         }
-        if (mTextScaleWithZoom) {
-            rootConfig.put(JSON_LABEL_SCALE_WITH_ZOOM_KEY, true);
+        if (mExplicitKeys.contains(JSON_LABEL_SCALE_WITH_ZOOM_KEY) || (mTextScaleWithZoom)) {
+            rootConfig.put(JSON_LABEL_SCALE_WITH_ZOOM_KEY, mTextScaleWithZoom);
         }
-        if (mTextZoomScaleStops != null && !mTextZoomScaleStops.trim().isEmpty()) {
-            rootConfig.put(JSON_LABEL_ZOOM_STOPS_KEY, mTextZoomScaleStops);
+        if (mExplicitKeys.contains(JSON_LABEL_ZOOM_STOPS_KEY) || (mTextZoomScaleStops != null && !mTextZoomScaleStops.trim().isEmpty())) {
+            rootConfig.put(JSON_LABEL_ZOOM_STOPS_KEY, mTextZoomScaleStops == null ? JSONObject.NULL : mTextZoomScaleStops);
         }
-        if (mTextAllowOverlap != null) {
-            rootConfig.put(JSON_LABEL_ALLOW_OVERLAP_KEY, mTextAllowOverlap);
+        if (mExplicitKeys.contains(JSON_LABEL_ALLOW_OVERLAP_KEY) || (mTextAllowOverlap != null)) {
+            rootConfig.put(JSON_LABEL_ALLOW_OVERLAP_KEY, mTextAllowOverlap == null ? JSONObject.NULL : mTextAllowOverlap);
         }
-        if (!mTextOptional) {
-            rootConfig.put(JSON_LABEL_OPTIONAL_KEY, false);
+        if (mExplicitKeys.contains(JSON_LABEL_OPTIONAL_KEY) || (!mTextOptional)) {
+            rootConfig.put(JSON_LABEL_OPTIONAL_KEY, mTextOptional);
         }
-        if (mSymbolSpacing != DEFAULT_SYMBOL_SPACING) {
+        if (mExplicitKeys.contains(JSON_LABEL_SPACING_KEY) || (mSymbolSpacing != DEFAULT_SYMBOL_SPACING)) {
             rootConfig.put(JSON_LABEL_SPACING_KEY, mSymbolSpacing);
         }
-        if (mTextMaxWidth > 0f) {
+        if (mExplicitKeys.contains(JSON_TEXT_MAX_WIDTH_KEY) || (mTextMaxWidth > 0f)) {
             rootConfig.put(JSON_TEXT_MAX_WIDTH_KEY, mTextMaxWidth);
         }
-        if (!DEFAULT_TEXT_FONT.equals(getTextFont())) {
+        if (mExplicitKeys.contains(JSON_LABEL_FONT_KEY) || (!DEFAULT_TEXT_FONT.equals(getTextFont()))) {
             rootConfig.put(JSON_LABEL_FONT_KEY, getTextFont());
         }
-        if (!DEFAULT_TEXT_JUSTIFY.equals(getTextJustify())) {
+        if (mExplicitKeys.contains(JSON_LABEL_JUSTIFY_KEY) || (!DEFAULT_TEXT_JUSTIFY.equals(getTextJustify()))) {
             rootConfig.put(JSON_LABEL_JUSTIFY_KEY, getTextJustify());
         }
-        if (!DEFAULT_TEXT_TRANSFORM.equals(getTextTransform())) {
+        if (mExplicitKeys.contains(JSON_LABEL_TRANSFORM_KEY) || (!DEFAULT_TEXT_TRANSFORM.equals(getTextTransform()))) {
             rootConfig.put(JSON_LABEL_TRANSFORM_KEY, getTextTransform());
         }
-        if (mTextLetterSpacing != 0f) {
+        if (mExplicitKeys.contains(JSON_LABEL_LETTER_SPACING_KEY) || (mTextLetterSpacing != 0f)) {
             rootConfig.put(JSON_LABEL_LETTER_SPACING_KEY, mTextLetterSpacing);
         }
-        if (getTextLineHeight() != DEFAULT_TEXT_LINE_HEIGHT) {
+        if (mExplicitKeys.contains(JSON_LABEL_LINE_HEIGHT_KEY) || (getTextLineHeight() != DEFAULT_TEXT_LINE_HEIGHT)) {
             rootConfig.put(JSON_LABEL_LINE_HEIGHT_KEY, getTextLineHeight());
         }
-        if (getTextPadding() != DEFAULT_TEXT_PADDING) {
+        if (mExplicitKeys.contains(JSON_LABEL_PADDING_KEY) || (getTextPadding() != DEFAULT_TEXT_PADDING)) {
             rootConfig.put(JSON_LABEL_PADDING_KEY, getTextPadding());
         }
-        if (mTextKeepUpright != null) {
-            rootConfig.put(JSON_LABEL_KEEP_UPRIGHT_KEY, mTextKeepUpright);
+        if (mExplicitKeys.contains(JSON_LABEL_KEEP_UPRIGHT_KEY) || (mTextKeepUpright != null)) {
+            rootConfig.put(JSON_LABEL_KEEP_UPRIGHT_KEY, mTextKeepUpright == null ? JSONObject.NULL : mTextKeepUpright);
         }
-        if (getTextMaxAngle() != DEFAULT_TEXT_MAX_ANGLE) {
+        if (mExplicitKeys.contains(JSON_LABEL_MAX_ANGLE_KEY) || (getTextMaxAngle() != DEFAULT_TEXT_MAX_ANGLE)) {
             rootConfig.put(JSON_LABEL_MAX_ANGLE_KEY, getTextMaxAngle());
         }
-        if (mLabelTemplate != null && !mLabelTemplate.isEmpty()) {
-            rootConfig.put(JSON_LABEL_TEMPLATE_KEY, mLabelTemplate);
+        if (mExplicitKeys.contains(JSON_LABEL_TEMPLATE_KEY) || (mLabelTemplate != null && !mLabelTemplate.isEmpty())) {
+            rootConfig.put(JSON_LABEL_TEMPLATE_KEY, mLabelTemplate == null ? JSONObject.NULL : mLabelTemplate);
         }
-        if (mLabelMinZoom >= 0f) {
+        if (mExplicitKeys.contains(JSON_LABEL_MIN_ZOOM_KEY) || (mLabelMinZoom >= 0f)) {
             rootConfig.put(JSON_LABEL_MIN_ZOOM_KEY, mLabelMinZoom);
         }
-        if (mLabelMaxZoom >= 0f) {
+        if (mExplicitKeys.contains(JSON_LABEL_MAX_ZOOM_KEY) || (mLabelMaxZoom >= 0f)) {
             rootConfig.put(JSON_LABEL_MAX_ZOOM_KEY, mLabelMaxZoom);
         }
-        if (!mLineLabelRepeat) {
-            rootConfig.put(JSON_LINE_LABEL_REPEAT_KEY, false);
+        if (mExplicitKeys.contains(JSON_LINE_LABEL_REPEAT_KEY) || (!mLineLabelRepeat)) {
+            rootConfig.put(JSON_LINE_LABEL_REPEAT_KEY, mLineLabelRepeat);
         }
-        if (mLineLabelHorizontal) {
-            rootConfig.put(JSON_LINE_LABEL_HORIZONTAL_KEY, true);
+        if (mExplicitKeys.contains(JSON_LINE_LABEL_HORIZONTAL_KEY) || (mLineLabelHorizontal)) {
+            rootConfig.put(JSON_LINE_LABEL_HORIZONTAL_KEY, mLineLabelHorizontal);
         }
     }
 
@@ -442,11 +532,11 @@ public class LabelAttributes implements IJSONStore, Cloneable {
         mTextHaloBlur = (float) jsonObject.optDouble(JSON_LABEL_HALO_BLUR_KEY, 0);
         mTextOpacity = jsonObject.optInt(JSON_LABEL_TEXT_OPACITY_KEY, DEFAULT_TEXT_OPACITY);
         mTextScaleWithZoom = jsonObject.optBoolean(JSON_LABEL_SCALE_WITH_ZOOM_KEY, false);
-        mTextZoomScaleStops = jsonObject.optString(JSON_LABEL_ZOOM_STOPS_KEY, null);
+        mTextZoomScaleStops = jsonObject.isNull(JSON_LABEL_ZOOM_STOPS_KEY) ? null : jsonObject.optString(JSON_LABEL_ZOOM_STOPS_KEY, null);
         if (mTextZoomScaleStops != null && mTextZoomScaleStops.trim().isEmpty()) {
             mTextZoomScaleStops = null;
         }
-        if (jsonObject.has(JSON_LABEL_ALLOW_OVERLAP_KEY)) {
+        if (jsonObject.has(JSON_LABEL_ALLOW_OVERLAP_KEY) && !jsonObject.isNull(JSON_LABEL_ALLOW_OVERLAP_KEY)) {
             mTextAllowOverlap = jsonObject.optBoolean(JSON_LABEL_ALLOW_OVERLAP_KEY);
         } else {
             mTextAllowOverlap = null;
@@ -461,14 +551,14 @@ public class LabelAttributes implements IJSONStore, Cloneable {
         setTextLineHeight((float) jsonObject.optDouble(
                 JSON_LABEL_LINE_HEIGHT_KEY, DEFAULT_TEXT_LINE_HEIGHT));
         setTextPadding((float) jsonObject.optDouble(JSON_LABEL_PADDING_KEY, DEFAULT_TEXT_PADDING));
-        if (jsonObject.has(JSON_LABEL_KEEP_UPRIGHT_KEY)) {
+        if (jsonObject.has(JSON_LABEL_KEEP_UPRIGHT_KEY) && !jsonObject.isNull(JSON_LABEL_KEEP_UPRIGHT_KEY)) {
             mTextKeepUpright = jsonObject.optBoolean(JSON_LABEL_KEEP_UPRIGHT_KEY);
         } else {
             mTextKeepUpright = null;
         }
         setTextMaxAngle((float) jsonObject.optDouble(JSON_LABEL_MAX_ANGLE_KEY, DEFAULT_TEXT_MAX_ANGLE));
         if (jsonObject.has(JSON_LABEL_TEMPLATE_KEY)) {
-            mLabelTemplate = jsonObject.optString(JSON_LABEL_TEMPLATE_KEY, null);
+            mLabelTemplate = jsonObject.isNull(JSON_LABEL_TEMPLATE_KEY) ? null : jsonObject.optString(JSON_LABEL_TEMPLATE_KEY, null);
         } else {
             mLabelTemplate = null;
         }
@@ -476,6 +566,9 @@ public class LabelAttributes implements IJSONStore, Cloneable {
         mLabelMaxZoom = (float) jsonObject.optDouble(JSON_LABEL_MAX_ZOOM_KEY, -1);
         mLineLabelRepeat = jsonObject.optBoolean(JSON_LINE_LABEL_REPEAT_KEY, DEFAULT_LINE_LABEL_REPEAT);
         mLineLabelHorizontal = jsonObject.optBoolean(JSON_LINE_LABEL_HORIZONTAL_KEY, false);
+        mExplicitKeys.clear();
+        for (String key : new String[]{JSON_LABEL_HALO_COLOR_KEY, JSON_LABEL_HALO_WIDTH_KEY, JSON_LABEL_HALO_BLUR_KEY, JSON_LABEL_TEXT_OPACITY_KEY, JSON_LABEL_SCALE_WITH_ZOOM_KEY, JSON_LABEL_ZOOM_STOPS_KEY, JSON_LABEL_ALLOW_OVERLAP_KEY, JSON_LABEL_OPTIONAL_KEY, JSON_LABEL_SPACING_KEY, JSON_TEXT_MAX_WIDTH_KEY, JSON_LABEL_FONT_KEY, JSON_LABEL_JUSTIFY_KEY, JSON_LABEL_TRANSFORM_KEY, JSON_LABEL_LETTER_SPACING_KEY, JSON_LABEL_LINE_HEIGHT_KEY, JSON_LABEL_PADDING_KEY, JSON_LABEL_KEEP_UPRIGHT_KEY, JSON_LABEL_MAX_ANGLE_KEY, JSON_LABEL_TEMPLATE_KEY, JSON_LABEL_MIN_ZOOM_KEY, JSON_LABEL_MAX_ZOOM_KEY, JSON_LINE_LABEL_REPEAT_KEY, JSON_LINE_LABEL_HORIZONTAL_KEY})
+            if (jsonObject.has(key)) mExplicitKeys.add(key);
     }
 
     @Override
