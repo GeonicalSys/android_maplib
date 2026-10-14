@@ -580,3 +580,10 @@ callback, provider URI и service ticket до фактического заве�
 пользовательская инструкция: docs/guides/project-synchronization-user-guide.md.
 Перед изменениями читать оба документа. Нельзя заменить изоляцию временным
 переключением глобальной карты или prefs, либо закрыть БД по timeout при живом child.
+
+## Профиль полной приёмки consumer
+
+Opt-in verification APK app имеет отдельные IDs/storage и использует существующий
+maplib без изменения GIS/sync API. Полная приёмка consumer выполняет maplib unit
+tests, simulated location/track cases на эмуляторе и статические сценарии на
+смартфоне: [автотесты](../../docs/runbooks/automated-tests.md).
