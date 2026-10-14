@@ -347,13 +347,13 @@ public class SyncAdapter
                     + ProdLogUtil.formatSyncResultStats(syncResult));
         }
 
-        if (mapContentProviderHelper != null && !syncResult.hasError()) {
+        if (mapContentProviderHelper != null && !syncResult.hasError() && !mQueueOwnsLifecycle
+                && hasNgwVectorLayerForAccount(mapContentProviderHelper, account.name)) {
             final String accountNameHash = "_" + account.name.hashCode();
             SharedPreferences settings = getContext().getSharedPreferences(Constants.PREFERENCES, MODE_MULTI_PROCESS);
             SharedPreferences.Editor editor = settings.edit();
             long now = System.currentTimeMillis();
             editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP + accountNameHash, now);
-            editor.putLong(SettingsConstants.KEY_PREF_LAST_SYNC_TIMESTAMP, now);
             editor.apply();
         }
 

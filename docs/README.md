@@ -6,6 +6,18 @@ last_verified: 2026-10-14
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Готовые изменения и подтверждение полного проекта
+
+NGWVectorLayer публикует owning-map onLocalChangesCommitted только после commit,
+включая снятие TEMP/NOT_SYNC после Save. Нижняя библиотека не зависит от scheduler
+maplibui. Готовая выборка FeatureChanges исключает отдельные Save-флаги всего
+feature/attachment; остальные записи не отправляются до сохранения. Rollback
+не вызывает callback. ProjectSyncState хранит отдельный full completion clock
+canonical workspace; библиотечный account adapter не пишет общий UI timestamp,
+а при queue-owned lifecycle передаёт право подтверждения верхней очереди.
+Tracked URL читает часы своего проекта, с since=0 для неизвестного подтверждения.
+Регрессии: LocalChangesCommitTest и ProjectSyncStateTest, native consumer tests.
+
 ## Автоматический background lease и display-only Network
 
 `GpsEventSource.acquireBackgroundUpdates/releaseBackgroundUpdates` добавляют

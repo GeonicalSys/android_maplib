@@ -485,5 +485,8 @@ public interface IGISApplication
      */
     boolean backupEditableLayerData(NGWVectorLayer layer, String reason);
 
+    /** Called after local feature/outbox commit, with its original owning workspace. */
+    default void onLocalChangesCommitted(com.nextgis.maplib.map.MapBase map) { }
+
     Context getSelfContext();
 }
