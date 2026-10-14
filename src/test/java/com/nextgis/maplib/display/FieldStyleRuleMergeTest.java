@@ -14,6 +14,39 @@ import static org.junit.Assert.assertTrue;
  */
 public class FieldStyleRuleMergeTest {
 
+    @Test public void ruleInheritsHaloFontAndCollisionSettingsFromOther() {
+        LabelAttributes other = LabelAttributes.defaults();
+        other.setTextHaloColor(123); other.setTextHaloWidth(5); other.setTextHaloBlur(2);
+        other.setTextFont("Open Sans Bold"); other.setTextJustify("right"); other.setTextTransform("uppercase");
+        other.setTextLetterSpacing(.2f); other.setTextLineHeight(2); other.setTextPadding(8);
+        other.setTextMaxWidth(10); other.setTextMaxAngle(20); other.setTextOptional(false);
+        other.setSymbolSpacing(100); other.setLineLabelRepeat(false); other.setLineLabelHorizontal(true);
+        LabelAttributes rule = LabelAttributes.defaults(); rule.fillUnsetFrom(other);
+        assertEquals(123,rule.getTextHaloColor()); assertEquals(5,rule.getTextHaloWidth(),0);
+        assertEquals(2,rule.getTextHaloBlur(),0); assertEquals("Open Sans Bold",rule.getTextFont());
+        assertEquals("right",rule.getTextJustify()); assertEquals("uppercase",rule.getTextTransform());
+        assertEquals(.2f,rule.getTextLetterSpacing(),0); assertEquals(2,rule.getTextLineHeight(),0);
+        assertEquals(8,rule.getTextPadding(),0); assertEquals(10,rule.getTextMaxWidth(),0);
+        assertEquals(20,rule.getTextMaxAngle(),0); assertTrue(!rule.isTextOptional());
+        assertEquals(100,rule.getSymbolSpacing(),0); assertTrue(!rule.isLineLabelRepeat()); assertTrue(rule.isLineLabelHorizontal());
+    }
+
+    @Test public void explicitDefaultAndFalseValuesOverrideOtherSettings() {
+        LabelAttributes other = LabelAttributes.defaults(); other.setTextScaleWithZoom(true);
+        other.setTextOpacity(128); other.setTextHaloWidth(5); other.setTextOptional(false);
+        LabelAttributes rule = LabelAttributes.defaults(); rule.setTextScaleWithZoom(false);
+        rule.setTextOpacity(255); rule.setTextHaloWidth(LabelAttributes.DEFAULT_HALO_WIDTH); rule.setTextOptional(true);
+        rule.fillUnsetFrom(other);
+        assertTrue(!rule.isTextScaleWithZoom()); assertEquals(255,rule.getTextOpacity());
+        assertEquals(LabelAttributes.DEFAULT_HALO_WIDTH,rule.getTextHaloWidth(),0); assertTrue(rule.isTextOptional());
+    }
+
+    @Test public void explicitlyDisabledSymbolScalingOverridesOther() throws Exception {
+        StyleStub other = new StyleStub(); other.setScaleSizeWithZoom(true);
+        StyleStub rule = new StyleStub(); rule.setScaleSizeWithZoom(false);
+        assertTrue(!FieldStyleRule.mergeRuleWithOther(rule,other).isScaleSizeWithZoom());
+    }
+
     @Test
     public void labelAttributesFillUnsetFromOther() {
         LabelAttributes other = LabelAttributes.defaults();

@@ -5,6 +5,10 @@ package com.nextgis.maplib.display;
 
 import org.maplibre.android.style.expressions.Expression;
 import org.maplibre.android.style.layers.Property;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeSet;
 
 import static com.nextgis.maplib.display.SimpleLineStyle.LineStyleDash;
 import static com.nextgis.maplib.display.SimpleLineStyle.LineStyleEdgingDash;
@@ -328,6 +332,48 @@ public final class MplStyleMapper {
                 baseSize);
     }
 
+    /** One top-level zoom interpolation can carry distinct piecewise-linear category curves. */
+    public static Expression ruleZoomScaleExpression(Expression baseSize, Expression scaleWithZoom,
+            boolean defaultScale, String defaultSpec, String property, Collection<String> alternatives) {
+        if (scaleWithZoom == null || alternatives == null || alternatives.isEmpty())
+            return zoomScaleExpression(baseSize, scaleWithZoom, defaultScale, defaultSpec);
+        Map<String, ZoomStop[]> curves = new LinkedHashMap<>();
+        String defaultKey = defaultSpec == null ? "" : defaultSpec;
+        curves.put(defaultKey, curve(defaultSpec));
+        for (String spec : alternatives) curves.put(spec == null ? "" : spec, curve(spec));
+        if (curves.size() == 1) return zoomScaleExpression(baseSize, scaleWithZoom, defaultScale, defaultSpec);
+        TreeSet<Float> zooms = new TreeSet<>();
+        for (ZoomStop[] curve : curves.values()) for (ZoomStop stop : curve) zooms.add(stop.zoom);
+        Expression enabled = Expression.toBool(Expression.coalesce(scaleWithZoom, Expression.literal(defaultScale)));
+        Expression choice = Expression.coalesce(Expression.get(property), Expression.literal(defaultKey));
+        Expression.Stop[] stops = new Expression.Stop[zooms.size()];
+        int index = 0;
+        for (float zoom : zooms) {
+            Expression.Stop[] values = new Expression.Stop[curves.size()];
+            int category = 0;
+            for (Map.Entry<String, ZoomStop[]> curve : curves.entrySet())
+                values[category++] = Expression.stop(curve.getKey(), sample(curve.getValue(), zoom));
+            Expression multiplier = Expression.match(choice, Expression.literal(sample(curves.get(defaultKey), zoom)), values);
+            stops[index++] = Expression.stop(zoom, Expression.product(baseSize,
+                    Expression.switchCase(enabled, multiplier, Expression.literal(1.0))));
+        }
+        return Expression.interpolate(Expression.linear(), Expression.zoom(), stops);
+    }
+
+    private static ZoomStop[] curve(String spec) {
+        ZoomStop[] parsed = parseZoomStops(spec);
+        return parsed != null ? parsed : new ZoomStop[]{new ZoomStop(6,.35f),new ZoomStop(10,.65f),
+                new ZoomStop(14,1f),new ZoomStop(18,1.5f),new ZoomStop(22,2.2f)};
+    }
+    private static double sample(ZoomStop[] curve, float zoom) {
+        if (zoom <= curve[0].zoom) return curve[0].multiplier;
+        for (int i = 1; i < curve.length; i++) if (zoom <= curve[i].zoom) {
+            double fraction = (zoom - curve[i-1].zoom) / (curve[i].zoom - curve[i-1].zoom);
+            return curve[i-1].multiplier + fraction * (curve[i].multiplier - curve[i-1].multiplier);
+        }
+        return curve[curve.length-1].multiplier;
+    }
+
     private static Float[] parseFloatList(String spec, int minCount, int maxCount) {
         if (spec == null || spec.trim().isEmpty()) {
             return null;
@@ -369,7 +415,7 @@ public final class MplStyleMapper {
             try {
                 float zoom = Float.parseFloat(parts[0].trim());
                 float multiplier = Float.parseFloat(parts[1].trim());
-                if (zoom <= prevZoom || multiplier <= 0f) {
+                if (!Float.isFinite(zoom) || !Float.isFinite(multiplier) || zoom <= prevZoom || multiplier <= 0f) {
                     return null;
                 }
                 stops[i] = new ZoomStop(zoom, multiplier);

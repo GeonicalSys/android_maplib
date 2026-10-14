@@ -27,6 +27,8 @@ import org.maplibre.android.style.layers.Property;
  * data-driven styling. Used when loading NG features and when clearing rule overrides.
  */
 public final class MplFeatureStyleProps {
+    public static final String SIZE_ZOOM_STOPS = "sizezoomstops";
+    public static final String TEXT_ZOOM_STOPS = "textzoomstops";
 
     private MplFeatureStyleProps() {
     }
@@ -123,6 +125,8 @@ public final class MplFeatureStyleProps {
         if (style == null || feature == null) {
             return;
         }
+        feature.addStringProperty(RuleGeometryLayouts.KEY, RuleGeometryLayouts.key(style));
+        feature.addStringProperty(SIZE_ZOOM_STOPS, style.getSizeZoomScaleStops() == null ? "" : style.getSizeZoomScaleStops());
         switch (geometryKind(geoType)) {
             case POINT:
                 feature.addStringProperty(COLOR_FILL, MPLFeaturesUtils.getColorName(style.getColor()));
@@ -161,6 +165,9 @@ public final class MplFeatureStyleProps {
                 feature.addBooleanProperty(SCALE_SIZE_WITH_ZOOM, style.isScaleSizeWithZoom());
                 if (style instanceof SimpleLineStyle) {
                     SimpleLineStyle lineStyle = (SimpleLineStyle) style;
+                    feature.addStringProperty(com.nextgis.maplib.map.mpl.LineLayerFactory.DASH_KEY,
+                            MplStyleMapper.isLineDashType(lineStyle.getType())
+                                    ? com.nextgis.maplib.map.mpl.LineLayerFactory.dashKey(lineStyle) : "");
                     feature.addNumberProperty(FILL_TYPE, lineStyle.getType());
                     feature.addNumberProperty(DASH_PRESET, lineStyle.getDashPreset());
                     feature.addStringProperty(LINE_CAP, MplStyleMapper.lineCapValue(lineStyle.getLineCap()));
@@ -223,6 +230,9 @@ public final class MplFeatureStyleProps {
 
     /** Removes geometry-specific style props from a MapLibre feature. */
     public static void clear(Feature feature, int geoType) {
+        feature.removeProperty(SIZE_ZOOM_STOPS);
+        feature.removeProperty(RuleGeometryLayouts.KEY);
+        feature.removeProperty(com.nextgis.maplib.map.mpl.LineLayerFactory.DASH_KEY);
         if (feature == null) {
             return;
         }
@@ -370,10 +380,14 @@ public final class MplFeatureStyleProps {
                 textRotationAlignmentValue(geoType, labelAttributes));
         feature.addNumberProperty(LABEL_MIN_ZOOM, labelAttributes.getLabelMinZoom());
         feature.addNumberProperty(LABEL_MAX_ZOOM, labelAttributes.getLabelMaxZoom());
+        feature.addStringProperty(RuleLabelLayouts.KEY, RuleLabelLayouts.key(labelAttributes, geoType));
+        feature.addStringProperty(TEXT_ZOOM_STOPS, labelAttributes.getTextZoomScaleStops() == null ? "" : labelAttributes.getTextZoomScaleStops());
     }
 
     /** Removes label-related GeoJSON properties only (not geometry paint props). */
     public static void clearTextProps(Feature feature) {
+        feature.removeProperty(TEXT_ZOOM_STOPS);
+        feature.removeProperty(RuleLabelLayouts.KEY);
         clearText(feature);
     }
 

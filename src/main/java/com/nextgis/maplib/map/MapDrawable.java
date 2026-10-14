@@ -773,6 +773,8 @@ public class MapDrawable
 
         String currentNamePrefixSymbol = "symbol-" +  namePrefix;
         String vectorLayerIdSymbols =currentNamePrefixSymbol + layer_namepart + id;
+        for (String baseId : new String[]{vectorLayerId, vectorLayerId2, vectorLayerIdPattern,
+                vectorLayerIdMarkerIcon, vectorLayerIdSymbols}) RuleLabelLayouts.remove(style, baseId);
 
         if (style.getLayer(vectorLayerId)!= null)
             style.removeLayer(vectorLayerId);
@@ -807,6 +809,8 @@ public class MapDrawable
                     ILayer iLayer = LayerGroup.getVectorLayersById(this, id);
                     if (iLayer == null)
                         return;
+                    final String preparedStyle = iLayer instanceof VectorLayer
+                            ? VectorLayerRenderCache.styleFingerprint((VectorLayer) iLayer) : null;
 
                     final AccountManager accountManager = AccountManager.get(getContext());
                     final Connections connections = fillConnections(getContext(), accountManager);
@@ -945,6 +949,13 @@ public class MapDrawable
                     final com.nextgis.maplib.display.Style finalStyle = ngStyle;
 
                     postMainGuarded("addLayerByID id=" + iLayer.getId() + " name=" + iLayer.getName(), () -> {
+                        if (preparedStyle != null && !TextUtils.equals(preparedStyle,
+                                VectorLayerRenderCache.styleFingerprint((VectorLayer) iLayer))) {
+                            // Hot add may be the only producer of this layer's source.
+                            // Retry current data instead of leaving the layer absent.
+                            addLayerByID(id);
+                            return;
+                        }
                         if (maplibreMap.get() == null) {
                             return;
                         }
@@ -1180,6 +1191,7 @@ public class MapDrawable
         }
 
         Handler mainHandler = new Handler(Looper.getMainLooper());
+        final String preparedStyle = VectorLayerRenderCache.styleFingerprint(layer);
         mMaplibreVectorReloadExecutor.execute(() -> {
             try {
                 // Never mutate the live Feature list here. MapLibre Feature.properties() is a
@@ -1201,6 +1213,7 @@ public class MapDrawable
                 final List<org.maplibre.geojson.Feature> result = features;
                 postMainGuarded("reloadVectorLayerStyleProps update layer=" + layer.getName(),
                         () -> {
+                            if (!TextUtils.equals(preparedStyle, VectorLayerRenderCache.styleFingerprint(layer))) return;
                             sourceFeaturesHashMap.put(layer.getId(), result);
                             updateVectorLayerGeoJsonSources(layer, result);
                         });
@@ -1247,12 +1260,16 @@ public class MapDrawable
     private void scheduleVectorLayerGeoJsonReapply(
             @NonNull final VectorLayer layer,
             @NonNull final List<org.maplibre.geojson.Feature> features,
-            final long reloadToken) {
+            final long reloadToken, final String preparedStyle) {
         Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> runGuarded("reloadVectorLayerDataToMaplibre delayed reapply layer="
                 + layer.getName(), () -> {
             Long currentToken = mVectorLayerReloadTokens.get(layer.getId());
             if (currentToken == null || currentToken.longValue() != reloadToken) {
+                return;
+            }
+            if (!TextUtils.equals(preparedStyle, VectorLayerRenderCache.styleFingerprint(layer))) {
+                reloadVectorLayerStylePropsToMaplibre(layer);
                 return;
             }
             applyMaplibreStyleLayersForVector(layer);
@@ -1431,8 +1448,13 @@ public class MapDrawable
                 getContext().sendBroadcast(msg);
 
                 try {
+                    final String preparedStyle = VectorLayerRenderCache.styleFingerprint(layer);
                     long tDbStart = Constants.DEBUG_MODE ? System.nanoTime() : 0L;
                     List<org.maplibre.geojson.Feature> vectorPolygonFeatures = createFeatureListFromLayer(layer);
+                    if (!TextUtils.equals(preparedStyle, VectorLayerRenderCache.styleFingerprint(layer))) {
+                        mainHandler.post(() -> reloadVectorLayerStylePropsToMaplibre(layer));
+                        return;
+                    }
                     if (Constants.DEBUG_MODE) {
                         Log.d(TAG, "reloadVectorLayerDataToMaplibre DB layer=" + layer.getName()
                                 + " features=" + vectorPolygonFeatures.size()
@@ -1449,10 +1471,11 @@ public class MapDrawable
                     mVectorLayerReloadTokens.put(layer.getId(), reloadToken);
 
                     postMainGuarded("reloadVectorLayerDataToMaplibre update layer=" + layer.getName(), () -> {
+                        if (!TextUtils.equals(preparedStyle, VectorLayerRenderCache.styleFingerprint(layer))) return;
                         updateVectorLayerGeoJsonSources(layer, vectorPolygonFeatures);
                         applyMaplibreStyleLayersForVector(layer);
                         logVectorLayerMaplibreState("apply", layer, vectorPolygonFeatures.size());
-                        scheduleVectorLayerGeoJsonReapply(layer, vectorPolygonFeatures, reloadToken);
+                        scheduleVectorLayerGeoJsonReapply(layer, vectorPolygonFeatures, reloadToken, preparedStyle);
                     });
                 } catch (OutOfMemoryError e) {
                     mainHandler.post(() -> Toast.makeText(mContext,
@@ -2690,7 +2713,12 @@ public class MapDrawable
         int count = -1;
         String error = null;
         try {
-            List<org.maplibre.geojson.Feature> result = map.queryRenderedFeatures(rect, target);
+            List<String> nativeIds = new ArrayList<>();
+            nativeIds.add(target);
+            if (map.getStyle() != null) for (Layer layer : map.getStyle().getLayers())
+                if (layer.getId().startsWith(target + "-layout-") || layer.getId().startsWith(target + "_dash_"))
+                    nativeIds.add(layer.getId());
+            List<org.maplibre.geojson.Feature> result = map.queryRenderedFeatures(rect, nativeIds.toArray(new String[0]));
             count = result == null ? -1 : result.size();
             return result;
         } catch (RuntimeException failure) {
@@ -4434,6 +4462,10 @@ public class MapDrawable
             return;
         }
         boolean isVisible = ((com.nextgis.maplib.map.Layer) targetlayer).isVisible();
+        String geometryId = namePrefix + layer_namepart + id;
+        for (String baseId : new String[]{geometryId, geometryId + outline_namepart, geometryId + pattern_namepart,
+                geometryId + MARKER_ICON_LAYER_SUFFIX, "symbol-" + geometryId})
+            RuleLabelLayouts.visibility(maplibreMap.get().getStyle(), baseId, isVisible ? VISIBLE : NONE);
 
         Layer layer = layersHashMap.get(id);
         if (layer != null)
@@ -4992,7 +5024,7 @@ public class MapDrawable
         String selection = TrackLayer.FIELD_VISIBLE + " = 1 AND " + (current
                 ? "(" + end + " IS NULL OR " + end + " = '')"
                 : end + " IS NOT NULL AND " + end + " != ''");
-        SQLiteDatabase database = owner.getDatabase(true);
+        SQLiteDatabase database = SharedTrackStore.get(owner.getContext()).getDatabase(true);
         try (Cursor tracks = database.query(TrackLayer.TABLE_TRACKS,
                 new String[]{TrackLayer.FIELD_ID}, selection, null, null, null, null)) {
             if (tracks == null) return result;

@@ -123,6 +123,8 @@ public class TrackLayer
     private Uri        mContentUriTracks, mContentUriTrackpoints;
     private MapContentProviderHelper    mMap;
     private Map<Integer, GeoMultiLineString> mTracks;
+    private final SharedTrackStore mStore;
+    private long mLoadedRevision = -1;
 
 
     public TrackLayer(
@@ -139,6 +141,7 @@ public class TrackLayer
         IGISApplication app = (IGISApplication) getContext();
         mMap = (MapContentProviderHelper) MapBase.getInstance();
         mAuthority = app.getAuthority();
+        mStore = SharedTrackStore.get(context);
 
         if (mMap == null) {
             throw new IllegalArgumentException(
@@ -171,6 +174,20 @@ public class TrackLayer
         mTracks = new HashMap<>();
     }
 
+    public SQLiteDatabase getDatabase(boolean readOnly) { return mStore.getDatabase(readOnly); }
+
+    @Override public boolean isVisible() { return mStore.isVisible(); }
+
+    @Override public void setVisible(boolean visible) {
+        mStore.setVisible(visible);
+        super.setVisible(visible);
+    }
+
+    @Override public void fromJSON(org.json.JSONObject json) throws org.json.JSONException {
+        super.fromJSON(json);
+        mStore.initializeVisibility(mIsVisible);
+    }
+
 
     @Override
     public String getName()
@@ -181,8 +198,8 @@ public class TrackLayer
 
     public Map<Integer, GeoMultiLineString> getTracks()
     {
-        if (mTracks.size() == 0) {
-            reloadTracks(INSERT);
+        if (mLoadedRevision != mStore.getRevision()) {
+            reloadTracks(UPDATE);
         }
 
         return mTracks;
@@ -197,7 +214,7 @@ public class TrackLayer
                 " != ''";
 
         List<Integer> trackIds = new ArrayList<>();
-        try (Cursor cursor = mMap.getDatabase(true).query(TABLE_TRACKS, proj,
+        try (Cursor cursor = getDatabase(true).query(TABLE_TRACKS, proj,
                 selection, null, null, null, null)) {
             while (cursor.moveToNext()) trackIds.add(cursor.getInt(0));
         }
@@ -237,6 +254,7 @@ public class TrackLayer
                 }
                 break;
         }
+        mLoadedRevision = mStore.getRevision();
     }
 
 
@@ -278,7 +296,7 @@ public class TrackLayer
     private Cursor getTrack(int id)
     {
         String[] proj = new String[] {FIELD_LON, FIELD_LAT, FIELD_SEGMENT};
-        return mMap.getDatabase(true).query(TABLE_TRACKPOINTS, proj,
+        return getDatabase(true).query(TABLE_TRACKPOINTS, proj,
                 FIELD_SESSION + " = ?", new String[]{Integer.toString(id)},
                 null, null, POINT_ORDER);
     }
@@ -325,13 +343,13 @@ public class TrackLayer
 
     private void initDB()
     {
-        mSQLiteDatabase = mMap.getDatabase(false);
-
-//        mSQLiteDatabase.execSQL("DROP TABLE IF EXISTS TRACKPOINTS;");
-//        mSQLiteDatabase.execSQL("DROP TABLE IF EXISTS TRACKS;");
-
-        mSQLiteDatabase.execSQL(DB_CREATE_TRACKS);
-        mSQLiteDatabase.execSQL(DB_CREATE_TRACKPOINTS);
+        try { mStore.migrateWorkspace(mMap.getPath()); }
+        catch (java.io.IOException | RuntimeException error) {
+            // Startup reports the failed source; the map remains usable and recorder/upload retry
+            // require SharedTrackProjects.prepare to succeed before consuming the incomplete store.
+            android.util.Log.w(Constants.TAG, "Legacy track migration deferred; source retained", error);
+        }
+        mSQLiteDatabase = getDatabase(false);
     }
 
 
@@ -343,7 +361,7 @@ public class TrackLayer
             String sortOrder,
             String limit) throws SQLException, IllegalArgumentException
     {
-        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(true);
+        SQLiteDatabase mSQLiteDatabase = getDatabase(true);
         Cursor cursor;
 
         switch (mUriMatcher.match(uri)) {
@@ -383,7 +401,7 @@ public class TrackLayer
             Uri uri,
             ContentValues values)
     {
-        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(false);
+        SQLiteDatabase mSQLiteDatabase = getDatabase(false);
         long id;
         Uri inserted;
 
@@ -433,29 +451,19 @@ public class TrackLayer
             String selection,
             String[] selectionArgs)
     {
-        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(false);
-
-        switch (mUriMatcher.match(uri)) {
-            case TYPE_TRACKS:
-                if (selection != null) {
-                    String trackpointsSel = selection.replace(FIELD_ID, FIELD_SESSION);
-                    mSQLiteDatabase.delete(TABLE_TRACKPOINTS, trackpointsSel, selectionArgs);
-                }
-                break;
-            case TYPE_SINGLE_TRACK:
-            case TYPE_TRACKPOINTS:
-                throw new IllegalArgumentException(
-                        "Only multiple tracks deletion implemented (WHERE _id IN (?,...,?))");
-            default:
-                throw new IllegalArgumentException("Wrong tracks URI: " + uri);
-        }
-
-        int deleted = mSQLiteDatabase.delete(TABLE_TRACKS, selection, selectionArgs);
+        SQLiteDatabase mSQLiteDatabase = getDatabase(false);
+        if (mUriMatcher.match(uri) != TYPE_TRACKS)
+            throw new IllegalArgumentException("Only multiple tracks deletion implemented");
+        int deleted = com.nextgis.maplib.util.LayerDatabaseTransaction.run(mSQLiteDatabase, () -> {
+            String pointSelection = FIELD_SESSION + " IN (SELECT " + FIELD_ID + " FROM " + TABLE_TRACKS
+                    + (TextUtils.isEmpty(selection) ? "" : " WHERE " + selection) + ")";
+            mSQLiteDatabase.delete(TABLE_TRACKPOINTS, pointSelection, selectionArgs);
+            return mSQLiteDatabase.delete(TABLE_TRACKS, selection, selectionArgs);
+        });
 
         if (deleted > 0) {
 //            notifyLayerChanged();
-            reloadTracks(DELETE);
-            getContext().getContentResolver().notifyChange(uri, null);
+            publishCommittedChange(mSQLiteDatabase, uri, DELETE, true);
         }
 
         return deleted;
@@ -468,7 +476,7 @@ public class TrackLayer
             String selection,
             String[] selectionArgs)
     {
-        SQLiteDatabase mSQLiteDatabase = mMap.getDatabase(false);
+        SQLiteDatabase mSQLiteDatabase = getDatabase(false);
         int updated;
         String table = TABLE_TRACKS;
 
@@ -504,6 +512,7 @@ public class TrackLayer
 
     private void publishCommittedChange(SQLiteDatabase db, Uri uri, int mode, boolean refresh) {
         com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db, () -> {
+            mStore.changed();
             Runnable notification = () -> {
                 try {
                     if (refresh) {

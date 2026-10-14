@@ -6,6 +6,14 @@ last_verified: 2026-10-14
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Общая история треков и проверки обычных стилей
+
+SharedTrackStore owns one private track database and durable spool per installation.
+Legacy read-only migration preserves all registered histories and rollback sources;
+MapDrawable/TrackLayer use shared snapshots. LabelAttributes preserves explicit
+optional presence, including false/default, and inherits all unset label settings.
+Contracts: consuming root docs/architecture/shared-tracks.md and classic-style-verification.md.
+
 ## Готовые изменения и подтверждение полного проекта
 
 NGWVectorLayer публикует owning-map onLocalChangesCommitted только после commit,
@@ -398,9 +406,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   `android-sdk-opengl` и не должен инициализировать Vulkan surface.
 - Rule-based подписи игнорируют зум/opacity/scale: проверить, что слойные
   дефолты взяты из «прочих», props после merge, и SymbolLayer min/max сброшены;
-  пустой зум/scale=false/opacity=255 в категории наследуются из other.
-- Zoom-stops «не действуют»: кривая слоя общая из other; нужен флаг scale
-  (на other или унаследованный); data-driven scale — outer switchCase.
+  только отсутствующие ключи наследуются из other; явно заданные false/255/default сохраняются.
+- Zoom-stops «не действуют»: проверить effective category curve и флаг scale
+  (на other или в категории); обычный GeoJSON renderer объединяет stops разных
+  category curves в top-level interpolate и выбирает multiplier по props.
 - Курсор перекрывается треком/вектором: проверить, что `user-location-layer`
   последний в live style после cold/lite/hot reload, а под ним
   `user-location-heading-outline`, `user-location-heading-halo`,

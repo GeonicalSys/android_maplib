@@ -98,7 +98,7 @@ public final class PointLayerFactory {
                 ? Expression.get(MplFeatureStyleProps.SCALE_SIZE_WITH_ZOOM)
                 : null;
         boolean defaultScaleSizeWithZoom = vars.scaleSizeWithZoom;
-        Expression fillIconSize = MplStyleMapper.zoomScaleExpression(
+        Expression fillIconSize = ctx.scaleSize(
                 fillIconSizeBase,
                 scaleSizeWithZoom,
                 defaultScaleSizeWithZoom,
@@ -113,7 +113,7 @@ public final class PointLayerFactory {
                 Expression.gt(iconRadiusPx, Expression.literal(0.0)),
                 iconRadiusPx,
                 markerRadiusPx);
-        Expression iconOverlaySize = MplStyleMapper.zoomScaleExpression(
+        Expression iconOverlaySize = ctx.scaleSize(
                 MarkerIconRegistry.iconSizeForRadiusExpression(effectiveIconRadiusPx),
                 scaleSizeWithZoom,
                 defaultScaleSizeWithZoom,
@@ -121,7 +121,7 @@ public final class PointLayerFactory {
         Expression strokePx = Expression.coalesce(
                 Expression.get(MplFeatureStyleProps.THICKNESS),
                 Expression.literal((double) getMPLThinkness(vars.thickness)));
-        Expression strokeIconSize = MplStyleMapper.zoomScaleExpression(
+        Expression strokeIconSize = ctx.scaleSize(
                 MarkerIconRegistry.strokeIconSizeExpression(fillIconSizeBase, strokePx),
                 scaleSizeWithZoom,
                 defaultScaleSizeWithZoom,
@@ -131,12 +131,8 @@ public final class PointLayerFactory {
         Expression iconAnchor = Expression.coalesce(
                 Expression.get(MplFeatureStyleProps.ICON_ANCHOR),
                 Expression.literal(MarkerIconRegistry.iconAnchorValue(vars.markerIconAnchor)));
-        Expression iconAllowOverlap = Expression.coalesce(
-                Expression.get(MplFeatureStyleProps.ICON_ALLOW_OVERLAP),
-                Expression.literal(vars.markerIconAllowOverlap));
-        Expression iconIgnorePlacement = Expression.coalesce(
-                Expression.get(MplFeatureStyleProps.ICON_IGNORE_PLACEMENT),
-                Expression.literal(vars.markerIconIgnorePlacement));
+        boolean iconAllowOverlap = vars.markerIconAllowOverlap;
+        boolean iconIgnorePlacement = vars.markerIconIgnorePlacement;
 
         Layer newLayer;
         if (existingLayer != null) {
@@ -149,6 +145,7 @@ public final class PointLayerFactory {
 
         Layer newLayer2 = null;
         if (usePointSymbols) {
+            ((SymbolLayer) newLayer).setFilter(Expression.all());
             ((SymbolLayer) newLayer).setProperties(
                     PropertyFactory.iconImage(generatedIconImage),
                     PropertyFactory.iconSize(fillIconSize),
@@ -200,7 +197,7 @@ public final class PointLayerFactory {
             Expression circleBlur = Expression.coalesce(
                     Expression.get(MplFeatureStyleProps.CIRCLE_BLUR),
                     Expression.literal((double) vars.circleBlur));
-            Expression circleRadius = MplStyleMapper.zoomScaleExpression(
+            Expression circleRadius = ctx.scaleSize(
                     Expression.coalesce(
                             Expression.get(MplFeatureStyleProps.SIZE),
                             Expression.literal(defaultRadius)),
@@ -258,8 +255,8 @@ public final class PointLayerFactory {
                                     vars.markerIconOffsetX,
                                     vars.markerIconOffsetY}))),
                     PropertyFactory.iconAnchor(iconAnchor),
-                    PropertyFactory.iconAllowOverlap(Expression.literal(true)),
-                    PropertyFactory.iconIgnorePlacement(Expression.literal(true)),
+                    PropertyFactory.iconAllowOverlap(iconAllowOverlap),
+                    PropertyFactory.iconIgnorePlacement(iconIgnorePlacement),
                     PropertyFactory.symbolSortKey(Expression.toNumber(
                             Expression.get(MplFeatureStyleProps.ORDER))));
         }

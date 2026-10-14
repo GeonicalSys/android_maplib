@@ -55,7 +55,9 @@ public class TrackPersistenceTest {
         map = new TestMap(app, new File(root, "test.ngm"));
         layer = new TrackLayer(app, new File(root, "tracks"));
         map.addLayer(layer);
-        db = map.getDatabase(false);
+        db = layer.getDatabase(false);
+        db.delete("trackpoints", null, null);
+        db.delete("tracks", null, null);
         ContentValues track = new ContentValues();
         track.put(TrackLayer.FIELD_NAME, "test");
         track.put(TrackLayer.FIELD_START, 1L);
