@@ -53,8 +53,12 @@ public final class PendingTrackPoints {
     }
 
     public PendingTrackPoints(File mapDirectory) throws IOException {
+        this(mapDirectory, false);
+    }
+
+    private PendingTrackPoints(File mapDirectory, boolean readOnly) throws IOException {
         directory = new File(mapDirectory, "pending-track-points");
-        if (!directory.isDirectory() && !directory.mkdirs())
+        if (!directory.isDirectory() && (readOnly || !directory.mkdirs()))
             throw new IOException("Cannot open pending track directory");
         File[] files = directory.listFiles((dir, name) -> name.endsWith(".json")
                 || name.endsWith(".json.bak") || name.endsWith(".json.new"));
@@ -67,7 +71,10 @@ public final class PendingTrackPoints {
             File file = new File(directory, baseName);
             try {
                 // AtomicFile recovers .bak. A complete first-write .new can also be recovered.
-                byte[] bytes = !file.exists() && source.getName().endsWith(".new")
+                File backup = new File(file + ".bak");
+                File readable = backup.isFile() ? backup : file.isFile() ? file : new File(file + ".new");
+                byte[] bytes = readOnly ? java.nio.file.Files.readAllBytes(readable.toPath())
+                        : !file.exists() && source.getName().endsWith(".new")
                         && !new File(file + ".bak").exists()
                         ? java.nio.file.Files.readAllBytes(source.toPath())
                         : new AtomicFile(file).readFully();
@@ -87,7 +94,7 @@ public final class PendingTrackPoints {
                     else values.put(name, value.toString());
                 }
                 Entry entry = new Entry(json.getString("operation"), values, file, order,
-                        file.exists());
+                        readOnly || file.exists());
                 if (!entry.durable) write(entry);
                 pending.addLast(entry);
             } catch (JSONException | RuntimeException error) {
@@ -101,6 +108,11 @@ public final class PendingTrackPoints {
     public synchronized int size() { return pending.size(); }
 
     public interface ReplayWriter { long insert(String operation, ContentValues values); }
+
+    /** Recover committed AtomicFile variants without renaming, rewriting or deleting rollback sources. */
+    public static void replayReadOnly(File mapDirectory, ReplayWriter writer) throws IOException {
+        new PendingTrackPoints(mapDirectory, true).replay(writer);
+    }
 
     /** Migration reads the durable tail without acknowledging or deleting its rollback source. */
     public synchronized void replay(ReplayWriter writer) throws IOException {

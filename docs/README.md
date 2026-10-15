@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-14
+last_verified: 2026-10-15
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -10,6 +10,10 @@ last_verified: 2026-10-14
 
 SharedTrackStore owns one private track database and durable spool per installation.
 Legacy read-only migration preserves all registered histories and rollback sources;
+the source filename is resolved through DatabaseContext as `layers.db`. Completed
+history missed by the first rollout is retried beside existing shared tracks.
+PendingTrackPoints migration reads atomic backup/new variants without modifying
+source files; transaction failure and lost acknowledgements remain retryable.
 MapDrawable/TrackLayer use shared snapshots. LabelAttributes preserves explicit
 optional presence, including false/default, and inherits all unset label settings.
 Contracts: consuming root docs/architecture/shared-tracks.md and classic-style-verification.md.

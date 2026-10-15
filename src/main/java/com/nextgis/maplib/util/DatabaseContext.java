@@ -58,16 +58,16 @@ public class DatabaseContext
     @Override
     public File getDatabasePath(String name)
     {
-        String dbfile = mDatabasePath + File.separator + name;
-        if (!dbfile.endsWith(".db")) {
-            dbfile += ".db";
-        }
-
         if (!mDatabasePath.exists()) {
             mDatabasePath.mkdirs();
         }
 
-        return new File(dbfile);
+        return resolveDatabaseFile(mDatabasePath, name);
+    }
+
+    /** Resolve the same on-disk name without creating or opening the source directory. */
+    public static File resolveDatabaseFile(File directory, String name) {
+        return new File(directory, name.endsWith(".db") ? name : name + ".db");
     }
 
 

@@ -10,6 +10,7 @@ import android.net.Uri;
 import com.nextgis.maplib.api.IGISApplication;
 import com.nextgis.maplib.datasource.GeoPoint;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.DatabaseContext;
 import com.nextgis.maplib.util.FeatureSaveJournal;
 import com.nextgis.maplib.util.GeoConstants;
 import com.nextgis.maplib.util.PendingTrackPoints;
@@ -155,7 +156,10 @@ public final class SharedTrackStore {
                 new String[]{source}, null, null, null)) {
             if (done.moveToFirst()) return;
         }
-        File sourceFile = new File(workspace, MapContentProviderHelper.DBNAME);
+        File sourceFile = DatabaseContext.resolveDatabaseFile(workspace, MapContentProviderHelper.DBNAME);
+        // Retain compatibility with extensionless offline exports. The actual
+        // application DatabaseHelper uses DatabaseContext and stores layers.db.
+        if (!sourceFile.isFile()) sourceFile = new File(workspace, MapContentProviderHelper.DBNAME);
         File spool = new File(workspace, "pending-track-points");
         // A not-yet-created project can acquire a legacy database later; do not mark it imported.
         if (!sourceFile.isFile()) {
@@ -217,7 +221,7 @@ public final class SharedTrackStore {
                 }
                 if (spool.isDirectory()) {
                     // Replay without deleting the original files; rollback leaves the entire source recoverable.
-                    new PendingTrackPoints(workspace).replay((operation, original) -> {
+                    PendingTrackPoints.replayReadOnly(workspace, (operation, original) -> {
                         long saved = FeatureSaveJournal.find(target, TABLE_TRACKPOINTS, operation);
                         if (saved != Constants.NOT_FOUND) return saved;
                         ContentValues values = new ContentValues(original);
