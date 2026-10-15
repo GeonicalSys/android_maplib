@@ -10,6 +10,17 @@ import java.util.*;
 import static org.junit.Assert.*;
 
 public class LocalVectorTileLabelsTest {
+    @Test public void computedMercatorTileEdgesAssignASeamAnchorExactlyOnceAtEveryZoom() {
+        Feature original=feature(square(-100,-100,100,100));
+        for(int zoom:new int[]{1,8,12,16,20}) {
+            int middle=1<<(zoom-1), count=0;
+            for(int x=middle-1;x<=middle;x++)for(int y=middle-1;y<=middle;y++) {
+                if(LocalVectorTileProvider.labelFeatureForTile(original,
+                        LocalVectorTileProvider.tileBounds(zoom,x,y))!=null)count++;
+            }
+            assertEquals("Seam ownership at zoom "+zoom,1,count);
+        }
+    }
     @Test public void oneOriginalQuarterAcrossFourTilesHasOnePointAndFourUnlabelledPolygons() throws Exception {
         Feature original = feature(square(-8, -8, 8, 8));
         int labels = 0;

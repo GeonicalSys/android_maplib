@@ -173,6 +173,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   `LocalVectorTileLabelAnchor` учитывает отверстия, выбирает наибольшую пригодную
   часть MultiPolygon и проверяет точку после округления в сетку MVT. Геометрии
   без представимой внутренней точки на данном зуме не получают подпись.
+  Общие границы соседних тайлов вычисляются одной формулой без epsilon-overlap;
+  повторяющиеся IDs пространственного индекса обрабатываются один раз на тайл.
 
 - Поддерживаемые геометрии локальных MVT:
   read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;

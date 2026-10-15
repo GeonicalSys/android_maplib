@@ -29,6 +29,7 @@ import com.nextgis.maplib.util.GeoConstants;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashSet;
 
 /**
  * Local vector tiles foundation.
@@ -85,7 +86,7 @@ final class LocalVectorTileProvider {
         boolean polygonLabels = geometryType != GeoConstants.GTPoint
                 && (!TextUtils.isEmpty(labelField) || !TextUtils.isEmpty(commonLabel));
         if (trace != null) trace.phase("feature_read_clip");
-        for (Long id : ids) {
+        for (Long id : new LinkedHashSet<>(ids)) {
             if (id == null || layer.isFeatureHidden(id)) {
                 continue;
             }
@@ -417,13 +418,15 @@ final class LocalVectorTileProvider {
         return Math.max(min, Math.min(max, value));
     }
 
-    private static LocalVectorTileEncoder.TileBounds tileBounds(int z, int x, int y) {
+    static LocalVectorTileEncoder.TileBounds tileBounds(int z, int x, int y) {
         double tiles = Math.pow(2.0, z);
         double tileSize = (MERCATOR_MAX * 2.0) / tiles;
         double minX = -MERCATOR_MAX + x * tileSize;
-        double maxX = minX + tileSize;
+        // Adjacent tiles must evaluate their shared edge with the identical expression.
+        // Adding tileSize to minX introduces tiny overlaps at seams (including coordinate zero).
+        double maxX = -MERCATOR_MAX + (x + 1.0) * tileSize;
         double maxY = MERCATOR_MAX - y * tileSize;
-        double minY = maxY - tileSize;
+        double minY = MERCATOR_MAX - (y + 1.0) * tileSize;
         return new LocalVectorTileEncoder.TileBounds(minX, minY, maxX, maxY);
     }
 
