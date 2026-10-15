@@ -29,6 +29,7 @@ import com.nextgis.maplib.util.GeoConstants;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashSet;
 
 /**
  * Local vector tiles foundation.
@@ -81,8 +82,11 @@ final class LocalVectorTileProvider {
         String commonLabel = style instanceof ITextStyle ? ((ITextStyle) style).getText() : null;
 
         List<Feature> tileFeatures = new ArrayList<>();
+        List<Feature> labelFeatures = new ArrayList<>();
+        boolean polygonLabels = geometryType != GeoConstants.GTPoint
+                && (!TextUtils.isEmpty(labelField) || !TextUtils.isEmpty(commonLabel));
         if (trace != null) trace.phase("feature_read_clip");
-        for (Long id : ids) {
+        for (Long id : new LinkedHashSet<>(ids)) {
             if (id == null || layer.isFeatureHidden(id)) {
                 continue;
             }
@@ -92,8 +96,15 @@ final class LocalVectorTileProvider {
                 continue;
             }
             GeoGeometry geometry = feature.getGeometry();
-            if (geometry == null || !geometry.intersects(queryEnvelope)) {
+            // The spatial index already selected bbox candidates. Legacy Polygon.intersects
+            // tests its rings and rejects tiles wholly inside the fill; the clipper below
+            // handles both boundary crossings and polygon/tile containment.
+            if (geometry == null) {
                 continue;
+            }
+            if (polygonLabels) {
+                Feature label = labelFeatureForTile(feature, bounds);
+                if (label != null) labelFeatures.add(label);
             }
             Feature clippedFeature = clipFeatureToEnvelope(feature, queryEnvelope);
             if (clippedFeature != null) {
@@ -101,13 +112,15 @@ final class LocalVectorTileProvider {
             }
         }
         if (trace != null) { trace.put("encoded_features", tileFeatures.size()); trace.phase("mvt_encode"); }
-        byte[] tile = encodeTile(
+        byte[] tile = geometryType == GeoConstants.GTPoint ? encodeTile(
                 geometryType,
                 tileFeatures,
                 bounds,
                 layer.getId(),
                 TextUtils.isEmpty(labelField) ? null : labelField,
-                TextUtils.isEmpty(commonLabel) ? null : commonLabel);
+                TextUtils.isEmpty(commonLabel) ? null : commonLabel)
+                : LocalVectorTileEncoder.encodePolygonTile(
+                        tileFeatures, labelFeatures, bounds, layer.getId(), labelField, commonLabel);
         if (Constants.DEBUG_MODE) {
             Log.d(TAG, "tile layer=" + layer.getName()
                     + " z=" + z + " x=" + x + " y=" + y
@@ -116,6 +129,15 @@ final class LocalVectorTileProvider {
                     + " bytes=" + tile.length);
         }
         return tile;
+    }
+
+    static Feature labelFeatureForTile(Feature original, LocalVectorTileEncoder.TileBounds bounds) {
+        // Calculate before clipping: all requests for this source feature choose the same anchor.
+        GeoPoint anchor = LocalVectorTileLabelAnchor.create(original.getGeometry(), bounds);
+        if (anchor == null || !bounds.ownsLabelPoint(anchor)) return null;
+        Feature label = new Feature(original);
+        label.setGeometry(anchor);
+        return label;
     }
 
     static boolean canServe(VectorLayer layer) {
@@ -399,13 +421,15 @@ final class LocalVectorTileProvider {
         return Math.max(min, Math.min(max, value));
     }
 
-    private static LocalVectorTileEncoder.TileBounds tileBounds(int z, int x, int y) {
+    static LocalVectorTileEncoder.TileBounds tileBounds(int z, int x, int y) {
         double tiles = Math.pow(2.0, z);
         double tileSize = (MERCATOR_MAX * 2.0) / tiles;
         double minX = -MERCATOR_MAX + x * tileSize;
-        double maxX = minX + tileSize;
+        // Adjacent tiles must evaluate their shared edge with the identical expression.
+        // Adding tileSize to minX introduces tiny overlaps at seams (including coordinate zero).
+        double maxX = -MERCATOR_MAX + (x + 1.0) * tileSize;
         double maxY = MERCATOR_MAX - y * tileSize;
-        double minY = maxY - tileSize;
+        double minY = MERCATOR_MAX - (y + 1.0) * tileSize;
         return new LocalVectorTileEncoder.TileBounds(minX, minY, maxX, maxY);
     }
 
