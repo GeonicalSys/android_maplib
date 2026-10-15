@@ -1226,6 +1226,8 @@ public class MPLFeaturesUtils {
         }
 
         Expression sortKey = Expression.toNumber(Expression.get(prop_order));
+        fillLayer.setFilter(Expression.eq(Expression.geometryType(), Expression.literal("Polygon")));
+        outlineLayer.setFilter(Expression.eq(Expression.geometryType(), Expression.literal("Polygon")));
         fillLayer.setProperties(
                 PropertyFactory.fillColor(getColorName(vars.fillColor)),
                 PropertyFactory.fillOpacity(MplStyleMapper.opacityWithLayerMultiplier(
@@ -1287,6 +1289,8 @@ public class MPLFeaturesUtils {
             } else {
                 symbolLayer.setSourceLayer(LocalVectorTileEncoder.SOURCE_LAYER);
             }
+            symbolLayer.setFilter(Expression.eq(Expression.get(LocalVectorTileEncoder.LABEL_ANCHOR),
+                    Expression.literal(true)));
             String[] font = labelAttributes.getTextFontStack();
             float defaultTextOpacity = labelAttributes.textOpacityFloat();
             symbolLayer.setProperties(

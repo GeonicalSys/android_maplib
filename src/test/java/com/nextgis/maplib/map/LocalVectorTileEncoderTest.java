@@ -39,6 +39,8 @@ public class LocalVectorTileEncoderTest {
 
         byte[] tile = LocalVectorTileEncoder.encodePolygonTile(
                 Collections.singletonList(feature),
+                Collections.singletonList(LocalVectorTileProvider.labelFeatureForTile(feature,
+                        new LocalVectorTileEncoder.TileBounds(0, 0, 10, 10))),
                 new LocalVectorTileEncoder.TileBounds(0, 0, 10, 10),
                 7,
                 null,

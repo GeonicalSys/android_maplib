@@ -17,6 +17,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ import java.util.Map;
 final class LocalVectorTileEncoder {
     static final int EXTENT = 4096;
     static final String SOURCE_LAYER = "features";
+    static final String LABEL_ANCHOR = "_label_anchor";
 
     private static final int GEOM_TYPE_POINT = 1;
     private static final int GEOM_TYPE_POLYGON = 3;
@@ -48,13 +50,16 @@ final class LocalVectorTileEncoder {
             int layerId,
             String labelField,
             String commonLabel) throws IOException {
-        return encodeTile(
-                features,
-                bounds,
-                layerId,
-                labelField,
-                commonLabel,
-                GEOM_TYPE_POLYGON);
+        return encodePolygonTile(features, Collections.emptyList(), bounds, layerId, labelField, commonLabel);
+    }
+
+    static byte[] encodePolygonTile(
+            List<Feature> features, List<Feature> labelFeatures, TileBounds bounds,
+            int layerId, String labelField, String commonLabel) throws IOException {
+        LocalVectorTileEncoder encoder = new LocalVectorTileEncoder();
+        encoder.addFeatures(features, bounds, layerId, null, null, GEOM_TYPE_POLYGON, false);
+        encoder.addFeatures(labelFeatures, bounds, layerId, labelField, commonLabel, GEOM_TYPE_POINT, true);
+        return encoder.encodeTile();
     }
 
     static byte[] encodePointTile(
@@ -80,6 +85,12 @@ final class LocalVectorTileEncoder {
             String commonLabel,
             int mvtGeometryType) throws IOException {
         LocalVectorTileEncoder encoder = new LocalVectorTileEncoder();
+        encoder.addFeatures(features, bounds, layerId, labelField, commonLabel, mvtGeometryType, false);
+        return encoder.encodeTile();
+    }
+
+    private void addFeatures(List<Feature> features, TileBounds bounds, int layerId,
+            String labelField, String commonLabel, int mvtGeometryType, boolean labelAnchor) throws IOException {
         int order = 0;
         for (Feature feature : features) {
             if (feature == null
@@ -87,7 +98,22 @@ final class LocalVectorTileEncoder {
                     || !isExpectedGeometry(feature.getGeometry(), mvtGeometryType)) {
                 continue;
             }
-            byte[] geometry = encoder.encodeGeometry(feature.getGeometry(), bounds);
+            if (labelAnchor && !bounds.ownsLabelPoint((GeoPoint) feature.getGeometry())) continue;
+            String label = resolveLabel(feature, labelField, commonLabel);
+            if (labelAnchor && isEmpty(label)) continue;
+            byte[] geometry;
+            if (labelAnchor) {
+                GeometryCommandWriter writer = new GeometryCommandWriter(bounds);
+                GeoPoint point = (GeoPoint) feature.getGeometry();
+                // Rounding near the east/south seam must not move an owned point to EXTENT,
+                // which the native renderer excludes from this tile's symbols.
+                writer.command(1, 1);
+                writer.point(new TilePoint(Math.min(EXTENT - 1, bounds.tileX(point.getX())),
+                        Math.min(EXTENT - 1, bounds.tileY(point.getY()))));
+                geometry = writer.toByteArray();
+            } else {
+                geometry = encodeGeometry(feature.getGeometry(), bounds);
+            }
             if (geometry.length == 0) {
                 continue;
             }
@@ -95,14 +121,13 @@ final class LocalVectorTileEncoder {
             props.put(MplFeatureStyleProps.FEATURE_ID, feature.getId());
             props.put(MplFeatureStyleProps.LAYER_ID, layerId);
             props.put(MplFeatureStyleProps.ORDER, ++order);
-            String label = resolveLabel(feature, labelField, commonLabel);
+            if (labelAnchor) props.put(LABEL_ANCHOR, true);
             if (!isEmpty(label)) {
                 props.put(MplFeatureStyleProps.SIGNATURE, label);
             }
-            encoder.mFeatures.add(encoder.encodeFeature(
+            mFeatures.add(encodeFeature(
                     feature.getId(), props, geometry, mvtGeometryType));
         }
-        return encoder.encodeTile();
     }
 
     private static boolean isExpectedGeometry(GeoGeometry geometry, int mvtGeometryType) {
@@ -279,6 +304,12 @@ final class LocalVectorTileEncoder {
             this.minY = minY;
             this.maxX = maxX;
             this.maxY = maxY;
+        }
+
+        boolean ownsLabelPoint(GeoPoint point) {
+            // Half-open in tile coordinates: a point on a seam belongs to its east/south tile.
+            return point.getX() >= minX && point.getX() < maxX
+                    && point.getY() > minY && point.getY() <= maxY;
         }
 
         int tileX(double mercatorX) {

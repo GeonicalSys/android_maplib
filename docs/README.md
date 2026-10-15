@@ -165,6 +165,16 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   это ограничивает пиковую Java/native память больших Collector-проектов и не
   сохраняет данные удалённых слоёв между reload;
 - `LocalVectorTileProvider` / `LocalVectorTileEncoder` — ленивые MVT для
+  кварталов содержат один внутренний label anchor исходного объекта в том же
+  `features` source-layer. Фрагменты полигонов не несут подпись; служебная Point
+  запись с `_label_anchor=true` и исходным ID попадает только в один тайл без
+  учёта buffer. Используются прежние VectorSource, FillLayer, LineLayer и
+  SymbolLayer; отдельный объектный слой/GeoJsonSource не создаётся.
+  `LocalVectorTileLabelAnchor` учитывает отверстия, выбирает наибольшую пригодную
+  часть MultiPolygon и проверяет точку после округления в сетку MVT. Геометрии
+  без представимой внутренней точки на данном зуме не получают подпись.
+
+- Поддерживаемые геометрии локальных MVT:
   read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;
   loopback-сервер допускает не более двух одновременных сборок и 16 ожидающих
   запросов, сериализует тяжёлые тайлы одного слоя, отменяет очередь предыдущего

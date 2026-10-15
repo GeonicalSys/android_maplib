@@ -81,6 +81,9 @@ final class LocalVectorTileProvider {
         String commonLabel = style instanceof ITextStyle ? ((ITextStyle) style).getText() : null;
 
         List<Feature> tileFeatures = new ArrayList<>();
+        List<Feature> labelFeatures = new ArrayList<>();
+        boolean polygonLabels = geometryType != GeoConstants.GTPoint
+                && (!TextUtils.isEmpty(labelField) || !TextUtils.isEmpty(commonLabel));
         if (trace != null) trace.phase("feature_read_clip");
         for (Long id : ids) {
             if (id == null || layer.isFeatureHidden(id)) {
@@ -95,19 +98,25 @@ final class LocalVectorTileProvider {
             if (geometry == null || !geometry.intersects(queryEnvelope)) {
                 continue;
             }
+            if (polygonLabels) {
+                Feature label = labelFeatureForTile(feature, bounds);
+                if (label != null) labelFeatures.add(label);
+            }
             Feature clippedFeature = clipFeatureToEnvelope(feature, queryEnvelope);
             if (clippedFeature != null) {
                 tileFeatures.add(clippedFeature);
             }
         }
         if (trace != null) { trace.put("encoded_features", tileFeatures.size()); trace.phase("mvt_encode"); }
-        byte[] tile = encodeTile(
+        byte[] tile = geometryType == GeoConstants.GTPoint ? encodeTile(
                 geometryType,
                 tileFeatures,
                 bounds,
                 layer.getId(),
                 TextUtils.isEmpty(labelField) ? null : labelField,
-                TextUtils.isEmpty(commonLabel) ? null : commonLabel);
+                TextUtils.isEmpty(commonLabel) ? null : commonLabel)
+                : LocalVectorTileEncoder.encodePolygonTile(
+                        tileFeatures, labelFeatures, bounds, layer.getId(), labelField, commonLabel);
         if (Constants.DEBUG_MODE) {
             Log.d(TAG, "tile layer=" + layer.getName()
                     + " z=" + z + " x=" + x + " y=" + y
@@ -116,6 +125,15 @@ final class LocalVectorTileProvider {
                     + " bytes=" + tile.length);
         }
         return tile;
+    }
+
+    static Feature labelFeatureForTile(Feature original, LocalVectorTileEncoder.TileBounds bounds) {
+        // Calculate before clipping: all requests for this source feature choose the same anchor.
+        GeoPoint anchor = LocalVectorTileLabelAnchor.create(original.getGeometry(), bounds);
+        if (anchor == null || !bounds.ownsLabelPoint(anchor)) return null;
+        Feature label = new Feature(original);
+        label.setGeometry(anchor);
+        return label;
     }
 
     static boolean canServe(VectorLayer layer) {

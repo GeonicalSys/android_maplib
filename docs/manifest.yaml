@@ -206,13 +206,15 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
     responsibility: Cache prepared vector rendering payload for map startup.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileProvider.java
-    responsibility: Query and clip local SQLite features into lazy MVT tiles for polygon/multipolygon and read-only simple circle Point layers.
+    responsibility: Query and clip SQLite geometry into lazy MVT, calculate polygon label anchors before clipping, and emit each original feature label only in its unbuffered owner tile.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileLabelAnchor.java
+    responsibility: Calculate one interior point on the largest usable original polygon part with holes, validate the snapped MVT grid position, and retain no source geometry or global point collection.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileServer.java
     responsibility: Serve loopback MVT requests through a bounded two-worker/sixteen-item queue, serialize heavy builds per layer, cancel queued sockets from obsolete map generations and return a retryable overload response instead of exhausting the Android heap.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileRequestPolicy.java
     responsibility: Define and unit-test local MVT concurrency, queue and minimum 64 MiB heap-headroom limits independently of Android runtime classes.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileEncoder.java
-    responsibility: Encode Point and Polygon MVT command streams plus feature identity and simple label properties.
+    responsibility: Encode polygon fragments without text and marked label Point records in the same features source-layer, plus the unchanged simple Point layer payload.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java
     responsibility: Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectCompositionSync.java
@@ -350,7 +352,7 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
   - id: ngw-vector-identity-backup
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-invariant_refs: [INV-LOCAL-LOG-STARTUP, INV-TRACK-DELIVERY, INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE]
+invariant_refs: [INV-LOCAL-LOG-STARTUP, INV-TRACK-DELIVERY, INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-LOCAL-VECTOR-TILE-LABELS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE]
 global_docs:
   - docs/guides/project-synchronization-user-guide.md
   - docs/architecture/conditional-form-rules.md
