@@ -96,7 +96,10 @@ final class LocalVectorTileProvider {
                 continue;
             }
             GeoGeometry geometry = feature.getGeometry();
-            if (geometry == null || !geometry.intersects(queryEnvelope)) {
+            // The spatial index already selected bbox candidates. Legacy Polygon.intersects
+            // tests its rings and rejects tiles wholly inside the fill; the clipper below
+            // handles both boundary crossings and polygon/tile containment.
+            if (geometry == null) {
                 continue;
             }
             if (polygonLabels) {
