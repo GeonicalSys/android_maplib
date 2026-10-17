@@ -65,6 +65,9 @@ recorders и precision leases. `getLastDisplayLocation` удерживает п�
 identity/history и парный итог. Точные пороги и ограниченный retry описаны выше.
 Consuming app доставляет snapshot через свой diagnostics transport.
 Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.
+Явный выход consuming app снимает только его автоматические leases; recording
+listeners Track/Walk остаются независимыми и удерживают acquisition/wake lock.
+Minimize и explicit close различает app controller; API нижней библиотеки прежний.
 
 
 ## Назначение

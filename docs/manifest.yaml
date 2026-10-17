@@ -266,7 +266,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
     responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases.
+    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases; releasing app automatic owners on explicit exit preserves Track/Walk recording listeners and their wake lock.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LayerDatabaseTransaction.java
     responsibility: Managed transactions, nested failure fencing and publication only after commit.
   - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureSaveJournal.java
