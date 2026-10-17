@@ -63,4 +63,24 @@ public class LocationSubscriptionControllerTest {
         controller.update(0, false, false);
         assertEquals(1, backend.releases);
     }
+
+    @Test public void recoveryReplacesTheSameRequestAndKeepsRecordingNetworkAndPrecisionLease() {
+        Fake backend = new Fake();
+        LocationSubscriptionController controller = new LocationSubscriptionController(backend);
+        assertFalse(controller.retryGps());
+        controller.update(250, true, true);
+        assertTrue(controller.retryGps());
+        assertEquals(250, backend.interval);
+        assertEquals(2, backend.gpsRequests);
+        assertEquals(0, backend.gpsStops);
+        assertEquals(1, backend.acquisitions);
+        assertEquals(0, backend.releases);
+        assertEquals(1, backend.networkRequests);
+        assertEquals(0, backend.networkStops);
+        backend.failGps = true;
+        assertFalse(controller.retryGps());
+        assertTrue(controller.hasGps());
+        assertTrue(controller.hasNetwork());
+        assertEquals(0, backend.releases);
+    }
 }

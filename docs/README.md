@@ -6,6 +6,15 @@ last_verified: 2026-10-17
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## GPS diagnostic episodes
+
+Snapshot v2 separates reception loss, callback delivery and processing; bounded
+24-sample history and correlated recovery/cancel preserve the episode UUID.
+Short no-fix gaps stay local; long/repeated gaps are rate limited. Only sustained
+fresh used-in-fix statuses without callbacks allow one same-listener re-registration.
+Recorders, Network, precision leases, wake lock, filtering and segment rules remain owned
+by their existing controllers. See consuming root docs/architecture/location-pipeline.md.
+
 ## Общая история треков и проверки обычных стилей
 
 SharedTrackStore owns one private track database and durable spool per installation.
@@ -39,9 +48,9 @@ recorders и precision leases. `getLastDisplayLocation` удерживает п�
 отображённую сетевую точку с исходным timestamp/accuracy и округлённым возрастом.
 `getLastKnownLocation`, запись и точные инструменты сохраняют прежнюю свежесть;
 скрытая сетевая точка старше последнего GPS не используется после потери GPS.
-`GpsRecoveryPolicy` даёт bounded snapshot после 30 s начального ожидания / 15 s
-повторного восстановления, не чаще одного раза в 10 min. Provider-off и permission
-loss тихие. Consuming app доставляет snapshot через свой diagnostics transport.
+`GpsRecoveryPolicy` различает local delay и remote escalation, сохраняя episode
+identity/history и парный итог. Точные пороги и ограниченный retry описаны выше.
+Consuming app доставляет snapshot через свой diagnostics transport.
 Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.
 
 

@@ -90,14 +90,24 @@ public class GpsDisplayRetentionTest {
         check.invoke(source);
         ShadowSystemClock.advanceBy(Duration.ofSeconds(31));
         check.invoke(source);
+        assertTrue(reports.isEmpty());
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(29));
+        check.invoke(source);
         assertEquals(1, reports.size());
         assertEquals(30_000L, reports.get(0).get("threshold_ms"));
         assertEquals(false, reports.get(0).get("raw_fresh"));
         assertEquals(1, reports.get(0).get("background_owners"));
         assertTrue(reports.get(0).containsKey("satellites_ephemeris"));
         assertTrue(reports.get(0).containsKey("power"));
+        assertTrue(reports.get(0).containsKey("last_callback_delivery_lag_ms"));
+        assertTrue(reports.get(0).containsKey("history"));
         check.invoke(source);
         assertEquals(1, reports.size());
+        accept(location(LocationManager.GPS_PROVIDER, 100f));
+        check.invoke(source);
+        assertEquals(2, reports.size());
+        assertEquals("recovered", reports.get(1).get("phase"));
+        assertEquals(reports.get(0).get("episode_id"), reports.get(1).get("episode_id"));
     }
 
     @Test public void stoppedSubscriptionDoesNotCountClosedAppTimeAsSlowRecovery() throws Exception {
@@ -112,13 +122,13 @@ public class GpsDisplayRetentionTest {
         source.acquireBackgroundUpdates(warmOwner);
         check.invoke(source);
         assertTrue(reports.isEmpty());
-        ShadowSystemClock.advanceBy(Duration.ofSeconds(29));
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(59));
         check.invoke(source);
         assertTrue(reports.isEmpty());
         ShadowSystemClock.advanceBy(Duration.ofSeconds(1));
         check.invoke(source);
         assertEquals(1, reports.size());
-        assertEquals(30_000L, reports.get(0).get("waiting_ms"));
+        assertEquals(60_000L, reports.get(0).get("waiting_ms"));
     }
 
     @Test public void mapAttachDetachDoesNotRestartGpsWithAutomaticOwner() {

@@ -47,4 +47,7 @@ final class LocationSubscriptionController {
 
     boolean hasGps() { return gpsInterval != 0; }
     boolean hasNetwork() { return network; }
+
+    /** Replace the same Android listener request without releasing recording resources or Network. */
+    boolean retryGps() { return gpsInterval != 0 && backend.requestGps(gpsInterval); }
 }
