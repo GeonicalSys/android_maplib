@@ -6,6 +6,16 @@ last_verified: 2026-10-17
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Временно скрытый сектор точности компаса
+
+Сектор и оба его контура выключены в `MapDrawable` внутренним флагом
+`SHOW_USER_HEADING_ACCURACY_SECTOR=false` до проверки достоверности оценки.
+Расчёт неопределённости, геометрия и стили сохранены. Стрелка направления,
+круг GPS и синяя точка 5 dp с белой каймой 2 dp остаются прежними.
+Related `cursor` в consuming app проверяет скрытие при холодном запуске,
+hot-add и lite reload, сохранность геометрии и переключение стрелки компас/курс.
+Ниже параметры сектора описывают сохранённую реализацию при выключенной видимости.
+
 ## GPS diagnostic episodes
 
 Snapshot v2 separates reception loss, callback delivery and processing; bounded

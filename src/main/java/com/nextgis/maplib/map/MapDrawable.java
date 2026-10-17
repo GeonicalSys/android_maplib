@@ -319,6 +319,8 @@ public class MapDrawable
     private static final String USER_HEADING_LAYER_ID = "user-location-heading";
     private static final String USER_HEADING_HALO_LAYER_ID = "user-location-heading-halo";
     private static final String USER_HEADING_OUTLINE_LAYER_ID = "user-location-heading-outline";
+    // Temporarily hidden until compass uncertainty is calibrated; retain geometry and styling.
+    private static final boolean SHOW_USER_HEADING_ACCURACY_SECTOR = false;
     private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
     private static final String WALK_PREVIEW_SOURCE = "walk-preview-source";
     private FeatureCollection walkPreview = FeatureCollection.fromFeatures(new ArrayList<>());
@@ -533,7 +535,9 @@ public class MapDrawable
     private static FillLayer createUserHeadingLayer() {
         return new FillLayer(USER_HEADING_LAYER_ID, USER_LOCATION_SOURCE_ID)
                 .withFilter(userLocationHeadingFilter())
-                .withProperties(PropertyFactory.fillColor("#137DE8"),
+                .withProperties(PropertyFactory.visibility(SHOW_USER_HEADING_ACCURACY_SECTOR
+                                ? Property.VISIBLE : Property.NONE),
+                        PropertyFactory.fillColor("#137DE8"),
                         PropertyFactory.fillOpacity(0.24f));
     }
 
@@ -541,7 +545,9 @@ public class MapDrawable
         return new LineLayer(halo ? USER_HEADING_HALO_LAYER_ID : USER_HEADING_OUTLINE_LAYER_ID,
                 USER_LOCATION_SOURCE_ID)
                 .withFilter(userLocationHeadingFilter())
-                .withProperties(PropertyFactory.lineColor(halo ? "#FFFFFF" : "#137DE8"),
+                .withProperties(PropertyFactory.visibility(SHOW_USER_HEADING_ACCURACY_SECTOR
+                                ? Property.VISIBLE : Property.NONE),
+                        PropertyFactory.lineColor(halo ? "#FFFFFF" : "#137DE8"),
                         PropertyFactory.lineOpacity(halo ? 0.75f : 0.85f),
                         PropertyFactory.lineWidth(halo ? 2.8f : 1.2f),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND));
