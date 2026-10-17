@@ -6,6 +6,28 @@ last_verified: 2026-10-17
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Настройка сектора точности компаса
+
+В «Настройки → Местоположение» есть чекбокс «Показывать сектор точности
+компаса» (`show_compass_accuracy_sector`, default false). Выбор сохраняется;
+MapFragment применяет его при возврате на карту через
+`MapDrawable.setCompassAccuracySectorVisible(boolean)`. Заливка и оба
+контура переключаются вместе, выбранная видимость сохраняется при reload.
+Расчёт и стили сектора сохранены для доработки. Стрелка направления, круг GPS
+и синяя точка 5 dp с белой каймой 2 dp независимы от чекбокса.
+Related `cursor` проверяет default off, включение/выключение после resume,
+hot-add/lite reload, реальные rendered features и русскую подпись чекбокса
+в обеих темах при крупном интерфейсе.
+
+## GPS diagnostic episodes
+
+Snapshot v2 separates reception loss, callback delivery and processing; bounded
+24-sample history and correlated recovery/cancel preserve the episode UUID.
+Short no-fix gaps stay local; long/repeated gaps are rate limited. Only sustained
+fresh used-in-fix statuses without callbacks allow one same-listener re-registration.
+Recorders, Network, precision leases, wake lock, filtering and segment rules remain owned
+by their existing controllers. See consuming root docs/architecture/location-pipeline.md.
+
 ## Общая история треков и проверки обычных стилей
 
 SharedTrackStore owns one private track database and durable spool per installation.
@@ -39,9 +61,9 @@ recorders и precision leases. `getLastDisplayLocation` удерживает п�
 отображённую сетевую точку с исходным timestamp/accuracy и округлённым возрастом.
 `getLastKnownLocation`, запись и точные инструменты сохраняют прежнюю свежесть;
 скрытая сетевая точка старше последнего GPS не используется после потери GPS.
-`GpsRecoveryPolicy` даёт bounded snapshot после 30 s начального ожидания / 15 s
-повторного восстановления, не чаще одного раза в 10 min. Provider-off и permission
-loss тихие. Consuming app доставляет snapshot через свой diagnostics transport.
+`GpsRecoveryPolicy` различает local delay и remote escalation, сохраняя episode
+identity/history и парный итог. Точные пороги и ограниченный retry описаны выше.
+Consuming app доставляет snapshot через свой diagnostics transport.
 Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.
 
 
@@ -313,7 +335,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   геодезический сектор точности компаса (`UserLocationGeometry`) длиной 56
   логических пикселей при текущем zoom. Заливка сектора 0.24 дополнена белым
   контуром 2.8 px с синим контуром 1.2 px поверх него. «Орбита-кольцо»
-  оставляет прозрачное окно диаметром 21 dp с синей точкой 6 dp в центре.
+  оставляет прозрачное окно диаметром 21 dp с синей точкой 5 dp с белой обводкой 2 dp в центре.
   Синий обод имеет внешний радиус 13 dp: он утолщён на 1 dp наружу за счёт
   белого обода, чей внешний радиус 15.2 dp и тонкая тёмная кромка сохранены.
   Заливки accuracy и компаса также освобождают окно; внутренний контур сектора

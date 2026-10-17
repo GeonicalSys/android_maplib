@@ -14,6 +14,9 @@
         android:pathData="M36,23 A13,13 0,1 1,36,49 A13,13 0,1 1,36,23 Z M36,25.5 A10.5,10.5 0,1 0,36,46.5 A10.5,10.5 0,1 0,36,25.5 Z" />
     <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="0.5"
         android:pathData="M36,23 A13,13 0,1 1,36,49 A13,13 0,1 1,36,23 Z" />
+    <!-- A 5 dp blue fix with a 2 dp white border stays distinct over the blue track. -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M36,31.5 A4.5,4.5 0,1 1,36,40.5 A4.5,4.5 0,1 1,36,31.5 Z" />
     <path android:fillColor="#0872E8"
-        android:pathData="M36,33 A3,3 0,1 1,36,39 A3,3 0,1 1,36,33" />
+        android:pathData="M36,33.5 A2.5,2.5 0,1 1,36,38.5 A2.5,2.5 0,1 1,36,33.5 Z" />
 </vector>

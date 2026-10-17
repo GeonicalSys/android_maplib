@@ -110,6 +110,7 @@ public class GpsEventSource {
     private float meanCn0;
     private boolean gnssStarted;
     private String lastRawDecision = "none";
+    private String recoveryRetryResult;
     private String lastDisplayProvider = LocationManager.NETWORK_PROVIDER;
     private long lastDisplayFixNanos;
     public static final String DISPLAY_NETWORK_AGE_SECONDS = "com.nextgis.maplib.networkDisplayAgeSeconds";
@@ -455,8 +456,10 @@ public class GpsEventSource {
         subscriptions.update(external ? 0 : (fine ? interval : 0),
                 coarse && (!listeners.isEmpty() || !backgroundClients.isEmpty()) && !external,
                 keepExternal ? recording : fine && recording);
-        if (!subscriptions.hasGps())
-            recoveryPolicy.shouldReport(SystemClock.elapsedRealtime(), false, false, false);
+        if (!subscriptions.hasGps()) {
+            checkRecovery();
+            recoveryPolicy.clearHistory();
+        }
         externalSession.setWanted(keepExternal);
         notifyKeepAlive(keepExternal);
         updateSharedWakeLock();
@@ -717,22 +720,42 @@ public class GpsEventSource {
         long now = SystemClock.elapsedRealtime();
         boolean allowed = !isExternalInput() && PermissionUtil.hasLocationPermissions(context)
                 && isProviderEnabled(LocationManager.GPS_PROVIDER);
-        if (!recoveryPolicy.shouldReport(now, subscriptions.hasGps(), allowed, isFresh(gps))) return;
+        long callbackAge = lastRawCallbackAt == 0 ? -1 : now - lastRawCallbackAt;
+        long statusAge = lastStatusAt == 0 ? -1 : now - lastStatusAt;
+        long rawAge = rawGps == null ? -1 : LocationFixPolicy.ageMs(
+                rawGps.getElapsedRealtimeNanos(), SystemClock.elapsedRealtimeNanos());
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        boolean screenOn = power != null && power.isInteractive();
+        if (subscriptions.hasGps() && allowed && recoveryPolicy.historyDue(now)) {
+            recoveryPolicy.recordHistory(now, "elapsedMs=" + now + " rawAgeMs=" + rawAge
+                    + " callbackAgeMs=" + callbackAge + " statusAgeMs=" + statusAge
+                    + " used=" + satellitesUsed + "/" + satellitesVisible + " cn0=" + meanCn0
+                    + " decision=" + lastRawDecision + " screenOn=" + screenOn
+                    + " owners=" + listeners.size() + "/" + backgroundClients.size() + "/" + recorders.size());
+        }
+        GpsRecoveryPolicy.Reason reason = GpsRecoveryPolicy.classify(isFresh(rawGps), isFresh(gps),
+                callbackAge, statusAge, satellitesUsed, lastRawDecision);
+        GpsRecoveryPolicy.Update update = recoveryPolicy.update(now, subscriptions.hasGps(), allowed, isFresh(gps), reason);
+        if (update == null) return;
         Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("waiting_ms", recoveryPolicy.waitingMs(now));
-        snapshot.put("threshold_ms", recoveryPolicy.thresholdMs());
+        snapshot.put("schema_version", 2);
+        snapshot.put("phase", update.phase);
+        snapshot.put("reason", update.reason.wireName());
+        snapshot.put("episode_id", update.episodeId);
+        snapshot.put("waiting_ms", update.waitingMs);
+        snapshot.put("threshold_ms", update.thresholdMs);
+        snapshot.put("recurring_gaps", update.recurringGaps);
         snapshot.put("raw_fresh", isFresh(rawGps));
-        snapshot.put("raw_age_ms", rawGps == null ? -1 : LocationFixPolicy.ageMs(
-                rawGps.getElapsedRealtimeNanos(), SystemClock.elapsedRealtimeNanos()));
+        snapshot.put("raw_age_ms", rawAge);
         snapshot.put("raw_accuracy_m", rawGps == null ? -1 : rawGps.getAccuracy());
-        snapshot.put("raw_callback_age_ms", lastRawCallbackAge);
-        snapshot.put("callback_silence_ms", lastRawCallbackAt == 0 ? -1 : now - lastRawCallbackAt);
+        snapshot.put("last_callback_age_ms", callbackAge);
+        snapshot.put("last_callback_delivery_lag_ms", lastRawCallbackAge);
         snapshot.put("last_raw_decision", lastRawDecision);
         snapshot.put("network_age_ms", network == null ? -1 : LocationFixPolicy.ageMs(
                 network.getElapsedRealtimeNanos(), SystemClock.elapsedRealtimeNanos()));
         snapshot.put("gnss_started", gnssStarted);
         snapshot.put("first_fix_ms", lastFirstFixMs);
-        snapshot.put("status_age_ms", lastStatusAt == 0 ? -1 : now - lastStatusAt);
+        snapshot.put("status_age_ms", statusAge);
         snapshot.put("satellites_visible", satellitesVisible);
         snapshot.put("satellites_used", satellitesUsed);
         snapshot.put("satellites_ephemeris", satellitesEphemeris);
@@ -741,10 +764,15 @@ public class GpsEventSource {
         snapshot.put("background_owners", backgroundClients.size());
         snapshot.put("display_owners", listeners.size());
         snapshot.put("recording_owners", recorders.size());
+        snapshot.put("screen_on", screenOn);
         snapshot.put("power", LocationPowerPolicy.diagnostics(context));
         snapshot.put("filter", getRecordingDiagnostics());
-        HyperLog.w(Constants.TAG, "GPS recovery slow " + snapshot);
-        if (recoveryReporter != null) recoveryReporter.report(snapshot);
+        if (update.retry) recoveryRetryResult = subscriptions.retryGps() ? "registered" : "failed";
+        snapshot.put("retry_attempted", update.retryAttempted);
+        if (update.retryAttempted) snapshot.put("subscription_retry", recoveryRetryResult);
+        snapshot.put("history", recoveryPolicy.history());
+        HyperLog.i(Constants.TAG, "GPS recovery " + snapshot);
+        if (update.report && recoveryReporter != null) recoveryReporter.report(snapshot);
     }
 
     private String unavailableDiagnostic() {
