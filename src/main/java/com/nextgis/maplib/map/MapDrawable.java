@@ -319,8 +319,8 @@ public class MapDrawable
     private static final String USER_HEADING_LAYER_ID = "user-location-heading";
     private static final String USER_HEADING_HALO_LAYER_ID = "user-location-heading-halo";
     private static final String USER_HEADING_OUTLINE_LAYER_ID = "user-location-heading-outline";
-    // Temporarily hidden until compass uncertainty is calibrated; retain geometry and styling.
-    private static final boolean SHOW_USER_HEADING_ACCURACY_SECTOR = false;
+    // Opt-in while compass uncertainty is being calibrated; independent of the direction arrow.
+    private boolean showUserHeadingAccuracySector = false;
     private static final String USER_LOCATION_LAYER_ID = "user-location-layer";
     private static final String WALK_PREVIEW_SOURCE = "walk-preview-source";
     private FeatureCollection walkPreview = FeatureCollection.fromFeatures(new ArrayList<>());
@@ -532,20 +532,20 @@ public class MapDrawable
                         PropertyFactory.fillOutlineColor("#3189D6"));
     }
 
-    private static FillLayer createUserHeadingLayer() {
+    private FillLayer createUserHeadingLayer() {
         return new FillLayer(USER_HEADING_LAYER_ID, USER_LOCATION_SOURCE_ID)
                 .withFilter(userLocationHeadingFilter())
-                .withProperties(PropertyFactory.visibility(SHOW_USER_HEADING_ACCURACY_SECTOR
+                .withProperties(PropertyFactory.visibility(showUserHeadingAccuracySector
                                 ? Property.VISIBLE : Property.NONE),
                         PropertyFactory.fillColor("#137DE8"),
                         PropertyFactory.fillOpacity(0.24f));
     }
 
-    private static LineLayer createUserHeadingOutlineLayer(boolean halo) {
+    private LineLayer createUserHeadingOutlineLayer(boolean halo) {
         return new LineLayer(halo ? USER_HEADING_HALO_LAYER_ID : USER_HEADING_OUTLINE_LAYER_ID,
                 USER_LOCATION_SOURCE_ID)
                 .withFilter(userLocationHeadingFilter())
-                .withProperties(PropertyFactory.visibility(SHOW_USER_HEADING_ACCURACY_SECTOR
+                .withProperties(PropertyFactory.visibility(showUserHeadingAccuracySector
                                 ? Property.VISIBLE : Property.NONE),
                         PropertyFactory.lineColor(halo ? "#FFFFFF" : "#137DE8"),
                         PropertyFactory.lineOpacity(halo ? 0.75f : 0.85f),
@@ -4585,6 +4585,20 @@ public class MapDrawable
     }
 
 
+
+    /** Applies the host's saved display choice, including before style/source creation. */
+    public void setCompassAccuracySectorVisible(boolean visible) {
+        showUserHeadingAccuracySector = visible;
+        MapLibreMap map = getMaplibreMap();
+        Style style = map != null ? map.getStyle() : null;
+        if (style == null) return;
+        for (String id : new String[]{USER_HEADING_LAYER_ID, USER_HEADING_HALO_LAYER_ID,
+                USER_HEADING_OUTLINE_LAYER_ID}) {
+            Layer layer = style.getLayer(id);
+            if (layer != null) layer.setProperties(PropertyFactory.visibility(
+                    visible ? Property.VISIBLE : Property.NONE));
+        }
+    }
 
     public void updateLocation(Point point, boolean isStanding, float bearing) {
         updateLocation(point, isStanding, bearing, 0f);
