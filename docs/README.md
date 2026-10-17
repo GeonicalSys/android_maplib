@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-15
+last_verified: 2026-10-17
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -615,3 +615,11 @@ Opt-in verification APK app имеет отдельные IDs/storage и исп�
 maplib без изменения GIS/sync API. Полная приёмка consumer выполняет maplib unit
 tests, simulated location/track cases на эмуляторе и статические сценарии на
 смартфоне: [автотесты](../../docs/runbooks/automated-tests.md).
+
+Startup наблюдается тем же MapRuntimeDiagnostics observer через beginStartup.
+Приложение задаёт только фиксированные phase names. Предыдущий private journal
+читается до первой новой записи и остаётся доступным delayed AppExitInfo;
+startup/query/tile записи вместе ограничены 16 KiB с удалением старейшей.
+Новых зависимостей на app/maplibui, чтения GIS из watchdog и изменений тайлов нет.
+Unit checks покрывают blocked startup, late ANR после перезаписи файла и размер
+общего journal; native consuming-app check использует настоящий SDK AnrV2Hint.

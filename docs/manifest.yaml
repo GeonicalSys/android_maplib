@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-15
+last_verified: 2026-10-17
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
@@ -30,9 +30,9 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
     responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
-    responsibility: Observe stalled render queries and tile stages independently of the UI, bound writer/log repetitions, persist a 16 KiB operation snapshot with process/version identity and match it to live or historical event timestamps without business storage reads.
+    responsibility: Observe stalled startup, render queries and tile stages independently of the UI, retain the prior-process journal before new writes, bound writer/log repetitions, persist a 16 KiB operation snapshot with process/version identity and match it to live or historical event timestamps without business storage reads.
   - path: maplib/src/test/java/com/nextgis/maplib/util/MapRuntimeDiagnosticsTest.java
-    responsibility: Verify fast-operation silence, non-returning query observation, independent rejection reasons, stage timing, old-process identity matching, stale-event exclusion and bounded atomic journal retention.
+    responsibility: Verify fast-operation silence, non-returning query observation, independent rejection reasons, stage timing, startup stack/phase, combined journal bounds and old-process identity after a new startup write, stale-event exclusion and bounded atomic journal retention.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocalLogInitializer.java
     responsibility: Initialize local HyperLog once per process after migrating its obsolete URL, retain custom format across app/base calls and preserve the log database and expiry contract.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LayerFormHashUtil.java

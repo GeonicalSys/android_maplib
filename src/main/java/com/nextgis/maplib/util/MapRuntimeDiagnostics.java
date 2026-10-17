@@ -28,9 +28,11 @@ public final class MapRuntimeDiagnostics {
     private MapRuntimeDiagnostics() {}
 
     public static void initialize(Context context, String version, int build, String revision) {
-        ENGINE.configure(version, build, revision);
         ((AndroidAdapter) ENGINE.adapter).journal = new File(context.getFilesDir(), "map-runtime-diagnostics.json");
+        ENGINE.configure(version, build, revision);
     }
+    /** Observe startup on the existing independent watcher, without moving GIS work or reading it. */
+    public static Trace beginStartup() { return ENGINE.begin("startup", now()); }
     public static long now() { return ENGINE.adapter.now(); }
     public static long nextRequestId() { return ENGINE.nextId.incrementAndGet(); }
     public static Trace beginQuery(String target, Integer mode) {
@@ -133,7 +135,8 @@ public final class MapRuntimeDiagnostics {
         final Map<Long, Trace> active = new ConcurrentHashMap<>();
         private final Map<String, Counter> limits = new LinkedHashMap<>();
         private final Map<String, Object> identity = new LinkedHashMap<>();
-        private volatile Map<String, Object> lastQuery, lastTile;
+        private volatile Map<String, Object> lastQuery, lastTile, lastStartup, previousProcess;
+        private boolean previousReadScheduled;
         volatile long lastFrame;
         volatile String mapState = "unknown";
         volatile String sceneState = "unknown";
@@ -146,6 +149,12 @@ public final class MapRuntimeDiagnostics {
         }
         synchronized void configure(String version, int build, String revision) {
             identity.put("app_version", version); identity.put("app_build", build); identity.put("source_revision", revision);
+            if (!previousReadScheduled) {
+                previousReadScheduled = true;
+                // This is queued before new startup writes. A delayed SDK ANR must still find
+                // the old process after the current startup replaces the journal on disk.
+                adapter.execute(() -> previousProcess = adapter.read());
+            }
         }
         Trace begin(String kind, long start) { return begin(kind, start, nextId.incrementAndGet()); }
         Trace begin(String kind, long start, long id) {
@@ -172,7 +181,7 @@ public final class MapRuntimeDiagnostics {
             data.put("last_frame_age_ms", lastFrame == 0 ? -1L : Math.max(0, adapter.now() - lastFrame));
             data.put("active_workers", activeWorkers); data.put("queued", queued);
             data.put("heap", adapter.memory());
-            if ("render_query".equals(trace.kind)) {
+            if ("render_query".equals(trace.kind) || "startup".equals(trace.kind)) {
                 List<String> stack = new ArrayList<>();
                 if ("stalled".equals(event)) {
                     for (StackTraceElement frame : trace.thread.getStackTrace()) {
@@ -186,8 +195,11 @@ public final class MapRuntimeDiagnostics {
                 for (Trace activeTrace : active.values()) {
                     if ("tile".equals(activeTrace.kind) && tiles.size() < 2) tiles.add(activeTrace.snapshot());
                 }
-                data.put("active_tiles", tiles);
-                lastQuery = data;
+                if ("startup".equals(trace.kind)) lastStartup = data;
+                else {
+                    data.put("active_tiles", tiles);
+                    lastQuery = data;
+                }
             } else lastTile = data;
             emit(trace.kind + ":" + event, data);
         }
@@ -214,16 +226,31 @@ public final class MapRuntimeDiagnostics {
             Map<String, Object> result = new LinkedHashMap<>(identity);
             if (lastQuery != null) result.put("render_query", lastQuery);
             if (lastTile != null) result.put("local_tile", lastTile);
+            if (lastStartup != null) result.put("startup", lastStartup);
+            // Keep the latest observations inside the existing on-disk bound.
+            while (new JSONObject(result).toString().getBytes(StandardCharsets.UTF_8).length > MAX_JOURNAL_BYTES) {
+                String oldest = null; long observed = Long.MAX_VALUE;
+                for (String key : new String[]{"startup", "render_query", "local_tile"}) {
+                    Object entry = result.get(key);
+                    if (!(entry instanceof Map)) continue;
+                    Object at = ((Map<?, ?>) entry).get("observed_at_ms");
+                    long time = at instanceof Number ? ((Number) at).longValue() : 0;
+                    if (oldest == null || time < observed) { oldest = key; observed = time; }
+                }
+                if (oldest == null) break;
+                result.remove(oldest);
+            }
             return result;
         }
         Map<String, Object> forEvent(long timestamp) {
             Map<String, Object> result = matching(journal(), timestamp);
+            if (result.isEmpty()) result = matching(previousProcess, timestamp);
             return result.isEmpty() ? matching(adapter.read(), timestamp) : result;
         }
         private Map<String, Object> matching(Map<String, Object> snapshot, long timestamp) {
             Map<String, Object> result = new LinkedHashMap<>();
             if (snapshot == null) return result;
-            for (String key : new String[]{"render_query", "local_tile"}) {
+            for (String key : new String[]{"render_query", "local_tile", "startup"}) {
                 Object value = snapshot.get(key);
                 if (!(value instanceof Map)) continue;
                 Map<?, ?> record = (Map<?, ?>) value;

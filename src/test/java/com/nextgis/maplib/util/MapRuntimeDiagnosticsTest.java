@@ -106,6 +106,49 @@ public class MapRuntimeDiagnosticsTest {
         } finally { Files.deleteIfExists(file.toPath()); }
     }
 
+    @Test public void startupObserverKeepsTheBlockedPhaseAndMainThreadStack() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        engine.configure("1.2", 23, "startup-revision");
+        MapRuntimeDiagnostics.Trace startup = engine.begin("startup", fake.now);
+        startup.phase("gis_application_load"); fake.advance(1200); startup.check();
+        Map<String, Object> context = engine.forEvent(fake.wall);
+        Map<?, ?> state = (Map<?, ?>) context.get("startup");
+        assertEquals("gis_application_load", state.get("phase"));
+        assertEquals(false, state.get("finished"));
+        assertFalse(((List<?>) state.get("thread_stack")).isEmpty());
+        assertEquals("startup-revision", context.get("source_revision"));
+        startup.finish(0, null);
+        assertTrue(engine.active.isEmpty()); assertEquals(1, fake.cancelled);
+    }
+
+    @Test public void currentStartupCannotEraseThePreviousProcessBeforeItsDelayedAnrArrives() {
+        Fake old = new Fake(); MapRuntimeDiagnostics.Engine previous = new MapRuntimeDiagnostics.Engine(old);
+        previous.configure("old", 12, "old-revision");
+        MapRuntimeDiagnostics.Trace blocked = previous.begin("startup", old.now);
+        blocked.phase("preferences_and_local_log"); old.advance(1200); blocked.check();
+        Fake fresh = new Fake(); fresh.saved = old.saved; fresh.wall = old.wall + 60000;
+        MapRuntimeDiagnostics.Engine restarted = new MapRuntimeDiagnostics.Engine(fresh);
+        restarted.configure("new", 13, "new-revision");
+        MapRuntimeDiagnostics.Trace current = restarted.begin("startup", fresh.now);
+        fresh.advance(1200); current.check();
+        assertEquals("new-revision", fresh.saved.get("source_revision"));
+        assertEquals("old-revision", restarted.forEvent(old.wall + 2000).get("source_revision"));
+        assertEquals("preferences_and_local_log", ((Map<?, ?>) restarted.forEvent(old.wall + 2000).get("startup")).get("phase"));
+    }
+
+    @Test public void journalDropsTheOldestObservationWhenTheirCombinedSizeExceedsTheDiskBound() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        engine.configure("1.2", 23, "revision");
+        MapRuntimeDiagnostics.Trace query = engine.begin("render_query", fake.now);
+        query.put("target", "q".repeat(9500)); fake.advance(1200); query.check();
+        MapRuntimeDiagnostics.Trace startup = engine.begin("startup", fake.now);
+        startup.put("synthetic_detail", "s".repeat(9500)); fake.advance(1200); startup.check();
+        assertTrue(fake.saved.containsKey("startup"));
+        assertFalse(fake.saved.containsKey("render_query"));
+        assertTrue(new org.json.JSONObject(fake.saved).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+                <= MapRuntimeDiagnostics.MAX_JOURNAL_BYTES);
+    }
+
     @Test public void boundedJournalRoundTripsAtomicallyAndOversizedReplacementRetainsPreviousData() throws Exception {
         File directory = Files.createTempDirectory("map-diagnostics-test").toFile();
         File file = new File(directory, "journal.json");
