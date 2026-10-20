@@ -1,2 +1,3 @@
 # Preserve the reviewed official source subset byte-for-byte, including upstream whitespace.
 src/main/cpp/quickjs/* -text -whitespace
+.githooks/* text eol=lf
