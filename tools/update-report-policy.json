@@ -1,0 +1,5 @@
+{
+  "reports_dir": "update-reports",
+  "id_prefix": "maplib-",
+  "base_branch": "master"
+}

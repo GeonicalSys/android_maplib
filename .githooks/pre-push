@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+if command -v py >/dev/null 2>&1; then
+    exec py -3.13 -B tools/check_update_reports.py --pre-push
+elif command -v python3 >/dev/null 2>&1; then
+    exec python3 -B tools/check_update_reports.py --pre-push
+else
+    exec python -B tools/check_update_reports.py --pre-push
+fi

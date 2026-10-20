@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-17
+last_verified: 2026-10-20
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -648,3 +648,9 @@ startup/query/tile записи вместе ограничены 16 KiB с уд
 Новых зависимостей на app/maplibui, чтения GIS из watchdog и изменений тайлов нет.
 Unit checks покрывают blocked startup, late ANR после перезаписи файла и размер
 общего journal; native consuming-app check использует настоящий SDK AnrV2Hint.
+
+
+## Учёт доработок
+
+Карточки и автоматический контроль исходных путей: [реестр обновлений](../update-reports/README.md).
+Перед push выполняется локальный hook; в новом клоне требуется его установка.
