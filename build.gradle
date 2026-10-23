@@ -23,7 +23,7 @@
 
 apply plugin: 'com.android.library'
 
-def productionVersionName = '3.1.2.29'
+def productionVersionName = '3.1.2.30'
 def debugVersionName = '3.1.2.23'
 
 android {

@@ -6,6 +6,10 @@ last_verified: 2026-10-23
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+Diagnostic VERSION_NAME: release 3.1.2.30, debug 3.1.2.23. При подготовке
+локального Lisa Release версия проверяется вместе с APK через consuming
+`tools/verify-apk-version-matrix.ps1 -LisaOnly`; публикация отдельно требует Full.
+
 ## Копирование, сдвиг и поворот
 
 GeometryTransform и FeatureCopyPolicy владеют независимыми копиями, совместимостью single/multi без потери частей, совпадением имён/типов полей и rigid transforms всех частей/отверстий. GeometryTransformGesture потребляет весь touch stream, не меняет камеру и завершает один Undo на жест. Default previewGeometryTransform сохраняет совместимость остальных hosts. Полный контракт — consuming docs/architecture/feature-copy-transform.md.
