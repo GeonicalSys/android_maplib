@@ -82,7 +82,8 @@ public class GpsDisplayRetentionTest {
         assertNotNull(source.getLastDisplayLocation());
     }
 
-    @Test public void slowRecoveryCreatesStructuredDiagnosticsWithoutVerboseLogging() throws Exception {
+    @Test public void providerSilenceCreatesStructuredDiagnosticsWithoutVerboseLogging() throws Exception {
+        seedSilentProvider();
         java.util.List<java.util.Map<String, Object>> reports = new java.util.ArrayList<>();
         source.setRecoveryReporter(reports::add);
         Method check = GpsEventSource.class.getDeclaredMethod("checkRecovery");
@@ -101,6 +102,11 @@ public class GpsDisplayRetentionTest {
         assertTrue(reports.get(0).containsKey("power"));
         assertTrue(reports.get(0).containsKey("last_callback_delivery_lag_ms"));
         assertTrue(reports.get(0).containsKey("history"));
+        assertEquals("provider_silent", reports.get(0).get("reason"));
+        assertEquals(3, reports.get(0).get("schema_version"));
+        assertEquals(60_000L, reports.get(0).get("reason_duration_ms"));
+        assertTrue(reports.get(0).containsKey("diagnostic_tick_gap_ms"));
+        assertTrue(reports.get(0).containsKey("device_sleep_gap_ms"));
         check.invoke(source);
         assertEquals(1, reports.size());
         accept(location(LocationManager.GPS_PROVIDER, 100f));
@@ -111,6 +117,7 @@ public class GpsDisplayRetentionTest {
     }
 
     @Test public void stoppedSubscriptionDoesNotCountClosedAppTimeAsSlowRecovery() throws Exception {
+        seedSilentProvider();
         java.util.List<java.util.Map<String, Object>> reports = new java.util.ArrayList<>();
         source.setRecoveryReporter(reports::add);
         Method check = GpsEventSource.class.getDeclaredMethod("checkRecovery");
@@ -129,6 +136,16 @@ public class GpsDisplayRetentionTest {
         check.invoke(source);
         assertEquals(1, reports.size());
         assertEquals(60_000L, reports.get(0).get("waiting_ms"));
+    }
+
+    private void seedSilentProvider() throws Exception {
+        // A real previous callback/status makes this delivery silence, not normal acquisition.
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(20));
+        long previous = SystemClock.elapsedRealtime() - 20_000;
+        for (String name : new String[]{"lastRawCallbackAt", "lastStatusAt"}) {
+            java.lang.reflect.Field field = GpsEventSource.class.getDeclaredField(name);
+            field.setAccessible(true); field.setLong(source, previous);
+        }
     }
 
     @Test public void mapAttachDetachDoesNotRestartGpsWithAutomaticOwner() {

@@ -2735,6 +2735,18 @@ public class MapDrawable
         }
     }
 
+    private boolean geometryTransformEnabled;
+    private final GeometryTransformGesture geometryTransformGesture = new GeometryTransformGesture();
+
+    public boolean isGeometryTransformEnabled() { return geometryTransformEnabled; }
+
+    public void setGeometryTransformEnabled(boolean enabled) {
+        geometryTransformEnabled = enabled;
+        geometryTransformGesture.reset();
+        if (enabled) { hideVertex(); hideMarker(); }
+        else if (editingObject != null) { showVertex(); showMarker(); }
+    }
+
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         MapLibreMap activeMap = maplibreMap.get();
@@ -2750,6 +2762,12 @@ public class MapDrawable
             return false;
         }
 
+        if (geometryTransformEnabled && editingObject != null && originalSelectedFeature != null
+                && activeMapContext.getMode() == 2 && activeMapContext.getSelectedLayer() != null
+                && activeMapContext.getSelectedLayer().isEditingAllowed()) {
+            mTapGesture.cancel();
+            return geometryTransformGesture.touch(this, activeMapContext, event);
+        }
         android.graphics.PointF screenPoint = new android.graphics.PointF(event.getX(), event.getY());
         if (event.getPointerCount() != 1) mTapGesture.cancel();
         switch (event.getActionMasked()) {
@@ -3607,6 +3625,7 @@ public class MapDrawable
     }
 
     public void unselectFeatureFromEdit(boolean backToOriginal, boolean keepEditObj) {
+        setGeometryTransformEnabled(false);
         if (editingObject != null && editingObject.editingFeature != null) {
             if (backToOriginal) {
                 copyProperties(editingFeatureOriginal, editingObject.editingFeature);

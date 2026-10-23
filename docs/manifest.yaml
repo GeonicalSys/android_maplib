@@ -2,13 +2,19 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-20
+last_verified: 2026-10-23
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryTransformGesture.java
+    responsibility: Own whole-object touch streams with fixed camera, no scale, exact cancel previews and one completed history step.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/GeometryTransform.java
+    responsibility: Copy and rigidly transform all projected components and rings without changing source geometry or CRS.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureCopyPolicy.java
+    responsibility: Match exact schema keys/types and losslessly adapt single/multi geometry for an independent new feature.
   - path: maplib/src/main/java/com/nextgis/maplib/display/MarkerIconRegistry.java
     responsibility: Register bundled marker images with the native SDF edge and distance range so thin strokes remain visible at the requested size.
   - path: maplib/src/main/java/com/nextgis/maplib/map/RuleLabelLayouts.java
@@ -26,7 +32,7 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/reliability/LocalChangesCommitTest.java
     responsibility: Verify committed owning-map callbacks, rollback silence and draft Save scheduling with real SQLite.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsRecoveryPolicy.java
-    responsibility: Classify bounded GPS episodes, rate-limit long/repeated warnings and paired recovery/cancel, keep 24 history samples and gate one same-listener retry on sustained fresh used-in-fix statuses without callbacks.
+    responsibility: Keep reception/acquisition/filter waits local, require a continuous faulty-reason threshold before reporting, correlate recovery/cancel, keep 24 history samples and gate one same-listener retry on sustained fresh used-in-fix statuses without callbacks; expose reason duration and observer/device-sleep gaps in snapshot v3.
   - path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
     responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
@@ -154,7 +160,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
     responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
   - path: maplib/build.gradle
-    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.29 and debug VERSION_NAME 3.1.2.23 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
+    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.30 and debug VERSION_NAME 3.1.2.23 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.0.2 through the explicit OpenGL artifact without unsupported library build-type version DSL.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
     responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
@@ -356,8 +362,9 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
   - id: ngw-vector-identity-backup
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-invariant_refs: [INV-LOCAL-LOG-STARTUP, INV-TRACK-DELIVERY, INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-LOCAL-VECTOR-TILE-LABELS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE]
+invariant_refs: [INV-FEATURE-COPY, INV-WHOLE-OBJECT-TRANSFORM, INV-LOCAL-LOG-STARTUP, INV-TRACK-DELIVERY, INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-LOCAL-VECTOR-TILE-LABELS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE]
 global_docs:
+  - docs/architecture/feature-copy-transform.md
   - docs/guides/project-synchronization-user-guide.md
   - docs/architecture/conditional-form-rules.md
   - docs/guides/form-behavior-user-guide.md
@@ -372,7 +379,7 @@ global_docs:
   - docs/architecture/stakeout.md
   - docs/reference/build-matrix.md
   - docs/reference/flavors-and-versioning.md
-smoke_tests: [SMOKE-MAP-RUNTIME-DIAGNOSTICS, SMOKE-TRACK-DELIVERY, SMOKE-FORM-APPEARANCE, SMOKE-CONDITIONAL-REQUIRED, SMOKE-FORM-NAVIGATION, SMOKE-PROJECT-SCRIPTS, SMOKE-REQUIRED-FIELDS, AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-POLYGON-LABEL-ANCHOR, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-MAP-SURFACE-LIFECYCLE, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCAL-VECTOR-TILE-STRESS, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-UNDERLAY-DISPLAY, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-DEBUG-UNDERLAY-MIGRATION, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-SYNC-INTERRUPT-ACTION, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT, AUTO-RELIABILITY-NATIVE, SMOKE-RELIABILITY-FAILURES, SMOKE-TOOL-TAP, SMOKE-NGID-AND-RESOURCE-ICONS]
+smoke_tests: [AUTO-FEATURE-EDITING, SMOKE-FEATURE-COPY-TRANSFORM, SMOKE-MAP-RUNTIME-DIAGNOSTICS, SMOKE-TRACK-DELIVERY, SMOKE-FORM-APPEARANCE, SMOKE-CONDITIONAL-REQUIRED, SMOKE-FORM-NAVIGATION, SMOKE-PROJECT-SCRIPTS, SMOKE-REQUIRED-FIELDS, AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-POLYGON-LABEL-ANCHOR, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-MAP-SURFACE-LIFECYCLE, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCAL-VECTOR-TILE-STRESS, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-UNDERLAY-DISPLAY, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-DEBUG-UNDERLAY-MIGRATION, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-SYNC-INTERRUPT-ACTION, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT, AUTO-RELIABILITY-NATIVE, SMOKE-RELIABILITY-FAILURES, SMOKE-TOOL-TAP, SMOKE-NGID-AND-RESOURCE-ICONS]
 upstream_hotspots: [MAP-DRAWABLE, RASTER-ANCHOR, RASTER-MBTILES, MAP-HOST, MAPLIBRE-BACKEND, COLLECTOR-RESOURCE]
 
 # Consumer verification preserves library identities, version mapping and GIS contracts; see docs/runbooks/automated-tests.md.

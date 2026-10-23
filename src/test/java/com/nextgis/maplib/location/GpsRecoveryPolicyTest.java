@@ -23,17 +23,16 @@ public class GpsRecoveryPolicyTest {
         assertFalse(end.report); assertFalse(end.retryAttempted);
     }
 
-    @Test public void longNoFixSendsOneWarningAndItsCorrelatedRecovery() {
+    @Test public void longNoFixStaysLocalIncludingRecovery() {
         GpsRecoveryPolicy p = new GpsRecoveryPolicy();
         tick(p, 1_000, NO_FIX);
         GpsRecoveryPolicy.Update local = tick(p, 31_000, NO_FIX);
         assertEquals(30_000, local.thresholdMs); assertFalse(local.report);
         assertNull(tick(p, 60_999, NO_FIX));
-        GpsRecoveryPolicy.Update warning = tick(p, 61_000, NO_FIX);
-        assertTrue(warning.report); assertFalse(warning.retry);
+        assertNull(tick(p, 61_000, NO_FIX));
         assertNull(tick(p, 500_000, NO_FIX));
         GpsRecoveryPolicy.Update end = p.update(501_000, true, true, true, NO_FIX);
-        assertTrue(end.report); assertEquals(warning.episodeId, end.episodeId);
+        assertFalse(end.report); assertEquals(local.episodeId, end.episodeId);
         assertEquals(500_000, end.waitingMs);
         assertNull(p.update(502_000, true, true, true, NO_FIX));
     }
@@ -45,10 +44,10 @@ public class GpsRecoveryPolicyTest {
             fresh(p, start);
             tick(p, start + 1, NO_FIX);
             GpsRecoveryPolicy.Update gap = tick(p, start + 15_001, NO_FIX);
-            assertEquals(i == 2, gap.report);
+            assertFalse(gap.report);
             assertFalse(gap.retry);
             GpsRecoveryPolicy.Update end = p.update(start + 16_000, true, true, true, NO_FIX);
-            assertEquals(i == 2, end.report);
+            assertFalse(end.report);
         }
         tick(p, 800_000, NO_FIX);
         assertFalse(tick(p, 815_000, NO_FIX).report);
@@ -67,19 +66,19 @@ public class GpsRecoveryPolicyTest {
 
     @Test public void recoveryKeepsTheWarningGroupEvenIfTheGapReasonChanged() {
         GpsRecoveryPolicy p = new GpsRecoveryPolicy();
-        tick(p, 1_000, NO_FIX); tick(p, 61_000, NO_FIX);
-        tick(p, 62_000, PROVIDER_SILENT);
+        tick(p, 1_000, CALLBACK_STALLED); tick(p, 31_000, CALLBACK_STALLED);
+        tick(p, 62_000, NO_FIX);
         GpsRecoveryPolicy.Update end = p.update(63_000, true, true, true, NO_FIX);
-        assertTrue(end.report); assertEquals(NO_FIX, end.reason);
+        assertTrue(end.report); assertEquals(CALLBACK_STALLED, end.reason);
     }
 
     @Test public void sustainedDeliveryStallRetriesOnceAndKeepsAttemptOnRecovery() {
         GpsRecoveryPolicy p = new GpsRecoveryPolicy();
         fresh(p, 1_000); tick(p, 2_000, CALLBACK_STALLED);
-        assertTrue(tick(p, 17_000, CALLBACK_STALLED).report);
+        assertFalse(tick(p, 17_000, CALLBACK_STALLED).report);
         assertNull(tick(p, 31_999, CALLBACK_STALLED));
         GpsRecoveryPolicy.Update retry = tick(p, 32_000, CALLBACK_STALLED);
-        assertTrue(retry.retry); assertTrue(retry.retryAttempted); assertFalse(retry.report);
+        assertTrue(retry.retry); assertTrue(retry.retryAttempted); assertTrue(retry.report);
         assertNull(tick(p, 100_000, CALLBACK_STALLED));
         GpsRecoveryPolicy.Update end = p.update(101_000, true, true, true, NO_FIX);
         assertTrue(end.retryAttempted); assertTrue(end.report);
@@ -99,11 +98,11 @@ public class GpsRecoveryPolicyTest {
     }
 
     @Test public void noFixFilterWaitAndProviderSilenceNeverRetry() {
-        for (GpsRecoveryPolicy.Reason reason : new GpsRecoveryPolicy.Reason[]{NO_FIX, FILTER_WAIT, PROVIDER_SILENT}) {
+        for (GpsRecoveryPolicy.Reason reason : new GpsRecoveryPolicy.Reason[]{NO_FIX, FILTER_WAIT, ACQUISITION}) {
             GpsRecoveryPolicy p = new GpsRecoveryPolicy();
             tick(p, 1_000, reason);
             assertFalse(tick(p, 31_000, reason).retry);
-            assertFalse(tick(p, 61_000, reason).retry);
+            assertNull(tick(p, 61_000, reason));
             assertNull(tick(p, 100_000, reason));
         }
     }
@@ -119,7 +118,7 @@ public class GpsRecoveryPolicyTest {
         tick(p, 10_000_000, NO_FIX);
         assertNull(tick(p, 10_029_999, NO_FIX));
         assertFalse(tick(p, 10_030_000, NO_FIX).report);
-        assertTrue(tick(p, 10_060_000, NO_FIX).report);
+        assertNull(tick(p, 10_060_000, NO_FIX));
         assertEquals("cancelled", p.update(10_060_001, true, false, true, NO_FIX).phase);
     }
 
@@ -134,5 +133,36 @@ public class GpsRecoveryPolicyTest {
         java.util.List<String> copy = p.history(); p.clearHistory();
         assertEquals(24, copy.size()); assertTrue(p.history().isEmpty());
         assertTrue(p.historyDue(500_000));
+    }
+
+    @Test public void satelliteAcquisitionDoesNotBecomeAnImmediateCallbackStall() {
+        GpsRecoveryPolicy p = new GpsRecoveryPolicy();
+        tick(p, 1_000, NO_FIX);
+        assertFalse(tick(p, 31_000, NO_FIX).report);
+        assertNull(tick(p, 33_045, CALLBACK_STALLED));
+        GpsRecoveryPolicy.Update end = p.update(34_086, true, true, true, NO_FIX);
+        assertFalse(end.report); assertFalse(end.retryAttempted);
+        assertEquals(1_041, end.reasonDurationMs);
+    }
+
+    @Test public void providerSilenceNeedsContinuousSixtySecondsAndRemainsReported() {
+        GpsRecoveryPolicy p = new GpsRecoveryPolicy();
+        tick(p, 1_000, NO_FIX); tick(p, 31_000, NO_FIX);
+        assertNull(tick(p, 60_000, PROVIDER_SILENT));
+        assertNull(tick(p, 119_999, PROVIDER_SILENT));
+        GpsRecoveryPolicy.Update gap = tick(p, 120_000, PROVIDER_SILENT);
+        assertTrue(gap.report); assertFalse(gap.retry); assertEquals(60_000, gap.reasonDurationMs);
+        assertNull(tick(p, 120_001, PROVIDER_SILENT));
+        assertTrue(p.update(121_000, true, true, true, NO_FIX).report);
+    }
+
+    @Test public void aRealProcessingFailureIsReportedAfterItsOwnThreshold() {
+        for (GpsRecoveryPolicy.Reason reason : new GpsRecoveryPolicy.Reason[]{STALE_FIX, INVALID_FIX, DISPLAY_PROCESSING}) {
+            GpsRecoveryPolicy p = new GpsRecoveryPolicy();
+            tick(p, 1_000, NO_FIX); tick(p, 31_000, NO_FIX);
+            assertNull(tick(p, 60_000, reason));
+            assertNull(tick(p, 74_999, reason));
+            assertTrue(tick(p, 75_000, reason).report);
+        }
     }
 }

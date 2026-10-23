@@ -1,10 +1,19 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-20
+last_verified: 2026-10-23
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+Diagnostic VERSION_NAME: release 3.1.2.30, debug 3.1.2.23. При подготовке
+локального Lisa Release версия проверяется вместе с APK через consuming
+`tools/verify-apk-version-matrix.ps1 -LisaOnly`; публикация отдельно требует Full.
+
+## Копирование, сдвиг и поворот
+
+GeometryTransform и FeatureCopyPolicy владеют независимыми копиями, совместимостью single/multi без потери частей, совпадением имён/типов полей и rigid transforms всех частей/отверстий. GeometryTransformGesture потребляет весь touch stream, не меняет камеру и завершает один Undo на жест. Default previewGeometryTransform сохраняет совместимость остальных hosts. Полный контракт — consuming docs/architecture/feature-copy-transform.md.
+
 
 ## Настройка сектора точности компаса
 
@@ -21,9 +30,18 @@ hot-add/lite reload, реальные rendered features и русскую под
 
 ## GPS diagnostic episodes
 
-Snapshot v2 separates reception loss, callback delivery and processing; bounded
+Snapshot v3 records continuous reason_duration_ms, diagnostic_tick_gap_ms and
+device_sleep_gap_ms in addition to the bounded history. No-fix/acquisition/filter
+wait remain local regardless of length or recurrence. Callback stalls need 30 s
+of that continuous reason; provider silence needs 60 s, invalid/stale/display
+processing needs 15 s. Earlier reception waiting cannot trigger an immediate
+callback-stall warning. Retry, recording and filter ownership remain unchanged.
+Source integration regressions seed actual prior callback/status silence before
+expecting a report; ordinary acquisition is not used as a delivery-fault fixture.
+
+Snapshot v3 separates reception loss, callback delivery and processing; bounded
 24-sample history and correlated recovery/cancel preserve the episode UUID.
-Short no-fix gaps stay local; long/repeated gaps are rate limited. Only sustained
+Reception gaps stay local; actual delivery/processing faults are rate limited. Only sustained
 fresh used-in-fix statuses without callbacks allow one same-listener re-registration.
 Recorders, Network, precision leases, wake lock, filtering and segment rules remain owned
 by their existing controllers. See consuming root docs/architecture/location-pipeline.md.

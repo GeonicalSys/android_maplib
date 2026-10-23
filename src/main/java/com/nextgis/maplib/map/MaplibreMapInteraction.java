@@ -24,6 +24,9 @@ public interface MaplibreMapInteraction {
 
     public void updateGeometryFromMaplibre(org.maplibre.geojson.Feature feature, Feature originalSelectedFeaturem, MLGeometryEditClass editObject );
 
+    /** Checkpoint a transform preview without allocating another Undo step. */
+    default void previewGeometryTransform(GeoGeometry geometry, Feature original) { }
+
     public VectorLayer getSelectedLayer();
 
     public void updateActions(MLGeometryEditClass editObject);
