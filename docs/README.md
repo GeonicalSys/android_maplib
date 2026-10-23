@@ -6,6 +6,11 @@ last_verified: 2026-10-23
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Копирование, сдвиг и поворот
+
+GeometryTransform и FeatureCopyPolicy владеют независимыми копиями, совместимостью single/multi без потери частей, совпадением имён/типов полей и rigid transforms всех частей/отверстий. GeometryTransformGesture потребляет весь touch stream, не меняет камеру и завершает один Undo на жест. Default previewGeometryTransform сохраняет совместимость остальных hosts. Полный контракт — consuming docs/architecture/feature-copy-transform.md.
+
+
 ## Настройка сектора точности компаса
 
 В «Настройки → Местоположение» есть чекбокс «Показывать сектор точности
