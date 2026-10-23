@@ -27,6 +27,8 @@ wait remain local regardless of length or recurrence. Callback stalls need 30 s
 of that continuous reason; provider silence needs 60 s, invalid/stale/display
 processing needs 15 s. Earlier reception waiting cannot trigger an immediate
 callback-stall warning. Retry, recording and filter ownership remain unchanged.
+Source integration regressions seed actual prior callback/status silence before
+expecting a report; ordinary acquisition is not used as a delivery-fault fixture.
 
 Snapshot v3 separates reception loss, callback delivery and processing; bounded
 24-sample history and correlated recovery/cancel preserve the episode UUID.

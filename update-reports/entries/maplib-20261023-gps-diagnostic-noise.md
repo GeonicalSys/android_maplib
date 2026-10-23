@@ -9,6 +9,7 @@ covers:
   - src/main/java/com/nextgis/maplib/location/GpsRecoveryPolicy.java
   - src/main/java/com/nextgis/maplib/location/GpsEventSource.java
   - src/test/java/com/nextgis/maplib/location/GpsRecoveryPolicyTest.java
+  - src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
   - docs/manifest.yaml
 ---
 
