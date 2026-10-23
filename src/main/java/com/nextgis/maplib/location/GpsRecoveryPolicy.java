@@ -42,14 +42,15 @@ public final class GpsRecoveryPolicy {
     public static final class Update {
         public final String phase, episodeId;
         public final Reason reason;
-        public final long waitingMs, thresholdMs;
+        public final long waitingMs, thresholdMs, reasonDurationMs;
         public final int recurringGaps;
         public final boolean report, retry, retryAttempted;
         private Update(String phase, String id, Reason reason, long waiting, long threshold,
-                int recurring, boolean report, boolean retry, boolean retryAttempted) {
+                int recurring, boolean report, boolean retry, boolean retryAttempted, long reasonDuration) {
             this.phase = phase; episodeId = id; this.reason = reason; waitingMs = waiting;
             thresholdMs = threshold; recurringGaps = recurring; this.report = report; this.retry = retry;
             this.retryAttempted = retryAttempted;
+            this.reasonDurationMs = reasonDuration;
         }
     }
 
@@ -80,9 +81,13 @@ public final class GpsRecoveryPolicy {
         if (reason != currentReason) { reason = currentReason; reasonSince = now; }
         boolean firstDelay = !delayed && now - waitingSince >= thresholdMs();
         if (firstDelay) { delayed = true; slowGaps.addLast(now); }
-        boolean actionable = reason == Reason.CALLBACK_STALLED || reason == Reason.DISPLAY_PROCESSING
-                || reason == Reason.STALE_FIX || reason == Reason.INVALID_FIX;
-        boolean send = delayed && !reported && (actionable || now - waitingSince >= LONG_GAP_MS || slowGaps.size() >= 3)
+        // Reception/acquisition and an intentional filter wait are normal field conditions.
+        // Count the continuous faulty reason, not earlier time spent acquiring satellites.
+        long required = reason == Reason.CALLBACK_STALLED ? RETRY_DELAY_MS
+                : reason == Reason.PROVIDER_SILENT ? LONG_GAP_MS
+                : reason == Reason.DISPLAY_PROCESSING || reason == Reason.STALE_FIX
+                        || reason == Reason.INVALID_FIX ? REACQUISITION_MS : Long.MAX_VALUE;
+        boolean send = delayed && !reported && now - reasonSince >= required
                 && (lastReportAt < 0 || now - lastReportAt >= REPORT_INTERVAL_MS);
         if (send) { reported = true; reportedReason = reason; lastReportAt = now; }
         boolean retry = reason == Reason.CALLBACK_STALLED && now - reasonSince >= RETRY_DELAY_MS && !retried
@@ -96,7 +101,7 @@ public final class GpsRecoveryPolicy {
         Reason groupedReason = ("recovered".equals(phase) || "cancelled".equals(phase)) && reportedReason != null
                 ? reportedReason : reason;
         return new Update(phase, episodeId, groupedReason, Math.max(0L, now - waitingSince),
-                thresholdMs(), slowGaps.size(), send, retry, retried);
+                thresholdMs(), slowGaps.size(), send, retry, retried, Math.max(0L, now - reasonSince));
     }
 
     public long thresholdMs() { return hadFreshFix ? REACQUISITION_MS : SLOW_RECOVERY_MS; }

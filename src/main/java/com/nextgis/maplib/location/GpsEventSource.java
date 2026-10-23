@@ -111,6 +111,7 @@ public class GpsEventSource {
     private boolean gnssStarted;
     private String lastRawDecision = "none";
     private String recoveryRetryResult;
+    private long lastRecoveryElapsed = -1, lastRecoveryUptime = -1;
     private String lastDisplayProvider = LocationManager.NETWORK_PROVIDER;
     private long lastDisplayFixNanos;
     public static final String DISPLAY_NETWORK_AGE_SECONDS = "com.nextgis.maplib.networkDisplayAgeSeconds";
@@ -718,6 +719,11 @@ public class GpsEventSource {
 
     private void checkRecovery() {
         long now = SystemClock.elapsedRealtime();
+        long uptime = SystemClock.uptimeMillis();
+        long tickGap = lastRecoveryElapsed < 0 ? -1 : now - lastRecoveryElapsed;
+        long sleepGap = lastRecoveryUptime < 0 ? -1 : Math.max(0, tickGap - (uptime - lastRecoveryUptime));
+        lastRecoveryElapsed = now;
+        lastRecoveryUptime = uptime;
         boolean allowed = !isExternalInput() && PermissionUtil.hasLocationPermissions(context)
                 && isProviderEnabled(LocationManager.GPS_PROVIDER);
         long callbackAge = lastRawCallbackAt == 0 ? -1 : now - lastRawCallbackAt;
@@ -731,6 +737,7 @@ public class GpsEventSource {
                     + " callbackAgeMs=" + callbackAge + " statusAgeMs=" + statusAge
                     + " used=" + satellitesUsed + "/" + satellitesVisible + " cn0=" + meanCn0
                     + " decision=" + lastRawDecision + " screenOn=" + screenOn
+                    + " tickGapMs=" + tickGap + " sleepGapMs=" + sleepGap
                     + " owners=" + listeners.size() + "/" + backgroundClients.size() + "/" + recorders.size());
         }
         GpsRecoveryPolicy.Reason reason = GpsRecoveryPolicy.classify(isFresh(rawGps), isFresh(gps),
@@ -738,11 +745,15 @@ public class GpsEventSource {
         GpsRecoveryPolicy.Update update = recoveryPolicy.update(now, subscriptions.hasGps(), allowed, isFresh(gps), reason);
         if (update == null) return;
         Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("schema_version", 2);
+        snapshot.put("schema_version", 3);
         snapshot.put("phase", update.phase);
         snapshot.put("reason", update.reason.wireName());
         snapshot.put("episode_id", update.episodeId);
         snapshot.put("waiting_ms", update.waitingMs);
+        snapshot.put("reason_duration_ms", update.reasonDurationMs);
+        snapshot.put("observed_reason", isFresh(gps) ? "fresh_fix" : reason.wireName());
+        snapshot.put("diagnostic_tick_gap_ms", tickGap);
+        snapshot.put("device_sleep_gap_ms", sleepGap);
         snapshot.put("threshold_ms", update.thresholdMs);
         snapshot.put("recurring_gaps", update.recurringGaps);
         snapshot.put("raw_fresh", isFresh(rawGps));
