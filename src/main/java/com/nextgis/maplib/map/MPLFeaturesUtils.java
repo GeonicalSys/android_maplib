@@ -2339,6 +2339,8 @@ public class MPLFeaturesUtils {
         RuleGeometryLayouts.sync(style, newLayer2, rules, layerDefaultsStyle);
         RuleGeometryLayouts.sync(style, patternFillLayer, rules, layerDefaultsStyle);
         RuleGeometryLayouts.sync(style, markerIconLayer, rules, layerDefaultsStyle);
+        if (layerType == GeoConstants.GTPoint || layerType == GeoConstants.GTMultiPoint)
+            com.nextgis.maplib.map.mpl.FireflyLayerFactory.sync(buildContext, newLayer, rules, layerDefaultsStyle);
         if (simbolLayer instanceof SymbolLayer) {
             RuleLabelLayouts.sync(style, (SymbolLayer) simbolLayer, rules, layerDefaultsStyle, layerType);
         } else RuleLabelLayouts.remove(style, labelId);

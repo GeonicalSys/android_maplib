@@ -1,10 +1,19 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-23
+last_verified: 2026-10-24
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## «Светлячок»
+
+SimpleMarkerStyle type=9 сохраняет прежний JSON и имеет чёткое ядро с внешним
+ореолом. FireflyMarkerRegistry строит ограниченные RGBA sprites и учитывает
+владельцев native images; FireflyLayerFactory добавляет обычные rendering
+children с общим picking/visibility/zoom. PointLayerFactory исключает новый тип
+из прежнего circle/SDF прохода. Прозрачное ядро не заполняется свечением.
+Подробности, ограничения и проверки — consuming docs/architecture/point-firefly.md.
 
 Diagnostic VERSION_NAME: release 3.1.2.30, debug 3.1.2.23. При подготовке
 локального Lisa Release версия проверяется вместе с APK через consuming

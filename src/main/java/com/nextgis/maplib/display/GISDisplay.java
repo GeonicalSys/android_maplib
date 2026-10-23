@@ -408,6 +408,17 @@ public class GISDisplay
     }
 
 
+    /** A screen-sized symbol centred on a map point; bitmap samples may be supersampled. */
+    public void drawCenteredBitmap(Bitmap bitmap, GeoPoint point, float width, float height) {
+        if (mMainCanvas == null) return;
+        Matrix matrix = new Matrix();
+        matrix.postScale((float) (width / bitmap.getWidth() / mScale),
+                (float) (-height / bitmap.getHeight() / mScale));
+        matrix.postTranslate((float) (point.getX() - width / mScale / 2),
+                (float) (point.getY() + height / mScale / 2));
+        mMainCanvas.drawBitmap(bitmap, matrix, new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+    }
+
     public void drawBitmap(
             Bitmap bitmap,
             GeoPoint point,

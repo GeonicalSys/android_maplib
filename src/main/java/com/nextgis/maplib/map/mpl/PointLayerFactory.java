@@ -32,10 +32,10 @@ public final class PointLayerFactory {
 
     public static void build(MplLayerBuildContext ctx, MplLayerBuildResult result) {
         MplLayerStyleVars vars = ctx.vars;
-        boolean usePointSymbols = MarkerIconRegistry.useSymbolLayerForMarkerType(
+        boolean usePointSymbols = (vars.type != SimpleMarkerStyle.MarkerStyleFirefly && MarkerIconRegistry.useSymbolLayerForMarkerType(
                 vars.type,
                 false,
-                null) || ruleRequiresSymbolMarkerBackgrounds(ctx);
+                null)) || ruleRequiresSymbolMarkerBackgrounds(ctx);
         boolean hasDefaultCustomIcon =
                 vars.markerIconImage != null && !vars.markerIconImage.trim().isEmpty();
         boolean hasRuleCustomIcon = ruleHasCustomIcons(ctx);
@@ -261,6 +261,11 @@ public final class PointLayerFactory {
                             Expression.get(MplFeatureStyleProps.ORDER))));
         }
 
+        Expression ordinary = Expression.neq(Expression.coalesce(Expression.get(MplFeatureStyleProps.FILL_TYPE),
+                Expression.literal(vars.type)), Expression.literal(SimpleMarkerStyle.MarkerStyleFirefly));
+        if (newLayer instanceof SymbolLayer) ((SymbolLayer) newLayer).setFilter(ordinary);
+        else ((CircleLayer) newLayer).setFilter(ordinary);
+        if (newLayer2 instanceof SymbolLayer) ((SymbolLayer) newLayer2).setFilter(ordinary);
         result.mainLayer = newLayer;
         result.outlineLayer = newLayer2;
         result.markerIconLayer = newIconLayer;
@@ -323,6 +328,7 @@ public final class PointLayerFactory {
             return false;
         }
         SimpleMarkerStyle markerStyle = (SimpleMarkerStyle) style;
+        if (markerStyle.getType() == SimpleMarkerStyle.MarkerStyleFirefly) return false;
         return MarkerIconRegistry.useSymbolLayerForMarkerType(
                 markerStyle.getType(),
                 false,
