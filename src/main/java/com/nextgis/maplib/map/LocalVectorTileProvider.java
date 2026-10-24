@@ -145,15 +145,35 @@ final class LocalVectorTileProvider {
             return false;
         }
         int geometryType = layer.getGeometryType();
-        boolean supported = geometryType == GeoConstants.GTPolygon
-                || geometryType == GeoConstants.GTMultiPolygon
-                || isSupportedSimplePointLayer(layer);
+        boolean polygon = geometryType == GeoConstants.GTPolygon || geometryType == GeoConstants.GTMultiPolygon;
+        boolean supported = polygon ? supportsPolygonOptions(layer) : isSupportedSimplePointLayer(layer);
         if (!supported) {
             HyperLog.w(Constants.TAG, "Local vector tiles unsupported geometry/style layer=\""
                     + layer.getName() + "\" geometryType=" + geometryType
                     + " editingAllowed=" + layer.isEditingAllowed());
         }
         return supported;
+    }
+
+    static boolean isSupportedPolygonStyle(Style style) {
+        if (!(style instanceof com.nextgis.maplib.display.SimplePolygonStyle)) return true;
+        com.nextgis.maplib.display.SimplePolygonStyle polygon = (com.nextgis.maplib.display.SimplePolygonStyle) style;
+        return (polygon.getPatternOptions() == null || !polygon.getPatternOptions().isEnabled())
+                && (polygon.getOutlineOptions() == null || !polygon.getOutlineOptions().isEnabled());
+    }
+    private static boolean supportsPolygonOptions(VectorLayer layer) {
+        Style fallback = layer.getDefaultStyleNoExcept();
+        if (!isSupportedPolygonStyle(fallback)) return false;
+        if (layer.getRenderer() instanceof RuleFeatureRenderer) {
+            RuleFeatureRenderer renderer = (RuleFeatureRenderer) layer.getRenderer();
+            if (renderer.getStyleRule() instanceof com.nextgis.maplib.display.FieldStyleRule) {
+                com.nextgis.maplib.display.FieldStyleRule rules = (com.nextgis.maplib.display.FieldStyleRule) renderer.getStyleRule();
+                if (!isSupportedPolygonStyle(rules.resolveOtherStyle(fallback))) return false;
+                for (String category : rules.getStyleRules().keySet())
+                    if (!isSupportedPolygonStyle(rules.resolveEffectiveStyle(category, fallback))) return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isSupportedSimplePointLayer(VectorLayer layer) {

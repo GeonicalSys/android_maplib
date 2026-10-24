@@ -206,6 +206,8 @@ public final class MplStyleMapper {
         }
     }
 
+    public static boolean isValidDashArray(String value) { return parseFloatList(value, 2, 16) != null; }
+
     public static Float[] dashArray(String customDashArray, int fallbackPreset) {
         Float[] parsed = parseFloatList(customDashArray, 2, 16);
         return parsed != null ? parsed : dashArray(fallbackPreset);
@@ -386,7 +388,7 @@ public final class MplStyleMapper {
         for (int i = 0; i < parts.length; i++) {
             try {
                 float value = Float.parseFloat(parts[i].trim());
-                if (value <= 0f) {
+                if (!Float.isFinite(value) || value <= 0f) {
                     return null;
                 }
                 values[i] = value;

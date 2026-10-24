@@ -47,6 +47,14 @@ public final class PolygonLayerFactory {
         }
 
         PolygonPatternRegistry.ensureRegistered(ctx.mapStyle);
+        com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.sync(ctx.mapStyle, polyMainId,
+                PolygonOutlineLayerFactory.effectiveStyles(ctx, vars.polygonStyle));
+        String defaultImage = vars.fillPatternImage;
+        if (vars.polygonStyle != null && com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.applies(vars.polygonStyle))
+            defaultImage = com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.imageName(vars.polygonStyle);
+        Expression patternOpacity = MplStyleMapper.fillOpacityExpression(
+                com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.OPACITY_PROPERTY,
+                vars.polygonStyle == null ? vars.fillOpacity : vars.polygonStyle.getPatternOpacity(), ctx.layerOpacityFactor);
 
         FillLayer fillLayer = (FillLayer) newLayer;
         // Legacy exports may use colorfill on polygons; NGW rule styles use fillcolor.
@@ -86,7 +94,7 @@ public final class PolygonLayerFactory {
             }
             patternFillLayer.setFilter(PolygonPatternRegistry.patternedFillFilter(effectiveDefaultPattern));
             patternFillLayer.setProperties(
-                    PropertyFactory.fillOpacity(fillOpacityExpr),
+                    PropertyFactory.fillOpacity(patternOpacity),
                     PropertyFactory.fillAntialias(true),
                     PropertyFactory.fillSortKey(fillSortKeyExpr),
                     PropertyFactory.fillTranslate(fillTranslate),
@@ -95,9 +103,7 @@ public final class PolygonLayerFactory {
                                     Expression.get(MplFeatureStyleProps.FILL_PATTERN_IMAGE),
                                     PolygonPatternRegistry.patternImageExpression(
                                             effectiveDefaultPattern,
-                                            hasCustomPatternImage
-                                                    ? vars.fillPatternImage
-                                                    : null))));
+                                            defaultImage))));
         } else {
             // MapLibre's Layer.setFilter(@NonNull) calls filter.toArray(); passing null crashes with
             // "Expression.toArray() on a null object reference". Use an always-true filter to clear any
@@ -122,14 +128,13 @@ public final class PolygonLayerFactory {
                 }
                 patternFillLayer.setFilter(PolygonPatternRegistry.patternedFillFilter(effectiveDefaultPattern));
                 patternFillLayer.setProperties(
-                        PropertyFactory.fillOpacity(fillOpacityExpr),
+                        PropertyFactory.fillOpacity(patternOpacity),
                         PropertyFactory.fillAntialias(true),
                         PropertyFactory.fillSortKey(fillSortKeyExpr),
                         PropertyFactory.fillTranslate(fillTranslate),
                         PropertyFactory.fillPattern(
-                                PolygonPatternRegistry.patternImageExpression(
-                                        effectiveDefaultPattern,
-                                        vars.fillPatternImage)));
+                                Expression.coalesce(Expression.get(MplFeatureStyleProps.FILL_PATTERN_IMAGE),
+                                        PolygonPatternRegistry.patternImageExpression(effectiveDefaultPattern, defaultImage))));
             } else {
                 Layer existingPattern = ctx.mapStyle.getLayer(polyPatternId);
                 if (existingPattern != null) {
@@ -138,6 +143,7 @@ public final class PolygonLayerFactory {
             }
         }
 
+        ((LineLayer) newLayer2).setFilter(Expression.all());
         newLayer2.setProperties(
                 PropertyFactory.lineColor(
                         Expression.coalesce(

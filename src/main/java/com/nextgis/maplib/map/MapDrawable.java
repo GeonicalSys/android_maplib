@@ -782,6 +782,7 @@ public class MapDrawable
         for (String baseId : new String[]{vectorLayerId, vectorLayerId2, vectorLayerIdPattern,
                 vectorLayerIdMarkerIcon, vectorLayerIdSymbols}) RuleLabelLayouts.remove(style, baseId);
         com.nextgis.maplib.display.FireflyMarkerRegistry.remove(style, vectorLayerId);
+        com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.remove(style, vectorLayerId);
 
         if (style.getLayer(vectorLayerId)!= null)
             style.removeLayer(vectorLayerId);

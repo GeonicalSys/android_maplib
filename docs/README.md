@@ -6,6 +6,10 @@ last_verified: 2026-10-24
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Штриховки, контуры и живой образец
+
+PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые стили MVT используют classic fallback. Контракт — consuming docs/architecture/polygon-style-controls.md.
+
 ## «Светлячок»
 
 SimpleMarkerStyle type=9 сохраняет прежний JSON и имеет чёткое ядро с внешним
