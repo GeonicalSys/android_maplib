@@ -205,7 +205,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   со сплошным `background-color: #FFFFFF`. При смене режима слой пересоздаётся,
   чтобы прежний `background-pattern` не перекрывал цвет; neutral и dark
   продолжают использовать штатные растровые узоры.
-- MapLibre Android `13.0.2` подключён через явный OpenGL-артефакт
+- MapLibre Android `13.7.1` подключён через явный OpenGL-артефакт
   `android-sdk-opengl`; generic `android-sdk` этой версии использует Vulkan и
   не совместим с частью устройств без рабочего Vulkan-драйвера;
 - горячее обновление style применяет вычисляемые свойства только к независимому
@@ -437,7 +437,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 - Нет imports из `maplibui`/`app`.
 - MapLibre backend должен оставаться согласованным с `maplibui` и `app`:
-  `org.maplibre.gl:android-sdk-opengl:13.0.2` во всех трёх модулях.
+  `org.maplibre.gl:android-sdk-opengl:13.7.1` во всех трёх модулях.
 - LayerGroup index `0` — bottom.
 - MBTiles local TMS path принимает только raster PNG/JPEG/WEBP с обязательными
   `tiles`/`metadata`; vector MBTiles и повреждённая SQLite отклоняются.
