@@ -197,6 +197,10 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
             if (t.getText() == null && s.getText() != null) {
                 t.setText(s.getText());
             }
+            if (t.getPatternOptions() == null && s.getPatternOptions() != null)
+                t.setPatternOptions(s.getPatternOptions().clone());
+            if (t.getOutlineOptions() == null && s.getOutlineOptions() != null)
+                t.setOutlineOptions(s.getOutlineOptions().clone());
             if (isBlank(t.getFillPatternImage()) && !isBlank(s.getFillPatternImage())) {
                 t.setFillPatternImage(s.getFillPatternImage());
             }
@@ -290,6 +294,8 @@ public class FieldStyleRule implements IStyleRule, IJSONStore {
             polygonStyle.setOutColor(ruleStyle.getOutColor());
             polygonStyle.setWidth(ruleStyle.getWidth());
             polygonStyle.setFill(ruleStyle.isFill());
+            polygonStyle.setPatternOptions(ruleStyle.getPatternOptions() == null ? null : ruleStyle.getPatternOptions().clone());
+            polygonStyle.setOutlineOptions(ruleStyle.getOutlineOptions() == null ? null : ruleStyle.getOutlineOptions().clone());
             polygonStyle.setFillPattern(ruleStyle.getFillPattern());
             polygonStyle.setText(ruleStyle.getText());
             polygonStyle.setTextSize(ruleStyle.getTextSize());

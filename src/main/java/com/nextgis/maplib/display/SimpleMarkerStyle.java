@@ -54,6 +54,7 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
     public final static int MarkerStyleBox = 6;
     public final static int MarkerEditStyleCircle = 7;
     public final static int MarkerStyleCrossedBox = 8;
+    public final static int MarkerStyleFirefly = 9;
 
     public final static float SIZE_SMALL = 3;
     public final static float SIZE_MEDIUM = 6;
@@ -193,6 +194,10 @@ public class SimpleMarkerStyle extends Style implements ITextStyle {
                 break;
             case MarkerStyleCrossedBox:
                 drawCrossedBoxMarker(scaledSize, width, pt, display);
+                break;
+            case MarkerStyleFirefly:
+                FireflyMarkerRegistry.Sprite sprite = FireflyMarkerRegistry.sprite(this);
+                display.drawCenteredBitmap(sprite.bitmap(), pt, sprite.radius * 2, sprite.radius * 2);
                 break;
         }
 

@@ -88,7 +88,7 @@ dependencies {
 
     // MapLibre 13's generic android-sdk artifact uses Vulkan. Keep OpenGL explicit so
     // devices without a compatible Vulkan implementation can open the map.
-    implementation 'org.maplibre.gl:android-sdk-opengl:13.0.2'
+    implementation 'org.maplibre.gl:android-sdk-opengl:13.7.1'
 
     implementation 'org.locationtech.jts:jts-core:1.20.0'
 

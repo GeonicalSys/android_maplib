@@ -781,6 +781,8 @@ public class MapDrawable
         String vectorLayerIdSymbols =currentNamePrefixSymbol + layer_namepart + id;
         for (String baseId : new String[]{vectorLayerId, vectorLayerId2, vectorLayerIdPattern,
                 vectorLayerIdMarkerIcon, vectorLayerIdSymbols}) RuleLabelLayouts.remove(style, baseId);
+        com.nextgis.maplib.display.FireflyMarkerRegistry.remove(style, vectorLayerId);
+        com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.remove(style, vectorLayerId);
 
         if (style.getLayer(vectorLayerId)!= null)
             style.removeLayer(vectorLayerId);
@@ -1079,6 +1081,14 @@ public class MapDrawable
                 }
                 if (! ((VectorLayer) iLayer).isVisible())
                     return;
+                if (localVectorTileUrlMap.containsKey(id)
+                        && !LocalVectorTileProvider.canServe((VectorLayer) iLayer)) {
+                    // A complex point style needs the existing classic fallback. Rebuild the
+                    // source kind and the whole stack together instead of painting it as a circle.
+                    MaplibreMapInteraction host = mapContext.get();
+                    if (host != null) host.reloadMapStyleAndLayersAfterLayerFillBatch();
+                    return;
+                }
                 if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles((VectorLayer) iLayer)
                         && localVectorTileUrlMap.containsKey(id)) {
                     createFillLayerForLocalVectorTileLayer(

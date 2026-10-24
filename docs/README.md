@@ -1,10 +1,23 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-23
+last_verified: 2026-10-24
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## Штриховки, контуры и живой образец
+
+PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые стили MVT используют classic fallback. Контракт — consuming docs/architecture/polygon-style-controls.md.
+
+## «Светлячок»
+
+SimpleMarkerStyle type=9 сохраняет прежний JSON и имеет чёткое ядро с внешним
+ореолом. FireflyMarkerRegistry строит ограниченные RGBA sprites и учитывает
+владельцев native images; FireflyLayerFactory добавляет обычные rendering
+children с общим picking/visibility/zoom. PointLayerFactory исключает новый тип
+из прежнего circle/SDF прохода. Прозрачное ядро не заполняется свечением.
+Подробности, ограничения и проверки — consuming docs/architecture/point-firefly.md.
 
 Diagnostic VERSION_NAME: release 3.1.2.30, debug 3.1.2.23. При подготовке
 локального Lisa Release версия проверяется вместе с APK через consuming
@@ -192,7 +205,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   со сплошным `background-color: #FFFFFF`. При смене режима слой пересоздаётся,
   чтобы прежний `background-pattern` не перекрывал цвет; neutral и dark
   продолжают использовать штатные растровые узоры.
-- MapLibre Android `13.0.2` подключён через явный OpenGL-артефакт
+- MapLibre Android `13.7.1` подключён через явный OpenGL-артефакт
   `android-sdk-opengl`; generic `android-sdk` этой версии использует Vulkan и
   не совместим с частью устройств без рабочего Vulkan-драйвера;
 - горячее обновление style применяет вычисляемые свойства только к независимому
@@ -424,7 +437,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 - Нет imports из `maplibui`/`app`.
 - MapLibre backend должен оставаться согласованным с `maplibui` и `app`:
-  `org.maplibre.gl:android-sdk-opengl:13.0.2` во всех трёх модулях.
+  `org.maplibre.gl:android-sdk-opengl:13.7.1` во всех трёх модулях.
 - LayerGroup index `0` — bottom.
 - MBTiles local TMS path принимает только raster PNG/JPEG/WEBP с обязательными
   `tiles`/`metadata`; vector MBTiles и повреждённая SQLite отклоняются.

@@ -56,6 +56,8 @@ public class LocalVectorTileProviderTest {
         assertTrue(!LocalVectorTileProvider.isSupportedSimplePointStyle(
                 SimpleMarkerStyle.MarkerStyleDiamond, null, false, false, false));
         assertTrue(!LocalVectorTileProvider.isSupportedSimplePointStyle(
+                SimpleMarkerStyle.MarkerStyleFirefly, null, false, false, false));
+        assertTrue(!LocalVectorTileProvider.isSupportedSimplePointStyle(
                 SimpleMarkerStyle.MarkerStyleCircle, "custom", false, false, false));
         assertTrue(!LocalVectorTileProvider.isSupportedSimplePointStyle(
                 SimpleMarkerStyle.MarkerStyleCircle, null, true, false, false));

@@ -33,6 +33,7 @@ public final class MplLayerStyleVars {
     public float lineOutlineMultiplier = 3f;
     public boolean scaleSizeWithZoom;
     public String sizeZoomScaleStops;
+    public SimplePolygonStyle polygonStyle;
     public int fillPattern = PolygonPatternRegistry.FILL_PATTERN_NONE;
     public String fillPatternImage;
     public float fillTranslateX;
@@ -99,6 +100,7 @@ public final class MplLayerStyleVars {
         }
         if (layerStyle instanceof SimplePolygonStyle) {
             SimplePolygonStyle polygonStyle = (SimplePolygonStyle) layerStyle;
+            vars.polygonStyle = polygonStyle;
             vars.fillPattern = polygonStyle.getFillPattern();
             vars.fillPatternImage = polygonStyle.getFillPatternImage();
             vars.fillTranslateX = polygonStyle.getFillTranslateX();
