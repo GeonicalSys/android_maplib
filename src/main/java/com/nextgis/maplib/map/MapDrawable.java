@@ -473,6 +473,7 @@ public class MapDrawable
      * MapLibre and preserves its properties.
      */
     private void ensureUserLocationLayerOnTop(@Nullable Style style) {
+        ensureTrackAndPointOrder(style);
         if (style == null || style.getSource(USER_LOCATION_SOURCE_ID) == null) return;
         List<Layer> layers = style.getLayers();
         int n = layers.size();
@@ -2237,23 +2238,14 @@ public class MapDrawable
                             style.addSource(tracksLineSource);
                         }
 
-                        Layer trackLayer = new LineLayer( "track-line-layer", "track-line-source").
-                                withProperties(
-                                        PropertyFactory.lineColor("#0000FF"),
-                                        PropertyFactory.lineWidth(getMPLThinkness(5)));
-                        style.addLayer(trackLayer);
-
                         // track in progress
                         if (createSource) {
                             trackInProgressSource = new GeoJsonSource("track-inprogress-source", FeatureCollection.fromFeatures(new ArrayList<>()));
                             style.addSource(trackInProgressSource);
                         }
 
-                        Layer trackInProgressLayer = new LineLayer( "track-inprogress-layer", "track-inprogress-source").
-                                withProperties(
-                                        PropertyFactory.lineColor("#0000FF"),
-                                        PropertyFactory.lineWidth(getMPLThinkness(5)));
-                        style.addLayer(trackInProgressLayer);
+                        TrackMapStyle.install(style);
+                        TrackMapStyle.select(style, mSelectedTrackId);
 
                         /* Upstream adds track start/end flag icons here; per CUSTOMIZATIONS §14
                            «Tracks: no start/end flag icons» we intentionally skip flag source/layer
@@ -2523,18 +2515,8 @@ public class MapDrawable
 
         // TRACKING
         // saved track line
-        Layer trackLayer = new LineLayer( "track-line-layer", "track-line-source").
-                withProperties(
-                        PropertyFactory.lineColor("#0000FF"),
-                        PropertyFactory.lineWidth(getMPLThinkness(5)));
-        style.addLayer(trackLayer);
-
-        // track in progress
-        Layer trackInProgressLayer = new LineLayer( "track-inprogress-layer", "track-inprogress-source").
-                withProperties(
-                        PropertyFactory.lineColor("#0000FF"),
-                        PropertyFactory.lineWidth(getMPLThinkness(5)));
-        style.addLayer(trackInProgressLayer);
+        TrackMapStyle.install(style);
+        TrackMapStyle.select(style, mSelectedTrackId);
 
         // marker
         final Drawable drawable = getContext().getResources().getDrawable( R.drawable.ic_action_anchor_2);
@@ -4569,14 +4551,7 @@ public class MapDrawable
             }
         }
         if (targetlayer instanceof TrackLayer ){
-
-            Layer trackLayer = maplibreMap.get().getStyle().getLayer("track-line-layer");
-            if (trackLayer!= null)
-                trackLayer.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
-            Layer trackLayerInProgress = maplibreMap.get().getStyle().getLayer("track-inprogress-layer");
-            if (trackLayerInProgress!= null)
-                trackLayerInProgress.setProperties(visibility(isVisible ? VISIBLE:NONE));
+            TrackMapStyle.visibility(maplibreMap.get().getStyle(), isVisible);
         }
     }
 
@@ -5046,6 +5021,89 @@ public class MapDrawable
         return true;
     }
 
+    private long mSelectedTrackId = -1;
+
+    public void selectTrack(long id) {
+        mSelectedTrackId = id;
+        MapLibreMap map = maplibreMap.get();
+        if (map != null) TrackMapStyle.select(map.getStyle(), id);
+    }
+
+    /** Native hit testing respects clipping, zoom and visibility; segment hits share one session ID. */
+    public List<Long> queryTrackIds(float x, float y, float tolerance) {
+        MapLibreMap map = maplibreMap.get();
+        List<Long> result = new ArrayList<>();
+        if (map == null || map.getStyle() == null) return result;
+        android.graphics.RectF rect = new android.graphics.RectF(
+                x - tolerance, y - tolerance, x + tolerance, y + tolerance);
+        // A visible point takes precedence over a line passing through it.
+        List<String> pointIds = new ArrayList<>();
+        java.util.Set<String> pointSources = new java.util.HashSet<>();
+        for (Integer id : sourcesOrder.keySet()) {
+            ILayer logical = getLayerById(id);
+            if (isPointLayer(logical)) pointSources.add(logical.getPath().toString());
+        }
+        for (Layer nativeLayer : map.getStyle().getLayers()) {
+            String source = vectorSourceId(nativeLayer);
+            if (pointSources.contains(source)) pointIds.add(nativeLayer.getId());
+        }
+        if (!pointIds.isEmpty() && !map.queryRenderedFeatures(rect, pointIds.toArray(new String[0])).isEmpty())
+            return result;
+        for (org.maplibre.geojson.Feature feature : map.queryRenderedFeatures(rect,
+                "track-line-layer", "track-inprogress-layer")) {
+            if (!feature.hasProperty(TrackMapStyle.TRACK_ID)) continue;
+            long id = feature.getNumberProperty(TrackMapStyle.TRACK_ID).longValue();
+            if (!result.contains(id)) result.add(id);
+        }
+        return result;
+    }
+
+    private static boolean isPointLayer(ILayer layer) {
+        if (!(layer instanceof VectorLayer)) return false;
+        int type = ((VectorLayer) layer).getGeometryType();
+        return type == GeoConstants.GTPoint || type == GeoConstants.GTMultiPoint;
+    }
+
+    private static String vectorSourceId(Layer layer) {
+        if (layer instanceof CircleLayer) return ((CircleLayer) layer).getSourceId();
+        if (layer instanceof SymbolLayer) return ((SymbolLayer) layer).getSourceId();
+        if (layer instanceof LineLayer) return ((LineLayer) layer).getSourceId();
+        if (layer instanceof FillLayer) return ((FillLayer) layer).getSourceId();
+        return null;
+    }
+
+    /** Data stack: non-points, tracks, point groups, transient tools, location cursor. */
+    private void ensureTrackAndPointOrder(@Nullable Style style) {
+        if (style == null || style.getLayer("selected-dot-layer") == null) return;
+        List<Layer> existing = style.getLayers();
+        List<Layer> ordered = new ArrayList<>();
+        for (Layer layer : existing)
+            if (layer.getId().startsWith("track-line-") || layer.getId().startsWith("track-inprogress-"))
+                ordered.add(layer);
+        List<Integer> logicalIds = new ArrayList<>(sourcesOrder.keySet());
+        Collections.reverse(logicalIds);
+        Map<String, List<Layer>> pointGroups = new LinkedHashMap<>();
+        for (Integer id : logicalIds) {
+            ILayer logical = getLayerById(id);
+            if (!isPointLayer(logical)) continue;
+            pointGroups.put(logical.getPath().toString(), new ArrayList<>());
+        }
+        for (Layer layer : existing) {
+            List<Layer> group = pointGroups.get(vectorSourceId(layer));
+            if (group != null) group.add(layer);
+        }
+        for (List<Layer> group : pointGroups.values()) ordered.addAll(group);
+        int anchor = -1;
+        for (int i = 0; i < existing.size(); i++)
+            if ("selected-dot-layer".equals(existing.get(i).getId())) anchor = i;
+        boolean correct = anchor >= ordered.size();
+        for (int i = 0; correct && i < ordered.size(); i++)
+            correct = existing.get(anchor - ordered.size() + i).getId().equals(ordered.get(i).getId());
+        if (correct) return;
+        for (Layer layer : ordered) if (style.removeLayer(layer))
+            style.addLayerBelow(layer, "selected-dot-layer");
+    }
+
     public void reloadCurrentTrackToMap() {
         reloadTrackSnapshot(true);
     }
@@ -5075,9 +5133,11 @@ public class MapDrawable
                 : end + " IS NOT NULL AND " + end + " != ''");
         SQLiteDatabase database = SharedTrackStore.get(owner.getContext()).getDatabase(true);
         try (Cursor tracks = database.query(TrackLayer.TABLE_TRACKS,
-                new String[]{TrackLayer.FIELD_ID}, selection, null, null, null, null)) {
+                new String[]{TrackLayer.FIELD_ID, TrackLayer.FIELD_NAME, TrackLayer.FIELD_COLOR,
+                        TrackLayer.FIELD_VISIBLE, TrackLayer.FIELD_END}, selection, null, null, null, null)) {
             if (tracks == null) return result;
             while (tracks.moveToNext()) {
+                TrackLayer.TrackInfo info = TrackLayer.TrackInfo.fromCursor(tracks);
                 try (Cursor points = database.query(TrackLayer.TABLE_TRACKPOINTS,
                         new String[]{TrackLayer.FIELD_LON, TrackLayer.FIELD_LAT, TrackLayer.FIELD_SEGMENT},
                         TrackLayer.FIELD_SESSION + " = ?", new String[]{tracks.getString(0)},
@@ -5088,24 +5148,26 @@ public class MapDrawable
                     while (points.moveToNext()) {
                         int segment = points.getInt(2);
                         if (segment != previous) {
-                            addTrackSegment(result, part);
+                            addTrackSegment(result, part, info, layerId);
                             part = new ArrayList<>();
                             previous = segment;
                         }
                         double[] lonLat = convert3857To4326(points.getDouble(0), points.getDouble(1));
                         part.add(Point.fromLngLat(lonLat[0], lonLat[1]));
                     }
-                    addTrackSegment(result, part);
+                    addTrackSegment(result, part, info, layerId);
                 }
             }
         }
-        if (!current) for (org.maplibre.geojson.Feature feature : result)
-            feature.addStringProperty(prop_layerid, String.valueOf(layerId));
         return result;
     }
 
-    private static void addTrackSegment(List<org.maplibre.geojson.Feature> features, List<Point> points) {
-        if (points.size() >= 2) features.add(org.maplibre.geojson.Feature.fromGeometry(LineString.fromLngLats(points)));
+    private static void addTrackSegment(List<org.maplibre.geojson.Feature> features, List<Point> points,
+                                        TrackLayer.TrackInfo info, int layerId) {
+        if (points.size() < 2) return;
+        org.maplibre.geojson.Feature feature = org.maplibre.geojson.Feature.fromGeometry(LineString.fromLngLats(points));
+        TrackMapStyle.properties(feature, info.id, info.name, info.color, layerId);
+        features.add(feature);
     }
 
     public void reloadTrackListToMap() {

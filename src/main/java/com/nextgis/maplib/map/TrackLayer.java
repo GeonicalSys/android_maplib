@@ -310,6 +310,40 @@ public class TrackLayer
         return getColor(mContext, mContentUriTracks, id);
     }
 
+    /** One metadata query per render snapshot, rather than one provider query per segment. */
+    public Map<Integer, TrackInfo> getTrackInfo() {
+        Map<Integer, TrackInfo> result = new HashMap<>();
+        try (Cursor cursor = getDatabase(true).query(TABLE_TRACKS,
+                new String[]{FIELD_ID, FIELD_NAME, FIELD_COLOR, FIELD_VISIBLE, FIELD_END},
+                null, null, null, null, null)) {
+            while (cursor.moveToNext()) {
+                TrackInfo info = TrackInfo.fromCursor(cursor);
+                result.put(info.id, info);
+            }
+        }
+        return result;
+    }
+
+    public static final class TrackInfo {
+        public final int id, color;
+        public final String name;
+        public final boolean visible, finished;
+
+        private TrackInfo(int id, String name, int color, boolean visible, boolean finished) {
+            this.id = id;
+            this.name = name;
+            this.color = color;
+            this.visible = visible;
+            this.finished = finished;
+        }
+
+        public static TrackInfo fromCursor(Cursor cursor) {
+            return new TrackInfo(cursor.getInt(0), cursor.getString(1),
+                    cursor.isNull(2) ? mColor : cursor.getInt(2), cursor.getInt(3) != 0,
+                    !cursor.isNull(4) && !TextUtils.isEmpty(cursor.getString(4)));
+        }
+    }
+
     public static int getColor(Context context, Uri tracksUri, long id)
     {
         String selection = FIELD_ID + " = ?";
@@ -409,6 +443,14 @@ public class TrackLayer
             case TYPE_SINGLE_TRACK:
                 values.remove(FIELD_ID);
             case TYPE_TRACKS:
+                if (!values.containsKey(FIELD_COLOR) || values.getAsInteger(FIELD_COLOR) == null) {
+                    int previous = mColor;
+                    try (Cursor last = mSQLiteDatabase.query(TABLE_TRACKS, new String[]{FIELD_COLOR},
+                            null, null, null, null, FIELD_ID + " DESC", "1")) {
+                        if (last.moveToFirst() && !last.isNull(0)) previous = last.getInt(0);
+                    }
+                    values.put(FIELD_COLOR, TrackColorPalette.nextColor(new java.util.Random(), previous));
+                }
                 id = mSQLiteDatabase.insertOrThrow(TABLE_TRACKS, null, values);
                 inserted = ContentUris.withAppendedId(mContentUriTracks, id);
                 break;

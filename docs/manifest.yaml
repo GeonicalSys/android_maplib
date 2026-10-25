@@ -9,6 +9,10 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/map/TrackColorPalette.java
+    responsibility: Assign persistent saturated track colors without changing existing explicit colors.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/TrackMapStyle.java
+    responsibility: Share per-feature glow, selection and crisp core passes across saved and current tracks.
   - path: maplib/src/main/java/com/nextgis/maplib/display/PolygonPatternOptions.java
     responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
   - path: maplib/src/main/java/com/nextgis/maplib/display/PolygonOutlineOptions.java

@@ -6,6 +6,11 @@ last_verified: 2026-10-24
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+TrackColorPalette назначает насыщенный цвет один раз при insert. TrackMapStyle
+владеет общими проходами свечения/линии/выделения; MapDrawable передаёт metadata
+сегментов и поднимает Point/MultiPoint группы над треками. См. consuming
+`docs/architecture/track-controls.md`; native rendering проверяется в приложении.
+
 ## Штриховки, контуры и живой образец
 
 PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые стили MVT используют classic fallback. Контракт — consuming docs/architecture/polygon-style-controls.md.
