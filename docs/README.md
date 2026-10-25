@@ -694,3 +694,5 @@ Unit checks покрывают blocked startup, late ANR после переза
 SharedTrackStore schema 2 назначает насыщенные постоянные цвета прежним SQL NULL
 при upgrade и позднем импорте. Все явные цвета/metadata/points сохраняются;
 ошибка откатывает и цвета, и версию. TrackMapStyle: core 2/glow 6/selection 4.
+
+LineString/MultiLineString labels use one whole point-anchored block for the current visible extent. VisibleLineLabelLayout clips loaded geometry and computes its predominant direction; VisibleLineLabelController coalesces camera/source changes without SQLite or per-frame layout. See consuming docs/architecture/visible-line-labels.md.

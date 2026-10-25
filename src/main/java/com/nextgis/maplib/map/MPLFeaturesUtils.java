@@ -196,7 +196,7 @@ public class MPLFeaturesUtils {
     static final public String track_namepart = "track-";
     static final public String track_flags_namepart = "track-flags-";
 
-    static final public String source_polygon_text = "-text"; // source for text part of polygon[s]
+    static final public String source_polygon_text = "-text"; // point labels for polygons and visible line parts
     static final public String id_name = "_id";
 
 
@@ -1058,7 +1058,8 @@ public class MPLFeaturesUtils {
         }
 
         boolean addPolyTextSource = false;
-        if (layerType == GTPolygon || layerType == GTMultiPolygon){
+        if (layerType == GTPolygon || layerType == GTMultiPolygon
+                || layerType == GTLineString || layerType == GTMultiLineString){
             addPolyTextSource = true;
         }
 
@@ -2067,8 +2068,9 @@ public class MPLFeaturesUtils {
                         if (simbolLayer == null) {
                             Log.d("Mbgl", "create layer name : " + symbolLayerId);
                             Log.d("Mbgl", "create layer source : " + (layerPath + (isPolygon ? source_polygon_text : "")));
+                            boolean separateLabels = isPolygon || layerType == GTLineString || layerType == GTMultiLineString;
                             simbolLayer = new SymbolLayer(symbolLayerId,
-                                    layerPath + (isPolygon ? source_polygon_text : ""));
+                                    layerPath + (separateLabels ? source_polygon_text : ""));
 
                             if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ){
                                 style.addLayerAbove(simbolLayer, signaturesRootLayer.getId());

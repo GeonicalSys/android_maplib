@@ -380,6 +380,13 @@ public class MapDrawable
 
     WeakReference<MapLibreMap> maplibreMap = new WeakReference(null);
     WeakReference<org.maplibre.android.maps.MapView> maplibreMapView = new WeakReference(null);
+    private VisibleLineLabelController mVisibleLineLabels;
+
+    private void bindVisibleLineLabels() {
+        if(mVisibleLineLabels!=null){mVisibleLineLabels.close();mVisibleLineLabels=null;}
+        MapLibreMap renderer=maplibreMap.get();MapView view=maplibreMapView.get();
+        if(renderer!=null && view!=null)mVisibleLineLabels=new VisibleLineLabelController(this,renderer,view);
+    }
 
     /** Monotonic id so only the latest {@link #loadLayersToMaplibreMap} style callback applies UI teardown. */
     private final AtomicInteger mLoadLayersStyleRequestId = new AtomicInteger(0);
@@ -424,10 +431,12 @@ public class MapDrawable
 
     public void setMaplibreMap(final MapLibreMap maplibreMap){
         this.maplibreMap = new WeakReference<>(maplibreMap);
+        bindVisibleLineLabels();
     }
 
     public void setMaplibreMapView(final org.maplibre.android.maps.MapView maplibreMapView){
         this.maplibreMapView = new WeakReference<>(maplibreMapView);
+        bindVisibleLineLabels();
 
     }
 
@@ -4479,6 +4488,10 @@ public class MapDrawable
             return;
         }
         boolean isVisible = ((com.nextgis.maplib.map.Layer) targetlayer).isVisible();
+        if(mVisibleLineLabels!=null && targetlayer instanceof VectorLayer) {
+            int geometry=((VectorLayer)targetlayer).getGeometryType();
+            if(geometry==GTLineString || geometry==GTMultiLineString)mVisibleLineLabels.requestRefresh();
+        }
         String geometryId = namePrefix + layer_namepart + id;
         for (String baseId : new String[]{geometryId, geometryId + outline_namepart, geometryId + pattern_namepart,
                 geometryId + MARKER_ICON_LAYER_SUFFIX, "symbol-" + geometryId})

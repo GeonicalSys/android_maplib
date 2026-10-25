@@ -9,6 +9,12 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelLayout.java
+    responsibility: Clip a visible screen quadrilateral, deduplicate SQL IDs and plan one rigid point-anchored label per visible object.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java
+    responsibility: Coalesce camera and geometry-source updates, calculate visible labels off the UI thread and reject stale map/style results.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelLayoutTest.java
+    responsibility: Verify visible direction, winding geometry, multipart IDs, rotated clipping, dateline, upright and cancellation.
   - path: maplib/src/test/java/com/nextgis/maplib/map/LegacyTrackColorsTest.java
     responsibility: Verify transactional v1 color upgrade, failure rollback and retry.
   - path: maplib/src/main/java/com/nextgis/maplib/map/TrackColorPalette.java

@@ -48,8 +48,12 @@ public final class RuleLabelLayouts {
                 PropertyFactory.textAllowOverlap(overlap), PropertyFactory.textOptional(labels.isTextOptional()),
                 PropertyFactory.textIgnorePlacement(overlap && !labels.isTextOptional()),
                 PropertyFactory.symbolSpacing(labels.getSymbolSpacing()),
-                PropertyFactory.symbolPlacement(placement(labels, type)),
+                PropertyFactory.symbolPlacement(line(type) ? "point" : placement(labels, type)),
                 PropertyFactory.textRotationAlignment(rotation(labels, type)));
+        if(line(type))layer.setProperties(PropertyFactory.textMaxWidth(0f),PropertyFactory.textRotate(
+                labels.isLineLabelHorizontal()?Expression.literal(0):Expression.coalesce(Expression.get(
+                        Boolean.FALSE.equals(labels.getTextKeepUpright())?VisibleLineLabelLayout.ANGLE
+                                :VisibleLineLabelLayout.UPRIGHT_ANGLE),Expression.literal(0))));
     }
     public static void remove(org.maplibre.android.maps.Style style, String baseId) {
         String prefix = baseId + "-layout-";
@@ -91,6 +95,7 @@ public final class RuleLabelLayouts {
                     copy("text-anchor", base.getTextAnchor()), copy("text-offset", base.getTextOffset()),
                     copy("text-justify", base.getTextJustify()), copy("text-transform", base.getTextTransform()),
                     copy("text-letter-spacing", base.getTextLetterSpacing()), copy("text-max-width", base.getTextMaxWidth()),
+                    copy("text-rotate",base.getTextRotate()),
                     copy("symbol-sort-key", base.getSymbolSortKey()), copy("visibility", base.getVisibility()));
             constants(layer, entry.getValue(), type);
             layer.setFilter(Expression.eq(Expression.get(KEY), Expression.literal(entry.getKey())));
