@@ -701,3 +701,15 @@ SharedTrackStore schema 2 назначает насыщенные постоян
 ошибка откатывает и цвета, и версию. TrackMapStyle: core 2/glow 6/selection 4.
 
 LineString/MultiLineString labels use one whole point-anchored block for the current visible extent. VisibleLineLabelLayout clips loaded geometry and computes its predominant direction; VisibleLineLabelController coalesces camera/source changes without SQLite or per-frame layout. See consuming docs/architecture/visible-line-labels.md.
+
+## Полевые линии и mixed hit candidates
+
+queryTrackIds больше не исключает трек при попадании в точку. App объединяет
+track IDs с векторными кандидатами; сегменты одного трека не дублируются.
+LayerDisplayPriority распознаёт линейную геометрию с именем «Полевые линейные»
+или field_lines. MapDrawable располагает body/labels этих групп над треками
+и под Point/MultiPoint, включая derived label sources и вложенные logical
+слои. Full/lite/style/reorder восстанавливают тот же порядок; already-correct
+stack не перестраивается. Схема, API payload и число проходов не меняются.
+Consuming Related track-candidates: 4/4 native PASS. Контракт — consuming
+архитектура track-controls.md. Runtime unit/build и полный набор отдельны.

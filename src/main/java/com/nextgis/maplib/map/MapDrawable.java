@@ -5049,19 +5049,7 @@ public class MapDrawable
         if (map == null || map.getStyle() == null) return result;
         android.graphics.RectF rect = new android.graphics.RectF(
                 x - tolerance, y - tolerance, x + tolerance, y + tolerance);
-        // A visible point takes precedence over a line passing through it.
-        List<String> pointIds = new ArrayList<>();
-        java.util.Set<String> pointSources = new java.util.HashSet<>();
-        for (Integer id : sourcesOrder.keySet()) {
-            ILayer logical = getLayerById(id);
-            if (isPointLayer(logical)) pointSources.add(logical.getPath().toString());
-        }
-        for (Layer nativeLayer : map.getStyle().getLayers()) {
-            String source = vectorSourceId(nativeLayer);
-            if (pointSources.contains(source)) pointIds.add(nativeLayer.getId());
-        }
-        if (!pointIds.isEmpty() && !map.queryRenderedFeatures(rect, pointIds.toArray(new String[0])).isEmpty())
-            return result;
+        // Drawing points above tracks must not remove tracks from mixed hit candidates.
         for (org.maplibre.geojson.Feature feature : map.queryRenderedFeatures(rect,
                 "track-line-layer", "track-inprogress-layer")) {
             if (!feature.hasProperty(TrackMapStyle.TRACK_ID)) continue;
@@ -5085,7 +5073,7 @@ public class MapDrawable
         return null;
     }
 
-    /** Data stack: non-points, tracks, point groups, transient tools, location cursor. */
+    /** Data stack: ordinary data, tracks, field lines, point groups, tools, location cursor. */
     private void ensureTrackAndPointOrder(@Nullable Style style) {
         if (style == null || style.getLayer("selected-dot-layer") == null) return;
         List<Layer> existing = style.getLayers();
@@ -5096,15 +5084,28 @@ public class MapDrawable
         List<Integer> logicalIds = new ArrayList<>(sourcesOrder.keySet());
         Collections.reverse(logicalIds);
         Map<String, List<Layer>> pointGroups = new LinkedHashMap<>();
+        Map<String, List<Layer>> fieldLineGroups = new LinkedHashMap<>();
+        List<ILayer> logicalLayers = new ArrayList<>();
+        LayerGroup.getAllLayers(this, logicalLayers);
+        Map<Integer, ILayer> logicalById = new HashMap<>();
+        for (ILayer logical : logicalLayers) logicalById.put(logical.getId(), logical);
         for (Integer id : logicalIds) {
-            ILayer logical = getLayerById(id);
-            if (!isPointLayer(logical)) continue;
-            pointGroups.put(logical.getPath().toString(), new ArrayList<>());
+            ILayer logical = logicalById.get(id);
+            if (isPointLayer(logical)) pointGroups.put(logical.getPath().toString(), new ArrayList<>());
+            else if (logical instanceof VectorLayer && LayerDisplayPriority.isFieldLines(
+                    ((VectorLayer) logical).getGeometryType(), logical.getName())) {
+                fieldLineGroups.put(logical.getPath().toString(), new ArrayList<>());
+            }
         }
         for (Layer layer : existing) {
-            List<Layer> group = pointGroups.get(vectorSourceId(layer));
+            String source = vectorSourceId(layer);
+            List<Layer> group = fieldLineGroups.get(source);
+            if (group == null && source != null && source.endsWith(MPLFeaturesUtils.source_polygon_text))
+                group = fieldLineGroups.get(source.substring(0, source.length() - MPLFeaturesUtils.source_polygon_text.length()));
+            if (group == null) group = pointGroups.get(source);
             if (group != null) group.add(layer);
         }
+        for (List<Layer> group : fieldLineGroups.values()) ordered.addAll(group);
         for (List<Layer> group : pointGroups.values()) ordered.addAll(group);
         int anchor = -1;
         for (int i = 0; i < existing.size(); i++)
