@@ -31,14 +31,14 @@ public final class TrackMapStyle {
         for (String prefix : PREFIXES) {
             String source = prefix + "-source";
             style.addLayer(new LineLayer(prefix + "-glow", source).withProperties(
-                    lineColor(get(COLOR)), lineWidth(10f), lineBlur(3f), lineOpacity(0.55f),
+                    lineColor(get(COLOR)), lineWidth(6f), lineBlur(2f), lineOpacity(0.55f),
                     lineCap("round"), lineJoin("round")));
             LineLayer selection = new LineLayer(prefix + "-selection", source).withProperties(
-                    lineColor("#FFFFFF"), lineWidth(7f), lineCap("round"), lineJoin("round"));
+                    lineColor("#FFFFFF"), lineWidth(4f), lineCap("round"), lineJoin("round"));
             selection.setFilter(eq(get(TRACK_ID), literal(-1)));
             style.addLayer(selection);
             style.addLayer(new LineLayer(prefix + "-layer", source).withProperties(
-                    lineColor(get(COLOR)), lineWidth(4f), lineCap("round"), lineJoin("round")));
+                    lineColor(get(COLOR)), lineWidth(2f), lineCap("round"), lineJoin("round")));
         }
     }
 

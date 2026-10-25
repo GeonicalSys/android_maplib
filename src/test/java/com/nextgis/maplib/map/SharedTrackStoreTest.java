@@ -60,6 +60,23 @@ public class SharedTrackStoreTest {
     }
     private long count(String table) { return DatabaseUtils.queryNumEntries(store.getDatabase(true), table); }
 
+    @Test public void lateLegacyImportColorsMissingColorsWithoutRecoloringCustomHistory() throws Exception {
+        File directory = workspace();
+        try (SQLiteDatabase source = legacy(directory)) {
+            source.execSQL("UPDATE tracks SET color=NULL");
+            source.execSQL("INSERT INTO tracks(name,start,end,color,visible) VALUES('Another old',100,900,NULL,1)");
+            source.execSQL("INSERT INTO tracks(name,start,end,color,visible) VALUES('Custom',100,900,123,1)");
+            store.migrateWorkspace(directory);
+            assertEquals(0, DatabaseUtils.longForQuery(store.getDatabase(true),"SELECT count(*) FROM tracks WHERE color IS NULL",null));
+            assertEquals(2, DatabaseUtils.longForQuery(store.getDatabase(true),"SELECT count(DISTINCT color) FROM tracks WHERE name!='Custom'",null));
+            assertEquals(123, DatabaseUtils.longForQuery(store.getDatabase(true),"SELECT color FROM tracks WHERE name='Custom'",null));
+            assertEquals(2, DatabaseUtils.longForQuery(source,"SELECT count(*) FROM tracks WHERE color IS NULL",null));
+            store.getDatabase(false).execSQL("UPDATE tracks SET color=456 WHERE _id=1");
+            store.migrateWorkspace(directory);
+            assertEquals(456,DatabaseUtils.longForQuery(store.getDatabase(true),"SELECT color FROM tracks WHERE _id=1",null));
+        }
+    }
+
     @Test public void collidingProjectIdsAndTimestampsKeepBothHistoriesAndSentFlags() throws Exception {
         File first = workspace(), second = workspace();
         try (SQLiteDatabase a = legacy(first); SQLiteDatabase b = legacy(second)) {

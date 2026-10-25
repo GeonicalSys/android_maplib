@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-24
+last_verified: 2026-10-25
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -690,3 +690,7 @@ Unit checks покрывают blocked startup, late ANR после переза
 
 Карточки и автоматический контроль исходных путей: [реестр обновлений](../update-reports/README.md).
 Перед push выполняется локальный hook; в новом клоне требуется его установка.
+
+SharedTrackStore schema 2 назначает насыщенные постоянные цвета прежним SQL NULL
+при upgrade и позднем импорте. Все явные цвета/metadata/points сохраняются;
+ошибка откатывает и цвета, и версию. TrackMapStyle: core 2/glow 6/selection 4.

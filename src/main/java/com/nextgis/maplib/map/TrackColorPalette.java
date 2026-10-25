@@ -17,4 +17,14 @@ public final class TrackColorPalette {
         if (COLORS[index] == previous) index = (index + 1 + random.nextInt(COLORS.length - 1)) % COLORS.length;
         return COLORS[index];
     }
+
+    /** A full cycle for legacy history: use every hue before repeating one. */
+    public static int[] shuffledColors(Random random) {
+        int[] colors = COLORS.clone();
+        for (int i = colors.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            int swap = colors[i]; colors[i] = colors[j]; colors[j] = swap;
+        }
+        return colors;
+    }
 }

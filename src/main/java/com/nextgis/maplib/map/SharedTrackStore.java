@@ -46,7 +46,7 @@ public final class SharedTrackStore {
         this.directory = directory;
         if (!directory.isDirectory() && !directory.mkdirs())
             throw new SQLiteException("Cannot create shared track directory");
-        helper = new SQLiteOpenHelper(context, new File(directory, "tracks.db").getPath(), null, 1) {
+        helper = new SQLiteOpenHelper(context, new File(directory, "tracks.db").getPath(), null, 2) {
             @Override public void onCreate(SQLiteDatabase db) {
                 db.execSQL(DB_CREATE_TRACKS);
                 // A durable point ID must never be reused while an upload acknowledgement is in flight.
@@ -58,7 +58,8 @@ public final class SharedTrackStore {
                 db.execSQL("CREATE TABLE legacy_points(source TEXT, old_id INTEGER, new_id INTEGER NOT NULL, PRIMARY KEY(source,old_id))");
             }
             @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-                throw new SQLiteException("Unsupported shared track schema upgrade");
+                if (oldVersion == 1 && newVersion == 2) colorizeLegacyTracks(db);
+                else throw new SQLiteException("Unsupported shared track schema upgrade");
             }
         };
     }
@@ -68,6 +69,22 @@ public final class SharedTrackStore {
         return readOnly ? helper.getReadableDatabase() : helper.getWritableDatabase();
     }
     public long getRevision() { return revision.get(); }
+
+    /** Runs inside the owning upgrade/import transaction. NULL is the old automatic color. */
+    private static void colorizeLegacyTracks(SQLiteDatabase db) {
+        int[] colors = TrackColorPalette.shuffledColors(new java.util.Random());
+        int next = 0;
+        try (Cursor rows = db.query(TABLE_TRACKS, new String[]{FIELD_ID}, FIELD_COLOR + " IS NULL",
+                null, null, null, FIELD_ID + " ASC")) {
+            while (rows.moveToNext()) {
+                ContentValues color = new ContentValues();
+                color.put(FIELD_COLOR, colors[next++ % colors.length]);
+                if (db.update(TABLE_TRACKS, color, FIELD_ID + "=? AND " + FIELD_COLOR + " IS NULL",
+                        new String[]{rows.getString(0)}) != 1)
+                    throw new SQLiteException("Legacy track color was not saved");
+            }
+        }
+    }
 
     public void changed() {
         revision.incrementAndGet();
@@ -233,6 +250,8 @@ public final class SharedTrackStore {
                         return row;
                     });
                 }
+                // A workspace first opened after the schema upgrade can bring more old tracks.
+                colorizeLegacyTracks(target);
                 ContentValues done = new ContentValues(); done.put("source", source);
                 target.insertOrThrow("migrated_workspaces", null, done);
                 target.setTransactionSuccessful();
