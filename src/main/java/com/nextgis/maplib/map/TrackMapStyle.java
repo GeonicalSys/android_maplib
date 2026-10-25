@@ -14,6 +14,7 @@ import static org.maplibre.android.style.layers.PropertyFactory.*;
 public final class TrackMapStyle {
     public static final String TRACK_ID = "track_id";
     public static final String COLOR = "track_color";
+    public static final String CORE_COLOR = "track_core_color";
     public static final String NAME = "track_name";
     private static final String[] PREFIXES = {"track-line", "track-inprogress"};
     private static final String[] SUFFIXES = {"-glow", "-selection", "-layer"};
@@ -24,6 +25,11 @@ public final class TrackMapStyle {
         feature.addNumberProperty(TRACK_ID, id);
         feature.addStringProperty(NAME, name);
         feature.addStringProperty(COLOR, String.format(Locale.ROOT, "#%06X", color & 0xffffff));
+        // Keep the stored/user-picked hue for the glow; darken only the rendered core by 73%.
+        int core = Math.round((color >>> 16 & 255) * 0.27f) << 16
+                | Math.round((color >>> 8 & 255) * 0.27f) << 8
+                | Math.round((color & 255) * 0.27f);
+        feature.addStringProperty(CORE_COLOR, String.format(Locale.ROOT, "#%06X", core));
         feature.addStringProperty(MPLFeaturesUtils.prop_layerid, String.valueOf(layerId));
     }
 
@@ -31,14 +37,14 @@ public final class TrackMapStyle {
         for (String prefix : PREFIXES) {
             String source = prefix + "-source";
             style.addLayer(new LineLayer(prefix + "-glow", source).withProperties(
-                    lineColor(get(COLOR)), lineWidth(6f), lineBlur(2f), lineOpacity(0.55f),
+                    lineColor(get(COLOR)), lineWidth(4.5f), lineBlur(3f), lineOpacity(0.83f),
                     lineCap("round"), lineJoin("round")));
             LineLayer selection = new LineLayer(prefix + "-selection", source).withProperties(
                     lineColor("#FFFFFF"), lineWidth(4f), lineCap("round"), lineJoin("round"));
             selection.setFilter(eq(get(TRACK_ID), literal(-1)));
             style.addLayer(selection);
             style.addLayer(new LineLayer(prefix + "-layer", source).withProperties(
-                    lineColor(get(COLOR)), lineWidth(2f), lineCap("round"), lineJoin("round")));
+                    lineColor(get(CORE_COLOR)), lineWidth(1.4f), lineCap("round"), lineJoin("round")));
         }
     }
 

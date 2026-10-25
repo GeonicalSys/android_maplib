@@ -11,6 +11,11 @@ TrackColorPalette назначает насыщенный цвет один ра
 сегментов и поднимает Point/MultiPoint группы над треками. См. consuming
 `docs/architecture/track-controls.md`; native rendering проверяется в приложении.
 
+По выбранному пользователем образцу обычный трек сохраняет два уровня:
+сердцевина 1.4 px с RGB-яркостью 27% исходного цвета и свечение исходного
+оттенка 4.5 px / blur 3 / opacity .83. `track_core_color` вычисляется при
+формировании сегмента; сохранённый `track_color`, БД и число проходов не меняются.
+
 ## Штриховки, контуры и живой образец
 
 PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые стили MVT используют classic fallback. Контракт — consuming docs/architecture/polygon-style-controls.md.

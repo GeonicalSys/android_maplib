@@ -20,7 +20,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/TrackColorPalette.java
     responsibility: Assign persistent saturated track colors without changing existing explicit colors.
   - path: maplib/src/main/java/com/nextgis/maplib/map/TrackMapStyle.java
-    responsibility: Own fixed track style passes with two-pixel core, compact glow and selected-session filter.
+    responsibility: Own fixed track style passes with a 1.4-pixel core at 27 percent of the original RGB channels, original-hue 4.5-pixel glow with blur 3 and opacity .83, and the existing selected-session filter; retain the stored base color.
   - path: maplib/src/main/java/com/nextgis/maplib/display/PolygonPatternOptions.java
     responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
   - path: maplib/src/main/java/com/nextgis/maplib/display/PolygonOutlineOptions.java
