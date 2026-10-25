@@ -37,7 +37,7 @@ public final class TrackMapStyle {
         for (String prefix : PREFIXES) {
             String source = prefix + "-source";
             style.addLayer(new LineLayer(prefix + "-glow", source).withProperties(
-                    lineColor(get(COLOR)), lineWidth(4.5f), lineBlur(3f), lineOpacity(0.83f),
+                    lineColor(get(COLOR)), lineWidth(6.5f), lineBlur(3f), lineOpacity(0.83f),
                     lineCap("round"), lineJoin("round")));
             LineLayer selection = new LineLayer(prefix + "-selection", source).withProperties(
                     lineColor("#FFFFFF"), lineWidth(4f), lineCap("round"), lineJoin("round"));
