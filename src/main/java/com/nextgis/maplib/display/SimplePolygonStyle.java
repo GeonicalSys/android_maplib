@@ -47,6 +47,8 @@ import static com.nextgis.maplib.util.GeoConstants.GTPolygon;
 
 public class SimplePolygonStyle extends Style implements ITextStyle {
     protected boolean mFill;
+    private PolygonPatternOptions mPatternOptions;
+    private PolygonOutlineOptions mOutlineOptions;
     protected int mFillPattern = PolygonPatternRegistry.FILL_PATTERN_NONE;
     protected String mFillPatternImage;
     protected float mFillTranslateX;
@@ -83,6 +85,8 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
     public SimplePolygonStyle clone() throws CloneNotSupportedException {
         SimplePolygonStyle obj = (SimplePolygonStyle) super.clone();
         obj.mFill = mFill;
+        obj.mPatternOptions = mPatternOptions == null ? null : mPatternOptions.clone();
+        obj.mOutlineOptions = mOutlineOptions == null ? null : mOutlineOptions.clone();
         obj.mFillPattern = mFillPattern;
         obj.mFillPatternImage = mFillPatternImage;
         obj.mFillTranslateX = mFillTranslateX;
@@ -93,6 +97,16 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
         obj.mField = mField;
         obj.mLabelAttributes = mLabelAttributes.clone();
         return obj;
+    }
+
+    public PolygonPatternOptions getPatternOptions() { return mPatternOptions; }
+    public void setPatternOptions(PolygonPatternOptions value) { mPatternOptions = value; }
+    public PolygonOutlineOptions getOutlineOptions() { return mOutlineOptions; }
+    public void setOutlineOptions(PolygonOutlineOptions value) { mOutlineOptions = value; }
+    /** New procedural patterns have their own opacity, including when the background is off. */
+    public float getPatternOpacity() {
+        return ConfigurablePolygonPatternRegistry.applies(this)
+                ? mPatternOptions.getAlpha() / 255f : MplStyleMapper.polygonFillOpacity(this);
     }
 
     public boolean isFill() {
@@ -257,6 +271,8 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
     public JSONObject toJSON() throws JSONException {
         JSONObject rootConfig = super.toJSON();
         rootConfig.put(JSON_FILL_KEY, mFill);
+        if (mPatternOptions != null) rootConfig.put(PolygonPatternOptions.JSON_KEY, mPatternOptions.toJSON());
+        if (mOutlineOptions != null) rootConfig.put(PolygonOutlineOptions.JSON_KEY, mOutlineOptions.toJSON());
         if (mFillPattern != PolygonPatternRegistry.FILL_PATTERN_NONE) {
             rootConfig.put(JSON_FILL_PATTERN_KEY, mFillPattern);
         }
@@ -290,6 +306,10 @@ public class SimplePolygonStyle extends Style implements ITextStyle {
     public void fromJSON(JSONObject jsonObject) throws JSONException {
         super.fromJSON(jsonObject);
         mFill = jsonObject.optBoolean(JSON_FILL_KEY, true);
+        JSONObject pattern = jsonObject.optJSONObject(PolygonPatternOptions.JSON_KEY);
+        mPatternOptions = pattern == null ? null : PolygonPatternOptions.fromJSON(pattern);
+        JSONObject outline = jsonObject.optJSONObject(PolygonOutlineOptions.JSON_KEY);
+        mOutlineOptions = outline == null ? null : PolygonOutlineOptions.fromJSON(outline);
         mFillPattern = jsonObject.optInt(
                 JSON_FILL_PATTERN_KEY, PolygonPatternRegistry.FILL_PATTERN_NONE);
         setFillPatternImage(jsonObject.optString(JSON_FILL_PATTERN_IMAGE_KEY, null));

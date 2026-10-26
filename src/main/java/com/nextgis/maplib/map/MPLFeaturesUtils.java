@@ -196,7 +196,7 @@ public class MPLFeaturesUtils {
     static final public String track_namepart = "track-";
     static final public String track_flags_namepart = "track-flags-";
 
-    static final public String source_polygon_text = "-text"; // source for text part of polygon[s]
+    static final public String source_polygon_text = "-text"; // point labels for polygons and visible line parts
     static final public String id_name = "_id";
 
 
@@ -249,16 +249,19 @@ public class MPLFeaturesUtils {
 
     static public List<org.maplibre.geojson.Feature> createFeatureListFromTrackLayer(final TrackLayer layer) {
         Map<Integer, GeoMultiLineString> tracks = layer.getTracks();
+        Map<Integer, TrackLayer.TrackInfo> metadata = layer.getTrackInfo();
         List<org.maplibre.geojson.Feature> lineFeatures = new ArrayList<>();
 
         for (Map.Entry<Integer, GeoMultiLineString> entry : tracks.entrySet()) {
             Integer id = entry.getKey();
+            TrackLayer.TrackInfo info = metadata.get(id);
+            if (info == null || !info.visible) continue;
             for (int segment = 0; segment < entry.getValue().size(); segment++) {
                 GeoLineString part = entry.getValue().get(segment);
                 if (part.getPointCount() < 2) continue;
                 LineString lineString = getLineString(part);
                 Feature lineFeature = org.maplibre.geojson.Feature.fromGeometry(lineString);
-                lineFeature.addStringProperty(prop_layerid, String.valueOf(layer.getId()));
+                TrackMapStyle.properties(lineFeature, id, info.name, info.color, layer.getId());
                 lineFeatures.add(lineFeature);
             }
         }
@@ -1055,7 +1058,8 @@ public class MPLFeaturesUtils {
         }
 
         boolean addPolyTextSource = false;
-        if (layerType == GTPolygon || layerType == GTMultiPolygon){
+        if (layerType == GTPolygon || layerType == GTMultiPolygon
+                || layerType == GTLineString || layerType == GTMultiLineString){
             addPolyTextSource = true;
         }
 
@@ -2064,8 +2068,9 @@ public class MPLFeaturesUtils {
                         if (simbolLayer == null) {
                             Log.d("Mbgl", "create layer name : " + symbolLayerId);
                             Log.d("Mbgl", "create layer source : " + (layerPath + (isPolygon ? source_polygon_text : "")));
+                            boolean separateLabels = isPolygon || layerType == GTLineString || layerType == GTMultiLineString;
                             simbolLayer = new SymbolLayer(symbolLayerId,
-                                    layerPath + (isPolygon ? source_polygon_text : ""));
+                                    layerPath + (separateLabels ? source_polygon_text : ""));
 
                             if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ){
                                 style.addLayerAbove(simbolLayer, signaturesRootLayer.getId());
@@ -2339,6 +2344,10 @@ public class MPLFeaturesUtils {
         RuleGeometryLayouts.sync(style, newLayer2, rules, layerDefaultsStyle);
         RuleGeometryLayouts.sync(style, patternFillLayer, rules, layerDefaultsStyle);
         RuleGeometryLayouts.sync(style, markerIconLayer, rules, layerDefaultsStyle);
+        if (layerType == GeoConstants.GTPolygon || layerType == GeoConstants.GTMultiPolygon)
+            com.nextgis.maplib.map.mpl.PolygonOutlineLayerFactory.sync(buildContext, (LineLayer) newLayer2, rules, layerDefaultsStyle);
+        if (layerType == GeoConstants.GTPoint || layerType == GeoConstants.GTMultiPoint)
+            com.nextgis.maplib.map.mpl.FireflyLayerFactory.sync(buildContext, newLayer, rules, layerDefaultsStyle);
         if (simbolLayer instanceof SymbolLayer) {
             RuleLabelLayouts.sync(style, (SymbolLayer) simbolLayer, rules, layerDefaultsStyle, layerType);
         } else RuleLabelLayouts.remove(style, labelId);

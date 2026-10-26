@@ -11,6 +11,7 @@ import static com.nextgis.maplib.util.GeoConstants.GTPolygon;
 import com.google.gson.JsonArray;
 import com.nextgis.maplib.api.ITextStyle;
 import com.nextgis.maplib.display.LabelAttributes;
+import com.nextgis.maplib.display.FireflyMarkerRegistry;
 import com.nextgis.maplib.display.MarkerIconRegistry;
 import com.nextgis.maplib.display.MplStyleMapper;
 import com.nextgis.maplib.display.PolygonPatternRegistry;
@@ -125,6 +126,11 @@ public final class MplFeatureStyleProps {
         if (style == null || feature == null) {
             return;
         }
+        feature.removeProperty(com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.OPACITY_PROPERTY);
+        feature.removeProperty(com.nextgis.maplib.map.mpl.PolygonOutlineLayerFactory.KEY);
+        feature.removeProperty(FILL_PATTERN_IMAGE);
+        feature.removeProperty(FireflyMarkerRegistry.IMAGE_PROPERTY);
+        feature.removeProperty(FireflyMarkerRegistry.SCALE_PROPERTY);
         feature.addStringProperty(RuleGeometryLayouts.KEY, RuleGeometryLayouts.key(style));
         feature.addStringProperty(SIZE_ZOOM_STOPS, style.getSizeZoomScaleStops() == null ? "" : style.getSizeZoomScaleStops());
         switch (geometryKind(geoType)) {
@@ -138,6 +144,11 @@ public final class MplFeatureStyleProps {
                     SimpleMarkerStyle markerStyle = (SimpleMarkerStyle) style;
                     feature.addNumberProperty(FILL_TYPE, markerStyle.getType());
                     feature.addNumberProperty(CIRCLE_BLUR, markerStyle.getCircleBlur());
+                    if (FireflyMarkerRegistry.isFirefly(markerStyle)) {
+                        FireflyMarkerRegistry.Sprite sprite = FireflyMarkerRegistry.sprite(markerStyle);
+                        feature.addStringProperty(FireflyMarkerRegistry.IMAGE_PROPERTY, sprite.imageName);
+                        feature.addNumberProperty(FireflyMarkerRegistry.SCALE_PROPERTY, sprite.iconScale);
+                    }
                     feature.addStringProperty(
                             ICON_IMAGE,
                             markerStyle.getIconImage() != null ? markerStyle.getIconImage() : "");
@@ -215,7 +226,18 @@ public final class MplFeatureStyleProps {
                             fillPattern);
                     if (polygonStyle.getFillPatternImage() != null) {
                         feature.addStringProperty(FILL_PATTERN_IMAGE, polygonStyle.getFillPatternImage());
+                    } else if (com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.applies(polygonStyle)) {
+                        feature.addStringProperty(FILL_PATTERN_IMAGE,
+                                com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.imageName(polygonStyle));
+                    } else {
+                        feature.addStringProperty(FILL_PATTERN_IMAGE, PolygonPatternRegistry.patternName(
+                                fillPattern >= 0 && fillPattern <= PolygonPatternRegistry.FILL_PATTERN_MARSH
+                                        ? fillPattern : PolygonPatternRegistry.FILL_PATTERN_HATCH));
                     }
+                    feature.addNumberProperty(com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.OPACITY_PROPERTY,
+                            polygonStyle.getPatternOpacity());
+                    feature.addStringProperty(com.nextgis.maplib.map.mpl.PolygonOutlineLayerFactory.KEY,
+                            polygonStyle.getOutlineOptions() == null || !polygonStyle.getOutlineOptions().isEnabled() ? "" : polygonStyle.getOutlineOptions().key());
                     addFloatArrayProperty(feature, FILL_TRANSLATE, new Float[]{
                             polygonStyle.getFillTranslateX(),
                             polygonStyle.getFillTranslateY()});
@@ -230,6 +252,12 @@ public final class MplFeatureStyleProps {
 
     /** Removes geometry-specific style props from a MapLibre feature. */
     public static void clear(Feature feature, int geoType) {
+        if (feature == null) return;
+        feature.removeProperty(com.nextgis.maplib.display.ConfigurablePolygonPatternRegistry.OPACITY_PROPERTY);
+        feature.removeProperty(com.nextgis.maplib.map.mpl.PolygonOutlineLayerFactory.KEY);
+        feature.removeProperty(FILL_PATTERN_IMAGE);
+        feature.removeProperty(FireflyMarkerRegistry.IMAGE_PROPERTY);
+        feature.removeProperty(FireflyMarkerRegistry.SCALE_PROPERTY);
         feature.removeProperty(SIZE_ZOOM_STOPS);
         feature.removeProperty(RuleGeometryLayouts.KEY);
         feature.removeProperty(com.nextgis.maplib.map.mpl.LineLayerFactory.DASH_KEY);

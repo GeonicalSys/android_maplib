@@ -1,10 +1,33 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-23
+last_verified: 2026-10-25
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+TrackColorPalette назначает насыщенный цвет один раз при insert. TrackMapStyle
+владеет общими проходами свечения/линии/выделения; MapDrawable передаёт metadata
+сегментов и поднимает Point/MultiPoint группы над треками. См. consuming
+`docs/architecture/track-controls.md`; native rendering проверяется в приложении.
+
+По выбранному пользователем образцу обычный трек сохраняет два уровня:
+сердцевина 1.4 px с RGB-яркостью 27% исходного цвета и свечение исходного
+оттенка 6.5 px / blur 3 / opacity .83. `track_core_color` вычисляется при
+формировании сегмента; сохранённый `track_color`, БД и число проходов не меняются.
+
+## Штриховки, контуры и живой образец
+
+PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые стили MVT используют classic fallback. Контракт — consuming docs/architecture/polygon-style-controls.md.
+
+## «Светлячок»
+
+SimpleMarkerStyle type=9 сохраняет прежний JSON и имеет чёткое ядро с внешним
+ореолом. FireflyMarkerRegistry строит ограниченные RGBA sprites и учитывает
+владельцев native images; FireflyLayerFactory добавляет обычные rendering
+children с общим picking/visibility/zoom. PointLayerFactory исключает новый тип
+из прежнего circle/SDF прохода. Прозрачное ядро не заполняется свечением.
+Подробности, ограничения и проверки — consuming docs/architecture/point-firefly.md.
 
 Diagnostic VERSION_NAME: release 3.1.2.30, debug 3.1.2.23. При подготовке
 локального Lisa Release версия проверяется вместе с APK через consuming
@@ -192,7 +215,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   со сплошным `background-color: #FFFFFF`. При смене режима слой пересоздаётся,
   чтобы прежний `background-pattern` не перекрывал цвет; neutral и dark
   продолжают использовать штатные растровые узоры.
-- MapLibre Android `13.0.2` подключён через явный OpenGL-артефакт
+- MapLibre Android `13.7.1` подключён через явный OpenGL-артефакт
   `android-sdk-opengl`; generic `android-sdk` этой версии использует Vulkan и
   не совместим с частью устройств без рабочего Vulkan-драйвера;
 - горячее обновление style применяет вычисляемые свойства только к независимому
@@ -424,7 +447,7 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 
 - Нет imports из `maplibui`/`app`.
 - MapLibre backend должен оставаться согласованным с `maplibui` и `app`:
-  `org.maplibre.gl:android-sdk-opengl:13.0.2` во всех трёх модулях.
+  `org.maplibre.gl:android-sdk-opengl:13.7.1` во всех трёх модулях.
 - LayerGroup index `0` — bottom.
 - MBTiles local TMS path принимает только raster PNG/JPEG/WEBP с обязательными
   `tiles`/`metadata`; vector MBTiles и повреждённая SQLite отклоняются.
@@ -672,3 +695,21 @@ Unit checks покрывают blocked startup, late ANR после переза
 
 Карточки и автоматический контроль исходных путей: [реестр обновлений](../update-reports/README.md).
 Перед push выполняется локальный hook; в новом клоне требуется его установка.
+
+SharedTrackStore schema 2 назначает насыщенные постоянные цвета прежним SQL NULL
+при upgrade и позднем импорте. Все явные цвета/metadata/points сохраняются;
+ошибка откатывает и цвета, и версию. TrackMapStyle: core 2/glow 6/selection 4.
+
+LineString/MultiLineString labels use one whole point-anchored block for the current visible extent. VisibleLineLabelLayout clips loaded geometry and computes its predominant direction; VisibleLineLabelController coalesces camera/source changes without SQLite or per-frame layout. See consuming docs/architecture/visible-line-labels.md.
+
+## Полевые линии и mixed hit candidates
+
+queryTrackIds больше не исключает трек при попадании в точку. App объединяет
+track IDs с векторными кандидатами; сегменты одного трека не дублируются.
+LayerDisplayPriority распознаёт линейную геометрию с именем «Полевые линейные»
+или field_lines. MapDrawable располагает body/labels этих групп над треками
+и под Point/MultiPoint, включая derived label sources и вложенные logical
+слои. Full/lite/style/reorder восстанавливают тот же порядок; already-correct
+stack не перестраивается. Схема, API payload и число проходов не меняются.
+Consuming Related track-candidates: 4/4 native PASS. Контракт — consuming
+архитектура track-controls.md. Runtime unit/build и полный набор отдельны.
