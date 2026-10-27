@@ -211,7 +211,14 @@ public final class MapRuntimeDiagnostics {
                     if (limits.size() >= 32) limits.remove(limits.keySet().iterator().next());
                     counter = new Counter(); limits.put(key, counter);
                 }
-                if (counter.logged && adapter.now() - counter.last < REPEAT_MS) { counter.suppressed++; return; }
+                if (counter.logged && adapter.now() - counter.last < REPEAT_MS) {
+                    counter.suppressed++;
+                    // A later startup/query may be the one that crashes. Throttle the text log,
+                    // but do not leave the previous operation's identity/stack on disk.
+                    if ("startup".equals(data.get("kind")) || "render_query".equals(data.get("kind")))
+                        adapter.execute(() -> adapter.write(journal()));
+                    return;
+                }
                 suppressed = counter.suppressed; counter.suppressed = 0;
                 counter.logged = true; counter.last = adapter.now();
             }

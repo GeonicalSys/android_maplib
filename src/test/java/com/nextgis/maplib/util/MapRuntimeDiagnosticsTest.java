@@ -37,6 +37,19 @@ public class MapRuntimeDiagnosticsTest {
         assertTrue(fake.logs.isEmpty()); assertNull(fake.saved); assertTrue(engine.active.isEmpty());
     }
 
+    @Test public void logThrottlingNeverLeavesAnOlderBlockedOperationOnDisk() {
+        for (String kind : List.of("startup", "render_query")) {
+            Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+            MapRuntimeDiagnostics.Trace first = engine.begin(kind, fake.now);
+            first.phase("first"); fake.advance(1100); first.check(); first.finish(0, null);
+            MapRuntimeDiagnostics.Trace next = engine.begin(kind, fake.now);
+            next.phase("second"); fake.advance(1100); next.check();
+            assertEquals("second", ((Map<?, ?>) fake.saved.get(kind)).get("phase"));
+            assertEquals(false, ((Map<?, ?>) fake.saved.get(kind)).get("finished"));
+            assertEquals("Repeated text logs stay limited", 2, fake.logs.size());
+        }
+    }
+
     @Test public void independentObserverRecordsAQueryThatNeverReturns() {
         Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
         engine.configure("1.2", 23, "revision");

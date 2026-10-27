@@ -34,6 +34,7 @@ import com.nextgis.maplib.util.GeoConstants;
 import org.w3c.dom.Node;
 
 import java.io.DataInputStream;
+import java.io.BufferedInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -210,9 +211,10 @@ public class GeometryRTree implements IGeometryCache {
 
         mPath = path;
 
-        try {
-            FileInputStream fileInputStream = new FileInputStream(path);
-            DataInputStream dataInputStream = new DataInputStream(fileInputStream);
+        // DataInputStream reads each primitive separately. Buffer before parsing the tree so
+        // startup does not perform a filesystem/Sentry operation for every byte and coordinate.
+        try (DataInputStream dataInputStream = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(path), 64 * 1024))) {
 
             maxEntries = dataInputStream.readInt();
             minEntries = dataInputStream.readInt();
@@ -222,8 +224,6 @@ public class GeometryRTree implements IGeometryCache {
             root = new Node();
             root.read(dataInputStream);
 
-            dataInputStream.close();
-            fileInputStream.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

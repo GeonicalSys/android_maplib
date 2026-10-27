@@ -1,10 +1,21 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-25
+last_verified: 2026-10-27
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## Пустые handles и загрузка индекса — 2026-10-27
+
+MapDrawable не обращается к native renderer для пустого marker collection и
+vertex-layer без editingObject. Заполненные handles, линейка и обычный picking
+сохраняются. GeometryRTree читает прежний бинарный формат через буфер 64 KiB;
+legacy persistence regression проверяет ID/координаты/поиск и точные байты.
+Новый snapshot повторного startup/render_query сохраняется и внутри текстового
+rate limit: ограничение сообщений не оставляет на диске прежний зависший запрос.
+Это адресная работа по MOB-02, не доказательство устранения всех native crash.
+Разбор и native-проверки — consuming docs/reference/mobile-crash-224-2026-10-27.md.
 
 TrackColorPalette назначает насыщенный цвет один раз при insert. TrackMapStyle
 владеет общими проходами свечения/линии/выделения; MapDrawable передаёт metadata

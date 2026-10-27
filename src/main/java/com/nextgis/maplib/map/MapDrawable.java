@@ -2715,6 +2715,12 @@ public class MapDrawable
 
     private List<org.maplibre.geojson.Feature> queryTouchFeatures(MapLibreMap map, android.graphics.RectF rect,
                                                                 String target, MaplibreMapInteraction interaction) {
+        // These sources are owned by the editor. An empty handle cannot be hit; asking the
+        // native renderer anyway can block ACTION_DOWN behind unrelated tile/render work.
+        if ("marker-layer".equals(target) && markerFeatureCollection.features().isEmpty())
+            return emptyList();
+        if ("vertex-layer".equals(target) && editingObject == null)
+            return emptyList();
         com.nextgis.maplib.util.MapRuntimeDiagnostics.Trace trace = com.nextgis.maplib.util.MapRuntimeDiagnostics
                 .beginQuery(target, interaction == null ? null : interaction.getMode());
         int count = -1;
