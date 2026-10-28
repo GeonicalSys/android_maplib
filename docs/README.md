@@ -6,6 +6,43 @@ last_verified: 2026-10-28
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Подробный локальный сбор ресурсов — opt-in, 2026-10-28
+
+`RenderResourceProfiler` по умолчанию выключен. Приватный app adapter явно
+вызывает `start(sessionId, version, build, revision, Sink)`; `Sink.offer` обязан
+только неблокирующе принять неизменяемую запись. Библиотека не создаёт файлов,
+не вызывает SDK, не делает новых SQL/memory reads и не управляет renderer/cache
+policy. Публичный `event(kind, numericFields)` принимает ограниченные числовые
+метрики и boolean, отбрасывает строки, координатные/URI/path/object-ID поля,
+невалидные числа и лишние поля. Сбор не добавляется в Sentry-журнал.
+
+Каждый `MapRuntimeDiagnostics.SqliteScope` получает независимый token, включая
+legacy-unobserved запросы: прежние cap16/cap32/10s throttle остаются прежними,
+но не ограничивают новый учёт. Хранятся до 256 слоёв и 512 подробных active
+tokens. Остальные запросы продолжают увеличивать общие и overflow-агрегаты;
+потеря подробных записей, отказ/ошибка sink и неизвестные слои явны.
+Requests, outcomes, work counts и суммы фаз учитываются до передачи raw записи
+и не зависят от заполненности очереди app writer. Никакая ошибка диагностики
+не должна превращать тайл в failure или успешный неполный результат.
+
+Wall clock — `SystemClock.elapsedRealtimeNanos`, включая suspend; CPU clock —
+`Debug.threadCpuTimeNanos` только между точками одного `Process.myTid`.
+Main→IO→Main интервалы имеют известное wall time и неизвестный CPU, а не
+разность часов разных потоков. Суммы elapsed разных запросов перекрываются
+и не являются временем сцены; histograms фаз описывают завершённые segments,
+а не p95 всего запроса. CPU включает overhead диагностических clocks/accounting.
+Process/SDK memory samples не являются удержанной памятью конкретного слоя.
+
+`stop(reason)` выключает только наблюдение и возвращает авторитетную bounded
+summary; `snapshot()` даёт такой же background checkpoint. App сохраняет summary
+отдельно от raw очереди. Незавершённые scopes остаются `active_at_snapshot`,
+не объявляются cancelled/finished, и после stop не меняют готовую summary.
+Summary содержит полные global totals/histograms, compact numeric rows всех
+отслеживаемых слоёв и точные phase arrays для top32 по CPU/elapsed; число слоёв
+без phase detail явно указано. Индивидуальные raw requests содержат все phase
+arrays, если очередь их сохранила. Это ограничение детализации не теряет общий
+знаменатель. Долговременный кеш и алгоритмы/данные карты этим шагом не меняются.
+
 ## Ограниченное чтение SQLite originals — MOB-04, 2026-10-28
 
 Final allmaplib gate:750PASS/132classes/0fail/error/skip59s, runtime unchanged;

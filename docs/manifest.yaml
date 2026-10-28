@@ -9,6 +9,10 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/util/RenderResourceProfiler.java
+    responsibility: Default-off local numeric resource accounting independent of legacy SQLite observer limits; count every accepted scope through bounded layer/detail overflows, separate BOOTTIME wall and same-TID thread CPU, retain aggregates despite raw sink rejection, return a bounded final summary without owning files or cancelling rendering.
+  - path: maplib/src/test/java/com/nextgis/maplib/util/RenderResourceProfilerTest.java
+    responsibility: Verify disabled mode, exact phase/count outcomes, cross-thread CPU unknowns, sink rejection/errors, duplicate finish, active/layer overflow, unfinished stop, privacy, actual legacy16-scope overflow fanout and bounded worst-value final summary.
   - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorFeatureReader.java
     responsibility: Visit eligible scoped original IDs through unchanged attributes-only cursors of at most32 rows in exact CASE order; on API28+ use a separate1MiB geometry window with at most32 whole small BLOBs<=16KiB, otherwise lazy full-PFD originals through one visit-owned statement. Preserve exact bytes/types/NULL/order/cardinality/current guards, close all resources on cancel/error and propagate real SQLite/resource failures.
   - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorFeatureReaderTest.java
