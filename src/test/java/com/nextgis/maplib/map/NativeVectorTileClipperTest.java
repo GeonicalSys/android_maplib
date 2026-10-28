@@ -9,8 +9,21 @@ public class NativeVectorTileClipperTest {
     @Test public void concaveClipKeepsDisconnectedMembersAndLeavesEveryOriginalCoordinateUntouched() throws Exception {
         GeoPolygon original = polygon(0,0,6,0,6,6,4,6,4,2,2,2,2,6,0,6,0,0);
         String before = original.toWKT(true);
-        Geometry clipped = NativeVectorTileClipper.clip(original,new NativeVectorTileEncoder.Bounds(0,3,6,5));
+        // At the classic128/512 margin these base bounds expand to y[2.75,5.25].
+        // Keep the independently reviewed clip window/output, not the old64px base bounds.
+        Geometry clipped = NativeVectorTileClipper.clip(original,
+                new NativeVectorTileEncoder.Bounds(0,19.0/6.0,6,29.0/6.0));
         assertEquals(2,clipped.getNumGeometries()); assertEquals(10,clipped.getArea(),1e-9);
+        boolean left=false,right=false;
+        for(int i=0;i<clipped.getNumGeometries();i++) {
+            Geometry part=clipped.getGeometryN(i);
+            org.locationtech.jts.geom.Envelope envelope=part.getEnvelopeInternal();
+            assertEquals(2.75,envelope.getMinY(),1e-9); assertEquals(5.25,envelope.getMaxY(),1e-9);
+            assertEquals(2,envelope.getWidth(),1e-9); assertEquals(5,part.getArea(),1e-9);
+            if(envelope.getMinX()==0) { left=true; assertEquals(2,envelope.getMaxX(),1e-9); }
+            else { assertEquals(4,envelope.getMinX(),1e-9); assertEquals(6,envelope.getMaxX(),1e-9); right=true; }
+        }
+        assertTrue("Both disconnected original arms must remain",left&&right);
         assertEquals(before,original.toWKT(true)); assertTrue(clipped.isValid());
     }
     @Test public void completeInteriorPolygonKeepsHolesAndSubpixelOriginalVerticesWithoutSimplification() throws Exception {

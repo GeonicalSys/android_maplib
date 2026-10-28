@@ -15,6 +15,9 @@ public final class NativeVectorTileEncoder {
     public static final int EXTENT = 8192;
     public static final String SOURCE_LAYER = "features", LABEL_ANCHOR = "_label_anchor";
     private static final double MERCATOR_MAX = 20037508.342789244;
+    // Match the unchanged classic GeoJsonSource: SDK13.7.1 defaults to128px at512px/tile.
+    // Both the SQLite candidate envelope and full-precision clip use these same bounds.
+    private static final double CLASSIC_BUFFER_RATIO = 128.0 / 512.0;
     private final Bounds bounds;
     private final List<byte[]> features = new ArrayList<>();
     private final Map<String, Integer> keys = new LinkedHashMap<>();
@@ -69,10 +72,10 @@ public final class NativeVectorTileEncoder {
             double top = MERCATOR_MAX - request.getY() * span;
             return new Bounds(left, top - span, left + span, top);
         }
-        double queryMinX() { return minX - (maxX - minX) / 8; }
-        double queryMaxX() { return maxX + (maxX - minX) / 8; }
-        double queryMinY() { return minY - (maxY - minY) / 8; }
-        double queryMaxY() { return maxY + (maxY - minY) / 8; }
+        double queryMinX() { return minX - (maxX - minX) * CLASSIC_BUFFER_RATIO; }
+        double queryMaxX() { return maxX + (maxX - minX) * CLASSIC_BUFFER_RATIO; }
+        double queryMinY() { return minY - (maxY - minY) * CLASSIC_BUFFER_RATIO; }
+        double queryMaxY() { return maxY + (maxY - minY) * CLASSIC_BUFFER_RATIO; }
         int x(double x) { return (int) Math.round((x - minX) / (maxX - minX) * EXTENT); }
         int y(double y) { return (int) Math.round((maxY - y) / (maxY - minY) * EXTENT); }
         boolean owns(double x, double y) { return x >= minX && x < maxX && y > minY && y <= maxY; }

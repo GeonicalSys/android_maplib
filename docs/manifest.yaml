@@ -9,6 +9,8 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileBufferParityTest.java
+    responsibility: Assert literal SDK128px/512px query and clipping parity through a strict candidate backend and independent PBF decode, preserving four translated edge polygons, holes, collinear vertices, typed properties and all originals.
   - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorLayerController.java
     responsibility: Own actual direct-SQLite native source generations, preserve geometry-role and edit/temporary-hide filters, and cancel before detach while fencing owner/model/style changes.
   - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileBackend.java

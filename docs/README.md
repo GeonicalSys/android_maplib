@@ -6,6 +6,16 @@ last_verified: 2026-10-28
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## SQLite tile buffer parity — MOB-04, 2026-10-28
+
+Candidate query и full-precision clipping нового native SQLite route используют
+128px/512px tile, как actual classic GeoJsonSource official13.7.1; прежний64px
+запас мог терять translated edge polygons. Две strict-backend/unit protobuf
+регрессии сохраняют full vertices/holes/props на всех четырёх краях. Это
+восстановление полноты, не memory reduction; candidate envelope больше, а
+произвольные большие style offsets и native edge pixels отдельно не приняты.
+См. [точный контракт/SDK proof](sqlite-vector-tile-buffer.md).
+
 ## Потоковые viewport line labels — MOB-04, 2026-10-28
 
 Production line-label worker использует `visitVisibleLines` и подготовленный
