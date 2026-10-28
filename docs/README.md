@@ -36,7 +36,7 @@ Lease освобождается на IO после настоящего unwind 
 fade/adjacent; age/zoom/density не используются для потери текущего результата.
 Pending SDK jobs и отдельные HTTP/line-label queues этим не ограничиваются.
 
-Новые25 cache/7 admission tests и прежние content/lifecycle/gate проверки —
+25 cache/7 admission tests (28 новых) и прежние content/lifecycle/gate проверки —
 техническая приёмка, не новый измеритель и не реальные smartphone timings.
 Владелец просит только обычный APK, сам установит его на телефон; ADB/native/
 Full/публикация в этом шаге не выполняются. Карточка:
