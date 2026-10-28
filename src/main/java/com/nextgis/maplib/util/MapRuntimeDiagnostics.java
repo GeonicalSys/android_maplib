@@ -29,6 +29,7 @@ public final class MapRuntimeDiagnostics {
 
     public static void initialize(Context context, String version, int build, String revision) {
         ((AndroidAdapter) ENGINE.adapter).journal = new File(context.getFilesDir(), "map-runtime-diagnostics.json");
+        ((AndroidAdapter) ENGINE.adapter).context = context.getApplicationContext();
         ENGINE.configure(version, build, revision);
     }
     /** Observe startup on the existing independent watcher, without moving GIS work or reading it. */
@@ -53,6 +54,11 @@ public final class MapRuntimeDiagnostics {
     public static void frameReceived() { ENGINE.lastFrame = now(); }
     public static void mapState(String state) { ENGINE.mapState = state; }
     public static void sceneState(String state) { ENGINE.sceneState = state; }
+    /** Before/after counters are observations, not ownership attribution for asynchronous native work. */
+    public static SourceScope source(int layerId, String type, String stage) {
+        return new SourceScope(ENGINE, layerId, type, stage);
+    }
+    public static void observeMemory(Map<String, Object> state) { ENGINE.observeMemory(state); }
     /** Includes a prior-process journal only when the event timestamp belongs to its recorded operation. */
     public static Map<String, Object> forEvent(long timestamp) { return ENGINE.forEvent(timestamp); }
 
@@ -67,6 +73,37 @@ public final class MapRuntimeDiagnostics {
         void write(Map<String, Object> snapshot);
         Map<String, Object> read();
         Map<String, Object> memory();
+    }
+
+    public static final class SourceScope implements AutoCloseable {
+        private final Engine engine;
+        private final Map<String, Object> data = new LinkedHashMap<>();
+        private final long id;
+        private boolean closed;
+        SourceScope(Engine engine, int layerId, String type, String stage) {
+            this.engine = engine; id = engine.nextId.incrementAndGet();
+            data.put("id", id); data.put("layer_id", layerId); data.put("source_type", type); data.put("stage", stage);
+            data.put("started_at_ms", engine.adapter.wall()); data.put("observed_at_ms", engine.adapter.wall());
+            data.put("memory_before", engine.adapter.memory()); data.put("finished", false);
+            engine.recordSource(id, data);
+        }
+        public void features(int count) { data.put("feature_count", count); }
+        /** Transport counts, not an attribution of asynchronous native memory ownership. */
+        public void payload(String role, int originalFeatures, long originalProperties,
+                            int nativeFeatures, long nativeProperties, int nonemptyLabels) {
+            data.put("payload_role", role);
+            data.put("original_feature_count", originalFeatures);
+            data.put("original_property_count", originalProperties);
+            data.put("native_feature_count", nativeFeatures);
+            data.put("native_property_count", nativeProperties);
+            data.put("nonempty_label_count", nonemptyLabels);
+        }
+        @Override public void close() {
+            if (closed) return; closed = true;
+            data.put("observed_at_ms", engine.adapter.wall()); data.put("finished", true);
+            data.put("memory_after", engine.adapter.memory());
+            engine.recordSource(id, data);
+        }
     }
 
     public static final class Trace {
@@ -136,6 +173,10 @@ public final class MapRuntimeDiagnostics {
         private final Map<String, Counter> limits = new LinkedHashMap<>();
         private final Map<String, Object> identity = new LinkedHashMap<>();
         private volatile Map<String, Object> lastQuery, lastTile, lastStartup, previousProcess;
+        private volatile Map<String, Object> lastMemory;
+        private final Map<Long, Map<String, Object>> sourceObservations = new LinkedHashMap<>();
+        private long lastMemoryAt;
+        private boolean memoryObserved;
         private boolean previousReadScheduled;
         volatile long lastFrame;
         volatile String mapState = "unknown";
@@ -157,6 +198,27 @@ public final class MapRuntimeDiagnostics {
             }
         }
         Trace begin(String kind, long start) { return begin(kind, start, nextId.incrementAndGet()); }
+        synchronized void recordSource(long id, Map<String, Object> data) {
+            sourceObservations.put(id, new LinkedHashMap<>(data));
+            while (sourceObservations.size() > 8) sourceObservations.remove(sourceObservations.keySet().iterator().next());
+            adapter.execute(() -> adapter.write(journal()));
+        }
+        void observeMemory(Map<String, Object> state) {
+            synchronized (this) {
+                if (memoryObserved && adapter.now() - lastMemoryAt < REPEAT_MS) return;
+                memoryObserved = true; lastMemoryAt = adapter.now();
+            }
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("started_at_ms", adapter.wall()); data.put("observed_at_ms", adapter.wall());
+            data.put("heap", adapter.memory());
+            // Producers provide bounded counters/IDs only. No arbitrary object/geometry serialization.
+            for (String key : new String[]{"available_ram_bytes", "java_headroom_bytes", "system_threshold_bytes", "system_low_memory",
+                    "free_memory_reserve_bytes", "tile_work_limit", "limited_layer_count", "global_economy",
+                    "classic_sources", "local_mvt_sources", "raster_sources", "java_source_features"})
+                if (state.containsKey(key)) data.put(key, state.get(key));
+            lastMemory = data;
+            adapter.execute(() -> adapter.write(journal()));
+        }
         Trace begin(String kind, long start, long id) {
             Trace trace = new Trace(this, kind, start, id);
             active.put(id, trace);
@@ -234,10 +296,16 @@ public final class MapRuntimeDiagnostics {
             if (lastQuery != null) result.put("render_query", lastQuery);
             if (lastTile != null) result.put("local_tile", lastTile);
             if (lastStartup != null) result.put("startup", lastStartup);
+            if (lastMemory != null) result.put("memory", lastMemory);
+            if (!sourceObservations.isEmpty()) result.put("source_observations", new ArrayList<>(sourceObservations.values()));
             // Keep the latest observations inside the existing on-disk bound.
             while (new JSONObject(result).toString().getBytes(StandardCharsets.UTF_8).length > MAX_JOURNAL_BYTES) {
+                Object sources = result.get("source_observations");
+                if (sources instanceof List && !((List<?>) sources).isEmpty()) {
+                    ((List<?>) sources).remove(0); continue;
+                }
                 String oldest = null; long observed = Long.MAX_VALUE;
-                for (String key : new String[]{"startup", "render_query", "local_tile"}) {
+                for (String key : new String[]{"startup", "render_query", "local_tile", "memory"}) {
                     Object entry = result.get(key);
                     if (!(entry instanceof Map)) continue;
                     Object at = ((Map<?, ?>) entry).get("observed_at_ms");
@@ -257,7 +325,7 @@ public final class MapRuntimeDiagnostics {
         private Map<String, Object> matching(Map<String, Object> snapshot, long timestamp) {
             Map<String, Object> result = new LinkedHashMap<>();
             if (snapshot == null) return result;
-            for (String key : new String[]{"render_query", "local_tile", "startup"}) {
+            for (String key : new String[]{"render_query", "local_tile", "startup", "memory"}) {
                 Object value = snapshot.get(key);
                 if (!(value instanceof Map)) continue;
                 Map<?, ?> record = (Map<?, ?>) value;
@@ -272,6 +340,23 @@ public final class MapRuntimeDiagnostics {
                     result.put(key, value);
                 }
             }
+            Object sources = snapshot.get("source_observations");
+            if (sources instanceof List) {
+                List<Object> matchingSources = new ArrayList<>();
+                for (Object value : (List<?>) sources) {
+                    if (!(value instanceof Map)) continue;
+                    Map<?, ?> record = (Map<?, ?>) value;
+                    Object first = record.get("started_at_ms"), last = record.get("observed_at_ms");
+                    if (first instanceof Number && last instanceof Number
+                            && timestamp >= ((Number) first).longValue() - 250
+                            && timestamp <= ((Number) last).longValue() + EVENT_GRACE_MS) matchingSources.add(value);
+                }
+                if (!matchingSources.isEmpty()) {
+                    if (result.isEmpty()) for (String meta : new String[]{"session", "pid", "app_version", "app_build", "source_revision"})
+                        if (snapshot.containsKey(meta)) result.put(meta, snapshot.get(meta));
+                    result.put("source_observations", matchingSources);
+                }
+            }
             return result;
         }
     }
@@ -279,6 +364,7 @@ public final class MapRuntimeDiagnostics {
 
     private static final class AndroidAdapter implements Adapter {
         volatile File journal;
+        volatile Context context;
         private ScheduledThreadPoolExecutor executor;
         private java.util.concurrent.ThreadPoolExecutor writer;
         private final AtomicLong dropped = new AtomicLong();
@@ -317,6 +403,7 @@ public final class MapRuntimeDiagnostics {
             data.put("max_bytes", memory.maxMemory()); data.put("used_bytes", used);
             data.put("available_bytes", Math.max(0, memory.maxMemory() - used));
             data.put("dropped_diagnostic_tasks", dropped.get());
+            data.putAll(RenderProcessMemory.sample(context));
             return data;
         }
         public void write(Map<String, Object> snapshot) {

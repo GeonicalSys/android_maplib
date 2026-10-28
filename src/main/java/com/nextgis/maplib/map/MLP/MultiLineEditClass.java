@@ -39,7 +39,7 @@ public class MultiLineEditClass extends MLGeometryEditClass {
                 it.remove();
             }
         }
-        selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(lineFeatures));
+        MPLFeaturesUtils.setNativeVectorGeoJson(selectedEditedSource, null, geoType, lineFeatures);
     }
 
     @Override

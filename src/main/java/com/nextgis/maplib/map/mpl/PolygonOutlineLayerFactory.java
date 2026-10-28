@@ -52,6 +52,7 @@ public final class PolygonOutlineLayerFactory {
     private static LineLayer create(MplLayerBuildContext ctx, LineLayer base, String id,
                                     PolygonOutlineOptions outline, boolean casing) {
         LineLayer layer = new LineLayer(id, ctx.layerPath);
+        MPLFeaturesUtils.inheritNativeSourceLayer(base, layer);
         Expression width = Expression.coalesce(Expression.get(MplFeatureStyleProps.THICKNESS),
                 Expression.literal(MPLFeaturesUtils.getMPLThinkness(ctx.vars.thickness)));
         if (casing) width = Expression.sum(width, Expression.literal(2 * outline.getCasingWidth()));

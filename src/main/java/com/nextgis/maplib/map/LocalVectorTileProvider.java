@@ -39,6 +39,9 @@ import java.util.LinkedHashSet;
  * geometry/style combinations return empty tiles instead of breaking map loading.
  */
 final class LocalVectorTileProvider {
+    static final class MemoryPressure extends java.io.IOException {
+        MemoryPressure() { super("render_memory_limited"); }
+    }
     private static final String TAG = "LocalVectorTiles";
     private static final double MERCATOR_MAX = 20037508.342789244;
     private static final double TILE_BUFFER_RATIO = 0.125;
@@ -56,6 +59,16 @@ final class LocalVectorTileProvider {
     }
 
     static byte[] buildTile(VectorLayer layer, int z, int x, int y, MapRuntimeDiagnostics.Trace trace) throws Exception {
+        return buildTile(layer, z, x, y, trace, () -> true);
+    }
+
+    static byte[] buildTile(VectorLayer layer, int z, int x, int y, MapRuntimeDiagnostics.Trace trace,
+                            java.util.function.BooleanSupplier current) throws Exception {
+        return buildTileInternal(layer, z, x, y, trace, current);
+    }
+
+    private static byte[] buildTileInternal(VectorLayer layer, int z, int x, int y, MapRuntimeDiagnostics.Trace trace,
+                                           java.util.function.BooleanSupplier current) throws Exception {
         if (layer == null || z < 0 || x < 0 || y < 0) {
             return new byte[0];
         }
@@ -86,7 +99,17 @@ final class LocalVectorTileProvider {
         boolean polygonLabels = geometryType != GeoConstants.GTPoint
                 && (!TextUtils.isEmpty(labelField) || !TextUtils.isEmpty(commonLabel));
         if (trace != null) trace.phase("feature_read_clip");
+        RenderMemoryGuard memory = RenderMemoryGuard.forLayer(layer);
+        int visited = 0;
         for (Long id : new LinkedHashSet<>(ids)) {
+            if (visited++ % 32 == 0) {
+                if (!current.getAsBoolean() || Thread.currentThread().isInterrupted())
+                    throw new java.util.concurrent.CancellationException("Obsolete local tile request");
+                if (memory != null && !memory.canBuildTile()) {
+                    memory.noteReducedCache();
+                    throw new MemoryPressure();
+                }
+            }
             if (id == null || layer.isFeatureHidden(id)) {
                 continue;
             }

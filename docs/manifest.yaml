@@ -2,21 +2,75 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorLayerController.java
+    responsibility: Own actual direct-SQLite native source generations, preserve geometry-role and edit/temporary-hide filters, and cancel before detach while fencing owner/model/style changes.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileBackend.java
+    responsibility: Define blocking complete PBF IO, immutable request snapshots, currentness and terminal close, separating bounded retryable pressure from explicit unsupported host fallback.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileRequest.java
+    responsibility: Fence canonical owner/source/content/style/excluded-edit/tile identity and process-local derived cache keys without business payload.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileProvider.java
+    responsibility: Read full SQLite originals via RTree on IO, emit complete styled PBF without startup GeoJSON and expose full editor originals. Visit viewport lines one at a time with epoch fences and bounded style serialization; keep the List collector only for compatibility.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelStreamingTest.java
+    responsibility: Assert full-original streaming placement/style/dateline parity, candidate ownership without retained line geometry, late UI properties and cancellation before read/during scan/before publication.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileEncoder.java
+    responsibility: Encode scalar generic MVT2 properties and all six multipart geometry kinds with native8192 extent, stable identities/order and inline polygon anchor role, preserving the legacy encoder separately.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTilePropertyCodec.java
+    responsibility: Preserve typed scalar native consumers, flatten text/icon offsets for semiliteral X/Y factories, omit null under the known coalesce contract and fail explicitly for unexpected complex/nonfinite values.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileClipper.java
+    responsibility: Intersect full3857 geometry with buffered tile bounds using robust JTS multipart clipping, preserving holes/disconnected pieces without simplification or source mutation and bypassing overlay for contained/disjoint objects.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkLimiter.java
+    responsibility: Share one two-permit fair gate with HTTP MVT and direct native/visible-line IO and bound layer lock metadata to64 stripes rather than an unbounded global map.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileRequestTest.java
+    responsibility: Assert independent cache identity changes, valid canonical addresses and bounded retry backoff before IO.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileProviderTest.java
+    responsibility: Decode4097 complete IDs and warm-cache reuse, preserve Rule scalars and full editor/viewport geometry, bound style serialization and reject canceled/stale/unsupported work without partial cache while checking one polygon label owner across4tiles.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTilePropertyCodecTest.java
+    responsibility: Assert scalar/unknown/explicit-false preservation, known offset pair transport, unchanged originals and explicit unsupported complex/nonfinite/collision failures.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileEncoderTest.java
+    responsibility: Independently decode protobuf geometry/values/extent for all six kinds, holes/multipart/retained collinear vertices and actual native Rule property names and typed offsets.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileClipperTest.java
+    responsibility: Assert disconnected concave intersections, holes, all six geometry kinds, clipping containment and unchanged original coordinates.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorSpatialQueryTest.java
+    responsibility: Race the actual SQLite/RTree rebuild against blocked native readers, reject partial PBF and canceled-index persistence, compare independent SQL IDs, check actual after-commit invalidation before UI notification and accept a legitimate newly empty table.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeFeaturePayload.java
+    responsibility: Project native-only GeoJSON properties without copying unused layout arrays or changing rich editor features, full geometry, IDs, unknown fields, actual paint/label gates and line fallback inputs.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeFeaturePayloadTest.java
+    responsibility: Independently assert literal required/dead keys, all geometry kinds, IDs/bbox/unknown/original preservation, empty polygon labels, line-query fallback and exact uniform-default sparsity.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryGuard.java
+    responsibility: Decide owner-fenced cache economy and complete-work admission from actual free system/Java memory and OS low-memory state; retain used/native/RSS as diagnostics only, with no layer suppression or source reservations.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryPolicy.java
+    responsibility: Define actual free-headroom decisions, ordinary disk-cache and allocation-reserve sizing; device class or used/native/RSS never independently triggers a warning, economy or serialization, and no enforced native cap or content thinning is claimed.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/RenderMemoryGuardTest.java
+    responsibility: Check that queue delay alone does not produce a false low-memory notice on a roomy device and that actual low-free-memory delay notifies once; native delivery is a separate acceptance gate.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkGate.java
+    responsibility: Keep two normal builders and fairly serialize resource-constrained complete tile work with cancellable, idempotently released permits.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileDiskCache.java
+    responsibility: Bound private derived complete-PBF cache by bytes and file count, using process/map/content/style keys without modifying authoritative project data.
+  - path: maplib/src/main/java/com/nextgis/maplib/util/RenderProcessMemory.java
+    responsibility: Read optional self-process RSS/native and system-availability counters without enumerating other applications or reading heap contents.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorTileFullContentTest.java
+    responsibility: Decode every identity in a4097-simple-point complete tile and its disk-cache roundtrip, beyond the removed arbitrary2048 cutoff.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/RenderTileWorkGateTest.java
+    responsibility: Assert normal two-builder throughput, exclusive fair constrained work and permit preservation after interruption, failure, double close, canceled job wait and a throwing current callback.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerDisplayPriority.java
     responsibility: Match named standard field LineString/MultiLineString layers for display above tracks and below points, independent of tap eligibility.
   - path: maplib/src/test/java/com/nextgis/maplib/map/LayerDisplayPriorityTest.java
     responsibility: Reject unrelated names and geometry types and accept canonical Russian/field_lines names with case and edge-space normalization.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelLayout.java
-    responsibility: Clip a visible screen quadrilateral, deduplicate SQL IDs and plan one rigid point-anchored label per visible object.
+    responsibility: Clip the true visible quadrilateral and plan one rigid point label per object, stream DB originals without retained geometry in candidates, preserve late UI properties and keep classic native-fragment merge/dedup compatibility.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java
-    responsibility: Coalesce camera and geometry-source updates, calculate visible labels off the UI thread and reject stale map/style results.
+    responsibility: Coalesce camera/source updates, preserve classic snapshots and stream one full SQLite viewport line at a time into geometry-free label candidates; retain SDK access on UI and reject stale camera/map/view/style/source/provider/layer-content results.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelQuery.java
+    responsibility: Form finite Mercator envelopes with camera-relative dateline splitting, visit complete unclipped originals directly into prepared exact layout and cancel before read/scan/publication without collecting full viewport geometry; preserve the prior Reader API.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelQueryTest.java
+    responsibility: Independently assert projected rotated bounds, two narrow dateline windows, camera-relative wide bounds, complete LineString/MultiLineString preservation, exact quadrilateral clipping and before/after-read cancellation; technical units do not certify native SQLite rendering.
   - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelLayoutTest.java
     responsibility: Verify visible direction, winding geometry, multipart IDs, rotated clipping, dateline, upright and cancellation.
   - path: maplib/src/test/java/com/nextgis/maplib/map/LegacyTrackColorsTest.java
@@ -30,7 +84,11 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/display/PolygonOutlineOptions.java
     responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
   - path: maplib/src/main/java/com/nextgis/maplib/display/ConfigurablePolygonPatternRegistry.java
-    responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
+    responsibility: Build exact color/alpha pattern bitmaps, crop only a pixel-identical repeating motif and retain the existing 4 MiB LRU and native image ownership.
+  - path: maplib/src/main/java/com/nextgis/maplib/display/PatternTilePeriod.java
+    responsibility: Find a rectangular periodic ARGB motif by checking every original pixel; preserve the full 512-pixel texture when no smaller exact period exists.
+  - path: maplib/src/test/java/com/nextgis/maplib/display/PatternTilePeriodTest.java
+    responsibility: Independently reconstruct original pixels and enumerate all 65536 binary 4-by-4 matrices, including nonperiodic and invalid inputs.
   - path: maplib/src/main/java/com/nextgis/maplib/map/mpl/PolygonLayerFactory.java
     responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
   - path: maplib/src/main/java/com/nextgis/maplib/map/mpl/PolygonOutlineLayerFactory.java
@@ -68,9 +126,9 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
     responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
-    responsibility: Observe stalled startup, render queries and tile stages independently of the UI, retain the prior-process journal before new writes, bound writer/log repetitions, persist a 16 KiB operation snapshot with process/version identity and match it to live or historical event timestamps without business storage reads.
+    responsibility: Observe stalled startup, render queries and tile stages independently of the UI, retain prior-process identity, bound writer/log repetitions and the 16 KiB journal, record actual available RAM/Java headroom/system threshold/low-memory/free reserve/work limit separately from diagnostic process counters, and match snapshots to event timestamps without business storage reads.
   - path: maplib/src/test/java/com/nextgis/maplib/util/MapRuntimeDiagnosticsTest.java
-    responsibility: Verify fast-operation silence, non-returning query observation, independent rejection reasons, stage timing, startup stack/phase, combined journal bounds and old-process identity after a new startup write, stale-event exclusion and bounded atomic journal retention.
+    responsibility: Verify fast-operation silence, non-returning query observation, independent rejection reasons, stage timing, startup stack/phase, retained free-headroom counters with legacy process-budget/private additions rejected, combined journal bounds and old-process identity after a new startup write, stale-event exclusion and bounded atomic journal retention.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocalLogInitializer.java
     responsibility: Initialize local HyperLog once per process after migrating its obsolete URL, retain custom format across app/base calls and preserve the log database and expiry contract.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LayerFormHashUtil.java
@@ -222,7 +280,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/service/NGWSyncService.java
     responsibility: Host Android account synchronization without blocking the main thread while a worker finishes during service teardown.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
-    responsibility: Create ordinary local vector layers as editable, load vector configuration, route create/insert/schema/delete operations through the layer-owning workspace database, suppress per-row cache notifications during bulk/rebuild, fail a bulk fill on the first rejected SQL insert, persist server attachment metadata inside the same fill transaction, persist the feature-title field independently from renderer labels, and rebuild the spatial index without persisting partially initialized subclass identity.
+    responsibility: Create editable local vector layers, load configuration, route mutations through the owning database, suppress per-row cache notifications during bulk/rebuild, fail bulk fill on rejected inserts, persist attachment metadata transactionally and independent feature titles, and rebuild without incomplete subclass identity. Native spatial snapshots share writer locks, validate readiness/count metadata outside SQL lock inversion, reject canceled/failed partial indexes and preserve the previous valid RTree file; count equality alone is not an ID oracle.
   - path: maplib/src/main/java/com/nextgis/maplib/map/Table.java
     responsibility: Persist map and layer JSON through Android AtomicFile so process death restores the previous complete configuration instead of exposing a truncated direct write.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeometryRTree.java
@@ -248,7 +306,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileLabelAnchor.java
     responsibility: Calculate one interior point on the largest usable original polygon part with holes, validate the snapped MVT grid position, and retain no source geometry or global point collection.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileServer.java
-    responsibility: Serve loopback MVT requests through a bounded two-worker/sixteen-item queue, serialize heavy builds per layer, cancel queued sockets from obsolete map generations and return a retryable overload response instead of exhausting the Android heap.
+    responsibility: Serve complete loopback MVT through a two-worker/sixteen-socket queue, per-layer serialization and a fair two-permit gate; serialize globally only from actual free-memory constraints, fence derived disk-cache entries and return explicit retryable 503 without caching incomplete output. This is no hard native-memory cap or verified SDK retry guarantee.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileRequestPolicy.java
     responsibility: Define and unit-test local MVT concurrency, queue and minimum 64 MiB heap-headroom limits independently of Android runtime classes.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileEncoder.java
@@ -284,9 +342,17 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoMultiPolygon.java
     responsibility: Split WKT polygon members by parenthesis depth so multipart geometry, outer rings and real holes survive import and draft recovery.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PolygonEditClass.java
-    responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, and retain existing ring structure.
+    responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, retain existing rings, and publish the remaining background through the compact native projection.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPolygonEditClass.java
-    responsibility: Build one-node tap sketches, display insertion direction inside the selected ring, and limit new MultiPolygon geometry to one polygon part without flattening existing multipart or holed geometry.
+    responsibility: Build one-node tap sketches, display insertion direction inside the selected ring, limit new MultiPolygon geometry to one polygon part without flattening existing geometry, and compact the remaining native background.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PointEditClass.java
+    responsibility: Retain rich selected point/editor state while publishing the remaining logical-layer background through the native payload projection.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPointEditClass.java
+    responsibility: Retain rich multipart point/editor state while compacting the remaining native background without changing its identities or geometry.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/LineEditClass.java
+    responsibility: Keep rich line/vertex editing and send remaining background features through the compact projection with label-query fallback inputs intact.
+  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiLineEditClass.java
+    responsibility: Keep all line parts and rich editor/vertex state while compacting only the native logical-layer background and retaining label inputs.
   - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
     responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed polygon ring to its own first vertex.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
@@ -314,6 +380,10 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/MapTapGesture.java
     responsibility: Density-aware short tap slop with cancellation of drag, long press and multitouch.
 public_contracts:
+  - id: render-resource-economy
+    symbol: MapDrawable.getRenderMemoryGuard, retryMemoryLimitedLayers and RenderMemoryGuard snapshot/hasResourceNotice/restrictions
+    path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryGuard.java
+    consumers: [app]
   - id: point-firefly
     symbol: SimpleMarkerStyle.MarkerStyleFirefly type 9
     path: maplib/src/main/java/com/nextgis/maplib/display/SimpleMarkerStyle.java
@@ -363,7 +433,7 @@ public_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
     consumers: [maplibui]
   - id: map-host
-    symbol: MaplibreMapInteraction including transient azimuth endpoint drag callbacks
+    symbol: MaplibreMapInteraction including transient azimuth endpoint drag and foreground resource-economy callbacks
     path: maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java
     consumers: [app, maplibui]
   - id: gis-application
@@ -384,6 +454,8 @@ public_contracts:
     consumers: [app]
 settings_refs: [map-runtime-diagnostics, track_send, track_send_default_enabled_v1, lisa_project_scripts, scripts_expected, scripts_active, scripts_status, project_scripts_cache, feature_label_field, mobile_render_mode, render_mode, layer_origin, mobile, ngw_identity_backup, ngrc_provenance, legacy_underlay_migration, feature-save-journal, pending-track-points]
 storage_contracts:
+  - id: local-vector-tile-derived-cache
+    path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileDiskCache.java
   - id: project_scripts_cache
     path: maplib/src/main/java/com/nextgis/maplib/scripts/ScriptPackageStore.java
   - id: feature-save-journal
@@ -398,7 +470,7 @@ storage_contracts:
     path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
   - id: ngw-vector-identity-backup
     path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-invariant_refs: [INV-POINT-FIREFLY, INV-FEATURE-COPY, INV-WHOLE-OBJECT-TRANSFORM, INV-LOCAL-LOG-STARTUP, INV-TRACK-DELIVERY, INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-LOCAL-VECTOR-TILE-LABELS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE]
+invariant_refs: [INV-SQLITE-NATIVE-VECTORS, INV-RENDER-MEMORY-PRESSURE, INV-NATIVE-GEOJSON-PAYLOAD, INV-RENDER-MEMORY-NOTICE, INV-POINT-FIREFLY, INV-FEATURE-COPY, INV-WHOLE-OBJECT-TRANSFORM, INV-LOCAL-LOG-STARTUP, INV-TRACK-DELIVERY, INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-LOCAL-VECTOR-TILE-LABELS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE]
 global_docs:
   - docs/architecture/point-firefly.md
   - docs/architecture/feature-copy-transform.md
@@ -416,7 +488,7 @@ global_docs:
   - docs/architecture/stakeout.md
   - docs/reference/build-matrix.md
   - docs/reference/flavors-and-versioning.md
-smoke_tests: [AUTO-POLYGON-STYLE-CONTROLS, AUTO-POINT-FIREFLY, AUTO-FEATURE-EDITING, SMOKE-FEATURE-COPY-TRANSFORM, SMOKE-MAP-RUNTIME-DIAGNOSTICS, SMOKE-TRACK-DELIVERY, SMOKE-FORM-APPEARANCE, SMOKE-CONDITIONAL-REQUIRED, SMOKE-FORM-NAVIGATION, SMOKE-PROJECT-SCRIPTS, SMOKE-REQUIRED-FIELDS, AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-POLYGON-LABEL-ANCHOR, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-MAP-SURFACE-LIFECYCLE, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCAL-VECTOR-TILE-STRESS, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-UNDERLAY-DISPLAY, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-DEBUG-UNDERLAY-MIGRATION, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-SYNC-INTERRUPT-ACTION, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT, AUTO-RELIABILITY-NATIVE, SMOKE-RELIABILITY-FAILURES, SMOKE-TOOL-TAP, SMOKE-NGID-AND-RESOURCE-ICONS]
+smoke_tests: [AUTO-RENDER-MEMORY-UNITS, AUTO-RENDER-MEMORY, SMOKE-RENDER-MEMORY-NATIVE, AUTO-POLYGON-STYLE-CONTROLS, AUTO-POINT-FIREFLY, AUTO-FEATURE-EDITING, SMOKE-FEATURE-COPY-TRANSFORM, SMOKE-MAP-RUNTIME-DIAGNOSTICS, SMOKE-TRACK-DELIVERY, SMOKE-FORM-APPEARANCE, SMOKE-CONDITIONAL-REQUIRED, SMOKE-FORM-NAVIGATION, SMOKE-PROJECT-SCRIPTS, SMOKE-REQUIRED-FIELDS, AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-POLYGON-LABEL-ANCHOR, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-MAP-SURFACE-LIFECYCLE, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCAL-VECTOR-TILE-STRESS, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-UNDERLAY-DISPLAY, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-DEBUG-UNDERLAY-MIGRATION, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-SYNC-INTERRUPT-ACTION, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT, AUTO-RELIABILITY-NATIVE, SMOKE-RELIABILITY-FAILURES, SMOKE-TOOL-TAP, SMOKE-NGID-AND-RESOURCE-ICONS]
 upstream_hotspots: [POLYGON-STYLE-CONTROLS, MAP-DRAWABLE, RASTER-ANCHOR, RASTER-MBTILES, MAP-HOST, MAPLIBRE-BACKEND, COLLECTOR-RESOURCE]
 
 # Consumer verification preserves library identities, version mapping and GIS contracts; see docs/runbooks/automated-tests.md.

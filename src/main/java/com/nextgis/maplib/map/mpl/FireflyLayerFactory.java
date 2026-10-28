@@ -5,6 +5,7 @@ import com.nextgis.maplib.display.FireflyMarkerRegistry;
 import com.nextgis.maplib.display.SimpleMarkerStyle;
 import com.nextgis.maplib.display.Style;
 import com.nextgis.maplib.map.MplFeatureStyleProps;
+import com.nextgis.maplib.map.MPLFeaturesUtils;
 import com.nextgis.maplib.map.RuleGeometryLayouts;
 
 import org.maplibre.android.style.expressions.Expression;
@@ -37,6 +38,7 @@ public final class FireflyLayerFactory {
             SimpleMarkerStyle marker = entry.getValue();
             FireflyMarkerRegistry.Sprite sprite = FireflyMarkerRegistry.sprite(marker);
             SymbolLayer child = new SymbolLayer(base.getId() + "-layout-firefly-" + (++index), ctx.layerPath);
+            MPLFeaturesUtils.inheritNativeSourceLayer(base, child);
             Expression isFirefly = Expression.eq(Expression.coalesce(Expression.get(MplFeatureStyleProps.FILL_TYPE),
                     Expression.literal(ctx.vars.type)), Expression.literal(SimpleMarkerStyle.MarkerStyleFirefly));
             Expression layout = rules == null ? Expression.literal(true) : Expression.any(

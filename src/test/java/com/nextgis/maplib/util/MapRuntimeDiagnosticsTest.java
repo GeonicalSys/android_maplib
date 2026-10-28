@@ -10,6 +10,60 @@ import java.util.Map;
 import static org.junit.Assert.*;
 
 public class MapRuntimeDiagnosticsTest {
+    @Test public void memorySamplesSurviveRestartAndDoNotAttachToAnUnrelatedOldCrash() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        engine.configure("old", 224, "memory-revision");
+        Map<String, Object> observed = new LinkedHashMap<>();
+        observed.put("classic_sources", 3); observed.put("local_mvt_sources", 2); observed.put("raster_sources", 1);
+        observed.put("available_ram_bytes", 4_294_967_296L); observed.put("java_headroom_bytes", 314_572_800L);
+        observed.put("system_threshold_bytes", 134_217_728L); observed.put("system_low_memory", false);
+        observed.put("free_memory_reserve_bytes", 67_108_864L); observed.put("tile_work_limit", 2);
+        observed.put("global_economy", "none");
+        // Stale producers/untrusted additions cannot restore the removed used-memory budget.
+        observed.put("process_budget_bytes", 805_306_368L);
+        observed.put("process_pressure_target_bytes", 805_306_368L);
+        observed.put("latitude", 1.23); observed.put("database_path", "/private/technical");
+        engine.observeMemory(observed);
+        Map<?, ?> memory = (Map<?, ?>) engine.forEvent(fake.wall).get("memory");
+        assertEquals(2, memory.get("local_mvt_sources"));
+        assertEquals(4_294_967_296L, memory.get("available_ram_bytes"));
+        assertEquals(314_572_800L, memory.get("java_headroom_bytes"));
+        assertEquals(134_217_728L, memory.get("system_threshold_bytes"));
+        assertEquals(false, memory.get("system_low_memory"));
+        assertEquals(67_108_864L, memory.get("free_memory_reserve_bytes"));
+        assertEquals(2, memory.get("tile_work_limit")); assertEquals("none", memory.get("global_economy"));
+        for (String forbidden : List.of("process_budget_bytes", "process_pressure_target_bytes", "latitude", "database_path"))
+            assertFalse(forbidden, memory.containsKey(forbidden));
+        assertTrue(engine.forEvent(fake.wall - 60000).isEmpty());
+        Fake next = new Fake(); next.saved = fake.saved; next.wall = fake.wall + 60000;
+        MapRuntimeDiagnostics.Engine restarted = new MapRuntimeDiagnostics.Engine(next);
+        restarted.configure("new", 225, "next-revision"); restarted.observeMemory(Map.of("classic_sources", 1));
+        assertEquals("memory-revision", restarted.forEvent(fake.wall + 1000).get("source_revision"));
+        Map<?, ?> previous = (Map<?, ?>) restarted.forEvent(fake.wall + 1000).get("memory");
+        assertEquals(4_294_967_296L, previous.get("available_ram_bytes"));
+        assertFalse(previous.containsKey("process_budget_bytes"));
+        assertFalse(previous.containsKey("process_pressure_target_bytes"));
+    }
+
+    @Test public void sourceCountersKeepOnlyEightObservationsWithoutCoordinatesOrDatabasePaths() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        engine.configure("x", 224, "source-revision");
+        for (int i = 0; i < 12; i++) try (MapRuntimeDiagnostics.SourceScope source =
+                new MapRuntimeDiagnostics.SourceScope(engine, i, i % 2 == 0 ? "classic" : "local_mvt", "native_source")) {
+            source.features(i * 10); source.payload("geometry", 12, 516, 12, 48, 3); fake.advance(30);
+        }
+        List<?> rows = (List<?>) engine.forEvent(fake.wall).get("source_observations");
+        assertEquals(8, rows.size());
+        Map<?, ?> latest = (Map<?, ?>) rows.get(rows.size() - 1);
+        assertEquals(11, latest.get("layer_id")); assertEquals(110, latest.get("feature_count"));
+        assertNotNull(latest.get("memory_before")); assertNotNull(latest.get("memory_after"));
+        assertEquals(true, latest.get("finished"));
+        assertEquals("geometry", latest.get("payload_role"));
+        assertEquals(516L, latest.get("original_property_count"));
+        assertEquals(48L, latest.get("native_property_count"));
+        assertEquals(3, latest.get("nonempty_label_count"));
+        assertTrue(engine.forEvent(fake.wall + 60000).isEmpty());
+    }
     static class Fake implements MapRuntimeDiagnostics.Adapter {
         long now = 100, wall = 100000;
         final List<Runnable> checks = new ArrayList<>();

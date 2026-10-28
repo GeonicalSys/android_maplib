@@ -1,10 +1,153 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## Потоковые viewport line labels — MOB-04, 2026-10-28
+
+Production line-label worker использует `visitVisibleLines` и подготовленный
+`OriginalPlanner`: каждый full DB original сразу превращается в label candidate,
+не собираясь в List всей видимой геометрии. Candidates содержат только props/id
+и Point anchor; Label не удерживает исходный Feature. Mercator viewport готовится
+один раз, exact clipping/axial direction/nearest anchor/upright/dateline/FID
+семантика сохраняется. DB координаты и source geometry не изменяются.
+Compatibility `readVisibleLines` и fragment-merging List planner оставлены;
+streaming принимает полные originals, не native tile fragments.
+Shared gate/lease и camera/data/owner/UI fences сохранены. Новые6tests проверяют
+в том числе ownership без GC timing; compilation/native/performance требуют
+fresh общей проверки, прежний26PASS checkpoint её не заменяет.
+См. [точный scope](../update-reports/entries/maplib-20261028-streamed-line-labels.md).
+
+## SQLite native vector tiles — MOB-04, 2026-10-28
+
+`SqliteVectorTileProvider` обслуживает полные PBF для CustomVectorSource прямо
+из RTree/SQLite, без общего startup GeoJSON и коллекции всех styled features.
+Public Backend/Request фиксируют canonical owner/source/content/style/excludedFID
+generation; `close()` terminal и nonblocking. Native bridge владеет Main/IO
+coroutine delivery, backend — единственным shared с HTTP MVT gate, полными
+derived PBF и отменой. `isCurrent()` и feature loops используют дешёвые epochs;
+renderer JSON проверяется на границах load. Free-only policy не меняется.
+`queryForNativeRender` не принимает перестраиваемый/отменённый неполный RTree:
+IDs читаются под spatial writer lock, COUNT validation один раз на tree/data/size
+generation выполняется вне lock. Weak marker не удерживает старое дерево.
+After-commit data generation защищает до UI broadcast; при неготовности bridge
+повторяет запрос вместо successful partial PBF. COUNT не доказывает правильность
+всех IDs в историческом индексе с тем же количеством записей.
+
+Generic encoder использует native extent8192, scalar paint/rule/label/layout
+properties и text/icon offset pairs через public `NativeVectorTilePropertyCodec`
+X/Y constants; factories должны собрать typed arrays `semiliteral` expressions.
+Unknown nested/nonfinite payload вызывает typed unsupported failure, не тихую
+потерю данных. JSON null становится absence только в известном coalesce
+renderer contract. Metadata-only `canServe` проверяет все шесть geometry types,
+exact Simple/Field Rule renderers и standard effective styles, без data scans.
+
+Clipper сохраняет multipart/holes/disconnected pieces, не добавляя simplification
+или чтения geom_zoom. Polygon label использует прежний classic anchor до clip
+и один half-open owner tile. Main geometry/inline polygon anchors имеют
+`features` source layer, `_label_anchor` выделяет label points. Line labels
+читают viewport originals; `loadOriginalFeature`/`readOriginalFeature` дают
+полную DB/styled geometry редактору. ORDER=FID стабилен между tiles. Host
+владеет fast editedFID filters, content/style source recreation и fallback.
+
+Прежний encoder остаётся compatibility foundation; его Rule-property loss
+не следует включать для поддерживаемых слоёв вместо нового route. Раздел
+compact GeoJSON ниже описывает сохранённый compatibility path. Новая схема
+прошёл focused26JVM/Robolectric tests и main/test compile, но ещё требует
+native styles/edit/full-content и benchmark cold/
+warm/pan/pinch на том же787: скорость и2GiB/OOM безопасность не объявлены PASS.
+См. [exact scope/ограничения](../update-reports/entries/maplib-20261028-sqlite-native-vector-tiles.md).
+
+## Компактный native GeoJSON — MOB-04, 2026-10-28
+
+Профиль проекта787 подтвердил основное удержание в копиях property maps
+внутреннего GeoJSONVT index, а не необходимость упрощать исходную геометрию.
+`NativeFeaturePayload` строит отдельные native-копии за один проход, сохраняя
+rich Java Feature для редактора, исходные geometry/bbox/IDs и неизвестные поля.
+Он не копирует поля, которые native factories уже задают константами через
+layout groups. Polygon geometry не несёт подписи; отдельные label points
+содержат только используемые label properties/IDs/unknowns и создаются лишь
+при непустой подписи. Point sources сохраняют совместные paint/label поля,
+а Line sources — label inputs для существующего fallback querySourceFeatures.
+Custom zoom curves, layout keys, label zoom gates и явные false/пустые override
+сохраняются. Исходные SQLite данные, style JSON, sync, видимость и геометрия
+не меняются; миграции сохранённых пользовательских данных нет.
+
+Только при точном SimpleFeatureRenderer/SimplePolygonStyle контексте одинаковые
+с factory defaults значения заменяются теми же native fallback. Без контекста
+или для rules применяется консервативная проекция. Все logical-vector native
+handoffs (cold/hot load, style/data reload, ID/edit/save/hide/show) используют
+один путь. Все6MLP edit constructors тоже передают оставшийся background list
+через compact projection; selected/tool/vertex features остаются rich.
+В этом совместимом constructor API нет layer owner, поэтому используется
+консервативный geometry payload, без uniform-default sparsity. Публичный
+geometry anchor helper не меняет семантику. Styled URI
+не может обойти проекцию; cache flag остаётся false. Отладочные transport counts
+пишут только layer ID, роль source, количества features/properties/nonempty labels;
+координаты и бизнес-значения не включаются, журнал ограничен прежними8записями.
+Initial load дополнительно оставляет компактные локальные HyperLog строки;
+camera-idle line updates не создают такие строки.
+
+Это исправляет подтверждённое дублирование payload, но не вводит eviction во
+внутренний GeoJSONVT index и не доказывает причину различия223→224. Фактическую
+экономию процесса, все GPU styles/labels/picking и приёмку на2GiB необходимо
+проверить отдельно. Unit regression: NativeFeaturePayloadTest; consuming
+VectorStyleRenderingTest сохраняет прежние rich Java/GPU assertions, а native
+readiness проверяет транспортную проекцию вместо намеренно удалённых полей.
+
+## Экономия кэшей и диагностика памяти — MOB-04, 2026-10-27
+
+`RenderMemoryGuard` принимает решения по текущей свободной системной памяти,
+её системному порогу, Java headroom и OS low-memory state. Номинальная RAM и
+Android low-RAM class определяют только обычный disk cache и резерв32/64MiB;
+сами по себе они не вызывают предупреждение, экономию кэша или сериализацию.
+Абсолютные used/native/RSS остаются числовой диагностикой без порога реакции.
+Полные builds сериализуются при свободном system остатке не выше512MiB
+либо системного порога с резервом, при малом Java headroom или OS low-memory.
+Неизвестный счётчик не считается нулём. Это **не** верхний предел native расхода.
+Вызов SDK `onLowMemory` и отключение межмасштабного кэша не гарантируют очистку
+всех внутренних GeoJSONVT структур. Подтверждённый профилем перерасход payload
+описан выше; runtime экономия и приёмка2GiB проверяются отдельно.
+Высокое устойчивое плато расхода само по себе не доказывает утечку: нужно
+сравнивать одинаковые действия и удерживаемые allocations после возврата камеры.
+
+Обычные слои и MVT используют полную исходную геометрию и весь подходящий набор
+объектов. Отбора ID, новых LOD, скрытия/снятия регистрации слоёв и переписывания
+SQLite/draft/visibility в этой защите нет. При действительном дефиците ресурсов
+тайл откладывается через retryable503; неполный тайл никогда не становится200
+или записью кэша. Штатные два builder сохраняются; при текущем дефиците
+свободной системной либо Java памяти один builder занимает оба fair permits.
+Переполнение очереди диагностируется отдельно: само по себе оно не доказывает
+нехватку памяти и не вызывает memory warning или очистку кэшей.
+Ответ503 сохраняет возможность повтора, однако восстановление тайла самим SDK
+после освобождения памяти ещё требует native проверки. Успешный unit test
+ответа не доказывает этот переход.
+
+Для local MVT отключён coarse prefetch. Полные derived PBF read-only слоёв могут
+попадать в private app cache:32MiB для слабого устройства,128MiB для остальных,
+не больше1024 файлов и4MiB на файл. Ключ включает процесс/поколение карты,
+canonical layer, content version, стиль и tile coordinates; это не межпроцессный
+кэш и не файл подкачки native heap. Потеря кэша не удаляет исходные данные.
+
+Callback очистки проверяет владельца map/view/host и lifecycle epoch. Pause и
+Destroy прекращают watcher; Retry пересматривает только кэш и не перестраивает
+все GeoJSON sources. Верхний app показывает одно автоматическое уведомление
+на процесс. Ограниченных слоёв нет: `restrictions()` возвращает пустой набор.
+
+MapRuntime хранит bounded source-stage before/after и периодические RSS/native/
+system-free counters в прежнем журнале16KiB, включая доступную RAM, Java headroom,
+системный порог/low-memory, резерв свободной памяти и текущий tile work limit.
+Они показывают наблюдаемые изменения,
+а не доказанное владение асинхронными native allocation. Настоящие координаты,
+геометрии и атрибуты в эти наблюдения не попадают. Native приёмка памяти,
+полноты карты и предупреждения остаётся отдельным обязательным gate.
+Компактный native payload дополняет эту защиту: полный rich Java снимок
+остаётся у редактора, guard не подменяет его частичной выборкой.
+Карточки: [экономия и диагностика](../update-reports/entries/maplib-20261027-render-memory-budget.md),
+[native payload](../update-reports/entries/maplib-20261028-native-geojson-payload.md).
 
 ## Пустые handles и загрузка индекса — 2026-10-27
 
@@ -30,6 +173,12 @@ TrackColorPalette назначает насыщенный цвет один ра
 ## Штриховки, контуры и живой образец
 
 PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые стили MVT используют classic fallback. Контракт — consuming docs/architecture/polygon-style-controls.md.
+
+`PatternTilePeriod` уменьшает исходную512×512ARGB решётку только при точном
+совпадении повторяемого прямоугольного мотива во всех пикселях. Сохраняются
+округление, плотность160, цвет/alpha, идентификаторы и владение изображениями;
+если меньшего периода нет, остаётся512×512. Геометрия и style JSON прежние.
+[Карточка](../update-reports/entries/maplib-20261027-pattern-exact-motif.md).
 
 ## «Светлячок»
 

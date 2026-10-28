@@ -91,6 +91,7 @@ public final class RuleGeometryLayouts {
             copy(properties, "line-offset", line.getLineOffset()); copy(properties, "line-gap-width", line.getLineGapWidth());
             copy(properties, "line-sort-key", line.getLineSortKey()); copy(properties, "line-dasharray", line.getLineDasharray());
         }
+        MPLFeaturesUtils.inheritNativeSourceLayer(base, child);
         copy(properties, "visibility", base.getVisibility());
         child.setProperties(properties.toArray(new PropertyValue<?>[0]));
         child.setMinZoom(base.getMinZoom()); child.setMaxZoom(base.getMaxZoom());

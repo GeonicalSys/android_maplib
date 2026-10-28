@@ -78,7 +78,7 @@ public class PolygonEditClass extends MLGeometryEditClass {
 
         }
 
-        selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(polygonFeatures));
+        MPLFeaturesUtils.setNativeVectorGeoJson(selectedEditedSource, null, geoType, polygonFeatures);
 
         if (this.originalEditingFeature != null) {
             extractVertices(this.originalEditingFeature, true);
