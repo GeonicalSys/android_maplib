@@ -6,6 +6,43 @@ last_verified: 2026-10-28
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Горячая запись PBF и отменяемый допуск к IO — MOB-04, 28 октября2026
+
+`LocalVectorTileDiskCache` сохраняет прежние ключи и полные PBF, byte/entry и
+1024-file bounds, временный файл/атомарный rename и SQLite как источник данных.
+Общий индекс canonical root запрашивается при каждой операции, поэтому HTTP
+экземпляры на каждый запрос и старые providers после вытеснения root ledger
+не расходятся в учёте. Registry ограничен8roots, каждый inventory держит не
+более1025metadata до trim. Метаданные/recency хранятся в памяти, сортированный
+набор обслуживается инкрементально; обычный put не читает и не сортирует каталог.
+Первичное чтение и обнаруженное изменение каталога требуют reconciliation;
+проверка имени без повторной regex compilation, stat метаданных на файл один раз.
+Ожидаются только штатные same-process writers этого private namespace;
+удаление cache ОС безопасно, произвольный внешний конкурентный writer не обещан.
+
+Native provider передаёт дешёвый current guard внутрь put: проверки до/после
+lock, перед write/rename и после публикации не меняют source/content/style keys.
+HTTP получает новый общий индекс через прежний3-argument API и сохраняет
+свои внешние current/key проверки; socket probe1мс не вводится в cache lock.
+При IO/iterator failure кэш остаётся optional miss, готовый полный тайл не
+отклоняется только из-за недоступного производного файла. Никакой новой
+долговременной cache policy, миграции проекта или background thread нет.
+
+`SqliteVectorTileSession` получает общий отменяемый допуск2 до отправки в shared
+IO dispatcher. Отменённые ожидающие SDK jobs не создают blocking payload каждый.
+Lease освобождается на IO после настоящего unwind и до Main, а predispatch cancel
+имеет идемпотентный fallback. Retry не держит permit; некооперативная активная
+работа сохраняет permit до выхода. SDK определяет нужные tiles, включая parent/
+fade/adjacent; age/zoom/density не используются для потери текущего результата.
+Pending SDK jobs и отдельные HTTP/line-label queues этим не ограничиваются.
+
+Новые25 cache/7 admission tests и прежние content/lifecycle/gate проверки —
+техническая приёмка, не новый измеритель и не реальные smartphone timings.
+Владелец просит только обычный APK, сам установит его на телефон; ADB/native/
+Full/публикация в этом шаге не выполняются. Карточка:
+`maplib-20261028-tile-cache-queue`; central contract:
+`INV-LOCAL-TILE-CACHE-ADMISSION`.
+
 ## Подробный локальный сбор ресурсов — opt-in, 2026-10-28
 
 `RenderResourceProfiler` по умолчанию выключен. Приватный app adapter явно

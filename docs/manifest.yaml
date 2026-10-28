@@ -9,6 +9,10 @@ entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorTileDiskCacheTest.java
+    responsibility: Independently assert real temporary filesystem complete bytes, constant hot-path inventory/metadata work, canonical aliases and shared instances/registry eviction, 128-to32MiB and1024-file budgets, external cache deletion, iterator/write/rename/delete failures and cancellation publication guards; no native speed claim.
+  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileAdmissionTest.kt
+    responsibility: Verify canceled SDK waiters avoid blocking dispatch, active noncooperative IO owns shared admission until unwind, worker release precedes blocked Main, predispatch cancel/current/snapshot failures release once and retry delay owns no permit.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RenderResourceProfiler.java
     responsibility: Default-off local numeric resource accounting independent of legacy SQLite observer limits; count every accepted scope through bounded layer/detail overflows, separate BOOTTIME wall and same-TID thread CPU, retain aggregates despite raw sink rejection, return a bounded final summary without owning files or cancelling rendering.
   - path: maplib/src/test/java/com/nextgis/maplib/util/RenderResourceProfilerTest.java
@@ -18,7 +22,7 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorFeatureReaderTest.java
     responsibility: Assert65 IDs/order/typedNULL/wide integers/full originals, three bounded small-geometry queries and no PFD for small buffers, exact16384/16385/multiMiB boundaries, API26/27 fallback versus API30 SQLite CASE, cancellation/cardinality/errors and no duplicate callbacks during mid-window fallback on technical fixtures only.
   - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorSourceBridge.kt
-    responsibility: Dispatch complete native tile IO and cancel stale requests while recording bounded IO-queue and Main-resume phase observations; a return-to-SDK counter is never native-content acceptance.
+    responsibility: Admit at most two native blocking payloads through cancellable shared pre-dispatch permits, release after actual IO unwind before Main with exact-once cancellation fallback, preserve SDK Job demand and complete current tile bytes; return-to-SDK is never native-content acceptance.
   - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorSourceBridgeTest.kt
     responsibility: Assert IO/Main boundaries, late cancellation, retries and lifecycle plus unchanged one-read callback bytes with optional phase diagnostics.
   - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileBufferParityTest.java
@@ -66,7 +70,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkGate.java
     responsibility: Keep two normal builders and fairly serialize resource-constrained complete tile work with cancellable, idempotently released permits.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileDiskCache.java
-    responsibility: Bound private derived complete-PBF cache by bytes and file count, using process/map/content/style keys without modifying authoritative project data.
+    responsibility: Bound complete derived PBF by existing bytes/file/entry budgets through one per-operation canonical-root metadata ledger, bounded8-root registry and incremental recency; bootstrap/reconcile separately from hot put without per-put full scan/sort/regex, retain atomic publication, optional IO failure and native current guards without changing identities or authoritative data.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RenderProcessMemory.java
     responsibility: Read optional self-process RSS/native and system-availability counters without enumerating other applications or reading heap contents.
   - path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorTileFullContentTest.java
