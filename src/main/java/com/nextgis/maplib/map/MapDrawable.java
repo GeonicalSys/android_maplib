@@ -433,6 +433,7 @@ public class MapDrawable
     private RenderMemoryGuard renderMemoryGuard;
     private final SqliteVectorLayerController sqliteVectorSources = new SqliteVectorLayerController();
     @Nullable private Integer sqliteEditingLayerId;
+    @Nullable private Long sqliteEditingHiddenFeatureId;
 
     public boolean isSqliteVectorLayer(int layerId) {
         return sqliteVectorSources.provider(layerId) != null;
@@ -3599,7 +3600,15 @@ public class MapDrawable
 
         if (editingFeatureTmp != null) {
             sqliteEditingLayerId = streamed ? ilayer.getId() : null;
-            if (streamed) sqliteVectorSources.exclude(maplibreMap.get().getStyle(), ilayer.getId(), selectedFeatureId);
+            sqliteEditingHiddenFeatureId = streamed && ((VectorLayer) ilayer).isFeatureHidden(selectedFeatureId)
+                    ? selectedFeatureId : null;
+            if (streamed) {
+                sqliteVectorSources.exclude(maplibreMap.get().getStyle(), ilayer.getId(), selectedFeatureId);
+                // Canvas edit activation already changed the model visibility/content version.
+                // Keep that mask and the native exclusion, but do not leave pending tiles on a stale provider.
+                SqliteVectorTileProvider attached = sqliteVectorSources.provider(ilayer.getId());
+                if (attached != null && !attached.isCurrent()) refreshSqliteLayer(ilayer.getId());
+            }
             selectedEditedSource = sourceHashMap.get(ilayer.getPath().toString());
             editingFeature = editingFeatureTmp;
 
@@ -3659,6 +3668,7 @@ public class MapDrawable
         if (isSqliteVectorLayer(layerdID)) {
             sqliteVectorSources.hide(maplibreMap.get().getStyle(), layerdID, selectedFeatureId, false);
             if (Objects.equals(sqliteEditingLayerId, layerdID)) {
+                restoreSqliteEditingModelVisibility(layerdID);
                 sqliteVectorSources.exclude(maplibreMap.get().getStyle(), layerdID, null);
                 sqliteEditingLayerId = null; editingObject = null;
             }
@@ -3965,6 +3975,9 @@ public class MapDrawable
             if (!keepEditObj) {
                 if (sqliteEditingLayerId != null) {
                     int layerId = sqliteEditingLayerId;
+                    // Restore the real model mask BEFORE capturing a replacement provider/version.
+                    // The overlay's later MODE_HIGHLIGHT/MODE_NONE show becomes a no-op.
+                    restoreSqliteEditingModelVisibility(layerId);
                     sqliteVectorSources.exclude(maplibreMap.get().getStyle(), layerId, null);
                     sqliteEditingLayerId = null;
                     polygonFeatures.clear();
@@ -5864,6 +5877,17 @@ public class MapDrawable
             logErr("Read selected SQLite feature layer=" + layer.getId(), failure);
             return null;
         }
+    }
+
+    private void restoreSqliteEditingModelVisibility(int layerId) {
+        ILayer model = getLayerById(layerId);
+        Long hiddenId = sqliteEditingHiddenFeatureId;
+        if (hiddenId != null && model instanceof VectorLayer
+                && ((VectorLayer) model).isFeatureHidden(hiddenId)) {
+            // This is the actual hide/show pair, not a synthetic data-change notification.
+            ((VectorLayer) model).showFeature(hiddenId);
+        }
+        sqliteEditingHiddenFeatureId = null;
     }
 
     private void refreshSqliteLayer(int layerId) {

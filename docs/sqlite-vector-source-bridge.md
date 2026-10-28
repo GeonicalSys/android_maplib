@@ -10,8 +10,10 @@ related_code:
   - src/main/java/com/nextgis/maplib/map/SqliteVectorLayerController.java
   - src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
   - src/main/java/com/nextgis/maplib/map/MapDrawable.java
+  - src/main/java/com/nextgis/maplib/map/VectorLayer.java
   - src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java
   - src/test/java/com/nextgis/maplib/map/SqliteVectorSourceBridgeTest.kt
+  - src/test/java/com/nextgis/maplib/map/VectorLayerVisibilityEpochTest.java
 ---
 
 # SQLite → native MVT bridge
@@ -116,6 +118,23 @@ model identity (`getLayerById(id) == model`), so a deleted/replaced layer cannot
 reappear from an old callback. Temporary hide refreshes the source after content
 version changes; feature-ID remap moves the exclusion only for the matching
 active edited feature. Root host integration owns Save/Cancel/native validation.
+
+Canvas edit activation calls model.hideFeature before native edit attachment.
+After applying the native feature-ID exclusion, MapDrawable checks the attached
+provider and refreshes it only when it is stale. It preserves the real model mask
+for Canvas and native background rendering. The actual model-hidden feature ID
+is retained separately from a later saved/remapped ID. Actual edit finish restores
+that owned model mask before clearing exclusion and rebuilding the background;
+`keepEditObj` retains both. A later overlay MODE_HIGHLIGHT/MODE_NONE show callback
+therefore cannot invalidate the newly captured provider.
+
+VectorLayer hide is idempotent: NOT_FOUND and already-hidden IDs do not change
+content version or emit a notification. A new valid hide advances the version
+without a layer notification, preserving the Canvas contract. Show only notifies
+after an actual ID removal, so repeating show(F2) while another F1 is still
+hidden does not spuriously invalidate the provider. Real show/showAll retains
+normal notification/version behavior. This is an ephemeral render-mask contract,
+not a DB/schema or visibility-persistence migration.
 
 Requests start and finish on `Dispatchers.Main.immediate`. Blocking snapshot
 and load work uses `runInterruptible` on one shared `Dispatchers.IO` dispatcher

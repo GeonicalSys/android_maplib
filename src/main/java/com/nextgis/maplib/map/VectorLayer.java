@@ -3561,8 +3561,8 @@ public class VectorLayer
 
     public void hideFeature(long featureId)
     {
-        renderContentVersion.incrementAndGet();
-        if (featureId != NOT_FOUND) {
+        if (featureId != NOT_FOUND && !mIgnoreFeatures.contains(featureId)) {
+            renderContentVersion.incrementAndGet();
             mIgnoreFeatures.add(featureId);
             //notifyLayerChanged();
         }
@@ -3575,8 +3575,9 @@ public class VectorLayer
             return;
         }
 
-        mIgnoreFeatures.remove(featureId);
-        notifyLayerChanged();
+        if (mIgnoreFeatures.remove(Long.valueOf(featureId))) {
+            notifyLayerChanged();
+        }
     }
 
 
