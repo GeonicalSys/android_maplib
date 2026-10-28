@@ -23,6 +23,29 @@ import static org.junit.Assert.*;
 public class SqliteVectorTileProviderTest {
     @Rule public TemporaryFolder folder=new TemporaryFolder();
 
+    @Test public void optionalDiagnosticOverloadPreservesAnExistingBackendWithoutAdditionalReads() throws Exception {
+        SqliteVectorTileRequest request = new SqliteVectorTileRequest("technical-owner", 1, 2, "style", null, 0, 0, 0);
+        int[] reads = {0};
+        SqliteVectorTileBackend backend = new SqliteVectorTileBackend() {
+            public SqliteVectorTileRequest snapshot(int z, int x, int y) { return request; }
+            public boolean isCurrent(SqliteVectorTileRequest value) { return value == request; }
+            public byte[] load(SqliteVectorTileRequest value, java.util.function.BooleanSupplier current) {
+                assertSame(request, value); assertTrue(current.getAsBoolean()); reads[0]++;
+                return new byte[]{1, 2, 3};
+            }
+        };
+        assertArrayEquals(new byte[]{1, 2, 3}, backend.load(request, () -> true, null));
+        assertEquals(1, reads[0]);
+    }
+    @Test public void missingOriginalFailsWholeTileAndCannotPopulatePartialPbfCache() throws Exception {
+        Fake source=new Fake(folder.getRoot());source.add(1,new GeoPoint(1,100));source.add(2,new GeoPoint(2,100));source.missing=2L;
+        SqliteVectorTileProvider provider=new SqliteVectorTileProvider(source,1,()->1,null);
+        assertThrows(SqliteVectorTileProvider.UnsupportedTileException.class,()->provider.load(provider.snapshot(0,0,0),()->true));
+        source.missing=null;
+        assertEquals(2,NativeVectorTileEncoderTest.decode(provider.load(provider.snapshot(0,0,0),()->true)).records.size());
+        assertEquals("Failed first request must not become a successful cached partial tile",2,source.queries);
+    }
+
     @Test public void complete4097IdsAndRulePropertiesSurviveColdThenWarmCacheWithoutGlobalReads() throws Exception {
         Fake source=new Fake(folder.getRoot());for(long id=1;id<=4097;id++)source.add(id,new GeoPoint(id,100));
         SqliteVectorTileProvider provider=new SqliteVectorTileProvider(source,7,()->7,null);
@@ -120,7 +143,7 @@ public class SqliteVectorTileProviderTest {
 
     static final class Fake implements SqliteVectorTileProvider.Access {
         final File cache;final Map<Long,com.nextgis.maplib.datasource.Feature> features=new LinkedHashMap<>();final Set<Long> hidden=new HashSet<>();
-        int type=GTPoint,reads,queries,fingerprints;long version;String style="style",mutate;boolean owner=true,job=true,unsupported;
+        int type=GTPoint,reads,queries,fingerprints;long version;Long missing;String style="style",mutate;boolean owner=true,job=true,unsupported;
         Fake(File cache){this.cache=cache;}
         void add(long id,GeoGeometry geometry){com.nextgis.maplib.datasource.Feature feature=new com.nextgis.maplib.datasource.Feature();feature.setId(id);feature.setGeometry(geometry);features.put(id,feature);}
         public String ownerIdentity(){return cache.getAbsolutePath();}public boolean ownerCurrent(){return owner;}
@@ -129,7 +152,7 @@ public class SqliteVectorTileProviderTest {
         public List<Long> query(GeoEnvelope envelope){queries++;return new ArrayList<>(features.keySet());}
         public com.nextgis.maplib.datasource.Feature read(long id){reads++;if(reads==2 && mutate!=null){
             if(mutate.equals("content"))version++;if(mutate.equals("style"))style="changed";if(mutate.equals("owner"))owner=false;if(mutate.equals("job"))job=false;
-        }return features.get(id);}
+        }return Objects.equals(missing,id)?null:features.get(id);}
         public boolean hidden(long id){return hidden.contains(id);}public RenderMemoryGuard memory(){return null;}public File cacheDirectory(){return cache;}
         public Feature styled(com.nextgis.maplib.datasource.Feature original,boolean full){
             Feature feature=full?MPLFeaturesUtils.getFeatureFromNGFeature(original.getGeometry()):Feature.fromGeometry(Point.fromLngLat(0,0));

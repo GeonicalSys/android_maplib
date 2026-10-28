@@ -6,6 +6,77 @@ last_verified: 2026-10-28
 
 # maplib — GIS model, storage, NGW и MapLibre
 
+## Ограниченное чтение SQLite originals — MOB-04, 2026-10-28
+
+Final allmaplib gate:750PASS/132classes/0fail/error/skip59s, runtime unchanged;
+71focused — поднабор. Independent dense1403/11.7z strict full-scene gate дал
+843d32.45–34.09s→6039 13.68–15.65s→D10110.33–12.27s, late map ROI MAE0.
+One processcold run/build/diskretained, не FPS/все стили/2–3s target. TrackLayer
+saved/active snapshots остаются полным GeoJSON и вне ordinary-vector tile path;
+длинные треки и их RAM не измерены.
+
+После actual tablet phase evidence добавлен `SqliteVectorFeatureReader`:
+attributes-only cursor на32 прежних eligible IDs с CASE order и один ленивый
+compiled BLOB statement на visit. На API28+ отдельный geometry-only cursor
+держит не более32 полных BLOB до16KiB в явном1MiB CursorWindow; API26/27,
+большие BLOB и safely unsupported driver используют прежний полный PFD путь.
+512KiB — предел small payload, не общий прирост RAM: SQLite sorter buffers,
+Java buffer и decoded original учитываются отдельно. Сохранены все typed
+поля/NULL, оригинальные geometry, hidden/excluded masks, порядок и generation
+guards. Cursor/statement закрываются при отмене/ошибке; missing/extra IDs или
+bad BLOB не дают успешного partial tile/cache. Direct/line-label visitors
+получают совместимый default Access seam; editor/sync API не меняются.
+Нет global features/GeoJSON cache или simplification. Typed phase boundaries
+сохранены для сравнения с private843d. Source RED/GREEN и native границы —
+[карточка](../update-reports/entries/maplib-20261028-sqlite-batched-original-reads.md).
+
+Small-BLOB window — отдельная невыпущенная доработка после actual6039 read
+evidence:3051 originals/2,076,156B/PBF356,630B сохранились, BLOB stage всё ещё
+занял1458.11ms. Nested CASE по typeof/length не материализует большой BLOB или
+TEXT в window; исходные bytes не обрезаются. Отмена между queries, exact
+ID/order/length/cardinality и cleanup errors проверяются до успеха всего tile.
+Mid-window unsupported driver переводит только текущий и оставшиеся IDs на
+PFD, без повторной доставки. Query/prefill/refill/getBlob относятся к BLOB_READ;
+inline_blobs/pfd_blobs считают полные buffers перед decode, BLOB_BYTES остаётся
+логическим объёмом потреблённых originals, не объёмом prefetch при отмене.
+Ordinary D101 normalall3 PASS62s/matrixPASS/71focused PASS. ActualT40/API30
+сохранил1350inline+2PFD/1352consumed originals в10terminal representatives,
+без read/window/SQLite/fatal markers. Same9counter cohorts121/110features
+сохранили BLOB/PBF/label counts: BLOB83.57→13.28ms и134.11→15.37ms против6039;
+163line originals42.24→8.59ms. Heavy3051 detail D101 отсутствует в snapshots,
+процесс-глобальные суммы/пики неизвестны; IOqueue всё ещё до3.374s в observed
+scope. Full native paint/labels/PSS/newextent проверяются отдельно.
+[Новая карточка](../update-reports/entries/maplib-20261028-sqlite-small-blob-window-reads.md).
+
+## Локальные SQLite phase timings — MOB-04, 2026-10-28
+
+Для разбора задержки полного содержимого на T40 Plus/API30 добавлен отдельный
+`MapRuntimeDiagnostics.SqliteScope`. Локальный logcat tag `LISA-SqlitePhase`
+разделяет ожидание IO/слоя/gate/cache, RTree query, чтение атрибутов/BLOB,
+декодирование original geometry, style/clip/anchors/PBF/cache write и возврат
+на Main. Записи содержат только числовые layer/epoch/content IDs, zoom без
+tile X/Y, длительности и counts; URI, координаты, значения полей и exception
+message не передаются. Это не новый sender событий GlitchTip.
+
+Наблюдаются максимум16 активных scopes и32 layer summaries; один observer
+использует существующий bounded writer. Text log — не чаще10s/слой; suppressed
+финал получает отложенный flush. Потеря наблюдений при saturation учитывается
+для слоёв с snapshot; unobserved-only layer без первого snapshot пока может
+не опубликовать counters, поэтому reported-layer суммы не process-global.
+Завершённые inactive summaries переиспользуются после throttle interval.
+Main не читает память/БД/MapLibre ради diagnostics. Ошибки clock/writer/watch
+не меняют исходные bytes, cancellation или currentness checks.
+
+`returned_to_sdk` означает только Java callback return, не native acceptance
+и не готовность всех объектов/подписей. `provider_returned`, `cancelled`,
+`failed` и активное ожидание различаются. Старый HTTP queue counter не выдаётся
+за очередь SQLite. Focused39 PASS и ordinary all3 build57s/version matrix PASS
+дали private843d. В нём один startup tile3051 объектов занял9.909s, включая
+5.281s attributes и1.548s BLOB; другие tiles ждали IO до3.432s. Это подтверждённый
+application read hot path на11.7, не готовность native/full contents или закрытие
+reported12.1 delay. Новая bounded-read правка ещё требует своего tablet route.
+См. [точный scope](../update-reports/entries/maplib-20261028-sqlite-phase-diagnostics.md).
+
 ## SQLite tile buffer parity — MOB-04, 2026-10-28
 
 Candidate query и full-precision clipping нового native SQLite route используют

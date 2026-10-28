@@ -3852,6 +3852,38 @@ public class VectorLayer
             return getFeatureOldData(featureId);
     }
 
+    /** A visit owns bounded attributes cursors and one BLOB statement; editor/sync reads stay independent. */
+    void visitOriginalsForNativeRender(java.util.Iterator<Long> ids,
+            com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteScope diagnostics,
+            java.util.function.BooleanSupplier current,SqliteVectorFeatureReader.Visitor visitor) throws Exception {
+        if(!ids.hasNext())return;
+        if(!useNewLargeDataload) {
+            while(ids.hasNext()) {
+                if(Thread.currentThread().isInterrupted() || !current.getAsBoolean())
+                    throw new java.util.concurrent.CancellationException("Obsolete SQLite original reader");
+                visitor.beforeRead();
+                Feature feature=getFeatureOldData(ids.next());
+                if(feature==null || feature.getGeometry()==null)
+                    throw new IOException("Incomplete indexed original feature read");
+                visitor.accept(feature);
+            }
+            return;
+        }
+        if(diagnostics!=null)diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.SQL_ATTRIBUTES);
+        MapContentProviderHelper map=DatabaseContext.getMapForLayer(this);
+        if(map==null)throw new IllegalStateException("Missing native original owner");
+        SqliteVectorFeatureReader.visit(ids,SqliteVectorFeatureReader.sqlite(map.getDatabase(true),mPath.getName(),getFields()),
+                current,diagnostics,visitor);
+    }
+
+    /** Same original read, with optional phase markers; no additional SQLite reads. */
+    Feature getFeatureForNativeRender(long featureId,
+            com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteScope diagnostics) {
+        if (useNewLargeDataload) return getFeatureLargeData(featureId, diagnostics);
+        // Kept explicit for a future legacy switch: this fallback is not a split BLOB/decode measurement.
+        return getFeatureOldData(featureId);
+    }
+
     public final  Feature getFeatureOldData(long featureId)
     {
         Cursor cursor = query(null, FIELD_ID + " = " + featureId, null, null, null);
@@ -3872,7 +3904,14 @@ public class VectorLayer
 
     public final  Feature getFeatureLargeData(long featureId)
     {
+        return getFeatureLargeData(featureId, null);
+    }
+
+    private Feature getFeatureLargeData(long featureId,
+            com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteScope diagnostics)
+    {
         Feature feature = null;
+        if (diagnostics != null) diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.SQL_ATTRIBUTES);
 
         final List<Field> fields = getFields();
         String[] projection = new String[fields.size() +1] ; // only ID, but beter all fields exept  geom
@@ -3904,8 +3943,13 @@ public class VectorLayer
             feature = new Feature(cursor.getLong(0), fields);
             feature.fromCursorWithoutGeometry(cursor);
 
+            if (diagnostics != null) diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.BLOB_READ);
             byte[] geomBlob = readLargeBlob(db,mPath.getName(),  feature.getId() );
             if (geomBlob != null) {
+                if (diagnostics != null) {
+                    diagnostics.count(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteCount.BLOB_BYTES, geomBlob.length);
+                    diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.GEOMETRY_DECODE);
+                }
                 try {
                     feature.setGeometry(GeoGeometryFactory.fromBlob(geomBlob));
                 } catch (Exception ex){

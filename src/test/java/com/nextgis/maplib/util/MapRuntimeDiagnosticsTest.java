@@ -10,6 +10,98 @@ import java.util.Map;
 import static org.junit.Assert.*;
 
 public class MapRuntimeDiagnosticsTest {
+    @Test public void sqliteInlineAndPfdCountsStayBoundedNumericWithoutMemoryReads() {
+        Fake fake=new Fake();MapRuntimeDiagnostics.Engine engine=new MapRuntimeDiagnostics.Engine(fake);
+        MapRuntimeDiagnostics.SqliteScope scope=engine.beginSqlite(8,12,"sqlite_native");
+        scope.count(MapRuntimeDiagnostics.SqliteCount.INLINE_BLOBS,32);scope.count(MapRuntimeDiagnostics.SqliteCount.PFD_BLOBS,2);
+        scope.count(MapRuntimeDiagnostics.SqliteCount.BLOB_BYTES,32768);scope.finish(MapRuntimeDiagnostics.SqliteOutcome.RETURNED_TO_SDK);
+        Map<?,?> current=(Map<?,?>)((List<?>)fake.saved.get("source_observations")).get(0);
+        Map<?,?> counts=(Map<?,?>)current.get("counts");
+        assertEquals(32L,counts.get("inline_blobs"));assertEquals(2L,counts.get("pfd_blobs"));assertEquals(32768L,counts.get("blob_bytes"));
+        assertEquals(0,fake.memoryCalls);assertTrue(engine.sqliteActive.isEmpty());
+    }
+    @Test public void sqlitePhasesSeparateQueueBlobDecodeAndMainWithoutReadingMemory() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        MapRuntimeDiagnostics.SqliteScope scope = engine.beginSqlite(7, 12, "sqlite_native");
+        scope.identity(41, 9); fake.advance(20);
+        scope.phase(MapRuntimeDiagnostics.SqlitePhase.BLOB_READ); fake.advance(50);
+        scope.count(MapRuntimeDiagnostics.SqliteCount.BLOB_BYTES, 8192);
+        scope.phase(MapRuntimeDiagnostics.SqlitePhase.GEOMETRY_DECODE); fake.advance(30);
+        scope.phase(MapRuntimeDiagnostics.SqlitePhase.MAIN_DISPATCH); fake.advance(1100);
+        fake.checks.get(0).run();
+        Map<?, ?> current = (Map<?, ?>) ((List<?>) fake.saved.get("source_observations")).get(0);
+        assertEquals("main_dispatch", current.get("phase")); assertEquals(false, current.get("finished"));
+        assertEquals("active", current.get("outcome")); assertEquals("unverified", current.get("native_content_ready"));
+        Map<?, ?> stages = (Map<?, ?>) current.get("stage_ms");
+        assertEquals(20.0, (Double) stages.get("io_queue"), 0.001);
+        assertEquals(50.0, (Double) stages.get("blob_read"), 0.001);
+        assertEquals(30.0, (Double) stages.get("geometry_decode"), 0.001);
+        assertEquals(1100.0, (Double) stages.get("main_dispatch"), 0.001);
+        assertEquals(8192L, ((Map<?, ?>) current.get("counts")).get("blob_bytes"));
+        assertEquals(0, fake.memoryCalls);
+        scope.finish(MapRuntimeDiagnostics.SqliteOutcome.RETURNED_TO_SDK);
+        fake.advance(10000); fake.checks.get(0).run();
+        assertTrue(engine.sqliteActive.isEmpty()); assertEquals(1, fake.cancelled);
+        String log = fake.logs.get(fake.logs.size() - 1);
+        assertTrue(log.contains("returned_to_sdk")); assertTrue(log.contains("\"native_content_ready\":\"unverified\""));
+        for (String forbidden : List.of("latitude", "longitude", "ownerIdentity", "database_path", "error_message", "tile_x", "tile_y"))
+            assertFalse(forbidden, log.contains(forbidden));
+    }
+
+    @Test public void sqlitePerLayerThrottleRetainsCancelledOutcomeInDelayedFlush() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        engine.beginSqlite(3, 12, "sqlite_native").finish(MapRuntimeDiagnostics.SqliteOutcome.RETURNED_TO_SDK);
+        fake.advance(100);
+        engine.beginSqlite(3, 12, "sqlite_native").finish(MapRuntimeDiagnostics.SqliteOutcome.CANCELLED);
+        assertEquals(1, fake.logs.size());
+        fake.advance(10000); fake.checks.get(fake.checks.size() - 1).run();
+        assertEquals(2, fake.logs.size());
+        String last = fake.logs.get(1);
+        assertTrue(last.contains("\"outcome\":\"cancelled\""));
+        assertTrue(last.contains("\"returned_to_sdk\":1")); assertTrue(last.contains("\"cancelled\":1"));
+        assertTrue(engine.sqliteActive.isEmpty());
+    }
+
+    @Test public void sqliteObservationCapacityHasOneWatcherAndExplicitDroppedScopes() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        List<MapRuntimeDiagnostics.SqliteScope> scopes = new ArrayList<>();
+        for (int i = 0; i < 17; i++) scopes.add(engine.beginSqlite(4, 12, "sqlite_native"));
+        assertEquals(16, engine.sqliteActive.size()); assertEquals(1, fake.checks.size());
+        for (MapRuntimeDiagnostics.SqliteScope scope : scopes) scope.finish(MapRuntimeDiagnostics.SqliteOutcome.CANCELLED);
+        fake.advance(10000); fake.checks.get(0).run();
+        assertTrue(engine.sqliteActive.isEmpty()); assertEquals(1, fake.cancelled);
+        String last = fake.logs.get(fake.logs.size() - 1);
+        assertTrue(last.contains("\"unobserved_scopes\":1")); assertTrue(last.contains("\"cancelled\":16"));
+        int logs = fake.logs.size(); fake.checks.get(0).run(); assertEquals(logs, fake.logs.size());
+    }
+
+    @Test public void sqliteLayerLimitReportsOverflowThenReusesOnlyExpiredInactiveSummaries() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        for (int i = 0; i < 32; i++) engine.beginSqlite(i, 12, "sqlite_native")
+                .finish(MapRuntimeDiagnostics.SqliteOutcome.PROVIDER_RETURNED);
+        engine.beginSqlite(33, 12, "sqlite_native").close();
+        fake.advance(1000); fake.checks.get(fake.checks.size() - 1).run();
+        assertTrue(fake.logs.get(fake.logs.size() - 1).contains("sqlite_observation_limit"));
+        assertTrue(fake.logs.get(fake.logs.size() - 1).contains("\"unobserved_layer_requests\":1"));
+        fake.advance(10000);
+        MapRuntimeDiagnostics.SqliteScope fresh = engine.beginSqlite(33, 12, "sqlite_native");
+        assertNotSame(MapRuntimeDiagnostics.SqliteScope.NONE, fresh);
+        fresh.finish(MapRuntimeDiagnostics.SqliteOutcome.RETURNED_TO_SDK);
+        assertEquals(32, engine.sqliteLayers.size()); assertTrue(engine.sqliteLayers.containsKey(33));
+    }
+
+    @Test public void sqliteClockWriterAndWatcherFailuresReleaseSlotsAndNeverChangeCallerOutcome() {
+        Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        MapRuntimeDiagnostics.SqliteScope first = engine.beginSqlite(5, 12, "sqlite_native");
+        fake.throwClock = true; first.finish(MapRuntimeDiagnostics.SqliteOutcome.CANCELLED);
+        assertTrue(engine.sqliteActive.isEmpty()); assertEquals(1, fake.cancelled);
+        fake.throwClock = false; fake.throwExecute = true;
+        engine.beginSqlite(6, 12, "sqlite_native").finish(MapRuntimeDiagnostics.SqliteOutcome.RETURNED_TO_SDK);
+        assertTrue(engine.sqliteActive.isEmpty());
+        fake.throwExecute = false; fake.throwWatch = true;
+        engine.beginSqlite(7, 12, "sqlite_native").finish(MapRuntimeDiagnostics.SqliteOutcome.RETURNED_TO_SDK);
+        assertTrue(engine.sqliteActive.isEmpty()); assertFalse(fake.logs.isEmpty()); assertEquals(0, fake.memoryCalls);
+    }
     @Test public void memorySamplesSurviveRestartAndDoNotAttachToAnUnrelatedOldCrash() {
         Fake fake = new Fake(); MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
         engine.configure("old", 224, "memory-revision");
@@ -70,16 +162,21 @@ public class MapRuntimeDiagnosticsTest {
         final List<String> logs = new ArrayList<>();
         Map<String, Object> saved;
         int cancelled;
+        int memoryCalls;
+        boolean throwClock, throwExecute, throwWatch;
         void advance(long delta) { now += delta; wall += delta; }
-        public long now() { return now; }
-        public long wall() { return wall; }
+        public long now() { if (throwClock) throw new IllegalStateException("clock unavailable"); return now; }
+        public long wall() { if (throwClock) throw new IllegalStateException("clock unavailable"); return wall; }
         public int pid() { return 42; }
-        public MapRuntimeDiagnostics.Cancel watch(Runnable task) { checks.add(task); return () -> cancelled++; }
-        public void execute(Runnable task) { task.run(); }
+        public MapRuntimeDiagnostics.Cancel watch(Runnable task) {
+            if (throwWatch) throw new IllegalStateException("watch unavailable");
+            checks.add(task); return () -> cancelled++;
+        }
+        public void execute(Runnable task) { if (throwExecute) throw new IllegalStateException("writer unavailable"); task.run(); }
         public void log(String value) { logs.add(value); }
         public void write(Map<String, Object> data) { saved = data; }
         public Map<String, Object> read() { return saved; }
-        public Map<String, Object> memory() { return Map.of("available_bytes", 1024L); }
+        public Map<String, Object> memory() { memoryCalls++; return Map.of("available_bytes", 1024L); }
     }
 
     @Test public void fastQueriesHaveNoLogsOrDiskWritesAndCancelTheWatch() {

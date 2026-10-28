@@ -21,6 +21,10 @@ import kotlinx.coroutines.runInterruptible
 import org.maplibre.android.style.sources.CustomVectorSource
 import org.maplibre.android.style.sources.CustomVectorTileProvider
 import org.maplibre.android.style.sources.TileData
+import com.nextgis.maplib.util.MapRuntimeDiagnostics
+import com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase
+import com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteCount
+import com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteOutcome
 
 /**
  * One terminal source generation. The host must close this bridge BEFORE removeSource,
@@ -33,7 +37,8 @@ class SqliteVectorSourceBridge @JvmOverloads constructor(
     backend: SqliteVectorTileBackend,
     sourceCurrent: BooleanSupplier,
     minZoom: Int = 0,
-    maxZoom: Int = 18
+    maxZoom: Int = 18,
+    diagnosticLayerId: Int = -1
 ) {
     private val session: SqliteVectorTileSession
     private val nativeSource: CustomVectorSource
@@ -42,7 +47,7 @@ class SqliteVectorSourceBridge @JvmOverloads constructor(
         requireUiThread()
         require(sourceId.isNotBlank()) { "Empty native source identity" }
         require(minZoom in 0..25 && maxZoom in minZoom..25) { "Invalid native source zoom range" }
-        session = SqliteVectorTileSession(backend, sourceCurrent)
+        session = SqliteVectorTileSession(backend, sourceCurrent, diagnosticLayerId = diagnosticLayerId)
         try {
             nativeSource = CustomVectorSource(
                 sourceId,
@@ -100,7 +105,8 @@ internal class SqliteVectorTileSession(
     private val backend: SqliteVectorTileBackend,
     private val sourceCurrent: BooleanSupplier,
     mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
-    private val workDispatcher: CoroutineDispatcher = SharedSqliteTileIo.dispatcher
+    private val workDispatcher: CoroutineDispatcher = SharedSqliteTileIo.dispatcher,
+    private val diagnosticLayerId: Int = -1
 ) {
     private val closed = AtomicBoolean(false)
     private val ownerJob = SupervisorJob()
@@ -119,26 +125,34 @@ internal class SqliteVectorTileSession(
     suspend fun fetch(z: Int, x: Int, y: Int): ByteArray {
         requested.incrementAndGet()
         active.incrementAndGet()
+        val diagnostic = MapRuntimeDiagnostics.sqliteTile(diagnosticLayerId, z)
+        var diagnosticOutcome = SqliteOutcome.ABANDONED
         try {
             val requestJob = coroutineContext[Job] ?: error("Tile request requires its own coroutine Job")
             var request: SqliteVectorTileRequest? = null
             while (true) {
                 ensureCurrent(requestJob, request)
                 try {
+                    diagnostic.phase(SqlitePhase.IO_QUEUE)
                     // Admission/byte budget belongs to the backend: no second gate here.
                     val bytes = runInterruptible(workDispatcher) {
+                        diagnostic.phase(SqlitePhase.STYLE)
                         ensureCurrent(requestJob, request)
                         val snapshot = request ?: backend.snapshot(z, x, y).also { request = it }
+                        diagnostic.identity(snapshot.sourceEpoch, snapshot.contentVersion)
                         ensureCurrent(requestJob, snapshot)
                         val current = BooleanSupplier { isCurrent(requestJob, snapshot) }
-                        backend.load(snapshot, current).also {
+                        backend.load(snapshot, current, diagnostic).also {
                             ioSuccessful.incrementAndGet()
                             ensureCurrent(requestJob, snapshot)
+                            // Written on IO before resuming Main; a blocked Main is visible to the watcher.
+                            diagnostic.phase(SqlitePhase.MAIN_DISPATCH)
                         }
                     }
                     // Main check still directly precedes return: no added suspension or native call.
                     ensureCurrent(requestJob, request)
                     returnedToSdk.incrementAndGet()
+                    diagnosticOutcome = SqliteOutcome.RETURNED_TO_SDK
                     return bytes
                 } catch (failure: CancellationException) {
                     throw failure
@@ -147,11 +161,14 @@ internal class SqliteVectorTileSession(
                     ensureCurrent(requestJob, request)
                     if (failure !is SqliteVectorTileBackend.RetryableTileException) throw failure
                     retries.incrementAndGet()
+                    diagnostic.count(SqliteCount.RETRIES, 1)
+                    diagnostic.phase(SqlitePhase.RETRY_DELAY)
                     // IO and all backend permits have unwound before this cancellable Main delay.
                     delay(failure.retryAfterMillis)
                 }
             }
         } catch (failure: CancellationException) {
+            diagnosticOutcome = SqliteOutcome.CANCELLED
             cancelled.incrementAndGet()
             lastCancelKind.set(when {
                 closed.get() -> "source_closed"
@@ -164,11 +181,13 @@ internal class SqliteVectorTileSession(
             })
             throw failure
         } catch (failure: Exception) {
+            diagnosticOutcome = SqliteOutcome.FAILED
             failures.incrementAndGet()
             lastFailureClass.set(failure.javaClass.name.take(128))
             throw failure
         } finally {
             active.decrementAndGet()
+            diagnostic.finish(diagnosticOutcome) // Pure Java, fail-open; no SDK call or suspension.
         }
     }
 

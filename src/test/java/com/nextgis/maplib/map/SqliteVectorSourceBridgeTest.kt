@@ -80,6 +80,20 @@ class SqliteVectorSourceBridgeTest {
             session.diagnostics().keys)
     }
 
+    @Test fun diagnosticCallbackKeepsOneBackendReadAndOriginalCompletionBytes() {
+        val backend = Backend().apply { onLoad = { _, current ->
+            assertTrue(current.asBoolean)
+            byteArrayOf(9, 7, 5)
+        } }
+        val session = SqliteVectorTileSession(backend, BooleanSupplier { true }, main, io,
+            diagnosticLayerId = 7).also { sessions.add(it) }
+        assertArrayEquals(byteArrayOf(9, 7, 5), await(session.scope.async { session.fetch(3, 4, 5) }))
+        assertEquals(1, backend.loads.get())
+        assertEquals(1, backend.diagnosticLoads.get())
+        assertCounter(session, "returned_to_sdk", 1)
+        assertCounter(session, "active", 0)
+    }
+
     @Test fun closeIsTerminalAndLateSuccessfulIoCannotReachCaller() {
         val entered = CountDownLatch(1)
         val release = ownedRelease()
@@ -392,6 +406,7 @@ class SqliteVectorSourceBridgeTest {
 
     private class Backend : SqliteVectorTileBackend {
         val loads = AtomicInteger()
+        val diagnosticLoads = AtomicInteger()
         val snapshots = AtomicInteger()
         val closes = AtomicInteger()
         var onSnapshot: (Int, Int, Int) -> SqliteVectorTileRequest = ::request
@@ -405,6 +420,11 @@ class SqliteVectorSourceBridgeTest {
         override fun load(request: SqliteVectorTileRequest, current: BooleanSupplier): ByteArray {
             loads.incrementAndGet()
             return onLoad(request, current)
+        }
+        override fun load(request: SqliteVectorTileRequest, current: BooleanSupplier,
+                          diagnostics: com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteScope): ByteArray {
+            diagnosticLoads.incrementAndGet()
+            return load(request, current)
         }
         override fun close() { closes.incrementAndGet() }
     }

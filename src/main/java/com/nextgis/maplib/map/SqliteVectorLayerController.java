@@ -127,7 +127,7 @@ final class SqliteVectorLayerController {
         SqliteSourceRetirement.Registration registration = null;
         try {
             bridge = new SqliteVectorSourceBridge(nativeId, provider,
-                    () -> !retirement.isRetired() && epoch.get() == generation);
+                    () -> !retirement.isRetired() && epoch.get() == generation, 0, 18, layer.getId());
             registration = retirement.register(bridge::cancelPendingWork);
             if (retirement.isRetired()) return false;
             Source source = bridge.getSource();
