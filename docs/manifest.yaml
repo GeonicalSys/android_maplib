@@ -2,7 +2,7 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
@@ -78,9 +78,9 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/map/RenderTileWorkGateTest.java
     responsibility: Assert normal two-builder throughput, exclusive fair constrained work and permit preservation after interruption, failure, double close, canceled job wait and a throwing current callback.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerDisplayPriority.java
-    responsibility: Match named standard field LineString/MultiLineString layers for display above tracks and below points, independent of tap eligibility.
+    responsibility: Plan whole field-line and Point/MultiPoint SDK pass groups using exact logical/current-controller/line-label aliases and canonical bottom-to-top model input; retain internal and relative group order, ignore stale/prefix-only aliases and polygon label anchors, and avoid moves for an already correct stack independently of tap eligibility.
   - path: maplib/src/test/java/com/nextgis/maplib/map/LayerDisplayPriorityTest.java
-    responsibility: Reject unrelated names and geometry types and accept canonical Russian/field_lines names with case and edge-space normalization.
+    responsibility: Verify field name/geometry policy, exact current versus stale aliases, whole body/label/icon grouping, stable relative/internal order and no-op already-correct stacks; pure tests do not certify native nested-group or Activity recreation behavior.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelLayout.java
     responsibility: Clip the true visible quadrilateral and plan one rigid point label per object, stream DB originals without retained geometry in candidates, preserve late UI properties and keep classic native-fragment merge/dedup compatibility.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java

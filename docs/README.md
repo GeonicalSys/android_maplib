@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -1028,3 +1028,29 @@ LayerDisplayPriority распознаёт линейную геометрию с
 stack не перестраивается. Схема, API payload и число проходов не меняются.
 Consuming Related track-candidates: 4/4 native PASS. Контракт — consuming
 архитектура track-controls.md. Runtime unit/build и полный набор отдельны.
+
+Регрессия ordinary SQLite native route29 октября: logical path недостаточен
+для поиска current SDK passes. Планировщик получает точные aliases logical,
+controller-owned current native source и отдельного line-label source; старое
+поколение и похожий prefix не включаются. Группы обходятся по canonical
+flattened LayerGroup снизу вверх, а не по insertion/reverse sourcesOrder cache.
+Это существенно для hot-add и standalone bind в произвольном порядке.
+Перестановка использует `Style.getLayer(id)` cached factory wrapper: свежие
+enumeration wrappers служат только метаданными, иначе теряется identity владельца
+hide/edit filter. Порядок восстанавливается в style-props, GeoJSON-source update,
+data-reload и private SQLite refresh; full/lite выполняют одну перестановку
+после batch. Cache/IO admission, epoch/cancellation и сами данные не меняются.
+Новая карточка: [maplib-20261029-sqlite-layer-display-priority](../update-reports/entries/maplib-20261029-sqlite-layer-display-priority.md).
+Первый app native запуск подтвердил реальный дефект взаимного порядка групп;
+после canonical model traversal исправления focused `sqlite-priority`1/1 PASS
+на T40/API30 (`priority-related-t40-02`), затем все10 distinct методов класса
+PASS (`sqlite-related-t40-03/result.json`). Final83 JVM/10classes PASS,
+0fail/error/skip. Обычный Lisa224/3.1.2.30 с окончательным исправлением собран и
+установлен поверх приложения T40 с прежней подписью и данными; SHA256
+`57a495854c9c18a5265bf42074101b9dd6d5750ad0fe5e3d6e606c5ef10984bd`.
+Normal variants/version matrix PASS; profiler/verification выключены,
+profileable отсутствует. Восстановленная карта14.2 визуально просмотрена;
+это normal smoke, не полнота/pixel приёмка реального проекта либо Full.
+UID logcat collector `--uid` на T40 не поддержан — отдельный diagnostic gap.
+Native nested/recreation остаются
+непроверенными; прежний4/4 classic-route PASS не является новой приёмкой.
