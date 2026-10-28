@@ -236,6 +236,9 @@ public class VectorLayer
     /** When true, bulk inserts skip insert broadcast and notifyInsert skips save/cache refresh (NGW/GeoJSON import). */
     protected volatile boolean mBulkImportMode;
     private final Object mSpatialCacheLock = new Object();
+    private transient java.lang.ref.WeakReference<Object> mNativeValidatedSpatialCache;
+    private transient long mNativeValidatedDataGeneration = Long.MIN_VALUE;
+    private transient int mNativeValidatedSpatialSize = -1;
     protected int     mGeometryType;
     protected long    mUniqId;
     protected boolean mIsLocked;
@@ -245,6 +248,13 @@ public class VectorLayer
     protected boolean mCollectorEditable = true;
 
     static final boolean useNewLargeDataload = true;
+    private final java.util.concurrent.atomic.AtomicLong renderContentVersion = new java.util.concurrent.atomic.AtomicLong();
+    long renderContentVersion() { return renderContentVersion.get(); }
+
+    @Override public void notifyLayerChanged() {
+        if (renderContentVersion != null) renderContentVersion.incrementAndGet();
+        super.notifyLayerChanged();
+    }
     /**
      * The geometry cache for fast querying and drawing
      */
@@ -941,7 +951,7 @@ public class VectorLayer
             rootConfig.put(Constants.JSON_BBOX_MINY_KEY, mExtents.getMinY());
         }
 
-        if (!mIsCacheRebuilding) {
+        if (!mIsCacheRebuilding && mCacheLoaded) {
 //            Log.e("CCACHH","mCache.save");
 
             mCache.save(new File(mPath, RTREE));
@@ -3115,6 +3125,7 @@ public class VectorLayer
     @Override
     public void notifyDelete(long rowId)
     {
+        renderContentVersion.incrementAndGet();
         if (mBulkImportMode || mIsCacheRebuilding) {
             return;
         }
@@ -3204,6 +3215,7 @@ public class VectorLayer
     @Override
     public void notifyDeleteAll()
     {
+        renderContentVersion.incrementAndGet();
         if (mBulkImportMode || mIsCacheRebuilding) {
             return;
         }
@@ -3224,6 +3236,7 @@ public class VectorLayer
     @Override
     public void notifyInsert(long rowId)
     {
+        renderContentVersion.incrementAndGet();
         if (mBulkImportMode || mIsCacheRebuilding) {
             return;
         }
@@ -3253,6 +3266,7 @@ public class VectorLayer
             long oldRowId,
             boolean attributesOnly)
     {
+        renderContentVersion.incrementAndGet();
         if (mBulkImportMode || mIsCacheRebuilding) {
             return;
         }
@@ -3315,6 +3329,7 @@ public class VectorLayer
     @Override
     public void notifyUpdateAll()
     {
+        renderContentVersion.incrementAndGet();
         reloadCache();
         invalidateLocalRenderCache();
         notifyLayerChanged();
@@ -3481,6 +3496,45 @@ public class VectorLayer
         return result;
     }
 
+    /** A complete spatial snapshot for native tiles; an unfinished index is retryable, never empty success. */
+    public List<Long> queryForNativeRender(GeoEnvelope env)
+            throws SqliteVectorTileBackend.RetryableTileException {
+        if (mIsCacheRebuilding) throw nativeIndexNotReady();
+        Object cache; long generation; int size;
+        synchronized (mSpatialCacheLock) {
+            if (mIsCacheRebuilding) throw nativeIndexNotReady();
+            cache = mCache; generation = getDataGeneration(); size = mCache.size();
+            if (mCacheLoaded && mNativeValidatedSpatialCache != null && cache == mNativeValidatedSpatialCache.get()
+                    && generation == mNativeValidatedDataGeneration && size == mNativeValidatedSpatialSize)
+                return nativeSpatialIds(env, cache, generation, size);
+        }
+        // Do not wait for SQLite while holding the spatial writer lock: bulk writers may own a transaction.
+        // COUNT reads IDs/pages only, once per observed tree/data/size generation, never full geometries.
+        int rows = getSqliteTableRowCount();
+        synchronized (mSpatialCacheLock) {
+            if (mIsCacheRebuilding || cache != mCache || generation != getDataGeneration()
+                    || size != mCache.size() || rows < 0 || rows != size) throw nativeIndexNotReady();
+            // A newly created empty table needs no index scan; failed/canceled nonempty indexes remain unready.
+            if (!mCacheLoaded && size == 0) mCacheLoaded = true;
+            if (!mCacheLoaded) throw nativeIndexNotReady();
+            mNativeValidatedSpatialCache = new java.lang.ref.WeakReference<>(cache); mNativeValidatedDataGeneration = generation;
+            mNativeValidatedSpatialSize = size;
+            return nativeSpatialIds(env, cache, generation, size);
+        }
+    }
+
+    /** Called only while holding mSpatialCacheLock; old disk load also synchronizes RTree load/search. */
+    private List<Long> nativeSpatialIds(GeoEnvelope env, Object cache, long generation, int size)
+            throws SqliteVectorTileBackend.RetryableTileException {
+        List<Long> ids = query(env);
+        if (!mCacheLoaded || mIsCacheRebuilding || cache != mCache || generation != getDataGeneration()
+                || size != mCache.size()) throw nativeIndexNotReady();
+        return ids;
+    }
+    private static SqliteVectorTileBackend.RetryableTileException nativeIndexNotReady() {
+        return new SqliteVectorTileBackend.RetryableTileException("spatial_index_not_ready", 100);
+    }
+
 
     /**
      * All {@link #FIELD_ID} values in this layer's SQLite table.
@@ -3507,7 +3561,8 @@ public class VectorLayer
 
     public void hideFeature(long featureId)
     {
-        if (featureId != NOT_FOUND) {
+        if (featureId != NOT_FOUND && !mIgnoreFeatures.contains(featureId)) {
+            renderContentVersion.incrementAndGet();
             mIgnoreFeatures.add(featureId);
             //notifyLayerChanged();
         }
@@ -3520,8 +3575,9 @@ public class VectorLayer
             return;
         }
 
-        mIgnoreFeatures.remove(featureId);
-        notifyLayerChanged();
+        if (mIgnoreFeatures.remove(Long.valueOf(featureId))) {
+            notifyLayerChanged();
+        }
     }
 
 
@@ -3575,6 +3631,7 @@ public class VectorLayer
         int cached = 0;
         try {
             mIsCacheRebuilding = true;
+            mCacheLoaded = false;
             mCache = createNewCache();
             mExtents.unInit();
 
@@ -3615,12 +3672,16 @@ public class VectorLayer
                 }
             }
 
-            mCacheLoaded = true;
+            mCacheLoaded = cached == cursor.getCount() && (progressor == null || !progressor.isCanceled());
         } finally {
             if (null != cursor) {
                 cursor.close();
             }
             mIsCacheRebuilding = false;
+        }
+        if (!mCacheLoaded) {
+            HyperLog.w(Constants.TAG, "Spatial cache rebuild incomplete; native rendering waits for a complete index");
+            return;
         }
         if (persistLayerConfigAfterRebuild) {
             save();
@@ -3746,42 +3807,37 @@ public class VectorLayer
 
     public static byte[] readLargeBlob(SQLiteDatabase db, String tableName, long rowId) {
         String sql = "SELECT " + FIELD_GEOM + " FROM " + tableName + " WHERE _id = ?";
-        SQLiteStatement st = db.compileStatement(sql);
-        st.bindLong(1, rowId);
-
-        ParcelFileDescriptor pfd = null;
-        try {
-            pfd = st.simpleQueryForBlobFileDescriptor();
-        } catch (SQLiteDoneException e) {
-            return null;
+        try (SQLiteStatement statement = db.compileStatement(sql)) {
+            statement.bindLong(1, rowId);
+            ParcelFileDescriptor descriptor;
+            try { descriptor = statement.simpleQueryForBlobFileDescriptor(); }
+            catch (SQLiteDoneException absent) { return null; }
+            return descriptor == null ? null : readBlob(descriptor);
         }
-
-        if (pfd == null)
-            return null;
-
-        final byte[] result = readBlob(pfd.getFileDescriptor());
-        try {
-            pfd.close();
-        } catch (Exception ex){
-            Log.e("readLargeBlob", ex != null ? ex.getMessage() : "null message");
-        }
-
-        return result;
     }
 
-    private static byte[] readBlob(FileDescriptor fd) {
-        try (FileInputStream fis = new FileInputStream(fd);
-             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-
+    static byte[] readBlob(ParcelFileDescriptor descriptor) {
+        try (java.io.InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
+            long length = descriptor.getStatSize();
+            if (length > 0 && length <= Integer.MAX_VALUE - 8) {
+                // The SQLite BLOB descriptor is immutable. Avoid the growing byte stream
+                // and its second full-size toByteArray copy on every MVT feature read.
+                byte[] bytes = new byte[(int) length]; int used = 0;
+                while (used < bytes.length) {
+                    int count = input.read(bytes, used, bytes.length - used);
+                    if (count < 0) break;
+                    used += count;
+                }
+                return used == bytes.length ? bytes : java.util.Arrays.copyOf(bytes, used);
+            }
+            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int bytesRead;
-
-            while ((bytesRead = fis.read(buffer)) != -1) {
+            while ((bytesRead = input.read(buffer)) != -1) {
                 bos.write(buffer, 0, bytesRead);
             }
-
             return bos.toByteArray();
-
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -3794,6 +3850,38 @@ public class VectorLayer
             return getFeatureLargeData(featureId);
         else
             return getFeatureOldData(featureId);
+    }
+
+    /** A visit owns bounded attributes cursors and one BLOB statement; editor/sync reads stay independent. */
+    void visitOriginalsForNativeRender(java.util.Iterator<Long> ids,
+            com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteScope diagnostics,
+            java.util.function.BooleanSupplier current,SqliteVectorFeatureReader.Visitor visitor) throws Exception {
+        if(!ids.hasNext())return;
+        if(!useNewLargeDataload) {
+            while(ids.hasNext()) {
+                if(Thread.currentThread().isInterrupted() || !current.getAsBoolean())
+                    throw new java.util.concurrent.CancellationException("Obsolete SQLite original reader");
+                visitor.beforeRead();
+                Feature feature=getFeatureOldData(ids.next());
+                if(feature==null || feature.getGeometry()==null)
+                    throw new IOException("Incomplete indexed original feature read");
+                visitor.accept(feature);
+            }
+            return;
+        }
+        if(diagnostics!=null)diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.SQL_ATTRIBUTES);
+        MapContentProviderHelper map=DatabaseContext.getMapForLayer(this);
+        if(map==null)throw new IllegalStateException("Missing native original owner");
+        SqliteVectorFeatureReader.visit(ids,SqliteVectorFeatureReader.sqlite(map.getDatabase(true),mPath.getName(),getFields()),
+                current,diagnostics,visitor);
+    }
+
+    /** Same original read, with optional phase markers; no additional SQLite reads. */
+    Feature getFeatureForNativeRender(long featureId,
+            com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteScope diagnostics) {
+        if (useNewLargeDataload) return getFeatureLargeData(featureId, diagnostics);
+        // Kept explicit for a future legacy switch: this fallback is not a split BLOB/decode measurement.
+        return getFeatureOldData(featureId);
     }
 
     public final  Feature getFeatureOldData(long featureId)
@@ -3816,7 +3904,14 @@ public class VectorLayer
 
     public final  Feature getFeatureLargeData(long featureId)
     {
+        return getFeatureLargeData(featureId, null);
+    }
+
+    private Feature getFeatureLargeData(long featureId,
+            com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteScope diagnostics)
+    {
         Feature feature = null;
+        if (diagnostics != null) diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.SQL_ATTRIBUTES);
 
         final List<Field> fields = getFields();
         String[] projection = new String[fields.size() +1] ; // only ID, but beter all fields exept  geom
@@ -3848,8 +3943,13 @@ public class VectorLayer
             feature = new Feature(cursor.getLong(0), fields);
             feature.fromCursorWithoutGeometry(cursor);
 
+            if (diagnostics != null) diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.BLOB_READ);
             byte[] geomBlob = readLargeBlob(db,mPath.getName(),  feature.getId() );
             if (geomBlob != null) {
+                if (diagnostics != null) {
+                    diagnostics.count(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqliteCount.BLOB_BYTES, geomBlob.length);
+                    diagnostics.phase(com.nextgis.maplib.util.MapRuntimeDiagnostics.SqlitePhase.GEOMETRY_DECODE);
+                }
                 try {
                     feature.setGeometry(GeoGeometryFactory.fromBlob(geomBlob));
                 } catch (Exception ex){

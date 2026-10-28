@@ -37,7 +37,7 @@ public class PointEditClass extends MLGeometryEditClass {
         }
 
 
-        selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(polygonFeatures));
+        MPLFeaturesUtils.setNativeVectorGeoJson(selectedEditedSource, null, geoType, polygonFeatures);
 
         editingFeature.addStringProperty("color", MPLFeaturesUtils.colorLightBlue);
     }

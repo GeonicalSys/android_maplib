@@ -47,6 +47,8 @@ public final class LocalVectorTileServer {
     private final Map<Integer, Object> mLayerBuildLocks = new ConcurrentHashMap<>();
     private final ThreadPoolExecutor mExecutor = LocalVectorTileRequestPolicy.newExecutor();
     private final AtomicLong mLayerGeneration = new AtomicLong();
+    private final String mCacheSession = java.util.UUID.randomUUID().toString();
+    private final RenderTileWorkGate mTileWorkGate = RenderTileWorkLimiter.processShared();
 
     private volatile ServerSocket mServerSocket;
     private volatile int mPort = -1;
@@ -67,7 +69,7 @@ public final class LocalVectorTileServer {
             return null;
         }
         mLayers.put(layer.getId(), layer);
-        mLayerBuildLocks.computeIfAbsent(layer.getId(), ignored -> new Object());
+        mLayerBuildLocks.computeIfAbsent(layer.getId(), ignored -> RenderTileWorkLimiter.layerLock(layer));
         return getTileUrl(layer.getId());
     }
 
@@ -128,6 +130,10 @@ public final class LocalVectorTileServer {
                 try {
                     mExecutor.execute(request);
                 } catch (RejectedExecutionException rejected) {
+                    for (VectorLayer layer : mLayers.values()) {
+                        RenderMemoryGuard memory = RenderMemoryGuard.forLayer(layer);
+                        if (memory != null) memory.noteDelayedWork();
+                    }
                     MapRuntimeDiagnostics.tileRejected(request.mRequestId, "queue_full",
                             mExecutor.getActiveCount(), mExecutor.getQueue().size(), null);
                     request.rejectOverload();
@@ -159,7 +165,7 @@ public final class LocalVectorTileServer {
             while ((line = reader.readLine()) != null && line.length() > 0) {
                 // Drain headers; keep-alive is deliberately ignored.
             }
-            Response response = route(requestLine, generation, trace);
+            Response response = route(requestLine, generation, trace, s);
             trace.put("status", response.status);
             if (response.status == 500) failure = "tile_error";
             bytes = response.body == null ? 0 : response.body.length;
@@ -173,7 +179,7 @@ public final class LocalVectorTileServer {
         }
     }
 
-    private Response route(String requestLine, long generation, MapRuntimeDiagnostics.Trace trace) {
+    private Response route(String requestLine, long generation, MapRuntimeDiagnostics.Trace trace, Socket socket) {
         try {
             String[] parts = requestLine.split(" ");
             if (parts.length < 2 || !"GET".equals(parts[0].toUpperCase(Locale.ROOT))) {
@@ -197,29 +203,81 @@ public final class LocalVectorTileServer {
             if (layer == null) {
                 return Response.text(404, "Layer Not Registered");
             }
+            RenderMemoryGuard memory = RenderMemoryGuard.forLayer(layer);
+            if (memory != null && !memory.canBuildTile()) {
+                memory.noteReducedCache();
+                return Response.busy("render_memory_limited", trace.id());
+            }
             Runtime runtime = Runtime.getRuntime();
             if (!LocalVectorTileRequestPolicy.hasHeapHeadroom(
                     runtime.maxMemory(), runtime.totalMemory(), runtime.freeMemory())) {
+                if (memory != null) memory.noteReducedCache();
                 MapRuntimeDiagnostics.tileRejected(trace.id(), "heap_headroom",
                         mExecutor.getActiveCount(), mExecutor.getQueue().size(), trace);
                 return Response.busy("heap_headroom", trace.id());
             }
-            Object buildLock = mLayerBuildLocks.computeIfAbsent(layerId, ignored -> new Object());
+            Object buildLock = mLayerBuildLocks.computeIfAbsent(layerId, ignored -> RenderTileWorkLimiter.layerLock(layer));
             byte[] tile;
             trace.phase("wait_layer_lock");
             synchronized (buildLock) {
                 if (generation != mLayerGeneration.get() || mLayers.get(layerId) != layer) {
                     return Response.text(404, "Layer Not Registered");
                 }
-                tile = LocalVectorTileProvider.buildTile(layer, z, x, y, trace);
+                long cacheBytes = memory == null ? 32 * RenderMemoryPolicy.MIB : memory.limits().diskCacheBytes;
+                LocalVectorTileDiskCache disk = new LocalVectorTileDiskCache(layer.getContext().getCacheDir());
+                // Cache only display-only sources. Session/generation/content fences
+                // avoid trusting the disabled legacy whole-layer GeoJSON cache generations.
+                boolean cacheEnabled = !layer.isEditingAllowed();
+                String key = cacheEnabled ? cacheKey(layer, generation, z, x, y) : "";
+                tile = cacheEnabled ? disk.read(key, Math.min(4 * RenderMemoryPolicy.MIB, cacheBytes / 16)) : null;
+                trace.put("disk_cache_hit", tile != null);
+                if (tile == null) {
+                    java.util.function.BooleanSupplier current =
+                            () -> generation == mLayerGeneration.get() && mLayers.get(layerId) == layer && !peerClosed(socket);
+                    boolean constrained = memory != null && memory.shouldSerializeTileWork();
+                    trace.put("tile_work_limit", constrained ? 1 : 2);
+                    if (constrained) memory.noteSerializedTiles();
+                    try (RenderTileWorkGate.Lease work = mTileWorkGate.acquire(constrained)) {
+                        if (!current.getAsBoolean()) throw new java.util.concurrent.CancellationException("Obsolete local tile request");
+                        tile = LocalVectorTileProvider.buildTile(layer, z, x, y, trace, current);
+                    }
+                    if (cacheEnabled && current.getAsBoolean() && key.equals(cacheKey(layer, generation, z, x, y)))
+                        disk.put(key, tile, cacheBytes);
+                }
             }
             return new Response(200, "application/x-protobuf", tile);
+        } catch (java.util.concurrent.CancellationException obsolete) {
+            trace.put("canceled", true);
+            return Response.busy("obsolete_viewport", trace.id());
+        } catch (InterruptedException canceled) {
+            Thread.currentThread().interrupt();
+            trace.put("canceled", true);
+            return Response.busy("obsolete_viewport", trace.id());
+        } catch (LocalVectorTileProvider.MemoryPressure limited) {
+            trace.put("memory_limited", true);
+            return Response.busy("render_memory_limited", trace.id());
         } catch (Exception e) {
             trace.put("error_type", e.getClass().getSimpleName());
             HyperLog.w(Constants.TAG, "Local vector tile request failed: "
                     + e.getMessage(), e);
             return Response.text(500, "Tile Error");
         }
+    }
+
+    private String cacheKey(VectorLayer layer, long generation, int z, int x, int y) throws IOException {
+        return LocalVectorTileDiskCache.key(mCacheSession + "/" + generation + "/" + layer.getPath().getCanonicalPath(),
+                layer.renderContentVersion(), VectorLayerRenderCache.styleFingerprint(layer),
+                "complete", z, x, y);
+    }
+
+    private static boolean peerClosed(Socket socket) {
+        try {
+            // Requests have no body and each connection serves one GET. Check FIN at bounded
+            // intervals instead of finishing thousands of features for a viewport already gone.
+            socket.setSoTimeout(1);
+            return socket.getInputStream().read() == -1;
+        } catch (java.net.SocketTimeoutException active) { return false; }
+        catch (IOException canceled) { return true; }
     }
 
     private void closeQueuedRequests() {

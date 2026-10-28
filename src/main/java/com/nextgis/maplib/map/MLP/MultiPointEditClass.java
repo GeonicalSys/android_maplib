@@ -38,7 +38,7 @@ public class MultiPointEditClass extends MLGeometryEditClass {
 
 //        polygonFeatures.removeIf(f -> Objects.equals(f.getStringProperty(MPLFeaturesUtils.prop_order),
 //                editingFeature.getStringProperty(MPLFeaturesUtils.prop_order)));
-        selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(polygonFeatures));
+        MPLFeaturesUtils.setNativeVectorGeoJson(selectedEditedSource, null, geoType, polygonFeatures);
 
         editingFeature.addStringProperty("color", MPLFeaturesUtils.colorLightBlue);
     }

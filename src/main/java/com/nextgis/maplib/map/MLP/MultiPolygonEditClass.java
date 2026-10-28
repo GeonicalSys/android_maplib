@@ -67,7 +67,7 @@ public class MultiPolygonEditClass extends MLGeometryEditClass {
 //            editingFeature.getStringProperty(MPLFeaturesUtils.prop_order)));
 
         }
-        selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(polygonFeatures));
+        MPLFeaturesUtils.setNativeVectorGeoJson(selectedEditedSource, null, geoType, polygonFeatures);
 
         if (this.originalEditingFeature != null) {
             extractVertices(this.originalEditingFeature, true);

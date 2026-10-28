@@ -22,6 +22,7 @@
  */
 
 apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 def productionVersionName = '3.1.2.30'
 def debugVersionName = '3.1.2.23'
@@ -74,6 +75,9 @@ android {
         targetCompatibility JavaVersion.VERSION_21
     }
     namespace 'com.nextgis.maplib'
+    kotlinOptions {
+        jvmTarget = '21'
+    }
     lint {
         targetSdk 36
     }
@@ -89,6 +93,7 @@ dependencies {
     // MapLibre 13's generic android-sdk artifact uses Vulkan. Keep OpenGL explicit so
     // devices without a compatible Vulkan implementation can open the map.
     implementation 'org.maplibre.gl:android-sdk-opengl:13.7.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
 
     implementation 'org.locationtech.jts:jts-core:1.20.0'
 

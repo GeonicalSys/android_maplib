@@ -52,7 +52,7 @@ public class LineEditClass extends MLGeometryEditClass {
             }
         }
 
-        selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(lineFeatures));
+        MPLFeaturesUtils.setNativeVectorGeoJson(selectedEditedSource, null, geoType, lineFeatures);
 
         editingFeature.addStringProperty("color", MPLFeaturesUtils.colorLightBlue);
     }

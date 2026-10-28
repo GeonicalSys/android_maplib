@@ -60,6 +60,8 @@ import com.nextgis.maplib.display.RuleFeatureRenderer;
 import com.nextgis.maplib.display.SimpleLineStyle;
 import com.nextgis.maplib.display.SimpleMarkerStyle;
 import com.nextgis.maplib.display.SimplePolygonStyle;
+import com.nextgis.maplib.display.SimpleFeatureRenderer;
+import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.display.TMSRenderer;
 import com.nextgis.maplib.display.TextStyleUtil;
 import com.nextgis.maplib.map.MLP.LineEditClass;
@@ -275,6 +277,14 @@ public class MPLFeaturesUtils {
     }
 
     static public List<org.maplibre.geojson.Feature> createFeatureListFromLayer(final VectorLayer layer) {
+        try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope memory =
+                     com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layer.getId(), "classic", "sqlite_to_geojson")) {
+            List<org.maplibre.geojson.Feature> result = buildFeatureListFromLayer(layer);
+            memory.features(result.size()); return result;
+        }
+    }
+
+    private static List<org.maplibre.geojson.Feature> buildFeatureListFromLayer(final VectorLayer layer) {
         List<org.maplibre.geojson.Feature> vectorFeatures = new ArrayList<>();
 
         String signatureField =  getLayerSignatureField(layer);
@@ -1007,6 +1017,22 @@ public class MPLFeaturesUtils {
                                             String layerPath,
                                             boolean forceCreate,
                                             java.net.URI fileUri) {
+        createSourceForLayer(layerId, layerType, layerFeatures, style, sourceHashMap, rasterLayersURL,
+                rasterLayersTmsTypeMap, layerPath, forceCreate, fileUri, null);
+    }
+
+    /** Optional owner supplies the exact uniform defaults used by the geometry factories. */
+    static public void createSourceForLayer(int layerId, int layerType, List<Feature> layerFeatures,
+                                            Style style, Map<String, GeoJsonSource> sourceHashMap,
+                                            Map<Integer, String> rasterLayersURL,
+                                            Map<Integer, Integer> rasterLayersTmsTypeMap, String layerPath,
+                                            boolean forceCreate, java.net.URI fileUri, VectorLayer owner) {
+        // An explicit classic bind replaces a streamed generation and all of its native children.
+        SqliteVectorLayerController.detachForClassic(style, layerPath);
+        try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope memory =
+                     com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layerId,
+                             layerType == GT_RASTER_WA ? "raster" : "classic", "native_source")) {
+        memory.features(layerFeatures == null ? 0 : layerFeatures.size());
         if (layerType == GT_TRACK_WA){
             return;
         }
@@ -1070,42 +1096,32 @@ public class MPLFeaturesUtils {
             vectorExisting = null;
         }
         GeoJsonSource vectorSource = (GeoJsonSource) vectorExisting;
-        boolean useNativeUri = fileUri != null
-                && layerFeatures != null
-                && !layerFeatures.isEmpty();
+        // The compatibility fileUri argument must not bypass the native projection through a
+        // legacy styled file. USE_MAPLIBRE_NATIVE_GEOJSON_URI stays disabled in the cache owner.
+        final List<Feature> nativeFeatures = nativeFeaturesForLayer(owner, layerType, layerFeatures);
+        recordNativePayload(memory, "geometry", layerFeatures, nativeFeatures);
+        HyperLog.d("NativeFeaturePayload", "layer=" + layerId + " role=geometry features="
+                + layerFeatures.size() + "->" + nativeFeatures.size() + " properties="
+                + NativeFeaturePayload.propertyCount(layerFeatures) + "->"
+                + NativeFeaturePayload.propertyCount(nativeFeatures));
         if (vectorSource == null) {
-            if (useNativeUri) {
-                try {
-                    vectorSource = new GeoJsonSource(layerPath, fileUri);
-                } catch (Exception uriEx) {
-                    Log.w("Mbgl", "createSourceForLayer: native URI failed, fallback to GeoJson "
-                            + layerPath + " " + uriEx.getMessage());
-                    vectorSource = new GeoJsonSource(layerPath,
-                            FeatureCollection.fromFeatures(layerFeatures));
-                }
-            } else {
-                vectorSource = new GeoJsonSource(layerPath, FeatureCollection.fromFeatures(layerFeatures));
-            }
+            vectorSource = new GeoJsonSource(layerPath, FeatureCollection.fromFeatures(nativeFeatures));
             style.addSource(vectorSource);
         } else {
-            if (useNativeUri) {
-                try {
-                    vectorSource.setUri(fileUri);
-                } catch (Exception uriEx) {
-                    Log.w("Mbgl", "createSourceForLayer: setUri failed, fallback to GeoJson "
-                            + layerPath + " " + uriEx.getMessage());
-                    vectorSource.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
-                }
-            } else {
-                vectorSource.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
-            }
+            vectorSource.setGeoJson(FeatureCollection.fromFeatures(nativeFeatures));
         }
 
         sourceHashMap.put(layerPath, vectorSource);
 
         if (addPolyTextSource){
 
-            List<Feature> points =  convertToPointFeatures(layerFeatures);
+            List<Feature> points = nativePolygonLabels(layerFeatures);
+            String labelRole = layerType == GTLineString || layerType == GTMultiLineString
+                    ? "line_labels" : "polygon_labels";
+            HyperLog.d("NativeFeaturePayload", "layer=" + layerId + " role=" + labelRole + " features="
+                    + layerFeatures.size() + "->" + points.size() + " properties="
+                    + NativeFeaturePayload.propertyCount(layerFeatures) + "->"
+                    + NativeFeaturePayload.propertyCount(points));
 
             Source vectorTextExisting = style.getSource(layerPath + source_polygon_text);
             if (vectorTextExisting != null && !(vectorTextExisting instanceof GeoJsonSource)) {
@@ -1113,6 +1129,9 @@ public class MPLFeaturesUtils {
                 vectorTextExisting = null;
             }
             GeoJsonSource vectorTextSource = (GeoJsonSource) vectorTextExisting;
+            try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope labelObservation =
+                         com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layerId, "classic", "native_payload")) {
+            recordNativePayload(labelObservation, labelRole, layerFeatures, points);
             if (vectorTextSource == null) {
                 vectorTextSource = new GeoJsonSource(layerPath + source_polygon_text, FeatureCollection.fromFeatures(points));
                 Log.d("Mbgl", "create source for: " + layerPath + source_polygon_text);
@@ -1122,7 +1141,73 @@ public class MPLFeaturesUtils {
             else
                 vectorTextSource.setGeoJson(FeatureCollection.fromFeatures(points));
             sourceHashMap.put(layerPath + source_polygon_text, vectorTextSource);
+            }
         }
+        }
+    }
+
+    public static List<Feature> nativeFeaturesForLayer(ILayer owner, int geometryType, List<Feature> features) {
+        com.google.gson.JsonObject defaults = null;
+        if ((geometryType == GTPolygon || geometryType == GTMultiPolygon) && owner instanceof VectorLayer) {
+            VectorLayer vector = (VectorLayer) owner;
+            if (vector.getRenderer() != null && vector.getRenderer().getClass() == SimpleFeatureRenderer.class
+                    && vector.getDefaultStyleNoExcept() instanceof SimplePolygonStyle) {
+                Feature reference = Feature.fromGeometry(Point.fromLngLat(0, 0));
+                MplFeatureStyleProps.apply(vector.getDefaultStyleNoExcept(), reference, geometryType);
+                defaults = reference.properties();
+            }
+        }
+        return NativeFeaturePayload.geometry(features, geometryType, defaults);
+    }
+
+    public static List<Feature> nativePolygonLabels(List<Feature> features) {
+        // Keep the public anchor helper's geometry-only contract unchanged.
+        return convertToPointFeatures(NativeFeaturePayload.labels(features));
+    }
+
+    public static void setNativeVectorGeoJson(GeoJsonSource source, ILayer owner, int geometryType,
+                                              List<Feature> features) {
+        // Streamed backgrounds stay in SQLite/MVT while the editor owns only selected/tool sources.
+        if (source == null) return;
+        List<Feature> compact = nativeFeaturesForLayer(owner, geometryType, features);
+        int layerId = owner == null ? -1 : owner.getId();
+        try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope observation =
+                     com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layerId, "classic", "native_payload")) {
+            recordNativePayload(observation, "geometry", features, compact);
+            source.setGeoJson(FeatureCollection.fromFeatures(compact));
+        }
+    }
+
+    public static void setNativeLabelGeoJson(GeoJsonSource source, String role, List<Feature> features) {
+        List<Feature> compact = NativeFeaturePayload.labels(features);
+        publishNativeLabels(source, role, features, compact);
+    }
+
+    public static void setNativePolygonLabelGeoJson(GeoJsonSource source, List<Feature> features) {
+        publishNativeLabels(source, "polygon_labels", features, nativePolygonLabels(features));
+    }
+
+    private static void publishNativeLabels(GeoJsonSource source, String role,
+                                             List<Feature> features, List<Feature> compact) {
+        if (source == null) return;
+        int layerId = -1;
+        for (Feature feature : features) {
+            if (feature == null || !feature.hasNonNullValueForProperty(prop_layerid)) continue;
+            try { layerId = Integer.parseInt(feature.getStringProperty(prop_layerid)); }
+            catch (RuntimeException ignored) { }
+            break;
+        }
+        try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope observation =
+                     com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layerId, "classic", "native_payload")) {
+            recordNativePayload(observation, role, features, compact);
+            source.setGeoJson(FeatureCollection.fromFeatures(compact));
+        }
+    }
+
+    public static void recordNativePayload(com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope scope,
+                                            String role, List<Feature> original, List<Feature> compact) {
+        scope.payload(role, original.size(), NativeFeaturePayload.propertyCount(original), compact.size(),
+                NativeFeaturePayload.propertyCount(compact), NativeFeaturePayload.labelCount(original));
     }
 
     static public boolean createLocalVectorTileSourceForLayer(
@@ -1132,6 +1217,8 @@ public class MPLFeaturesUtils {
             String tileUrl,
             float minZoom,
             float maxZoom) {
+        try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope memory =
+                     com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layerId, "local_mvt", "native_source")) {
         if (style == null || TextUtils.isEmpty(layerPath) || TextUtils.isEmpty(tileUrl)) {
             return false;
         }
@@ -1149,10 +1236,16 @@ public class MPLFeaturesUtils {
             if (maxZoom >= 0f) {
                 tileSet.setMaxZoom(maxZoom);
             }
-            style.addSource(new VectorSource(layerPath, tileSet));
+            VectorSource source = new VectorSource(layerPath, tileSet);
+            // A coarse prefetch tile can contain the entire local project. It duplicates
+            // geometry and blocks viewport tiles, especially during fast pan/pinch.
+            source.setPrefetchZoomDelta(0);
+            source.setVolatile(true); // Process-local loopback URLs are not reusable SDK disk keys.
+            style.addSource(source);
             Log.d("Mbgl", "create local vector tile source: " + layerPath + " url=" + tileUrl);
         }
         return true;
+        }
     }
 
     static public void createFillLayerForLocalVectorTileLayer(
@@ -1885,6 +1978,8 @@ public class MPLFeaturesUtils {
         if (style == null) {
             return;
         }
+        boolean sqliteTiles = SqliteVectorLayerController.isStreaming(style, layerPath);
+        String nativeSourceId = SqliteVectorLayerController.nativeSourceId(style, layerPath);
         // signatures between firstToolLayer and signaturesRootLayer
         float minZoom = -1;
         float maxZoom = -1;
@@ -2005,7 +2100,7 @@ public class MPLFeaturesUtils {
                 layerType,
                 style,
                 changeLayer,
-                layerPath,
+                nativeSourceId,
                 currentNamePrefix,
                 layerOpacityFactor,
                 styleVars,
@@ -2032,6 +2127,17 @@ public class MPLFeaturesUtils {
         dashLayers = buildResult.dashLayers;
         patternFillLayer = buildResult.patternFillLayer;
         markerIconLayer = buildResult.markerIconLayer;
+
+        // Source-layer participates in tile parsing but SDK13.7.1 does not compare it in
+        // Fill/Line.hasLayoutDifference. Establish it before the layer can reach a renderer.
+        if (sqliteTiles) {
+            setNativeVectorSourceLayer(newLayer, NativeVectorTileEncoder.SOURCE_LAYER);
+            setNativeVectorSourceLayer(newLayer2, NativeVectorTileEncoder.SOURCE_LAYER);
+            setNativeVectorSourceLayer(patternFillLayer, NativeVectorTileEncoder.SOURCE_LAYER);
+            setNativeVectorSourceLayer(markerIconLayer, NativeVectorTileEncoder.SOURCE_LAYER);
+            for (LineLayer dash : dashLayers)
+                setNativeVectorSourceLayer(dash, NativeVectorTileEncoder.SOURCE_LAYER);
+        }
 
         // signatures turn on
         if (layerStyle!= null) {
@@ -2067,10 +2173,14 @@ public class MPLFeaturesUtils {
                         simbolLayer = style.getLayer(symbolLayerId);
                         if (simbolLayer == null) {
                             Log.d("Mbgl", "create layer name : " + symbolLayerId);
-                            Log.d("Mbgl", "create layer source : " + (layerPath + (isPolygon ? source_polygon_text : "")));
-                            boolean separateLabels = isPolygon || layerType == GTLineString || layerType == GTMultiLineString;
+                            boolean separateLabels = isPolygon && !sqliteTiles
+                                    || layerType == GTLineString || layerType == GTMultiLineString;
+                            String labelSourceId = separateLabels ? layerPath + source_polygon_text : nativeSourceId;
+                            Log.d("Mbgl", "create layer source : " + labelSourceId);
                             simbolLayer = new SymbolLayer(symbolLayerId,
-                                    layerPath + (separateLabels ? source_polygon_text : ""));
+                                    labelSourceId);
+                            if (sqliteTiles && !separateLabels)
+                                setNativeVectorSourceLayer(simbolLayer, NativeVectorTileEncoder.SOURCE_LAYER);
 
                             if (signaturesRootLayer != null && style.getLayer(signaturesRootLayer.getId()) != null ){
                                 style.addLayerAbove(simbolLayer, signaturesRootLayer.getId());
@@ -2351,6 +2461,75 @@ public class MPLFeaturesUtils {
         if (simbolLayer instanceof SymbolLayer) {
             RuleLabelLayouts.sync(style, (SymbolLayer) simbolLayer, rules, layerDefaultsStyle, layerType);
         } else RuleLabelLayouts.remove(style, labelId);
+        if (sqliteTiles) bindSqliteVectorStyleLayers(style, nativeSourceId, isPolygon);
+    }
+
+    /** Copy a declared MVT layer name before adding a clone; classic null/empty stays unset. */
+    public static void inheritNativeSourceLayer(org.maplibre.android.style.layers.Layer base,
+                                                org.maplibre.android.style.layers.Layer child) {
+        String sourceLayer = null;
+        if (base instanceof FillLayer) sourceLayer = ((FillLayer) base).getSourceLayer();
+        else if (base instanceof LineLayer) sourceLayer = ((LineLayer) base).getSourceLayer();
+        else if (base instanceof CircleLayer) sourceLayer = ((CircleLayer) base).getSourceLayer();
+        else if (base instanceof SymbolLayer) sourceLayer = ((SymbolLayer) base).getSourceLayer();
+        setNativeVectorSourceLayer(child, sourceLayer);
+    }
+
+    private static void setNativeVectorSourceLayer(org.maplibre.android.style.layers.Layer layer,
+                                                   String sourceLayer) {
+        if (layer == null || TextUtils.isEmpty(sourceLayer)) return;
+        if (layer instanceof FillLayer) ((FillLayer) layer).setSourceLayer(sourceLayer);
+        else if (layer instanceof LineLayer) ((LineLayer) layer).setSourceLayer(sourceLayer);
+        else if (layer instanceof CircleLayer) ((CircleLayer) layer).setSourceLayer(sourceLayer);
+        else if (layer instanceof SymbolLayer) ((SymbolLayer) layer).setSourceLayer(sourceLayer);
+    }
+
+    /** The same native factories/rule groups consume MVT scalars; only source binding differs. */
+    private static void bindSqliteVectorStyleLayers(Style style, String path, boolean polygon) {
+        for (org.maplibre.android.style.layers.Layer layer : style.getLayers()) {
+            if (!path.equals(SqliteVectorLayerController.sourceId(layer))) continue;
+            if (layer instanceof FillLayer) {
+                FillLayer fills = (FillLayer) layer;
+                fills.setSourceLayer(NativeVectorTileEncoder.SOURCE_LAYER);
+                if (polygon) {
+                    Expression geometry = Expression.eq(Expression.geometryType(), Expression.literal("Polygon"));
+                    Expression previous = fills.getFilter();
+                    fills.setFilter(previous == null ? geometry : Expression.all(previous, geometry));
+                }
+            }
+            else if (layer instanceof LineLayer) {
+                LineLayer lines = (LineLayer) layer;
+                lines.setSourceLayer(NativeVectorTileEncoder.SOURCE_LAYER);
+                if (polygon) {
+                    Expression geometry = Expression.eq(Expression.geometryType(), Expression.literal("Polygon"));
+                    Expression previous = lines.getFilter();
+                    lines.setFilter(previous == null ? geometry : Expression.all(previous, geometry));
+                }
+            }
+            else if (layer instanceof CircleLayer) ((CircleLayer) layer).setSourceLayer(NativeVectorTileEncoder.SOURCE_LAYER);
+            else if (layer instanceof SymbolLayer) {
+                SymbolLayer symbols = (SymbolLayer) layer;
+                symbols.setSourceLayer(NativeVectorTileEncoder.SOURCE_LAYER);
+                symbols.setProperties(
+                        PropertyFactory.textOffset(sqliteVectorOffset(symbols.getTextOffset(),
+                                NativeVectorTilePropertyCodec.TEXT_OFFSET_X, NativeVectorTilePropertyCodec.TEXT_OFFSET_Y)),
+                        PropertyFactory.iconOffset(sqliteVectorOffset(symbols.getIconOffset(),
+                                NativeVectorTilePropertyCodec.ICON_OFFSET_X, NativeVectorTilePropertyCodec.ICON_OFFSET_Y)));
+                if (polygon) {
+                    Expression point = Expression.eq(Expression.geometryType(), Expression.literal("Point"));
+                    Expression previous = symbols.getFilter();
+                    symbols.setFilter(previous == null ? point : Expression.all(previous, point));
+                }
+            }
+        }
+    }
+
+    private static Expression sqliteVectorOffset(PropertyValue<Float[]> previous, String x, String y) {
+        Expression fallback = previous.isExpression() ? previous.getExpression()
+                : Expression.literal((Object) (previous.getValue() == null ? new Float[]{0f, 0f} : previous.getValue()));
+        return Expression.switchCase(Expression.all(Expression.has(x), Expression.has(y)),
+                Expression.semiliteral(Expression.toNumber(Expression.get(x)), Expression.toNumber(Expression.get(y))),
+                fallback);
     }
 
     public static String getColorName(int color) {

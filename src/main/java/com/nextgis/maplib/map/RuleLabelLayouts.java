@@ -88,6 +88,7 @@ public final class RuleLabelLayouts {
         int index = 0;
         for (Map.Entry<String, LabelAttributes> entry : layouts.entrySet()) {
             SymbolLayer layer = new SymbolLayer(base.getId() + "-layout-" + (++index), base.getSourceId());
+            MPLFeaturesUtils.inheritNativeSourceLayer(base, layer);
             layer.setProperties(copy("text-field", base.getTextField()), copy("text-size", base.getTextSize()),
                     copy("text-opacity", base.getTextOpacity()), copy("text-color", base.getTextColor()),
                     copy("text-halo-color", base.getTextHaloColor()), copy("text-halo-width", base.getTextHaloWidth()),

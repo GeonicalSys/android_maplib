@@ -243,7 +243,7 @@ public class MapDrawable
 
 
     // map  layerID : list of added features for layer
-    LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>> sourceFeaturesHashMap = new LinkedHashMap<Integer, List<org.maplibre.geojson.Feature>>();
+    final Map<Integer, List<org.maplibre.geojson.Feature>> sourceFeaturesHashMap = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final ExecutorService mMaplibreVectorReloadExecutor =
             Executors.newSingleThreadExecutor(r -> new Thread(r, "MaplibreVectorReload"));
@@ -426,15 +426,189 @@ public class MapDrawable
     }
 
     public void setMapContext(final MaplibreMapInteraction mapContext){
+        if (mapContext == null) closeSqliteVectorSourcesBeforeDetach();
         this.mapContext = new WeakReference<>(mapContext);
     }
 
+    private RenderMemoryGuard renderMemoryGuard;
+    private final SqliteVectorLayerController sqliteVectorSources = new SqliteVectorLayerController();
+    @Nullable private Integer sqliteEditingLayerId;
+    @Nullable private Long sqliteEditingHiddenFeatureId;
+
+    public boolean isSqliteVectorLayer(int layerId) {
+        return sqliteVectorSources.provider(layerId) != null;
+    }
+
+    public SqliteVectorTileProvider getSqliteVectorProvider(int layerId) {
+        return sqliteVectorSources.provider(layerId);
+    }
+
+    /** Pure fixed-size Java provider witness; no SDK calls, DB reads or business values. */
+    public Map<String, Object> getSqliteVectorDiagnostics(int layerId) {
+        return sqliteVectorSources.diagnostics(layerId);
+    }
+
+    /** Renderer identity may change independently of the stable SQLite layer path. */
+    public String getVectorRenderSourceId(int layerId) {
+        String nativeId = sqliteVectorSources.nativeSourceId(layerId);
+        ILayer layer = getLayerById(layerId);
+        return nativeId != null ? nativeId : layer == null ? null : layer.getPath().toString();
+    }
+
+    public void closeSqliteVectorSourcesBeforeDetach() {
+        sqliteVectorSources.reset();
+        renderMemoryOwnerEpoch.incrementAndGet();
+        mLoadLayersStyleRequestId.incrementAndGet();
+        mLayerLoadInProgress = false;
+        mPendingReload = false;
+    }
+
+    /** Terminal project replacement; safe on any thread while the app map monitor is held. */
+    public void retireSqliteVectorSources() {
+        sqliteVectorSources.retire();
+        renderMemoryOwnerEpoch.incrementAndGet();
+        mLoadLayersStyleRequestId.incrementAndGet();
+    }
+
+    private static List<org.maplibre.geojson.Feature> readRenderingCache(VectorLayer layer) {
+        // A nonnull empty entry means prepared streaming data, never a full-layer cache miss.
+        return SqliteVectorTileProvider.canServe(layer) ? new ArrayList<>()
+                : VectorLayerRenderCache.tryLoadFeatures(layer);
+    }
+
+    /** All ordinary native factories are reused; only their source now reads SQLite tiles. */
+    private boolean applySqliteVectorLayer(ILayer model, Style style) {
+        if (!(model instanceof VectorLayer) || !SqliteVectorTileProvider.canServe((VectorLayer) model)) return false;
+        if (sqliteVectorSources.isRetired() || getLayerById(model.getId()) != model
+                || ((IGISApplication) getContext().getApplicationContext()).getMap() != this) return true;
+        VectorLayer layer = (VectorLayer) model;
+        try {
+            SqliteVectorTileProvider before = sqliteVectorSources.provider(layer.getId());
+            if (!sqliteVectorSources.bind(maplibreMap.get(), style, layer, sourceHashMap)) return true;
+            if (before != sqliteVectorSources.provider(layer.getId())) {
+                layersHashMap.remove(layer.getId()); layersHashMap2.remove(layer.getId());
+                layersHashMapLineDash.remove(layer.getId()); symbolsLayerHashMap.remove(layer.getId());
+            }
+            sourceFeaturesHashMap.putIfAbsent(layer.getId(), new ArrayList<>());
+            sourcesOrder.putIfAbsent(layer.getId(), new ArrayList<>());
+            sourceNativeUriMap.remove(layer.getId()); localVectorTileUrlMap.remove(layer.getId());
+            createFillLayerForLayer(layer.getId(), layer.getGeometryType(), style,
+                    layersHashMap, layersHashMap2, layersHashMapLineDash, symbolsLayerHashMap,
+                    layer.getDefaultStyleNoExcept(), true, layer, layer.getPath().toString(),
+                    selectedDotCircleLayer, signaturesRootLayer);
+            sqliteVectorSources.layersCreated(style, layer.getId());
+        } catch (Exception failure) {
+            // A failed streamed source is not silently replaced by an unbounded full-layer allocation.
+            logErr("Apply SQLite vector source id=" + layer.getId(), failure);
+        }
+        return true;
+    }
+    private java.util.concurrent.ScheduledExecutorService renderMemoryWatch;
+    private final java.util.concurrent.atomic.AtomicLong renderMemoryOwnerEpoch = new java.util.concurrent.atomic.AtomicLong();
+    private volatile boolean renderMemoryActive;
+
+    /** Model counters only; native allocation ownership is measured separately. */
+    private void addMemorySourceCounts(Map<String, Object> state) {
+        // Full-load workers prepare their model/cache while the previous style remains live.
+        if (mLayerLoadInProgress) return;
+        int classic = 0, mvt = 0, raster = 0; long features = 0;
+        List<ILayer> models = new ArrayList<>(); LayerGroup.getAllLayers(this, models);
+        for (ILayer model : models) {
+            if (model instanceof VectorLayer && ((VectorLayer) model).isVisible()) {
+                if (localVectorTileUrlMap.containsKey(model.getId())) mvt++; else classic++;
+            } else if ((model instanceof NGWRasterLayer || model instanceof RemoteTMSLayer || model instanceof LocalTMSLayer)
+                    && model instanceof com.nextgis.maplib.map.Layer && ((com.nextgis.maplib.map.Layer) model).isVisible()) raster++;
+        }
+        // Ordinary data reloads publish from workers. These weakly consistent counters
+        // are diagnostic context, never an assertion that every source is native/live.
+        for (List<org.maplibre.geojson.Feature> source : sourceFeaturesHashMap.values())
+            if (source != null) features += source.size();
+        state.put("classic_sources", classic); state.put("local_mvt_sources", mvt);
+        state.put("raster_sources", raster); state.put("java_source_features", features);
+    }
+
+    public synchronized RenderMemoryGuard getRenderMemoryGuard() {
+        if (renderMemoryGuard == null)
+            renderMemoryGuard = new RenderMemoryGuard(getContext(), new RenderMemoryGuard.Listener() {
+                @Override public void restricted(int ignored) { postRenderResourcePolicy(true, false); }
+                @Override public void workDelayed() { postRenderResourcePolicy(false, false); }
+            });
+        return renderMemoryGuard;
+    }
+
+    /** Lifecycle owned: no polling thread remains after the foreground map is paused. */
+    public synchronized void setRenderMemoryWatchActive(boolean active) {
+        renderMemoryActive = active;
+        if (!active) {
+            renderMemoryOwnerEpoch.incrementAndGet();
+            if (renderMemoryWatch != null) renderMemoryWatch.shutdownNow();
+            renderMemoryWatch = null; return;
+        }
+        if (renderMemoryWatch != null) return;
+        renderMemoryOwnerEpoch.incrementAndGet();
+        RenderMemoryGuard guard = getRenderMemoryGuard();
+        renderMemoryWatch = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "RenderMemoryWatch"); thread.setDaemon(true); return thread;
+        });
+        final java.util.concurrent.ScheduledExecutorService ownedWatch = renderMemoryWatch;
+        renderMemoryWatch.scheduleWithFixedDelay(() -> {
+            try {
+                guard.checkPressure();
+                Map<String, Object> state = guard.snapshot();
+                final long epoch = renderMemoryOwnerEpoch.get();
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    synchronized (MapDrawable.this) {
+                        if (!renderMemoryActive || renderMemoryWatch != ownedWatch
+                                || renderMemoryOwnerEpoch.get() != epoch) return;
+                    }
+                    addMemorySourceCounts(state);
+                    try { ownedWatch.execute(() -> com.nextgis.maplib.util.MapRuntimeDiagnostics.observeMemory(state)); }
+                    catch (java.util.concurrent.RejectedExecutionException paused) { /* Lifecycle stopped. */ }
+                });
+            }
+            catch (RuntimeException unavailable) { Log.w(TAG, "Render memory sample unavailable", unavailable); }
+        }, 2, 2, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    /** Cache trimming never removes a source, model layer, feature snapshot or foreground edit. */
+    private void postRenderResourcePolicy(boolean trimCaches, boolean allowRecovery) {
+        final long epoch = renderMemoryOwnerEpoch.get();
+        final MapLibreMap expectedMap = maplibreMap.get();
+        final MapView expectedView = maplibreMapView.get();
+        final MaplibreMapInteraction expectedHost = mapContext.get();
+        if (expectedMap == null || expectedView == null) return;
+        new Handler(Looper.getMainLooper()).post(() -> {
+            if (!renderMemoryActive || renderMemoryOwnerEpoch.get() != epoch
+                    || maplibreMap.get() != expectedMap || maplibreMapView.get() != expectedView
+                    || mapContext.get() != expectedHost) return;
+            try {
+                if (trimCaches) {
+                    boolean reduce = !allowRecovery || getRenderMemoryGuard().shouldReduceCache();
+                    expectedMap.setTileCacheEnabled(!reduce);
+                    expectedView.onLowMemory();
+                }
+                if (expectedHost != null) expectedHost.onRenderMemoryWarningChanged();
+            } catch (RuntimeException unavailable) {
+                logErr("Trim current map cache", unavailable);
+            }
+        });
+    }
+
+    public void retryMemoryLimitedLayers() {
+        getRenderMemoryGuard().retry();
+        // Re-evaluate caches only: rebuilding all GeoJSON would increase the native peak.
+        postRenderResourcePolicy(true, true);
+    }
+
     public void setMaplibreMap(final MapLibreMap maplibreMap){
+        if (this.maplibreMap.get() != maplibreMap) closeSqliteVectorSourcesBeforeDetach();
         this.maplibreMap = new WeakReference<>(maplibreMap);
         bindVisibleLineLabels();
     }
 
     public void setMaplibreMapView(final org.maplibre.android.maps.MapView maplibreMapView){
+        if (this.maplibreMapView.get() != maplibreMapView) closeSqliteVectorSourcesBeforeDetach();
+        if (maplibreMapView == null) setRenderMemoryWatchActive(false);
         this.maplibreMapView = new WeakReference<>(maplibreMapView);
         bindVisibleLineLabels();
 
@@ -609,6 +783,7 @@ public class MapDrawable
         if (map == null) return;
         final Style style = map.getStyle();
         if (style == null) return;
+        SqliteVectorLayerController.closeBeforeStyleChange(map);
         for (final Layer layer : style.getLayers()){
 //            Log.e("ZXZY", "delete layer" + layer.getId());
             if (!layer.getId().equals("background"))
@@ -667,6 +842,10 @@ public class MapDrawable
 
         String oldFeatureIdString = String.valueOf(oldFeatureId);
         String newFeatureIdString = String.valueOf(newFeatureId);
+        boolean remappedSqliteEdit = Objects.equals(sqliteEditingLayerId, layerId)
+                && editingObject != null && editingObject.editingFeature != null
+                && editingObject.editingFeature.hasNonNullValueForProperty(prop_featureid)
+                && oldFeatureIdString.equals(editingObject.editingFeature.getStringProperty(prop_featureid));
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerId);
         if (layerFeatures != null) {
             for (org.maplibre.geojson.Feature feature : layerFeatures){
@@ -718,10 +897,15 @@ public class MapDrawable
                             it.remove();
                         }
                     }
-                    selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(layerFeaturesE));
+                    setNativeLayerFeatures(selectedEditedSource, layerFeaturesE);
                 }
             }
 
+        }
+        if (remappedSqliteEdit) {
+            MapLibreMap map = maplibreMap.get();
+            if (map != null && map.getStyle() != null)
+                sqliteVectorSources.exclude(map.getStyle(), layerId, newFeatureId);
         }
     }
 
@@ -770,13 +954,10 @@ public class MapDrawable
         localVectorTileUrlMap.remove(id);
         LocalVectorTileServer.getInstance().unregisterLayer(id);
         MapLibreMap map = maplibreMap.get();
-        if (map == null) {
-            return;
-        }
-        Style style = map.getStyle();
-        if (style == null) {
-            return;
-        }
+        Style style = map == null ? null : map.getStyle();
+        sqliteVectorSources.forget(id, style, sourceHashMap);
+        sourceFeaturesHashMap.remove(id); sourcesOrder.remove(id); sourceNativeUriMap.remove(id);
+        if (style == null) return;
         String sourceId = namePrefix + source_namepart + id;
 
         String vectorLayerId = namePrefix + layer_namepart + id;
@@ -879,7 +1060,7 @@ public class MapDrawable
                         VectorLayer layer = (VectorLayer) iLayer;
                         geoType = layer.getGeometryType();
                         String tileUrl = null;
-                        if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
+                        if (!SqliteVectorTileProvider.canServe(layer) && LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
                             tileUrl = LocalVectorTileServer.getInstance().registerLayer(layer);
                         }
                         if (tileUrl != null) {
@@ -902,7 +1083,7 @@ public class MapDrawable
                         });
                         try {
                             List<org.maplibre.geojson.Feature> fromCache =
-                                    VectorLayerRenderCache.tryLoadFeatures(layer);
+                                    readRenderingCache(layer);
                             if (fromCache != null) {
                                 vectorPolygonFeatures.addAll(fromCache);
                             } else {
@@ -981,6 +1162,11 @@ public class MapDrawable
                         if (mainStyle == null) {
                             return;
                         }
+                        if (applySqliteVectorLayer(iLayer, mainStyle)) {
+                            checkLayerVisibility(iLayer.getId());
+                            ensureUserLocationLayerOnTop(mainStyle);
+                            return;
+                        }
                         String localVectorTileUrl = localVectorTileUrlMap.get(iLayer.getId());
                         if (localVectorTileUrl != null) {
                             boolean sourceOk = createLocalVectorTileSourceForLayer(
@@ -1002,7 +1188,8 @@ public class MapDrawable
                         } else {
                             createSourceForLayer(iLayer.getId(), finalGeoType, vectorPolygonFeatures, mainStyle, sourceHashMap,
                                     rasterLayersURLMap, rasterLayersTmsTypeMap,
-                                    iLayer.getPath().toString(), false, null);
+                                    iLayer.getPath().toString(), false, null,
+                                    iLayer instanceof VectorLayer ? (VectorLayer) iLayer : null);
                         }
                         MPLFeaturesUtils.RasterSiblingAnchor rasterSiblingAnchor = null;
                         if (finalGeoType == GT_RASTER_WA && iLayer instanceof TMSLayer) {
@@ -1086,6 +1273,11 @@ public class MapDrawable
                     return;
                 }
                 Style maplbrStyle = maplibreMap.get().getStyle();
+                if (maplbrStyle != null && applySqliteVectorLayer(iLayer, maplbrStyle)) {
+                    checkLayerVisibility(id);
+                    ensureUserLocationLayerOnTop(maplbrStyle);
+                    return;
+                }
                 if (maplbrStyle == null) {
                     return;
                 }
@@ -1163,6 +1355,11 @@ public class MapDrawable
             return;
         }
         com.nextgis.maplib.display.Style ngStyle = layer.getDefaultStyleNoExcept();
+        if (applySqliteVectorLayer(layer, maplbrStyle)) {
+            checkLayerVisibility(layer.getId());
+            ensureUserLocationLayerOnTop(maplbrStyle);
+            return;
+        }
         if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)
                 && localVectorTileUrlMap.containsKey(layer.getId())) {
             createFillLayerForLocalVectorTileLayer(layer.getId(), layer.getGeometryType(), maplbrStyle,
@@ -1204,6 +1401,16 @@ public class MapDrawable
             return;
         }
         VectorLayer layer = (VectorLayer) ilayer;
+        if (SqliteVectorTileProvider.canServe(layer)) {
+            new Handler(Looper.getMainLooper()).post(() -> {
+                MapLibreMap map = maplibreMap.get();
+                if (map != null && map.getStyle() != null) {
+                    applySqliteVectorLayer(layer, map.getStyle());
+                    checkLayerVisibility(layer.getId());
+                }
+            });
+            return;
+        }
         List<org.maplibre.geojson.Feature> memFeatures = sourceFeaturesHashMap.get(layer.getId());
         boolean hasMemFeatures = memFeatures != null && !memFeatures.isEmpty();
         if (!MPLFeaturesUtils.needsSourceStyleRefresh(layer) && !hasMemFeatures) {
@@ -1225,7 +1432,7 @@ public class MapDrawable
                 // feature while a style worker writes derived properties. The render cache loads
                 // independent Feature instances; a missing/stale cache takes the full reload path.
                 List<org.maplibre.geojson.Feature> features =
-                        VectorLayerRenderCache.tryLoadFeatures(layer);
+                        readRenderingCache(layer);
                 if (features == null) {
                     Log.d(TAG, "reloadVectorLayerStyleProps: no cache, full data reload "
                             + layer.getName());
@@ -1260,27 +1467,47 @@ public class MapDrawable
         if (style == null) {
             return;
         }
+        if (applySqliteVectorLayer(layer, style)) return;
 
+        try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope memory =
+                     com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layer.getId(), "classic", "native_update")) {
+        memory.features(features.size());
         String layerPath = layer.getPath().toString();
         GeoJsonSource layerSource = resolveLiveVectorGeoJsonSource(
                 style, layerPath, layer, features);
         if (layerSource != null) {
             sourceNativeUriMap.remove(layer.getId());
-            layerSource.setGeoJson(FeatureCollection.fromFeatures(features));
+            setNativeLayerFeatures(layerSource, features);
         }
         if (layer.mGeometryType == GTPolygon || layer.mGeometryType == GTMultiPolygon) {
             String textSourceId = layerPath + source_polygon_text;
             GeoJsonSource layerSourceText = resolveLiveGeoJsonSource(style, textSourceId, layer);
             if (layerSourceText == null) {
                 createSourceForLayer(layer.getId(), layer.getGeometryType(), features, style,
-                        sourceHashMap, new HashMap<>(), new HashMap<>(), layerPath, false, null);
+                        sourceHashMap, new HashMap<>(), new HashMap<>(), layerPath, false, null, layer);
                 layerSourceText = resolveLiveGeoJsonSource(style, textSourceId, layer);
             }
             if (layerSourceText != null) {
-                List<org.maplibre.geojson.Feature> points = convertToPointFeatures(features);
-                layerSourceText.setGeoJson(FeatureCollection.fromFeatures(points));
+                MPLFeaturesUtils.setNativePolygonLabelGeoJson(layerSourceText, features);
             }
         }
+        }
+    }
+
+    /** All logical vector updates cross the same native projection, including edit/ID/save paths. */
+    private void setNativeLayerFeatures(GeoJsonSource source, List<org.maplibre.geojson.Feature> features) {
+        // A streamed background has no GeoJSON source. Only the current edit is materialized.
+        if (source == null) return;
+        ILayer owner = null;
+        for (org.maplibre.geojson.Feature feature : features) {
+            if (feature == null || !feature.hasNonNullValueForProperty(prop_layerid)) continue;
+            try { owner = getLayerById(Integer.parseInt(feature.getStringProperty(prop_layerid))); }
+            catch (RuntimeException ignored) { /* Unknown owners keep the conservative payload. */ }
+            break;
+        }
+        if (owner != null && !source.getId().equals(owner.getPath().toString())) owner = null;
+        MPLFeaturesUtils.setNativeVectorGeoJson(source, owner,
+                owner instanceof VectorLayer ? ((VectorLayer) owner).getGeometryType() : -1, features);
     }
 
     private void scheduleVectorLayerGeoJsonReapply(
@@ -1348,7 +1575,7 @@ public class MapDrawable
                 + " features=" + features.size()
                 + " source=" + ProdLogUtil.truncateForLog(sourceId, 120));
         createSourceForLayer(layer.getId(), layer.getGeometryType(), features, style,
-                sourceHashMap, new HashMap<>(), new HashMap<>(), sourceId, false, null);
+                sourceHashMap, new HashMap<>(), new HashMap<>(), sourceId, false, null, layer);
         return resolveLiveGeoJsonSource(style, sourceId, layer);
     }
 
@@ -1384,6 +1611,20 @@ public class MapDrawable
 
     public void reloadVectorLayerDataToMaplibre(final  ILayer ilayer) {
         Handler mainHandler = new Handler(Looper.getMainLooper());
+        if (ilayer instanceof VectorLayer && SqliteVectorTileProvider.canServe((VectorLayer) ilayer)) {
+            Runnable update = () -> {
+                MapLibreMap map = maplibreMap.get();
+                if (map == null || map.getStyle() == null) return;
+                VectorLayer layer = (VectorLayer) ilayer;
+                if (!layer.isVisible()) {
+                    sqliteVectorSources.remove(layer.getId(), map.getStyle(), sourceHashMap);
+                    sourceFeaturesHashMap.remove(layer.getId()); sourcesOrder.remove(layer.getId());
+                } else applySqliteVectorLayer(layer, map.getStyle());
+                checkLayerVisibility(layer.getId());
+            };
+            if (Looper.myLooper() == Looper.getMainLooper()) update.run(); else mainHandler.post(update);
+            return;
+        }
 
         Runnable r = () -> {
             mMaplibreVectorReloadExecutor.execute(() -> {
@@ -1603,6 +1844,9 @@ public class MapDrawable
      */
     private VectorLayerPrepResult prepareVectorLayerForMaplibre(VectorLayer layer, Handler mainHandler) {
         try {
+            if (SqliteVectorTileProvider.canServe(layer))
+                return new VectorLayerPrepResult(layer, new ArrayList<>(), layer.getGeometryType(),
+                        layer.getDefaultStyleNoExcept(), false, null, null);
             if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
                 String tileUrl = LocalVectorTileServer.getInstance().registerLayer(layer);
                 if (tileUrl != null) {
@@ -1614,7 +1858,7 @@ public class MapDrawable
                 }
             }
             logLocalVectorTilesFallback(layer);
-            List<org.maplibre.geojson.Feature> vectorFeatures = VectorLayerRenderCache.tryLoadFeatures(layer);
+            List<org.maplibre.geojson.Feature> vectorFeatures = readRenderingCache(layer);
             boolean fromCache = vectorFeatures != null;
             if (!fromCache) {
                 sendStylingBroadcast(mainHandler,
@@ -1665,7 +1909,7 @@ public class MapDrawable
             String symbolLayerId = "symbol-" + mainLayerId;
             boolean hasStyleLayer = style.getLayer(mainLayerId) != null
                     || style.getLayer(symbolLayerId) != null;
-            boolean hasSource = style.getSource(layer.getPath().toString()) != null;
+            boolean hasSource = style.getSource(getVectorRenderSourceId(layer.getId())) != null;
             if (!hasStyleLayer || !hasSource) {
                 complete = false;
                 HyperLog.w(Constants.TAG, "MapLibre post-load verification missing visible layer"
@@ -1688,6 +1932,7 @@ public class MapDrawable
         if (mapFrag == null || mapViewRef == null || mapRef == null) {
             return;
         }
+        final long loadOwnerEpoch = renderMemoryOwnerEpoch.get();
 
         if (mLayerLoadInProgress) {
             if (mDeferReloadOnceAllowed) {
@@ -1958,7 +2203,7 @@ public class MapDrawable
                                 continue;
                             }
                             String tileUrl = null;
-                            if (LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
+                            if (!SqliteVectorTileProvider.canServe(layer) && LocalVectorTileRenderMode.shouldUseLocalVectorTiles(layer)) {
                                 tileUrl = LocalVectorTileServer.getInstance().registerLayer(layer);
                             }
                             if (tileUrl != null) {
@@ -1976,7 +2221,7 @@ public class MapDrawable
                             }
                             logLocalVectorTilesFallback(layer);
                             List<org.maplibre.geojson.Feature> vectorFeatures =
-                                    VectorLayerRenderCache.tryLoadFeatures(layer);
+                                    readRenderingCache(layer);
                             boolean fromCache = vectorFeatures != null;
                             if (!fromCache) {
                                 Intent msg = new Intent(MESSAGE_INTENT_STYLING);
@@ -2123,14 +2368,16 @@ public class MapDrawable
                     ? new long[1] : null;
             final TrackLayer trackLayerFinal = trackLayerNGW;
             mainHandler.post(() -> {
-                final int styleRequestId = mLoadLayersStyleRequestId.incrementAndGet();
                 MapView mapViewForStyle = maplibreMapView.get();
                 MapLibreMap mapForStyle = maplibreMap.get();
-                if (mapViewForStyle == null || mapForStyle == null) {
+                if (mapViewForStyle != mapViewRef || mapForStyle != mapRef
+                        || loadOwnerEpoch != renderMemoryOwnerEpoch.get()
+                        || mapContext.get() != mapFrag
+                        || ((IGISApplication) getContext().getApplicationContext()).getMap() != this) {
                     mLayerLoadInProgress = false;
-                    dismissStylingProgress();
                     return;
                 }
+                final int styleRequestId = mLoadLayersStyleRequestId.incrementAndGet();
                 if (mLoadLayersStyleListener != null) {
                     mapViewForStyle.removeOnDidFinishLoadingStyleListener(mLoadLayersStyleListener);
                     mLoadLayersStyleListener = null;
@@ -2143,7 +2390,11 @@ public class MapDrawable
                             mvSelf.removeOnDidFinishLoadingStyleListener(this);
                             mLoadLayersStyleListener = null;
                         }
-                        if (styleRequestId != mLoadLayersStyleRequestId.get()) {
+                        if (styleRequestId != mLoadLayersStyleRequestId.get()
+                                || maplibreMap.get() != mapRef || maplibreMapView.get() != mapViewRef
+                                || loadOwnerEpoch != renderMemoryOwnerEpoch.get()
+                                || mapContext.get() != mapFrag
+                                || ((IGISApplication) getContext().getApplicationContext()).getMap() != MapDrawable.this) {
                             return;
                         }
                         if (Constants.MAP_STARTUP_UX_EXTRAS_ENABLED && Constants.DEBUG_MODE
@@ -2309,6 +2560,10 @@ public class MapDrawable
                             ProdLogUtil.setPhase("loadLayers apply id=" + entry.getKey()
                                     + (phaseLayer != null ? " name=" + phaseLayer.getName() : ""));
 
+                            if (applySqliteVectorLayer(phaseLayer, style)) {
+                                checkLayerVisibility(entry.getKey());
+                                continue;
+                            }
                             if (localVectorTileUrl != null) {
                                 if (createSource) {
                                     boolean sourceOk = createLocalVectorTileSourceForLayer(
@@ -2349,7 +2604,8 @@ public class MapDrawable
                                         rasterLayersURLMap,
                                         rasterLayersTmsTypeMap,
                                         pathForLayer, false,
-                                        sourceNativeUriMap.get(entry.getKey()));
+                                        sourceNativeUriMap.get(entry.getKey()),
+                                        phaseLayer instanceof VectorLayer ? (VectorLayer) phaseLayer : null);
 
                                 createFillLayerForLayer(entry.getKey(),
                                     geoType,
@@ -2439,6 +2695,7 @@ public class MapDrawable
                 if (Constants.MAP_STARTUP_UX_EXTRAS_ENABLED && Constants.DEBUG_MODE && tSetStyleCallNs != null) {
                     tSetStyleCallNs[0] = System.nanoTime();
                 }
+                SqliteVectorLayerController.closeBeforeStyleChange(mapForStyle);
                 mapForStyle.setStyle(new Style.Builder().fromJson(styleJson));
             });
             } catch (Throwable t) {
@@ -2657,6 +2914,10 @@ public class MapDrawable
                 }
                 runGuarded("loadLayersToMaplibreMapLite layer id=" + entry.getKey()
                         + " name=" + entryLayer.getName(), () -> {
+                    if (applySqliteVectorLayer(entryLayer, style)) {
+                        checkLayerVisibility(entry.getKey());
+                        return;
+                    }
                     if (localVectorTileUrlMap.containsKey(entry.getKey())) {
                         createFillLayerForLocalVectorTileLayer(
                                 entry.getKey(),
@@ -2715,6 +2976,12 @@ public class MapDrawable
 
     private List<org.maplibre.geojson.Feature> queryTouchFeatures(MapLibreMap map, android.graphics.RectF rect,
                                                                 String target, MaplibreMapInteraction interaction) {
+        // These sources are owned by the editor. An empty handle cannot be hit; asking the
+        // native renderer anyway can block ACTION_DOWN behind unrelated tile/render work.
+        if ("marker-layer".equals(target) && markerFeatureCollection.features().isEmpty())
+            return emptyList();
+        if ("vertex-layer".equals(target) && editingObject == null)
+            return emptyList();
         com.nextgis.maplib.util.MapRuntimeDiagnostics.Trace trace = com.nextgis.maplib.util.MapRuntimeDiagnostics
                 .beginQuery(target, interaction == null ? null : interaction.getMode());
         int count = -1;
@@ -3114,7 +3381,7 @@ public class MapDrawable
                     }
                 }
             }
-        } else if (localVectorTileUrlMap.containsKey(layerd.getId())
+        } else if ((localVectorTileUrlMap.containsKey(layerd.getId()) || isSqliteVectorLayer(layerd.getId()))
                 && originalSelectedFeature.getGeometry() != null) {
             viewedFeature = MPLFeaturesUtils.getFeatureFromNGFeature(originalSelectedFeature.getGeometry());
             if (viewedFeature != null) {
@@ -3191,6 +3458,7 @@ public class MapDrawable
 
 
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(ilayer.getId());
+        final boolean streamed = isSqliteVectorLayer(ilayer.getId());
         org.maplibre.geojson.Feature  editingFeatureTmp = null;
         if (layerFeatures != null)
             for (org.maplibre.geojson.Feature item:layerFeatures){
@@ -3202,6 +3470,10 @@ public class MapDrawable
                     }
                 }
             }
+
+        if (streamed && !createNew) {
+            editingFeatureTmp = readSingleSqliteFeature((VectorLayer) ilayer, selectedFeatureId);
+        }
 
         if (createNew) {
             org.maplibre.geojson.Feature feature = originalSelectedFeature != null
@@ -3327,6 +3599,16 @@ public class MapDrawable
         }
 
         if (editingFeatureTmp != null) {
+            sqliteEditingLayerId = streamed ? ilayer.getId() : null;
+            sqliteEditingHiddenFeatureId = streamed && ((VectorLayer) ilayer).isFeatureHidden(selectedFeatureId)
+                    ? selectedFeatureId : null;
+            if (streamed) {
+                sqliteVectorSources.exclude(maplibreMap.get().getStyle(), ilayer.getId(), selectedFeatureId);
+                // Canvas edit activation already changed the model visibility/content version.
+                // Keep that mask and the native exclusion, but do not leave pending tiles on a stale provider.
+                SqliteVectorTileProvider attached = sqliteVectorSources.provider(ilayer.getId());
+                if (attached != null && !attached.isCurrent()) refreshSqliteLayer(ilayer.getId());
+            }
             selectedEditedSource = sourceHashMap.get(ilayer.getPath().toString());
             editingFeature = editingFeatureTmp;
 
@@ -3350,7 +3632,7 @@ public class MapDrawable
 
             editingFeatureOriginal = copyFeature(editingFeatureTmp);
 
-            polygonFeatures = sourceFeaturesHashMap.get(ilayer.getId());
+            polygonFeatures = streamed ? new ArrayList<>() : sourceFeaturesHashMap.get(ilayer.getId());
             this.originalSelectedFeature = originalSelectedFeature;
 
             // choose layer
@@ -3383,6 +3665,19 @@ public class MapDrawable
     }
 
     public void deleteFeature(Long selectedFeatureId, int layerdID){
+        if (isSqliteVectorLayer(layerdID)) {
+            sqliteVectorSources.hide(maplibreMap.get().getStyle(), layerdID, selectedFeatureId, false);
+            if (Objects.equals(sqliteEditingLayerId, layerdID)) {
+                restoreSqliteEditingModelVisibility(layerdID);
+                sqliteVectorSources.exclude(maplibreMap.get().getStyle(), layerdID, null);
+                sqliteEditingLayerId = null; editingObject = null;
+            }
+            editingFeature = null; editingFeatureOriginal = null;
+            selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(emptyList()));
+            selectedDotSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()));
+            refreshSqliteLayer(layerdID);
+            return;
+        }
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerdID);
         org.maplibre.geojson.Feature  editingFeatureTmp = null;
         for (org.maplibre.geojson.Feature item: layerFeatures){
@@ -3412,7 +3707,7 @@ public class MapDrawable
             }
 
             //polygonFeatures.removeIf(f -> Objects.equals(f.getStringProperty(prop_order), editingFeature.getStringProperty(prop_order)));
-            selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(polygonFeatures));
+            setNativeLayerFeatures(selectedEditedSource, polygonFeatures);
             // need check sign
             ILayer iLayer = getLayerById(layerdID);
             VectorLayer vectorLayer = null;
@@ -3435,6 +3730,15 @@ public class MapDrawable
     }
 
     public void hideFeature(Long selectedFeatureId, int layerdID){
+        if (isSqliteVectorLayer(layerdID)) {
+            hiddedFeature = readSingleSqliteFeature((VectorLayer) getLayerById(layerdID), selectedFeatureId);
+            hiddedFeatureId = selectedFeatureId; hiddedlayerdID = layerdID;
+            sqliteVectorSources.hide(maplibreMap.get().getStyle(), layerdID, selectedFeatureId, true);
+            refreshSqliteLayer(layerdID);
+            selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(emptyList()));
+            selectedDotSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()));
+            return;
+        }
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerdID);
         org.maplibre.geojson.Feature found = null;
         for (org.maplibre.geojson.Feature feature : layerFeatures){
@@ -3468,7 +3772,7 @@ public class MapDrawable
                 }
             }
 
-            source.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
+            setNativeLayerFeatures(source, layerFeatures);
             selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
             selectedDotSource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
 
@@ -3476,13 +3780,24 @@ public class MapDrawable
     }
 
     public void showFeatureFromHide(Long selectedFeatureId, int layerdID, org.maplibre.geojson.Feature hiddedFeature){
+        if (isSqliteVectorLayer(layerdID)) {
+            sqliteVectorSources.hide(maplibreMap.get().getStyle(), layerdID, selectedFeatureId, false);
+            // A tile built while the delete/undo prompt was open may omit this temporary hidden row.
+            refreshSqliteLayer(layerdID);
+            if (hiddedFeature != null) {
+                int type = ((VectorLayer) getLayerById(layerdID)).getGeometryType();
+                (type == GTPoint || type == GTMultiPoint ? selectedDotSource : selectedPolySource)
+                        .setGeoJson(FeatureCollection.fromFeature(hiddedFeature));
+            }
+            return;
+        }
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerdID);
         GeoJsonSource source = sourceHashMap.get(getLayerById(layerdID).getPath().toString());
 
         if (hiddedFeature != null && source != null && layerFeatures != null){
             layerFeatures.add(hiddedFeature);
 
-            source.setGeoJson(FeatureCollection.fromFeatures(layerFeatures));
+            setNativeLayerFeatures(source, layerFeatures);
             selectedPolySource.setGeoJson(FeatureCollection.fromFeature(hiddedFeature));
             //selectedDotSource.setGeoJson(FeatureCollection.fromFeature(hiddedFeature));
 
@@ -3641,7 +3956,7 @@ public class MapDrawable
                 needChangeFeature = false;
             }
 
-            if (needChangeFeature) {
+            if (needChangeFeature && sqliteEditingLayerId == null) {
                 // remove old - add new
                 String targetOrder = target.getStringProperty(prop_order);
                 Iterator<org.maplibre.geojson.Feature> it = polygonFeatures.iterator();
@@ -3658,7 +3973,18 @@ public class MapDrawable
             }
 
             if (!keepEditObj) {
-                selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(polygonFeatures));
+                if (sqliteEditingLayerId != null) {
+                    int layerId = sqliteEditingLayerId;
+                    // Restore the real model mask BEFORE capturing a replacement provider/version.
+                    // The overlay's later MODE_HIGHLIGHT/MODE_NONE show becomes a no-op.
+                    restoreSqliteEditingModelVisibility(layerId);
+                    sqliteVectorSources.exclude(maplibreMap.get().getStyle(), layerId, null);
+                    sqliteEditingLayerId = null;
+                    polygonFeatures.clear();
+                    // Cancel reads the unchanged row; Save uses the already committed SQLite original.
+                    refreshSqliteLayer(layerId);
+                }
+                setNativeLayerFeatures(selectedEditedSource, polygonFeatures);
 
                 // re-assemble signs for poly
                 reAssembleSignPoly(maplibreMap.get().getStyle(),
@@ -4323,6 +4649,11 @@ public class MapDrawable
     public void reloadFeatureToMaplibre(
             long newFeatureID,
             VectorLayer layer){
+        if (isSqliteVectorLayer(layer.getId())) {
+            viewedFeature = readSingleSqliteFeature(layer, newFeatureID);
+            refreshSqliteLayer(layer.getId());
+            return;
+        }
 
         org.maplibre.geojson.Feature targetMlFeature =
                 isMaplibreFeature(viewedFeature, layer.getId(), newFeatureID)
@@ -4408,7 +4739,7 @@ public class MapDrawable
 
         GeoJsonSource targetSource = sourceHashMap.get(layer.getPath().toString());
         if (targetSource != null) {
-            targetSource.setGeoJson(FeatureCollection.fromFeatures(targetFeatures));
+            setNativeLayerFeatures(targetSource, targetFeatures);
         }
 
         if (layer.getGeometryType() == GTPolygon || layer.getGeometryType() == GTMultiPolygon) {
@@ -4530,7 +4861,7 @@ public class MapDrawable
         if (targetlayer instanceof VectorLayer) {
             Style liveStyle = maplibreMap.get().getStyle();
             String mainLayerId = namePrefix + layer_namepart + id;
-            boolean sourcePresent = liveStyle.getSource(targetlayer.getPath().toString()) != null;
+            boolean sourcePresent = liveStyle.getSource(getVectorRenderSourceId(targetlayer.getId())) != null;
             boolean renderLayerPresent = liveStyle.getLayer(mainLayerId) != null
                     || liveStyle.getLayer("symbol-" + mainLayerId) != null;
             boolean preparedEntryPresent = sourceFeaturesHashMap.containsKey(id);
@@ -4702,7 +5033,9 @@ public class MapDrawable
                         lastUserHeadingHalfAngleDegrees,
                         map.getProjection().getMetersPerPixelAtLatitude(
                                 lastUserLocationPoint.latitude()))));
-        ensureUserLocationLayerOnTop(map.getStyle());
+        // Updating GeoJSON does not change style order. Structural mutations already
+        // restore the cursor/track/point order; a heading sample must not enumerate
+        // every native layer or rebuild the logical layer groups at sensor frequency.
     }
 
     /**
@@ -5268,18 +5601,33 @@ public class MapDrawable
 
         if (style == null)
             return;
+        // Streamed polygon labels are inline PBF anchors, not a global GeoJSON label collection.
+        if (SqliteVectorLayerController.isStreaming(style, layerPath)) return;
 
-        List<org.maplibre.geojson.Feature> points =  convertToPointFeatures(polyFeatures);
-        if (points.size() == 0)
-            return;
+        // Generic edit completion calls this for points/lines too. Their labels keep
+        // their own source/controller; only an empty polygon collection needs clearing.
+        if (!polyFeatures.isEmpty()) {
+            boolean hasPolygon = false;
+            for (org.maplibre.geojson.Feature feature : polyFeatures) {
+                if (feature != null && (feature.geometry() instanceof org.maplibre.geojson.Polygon
+                        || feature.geometry() instanceof org.maplibre.geojson.MultiPolygon)) {
+                    hasPolygon = true;
+                    break;
+                }
+            }
+            if (!hasPolygon) return;
+        }
+
+        List<org.maplibre.geojson.Feature> points = MPLFeaturesUtils.nativePolygonLabels(polyFeatures);
         GeoJsonSource vectorTextSource = (GeoJsonSource) style.getSource(layerPath + source_polygon_text);
+        if (points.isEmpty() && vectorTextSource == null) return;
         if (vectorTextSource == null) {
             vectorTextSource = new GeoJsonSource(layerPath + source_polygon_text, FeatureCollection.fromFeatures(points));
             style.addSource(vectorTextSource);
             sourceHashMap.put(layerPath + source_polygon_text, vectorTextSource);
         }
         else
-            vectorTextSource.setGeoJson(FeatureCollection.fromFeatures(points));
+            MPLFeaturesUtils.setNativePolygonLabelGeoJson(vectorTextSource, polyFeatures);
 
     }
 
@@ -5492,8 +5840,12 @@ public class MapDrawable
 
     // use from collector
     public void loadViewFeature(long selectedFeatureId, int layerid){
+        if (isSqliteVectorLayer(layerid)) {
+            viewedFeature = readSingleSqliteFeature((VectorLayer) getLayerById(layerid), selectedFeatureId);
+            return;
+        }
         List<org.maplibre.geojson.Feature> layerFeatures = sourceFeaturesHashMap.get(layerid);
-
+        if (layerFeatures == null) return;
         for (org.maplibre.geojson.Feature item : layerFeatures){
             if (item!= null && item.hasProperty(prop_featureid)) {
                 long id = item.getNumberProperty(prop_featureid).longValue();
@@ -5513,6 +5865,37 @@ public class MapDrawable
         if (editingObject!= null && editingObject.editingFeature!= null && editingObject.editingFeature.hasProperty(prop_featureid)
         && editingObject.editingFeature.getStringProperty(prop_featureid).equals("-1"))
             editingObject.editingFeature.addStringProperty(prop_featureid, "" + newId);
+        if (sqliteEditingLayerId != null && maplibreMap.get() != null && maplibreMap.get().getStyle() != null)
+            sqliteVectorSources.exclude(maplibreMap.get().getStyle(), sqliteEditingLayerId, newId);
+    }
+
+    @Nullable
+    private org.maplibre.geojson.Feature readSingleSqliteFeature(VectorLayer layer, long featureId) {
+        try (SqliteVectorTileProvider reader = new SqliteVectorTileProvider(layer, 0, () -> 0L, null)) {
+            return reader.readOriginalFeature(featureId);
+        } catch (Exception failure) {
+            logErr("Read selected SQLite feature layer=" + layer.getId(), failure);
+            return null;
+        }
+    }
+
+    private void restoreSqliteEditingModelVisibility(int layerId) {
+        ILayer model = getLayerById(layerId);
+        Long hiddenId = sqliteEditingHiddenFeatureId;
+        if (hiddenId != null && model instanceof VectorLayer
+                && ((VectorLayer) model).isFeatureHidden(hiddenId)) {
+            // This is the actual hide/show pair, not a synthetic data-change notification.
+            ((VectorLayer) model).showFeature(hiddenId);
+        }
+        sqliteEditingHiddenFeatureId = null;
+    }
+
+    private void refreshSqliteLayer(int layerId) {
+        MapLibreMap map = maplibreMap.get();
+        ILayer layer = getLayerById(layerId);
+        if (map == null || map.getStyle() == null || !(layer instanceof VectorLayer)) return;
+        sqliteVectorSources.remove(layerId, map.getStyle(), sourceHashMap);
+        applySqliteVectorLayer(layer, map.getStyle());
     }
 
 

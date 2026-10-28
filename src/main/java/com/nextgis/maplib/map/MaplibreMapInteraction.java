@@ -11,6 +11,9 @@ import org.maplibre.geojson.Point;
 
 public interface MaplibreMapInteraction {
 
+    /** Temporary rendering restrictions; the map model and saved visibility are unchanged. */
+    default void onRenderMemoryWarningChanged() { }
+
     public boolean processMapLongClick(GeoEnvelope exactEnv,  PointF clickPoint); // x y  - mercator
 
     public boolean processMapClick(float x, float y);

@@ -18,6 +18,9 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(application=Application.class,sdk=36)
 public class PolygonStyleOptionsTest {
+    private static int repeatedPixel(Bitmap bitmap, int x, int y) {
+        return bitmap.getPixel(Math.floorMod(x, bitmap.getWidth()), Math.floorMod(y, bitmap.getHeight()));
+    }
     private SimplePolygonStyle configured() {
         SimplePolygonStyle style = new SimplePolygonStyle(Color.YELLOW,Color.BLUE);
         style.setFillPattern(PolygonPatternRegistry.FILL_PATTERN_HATCH);
@@ -68,13 +71,56 @@ public class PolygonStyleOptionsTest {
         SimplePolygonStyle style=configured(); style.getPatternOptions().setColor(Color.RED);
         style.getPatternOptions().setAngle(0); style.getPatternOptions().setSpacing(16); style.getPatternOptions().setWidth(2);
         Bitmap narrow=ConfigurablePolygonPatternRegistry.bitmap(style);
-        assertEquals(Color.RED,narrow.getPixel(20,0)); assertEquals(0,Color.alpha(narrow.getPixel(20,8)));
+        assertEquals(Color.RED,repeatedPixel(narrow,20,0)); assertEquals(0,Color.alpha(repeatedPixel(narrow,20,8)));
         style.getPatternOptions().setWidth(8); Bitmap wide=ConfigurablePolygonPatternRegistry.bitmap(style);
-        assertTrue(Color.alpha(wide.getPixel(20,3))>Color.alpha(narrow.getPixel(20,3)));
+        assertTrue(Color.alpha(repeatedPixel(wide,20,3))>Color.alpha(repeatedPixel(narrow,20,3)));
         style.setFillPattern(2);style.getPatternOptions().setSecondAngle(90);
-        assertTrue(Color.alpha(ConfigurablePolygonPatternRegistry.bitmap(style).getPixel(0,8))>0);
+        assertTrue(Color.alpha(repeatedPixel(ConfigurablePolygonPatternRegistry.bitmap(style),0,8))>0);
         style.getPatternOptions().setSecondAngle(0);
-        assertEquals(0,Color.alpha(ConfigurablePolygonPatternRegistry.bitmap(style).getPixel(0,8)));
+        assertEquals(0,Color.alpha(repeatedPixel(ConfigurablePolygonPatternRegistry.bitmap(style),0,8)));
+    }
+    @Test public void smallerMotifsExactlyReconstructAllOriginalPixelsForEveryPattern() {
+        SimplePolygonStyle style=configured();
+        float[][] profiles={{0,90,16,2},{45,135,12,2},{17,123,13.5f,.5f}};
+        for(int type=1;type<=6;type++) for(int profile=0;profile<profiles.length;profile++) {
+            style.setFillPattern(type); PolygonPatternOptions p=style.getPatternOptions();
+            p.setAngle(profiles[profile][0]);p.setSecondAngle(profiles[profile][1]);
+            p.setSpacing(profiles[profile][2]);p.setWidth(profiles[profile][3]);
+            p.setColor(new int[]{Color.RED,0xff1257ab,Color.GREEN}[profile]);p.setAlpha(profile*127);
+            Bitmap bitmap=ConfigurablePolygonPatternRegistry.bitmap(style);
+            assertEquals(160,bitmap.getDensity());
+            assertTrue(bitmap.getWidth()>=16 && bitmap.getHeight()>=16);
+            assertEquals(0,512%bitmap.getWidth());assertEquals(0,512%bitmap.getHeight());
+            int[] motif=new int[bitmap.getWidth()*bitmap.getHeight()];
+            bitmap.getPixels(motif,0,bitmap.getWidth(),0,0,bitmap.getWidth(),bitmap.getHeight());
+            int[] originalPixels=new int[512*512];
+            for(int y=0;y<512;y++) for(int x=0;x<512;x++)
+                originalPixels[y*512+x]=ConfigurablePolygonPatternRegistry.sample(style,x+.5,y+.5);
+            // The original uncropped Bitmap route is the oracle, including Android's
+            // premultiplied ARGB storage rounding at partially transparent edges.
+            Bitmap original=Bitmap.createBitmap(originalPixels,512,512,Bitmap.Config.ARGB_8888);
+            original.getPixels(originalPixels,0,512,0,0,512,512);
+            for(int y=0;y<512;y++) for(int x=0;x<512;x++) {
+                int actual=motif[y%bitmap.getHeight()*bitmap.getWidth()+x%bitmap.getWidth()];
+                int expected=originalPixels[y*512+x];
+                if(expected!=actual) fail("Changed pattern "+type+" profile "+profile+" pixel "+x+","+y);
+            }
+            original.recycle();
+        }
+    }
+    @Test public void exactRepeatsReduceImageBytesWithoutChangingTheWaveLattice() {
+        SimplePolygonStyle style=configured();
+        style.getPatternOptions().setAngle(0);style.getPatternOptions().setSpacing(16);
+        Bitmap axisAligned=ConfigurablePolygonPatternRegistry.bitmap(style);
+        assertEquals(16,axisAligned.getWidth());assertEquals(16,axisAligned.getHeight());
+        assertEquals(1024,axisAligned.getByteCount());
+        style.getPatternOptions().setAngle(45);style.getPatternOptions().setSpacing(12);
+        Bitmap diagonal=ConfigurablePolygonPatternRegistry.bitmap(style);
+        assertEquals(256,diagonal.getWidth());assertEquals(256,diagonal.getHeight());
+        assertEquals(262144,diagonal.getByteCount());
+        assertEquals(512,ConfigurablePolygonPatternRegistry.TILE_SIZE);
+        assertEquals(-30,new ConfigurablePolygonPatternRegistry.Wave(45,12).x);
+        assertEquals(30,new ConfigurablePolygonPatternRegistry.Wave(45,12).y);
     }
     @Test public void patternOpacityIsSeparateFromBackgroundAndFeaturePropsCannotLeak() {
         SimplePolygonStyle style=configured(); style.setFill(false);style.setAlpha(0);style.getPatternOptions().setAlpha(128);
@@ -95,7 +141,10 @@ public class PolygonStyleOptionsTest {
         SimplePolygonStyle style=configured();PolygonPatternOptions p=style.getPatternOptions();
         p.setSpacing(Float.MAX_VALUE);p.setWidth(Float.NaN);p.setAngle(Float.POSITIVE_INFINITY);p.setAlpha(-1);
         assertEquals(64,p.getSpacing(),0);assertEquals(2,p.getWidth(),0);assertEquals(45,p.getAngle(),0);assertEquals(0,p.getAlpha());
-        assertEquals(512,ConfigurablePolygonPatternRegistry.bitmap(style).getWidth());
+        Bitmap bounded=ConfigurablePolygonPatternRegistry.bitmap(style);
+        assertTrue(bounded.getWidth()>=16 && bounded.getWidth()<=512);
+        assertTrue(bounded.getHeight()>=16 && bounded.getHeight()<=512);
+        assertEquals(0,512%bounded.getWidth());assertEquals(0,512%bounded.getHeight());
         PolygonOutlineOptions o=style.getOutlineOptions();o.setGap(Float.POSITIVE_INFINITY);o.setCasingWidth(-100);
         assertEquals(0,o.getGap(),0);assertEquals(0,o.getCasingWidth(),0);
         assertFalse(MplStyleMapper.isValidDashArray("NaN,2"));assertFalse(MplStyleMapper.isValidDashArray("Infinity,2"));

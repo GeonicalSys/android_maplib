@@ -78,7 +78,11 @@ public final class ConfigurablePolygonPatternRegistry {
         int[] pixels = new int[TILE_SIZE * TILE_SIZE];
         for (int y = 0; y < TILE_SIZE; y++) for (int x = 0; x < TILE_SIZE; x++)
             pixels[y * TILE_SIZE + x] = sample(style.getFillPattern(), p, a, b, x + .5, y + .5);
-        bitmap = Bitmap.createBitmap(pixels, TILE_SIZE, TILE_SIZE, Bitmap.Config.ARGB_8888);
+        // Keep the 512px wave lattice: changing it would change angle/spacing quantization.
+        // Register a smaller motif only after exact ARGB equality across the entire tile.
+        PatternTilePeriod.Period repeat = PatternTilePeriod.find(pixels, TILE_SIZE, TILE_SIZE);
+        bitmap = Bitmap.createBitmap(pixels, 0, TILE_SIZE, repeat.width, repeat.height,
+                Bitmap.Config.ARGB_8888);
         bitmap.setDensity(160); BITMAPS.put(key, bitmap); return bitmap;
     }
     public static void sync(Style style, String owner, Collection<SimplePolygonStyle> polygons) {
