@@ -745,7 +745,7 @@ public class GpsEventSource {
         GpsRecoveryPolicy.Update update = recoveryPolicy.update(now, subscriptions.hasGps(), allowed, isFresh(gps), reason);
         if (update == null) return;
         Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("schema_version", 3);
+        snapshot.put("schema_version", 4);
         snapshot.put("phase", update.phase);
         snapshot.put("reason", update.reason.wireName());
         snapshot.put("episode_id", update.episodeId);
@@ -758,6 +758,9 @@ public class GpsEventSource {
         snapshot.put("recurring_gaps", update.recurringGaps);
         snapshot.put("raw_fresh", isFresh(rawGps));
         snapshot.put("raw_age_ms", rawAge);
+        // This is the current rawGps measurement, including an existing cache seed, not a callback timestamp.
+        snapshot.put("raw_fix_elapsed_realtime_ms", rawGps == null ? -1L
+                : rawGps.getElapsedRealtimeNanos() / 1_000_000L);
         snapshot.put("raw_accuracy_m", rawGps == null ? -1 : rawGps.getAccuracy());
         snapshot.put("last_callback_age_ms", callbackAge);
         snapshot.put("last_callback_delivery_lag_ms", lastRawCallbackAge);

@@ -103,17 +103,21 @@ public class GpsDisplayRetentionTest {
         assertTrue(reports.get(0).containsKey("last_callback_delivery_lag_ms"));
         assertTrue(reports.get(0).containsKey("history"));
         assertEquals("provider_silent", reports.get(0).get("reason"));
-        assertEquals(3, reports.get(0).get("schema_version"));
+        assertEquals(4, reports.get(0).get("schema_version"));
+        assertEquals(-1L, reports.get(0).get("raw_fix_elapsed_realtime_ms"));
         assertEquals(60_000L, reports.get(0).get("reason_duration_ms"));
         assertTrue(reports.get(0).containsKey("diagnostic_tick_gap_ms"));
         assertTrue(reports.get(0).containsKey("device_sleep_gap_ms"));
         check.invoke(source);
         assertEquals(1, reports.size());
-        accept(location(LocationManager.GPS_PROVIDER, 100f));
+        Location recovered = location(LocationManager.GPS_PROVIDER, 100f);
+        accept(recovered);
         check.invoke(source);
         assertEquals(2, reports.size());
         assertEquals("recovered", reports.get(1).get("phase"));
         assertEquals(reports.get(0).get("episode_id"), reports.get(1).get("episode_id"));
+        assertEquals(recovered.getElapsedRealtimeNanos() / 1_000_000L,
+                reports.get(1).get("raw_fix_elapsed_realtime_ms"));
     }
 
     @Test public void stoppedSubscriptionDoesNotCountClosedAppTimeAsSlowRecovery() throws Exception {

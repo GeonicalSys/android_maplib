@@ -140,9 +140,9 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/reliability/LocalChangesCommitTest.java
     responsibility: Verify committed owning-map callbacks, rollback silence and draft Save scheduling with real SQLite.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsRecoveryPolicy.java
-    responsibility: Keep reception/acquisition/filter waits local, require a continuous faulty-reason threshold before reporting, correlate recovery/cancel, keep 24 history samples and gate one same-listener retry on sustained fresh used-in-fix statuses without callbacks; expose reason duration and observer/device-sleep gaps in snapshot v3.
+    responsibility: Keep reception/acquisition/filter waits local, require a continuous faulty-reason threshold before reporting, correlate recovery/cancel, keep 24 history samples and gate one same-listener retry on sustained fresh used-in-fix statuses without callbacks; policy and reason/tick/sleep evidence remain unchanged when the source emits additive schema4 raw measurement time.
   - path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
-    responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics.
+    responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics; schema4 absent raw measurement remains sentinel-1 and recovered measurement time comes from the independently created Location rather than callback receipt age.
   - path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
     responsibility: Observe stalled startup, render queries and tile stages independently of the UI, retain prior-process identity and the 16 KiB journal, keep free-headroom counters separate from used-memory diagnostics, and match event times. Export typed SQLite phases locally through one bounded observer/writer with at most16 active scopes,32 layer summaries and10s per-layer throttle, explicit observation loss and distinct provider/SDK-return/cancel/failure states, without Main-thread memory/DB/SDK reads or URI/coordinates/attributes.
   - path: maplib/src/test/java/com/nextgis/maplib/util/MapRuntimeDiagnosticsTest.java
@@ -388,7 +388,7 @@ key_components:
   - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
     responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
   - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases; releasing app automatic owners on explicit exit preserves Track/Walk recording listeners and their wake lock.
+    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases; schema4 exposes current rawGps measurement milliseconds including existing seed without changing callback/retry/filter semantics; releasing app automatic owners on explicit exit preserves Track/Walk recording listeners and their wake lock.
   - path: maplib/src/main/java/com/nextgis/maplib/util/LayerDatabaseTransaction.java
     responsibility: Managed transactions, nested failure fencing and publication only after commit.
   - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureSaveJournal.java

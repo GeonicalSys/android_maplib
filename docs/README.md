@@ -420,6 +420,15 @@ recorders и precision leases. `getLastDisplayLocation` удерживает п�
 `GpsRecoveryPolicy` различает local delay и remote escalation, сохраняя episode
 identity/history и парный итог. Точные пороги и ограниченный retry описаны выше.
 Consuming app доставляет snapshot через свой diagnostics transport.
+Snapshot v4 добавляет `raw_fix_elapsed_realtime_ms`: время измерения текущего
+rawGps, включая существующий cache seed, с sentinel-1 при отсутствии. Поле не
+обозначает вход callback и не меняет acquisition/filter state. Consumer app
+сопоставляет его с пассивным system GPS cache только в уже отправляемом report;
+no-fix/local500ms ticks не запускают probe. Схемы прежних replay сохраняются.
+10 fixed numeric/enum witness fields и отсутствие координат/causal conclusions
+описаны в consuming [error-reporting](../../docs/architecture/error-reporting.md#пассивное-сравнение-с-системным-gps-cache--29-октября-2026).
+Это сбор недостающего свидетельства, не устранённый delivery stall. Таймаут
+синхронного platform getter не вводится; пороги/retry/owners/recording не меняются.
 Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.
 Явный выход consuming app снимает только его автоматические leases; recording
 listeners Track/Walk остаются независимыми и удерживают acquisition/wake lock.
