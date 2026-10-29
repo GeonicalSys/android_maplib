@@ -1,10 +1,84 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## Горячая запись PBF и отменяемый допуск к IO — MOB-04, 28 октября2026
+
+`LocalVectorTileDiskCache` сохраняет прежние ключи и полные PBF, byte/entry и
+1024-file bounds, временный файл/атомарный rename и SQLite как источник данных.
+Общий индекс canonical root запрашивается при каждой операции, поэтому HTTP
+экземпляры на каждый запрос и старые providers после вытеснения root ledger
+не расходятся в учёте. Registry ограничен8roots, каждый inventory держит не
+более1025metadata до trim. Метаданные/recency хранятся в памяти, сортированный
+набор обслуживается инкрементально; обычный put не читает и не сортирует каталог.
+Первичное чтение и обнаруженное изменение каталога требуют reconciliation;
+проверка имени без повторной regex compilation, stat метаданных на файл один раз.
+Ожидаются только штатные same-process writers этого private namespace;
+удаление cache ОС безопасно, произвольный внешний конкурентный writer не обещан.
+
+Native provider передаёт дешёвый current guard внутрь put: проверки до/после
+lock, перед write/rename и после публикации не меняют source/content/style keys.
+HTTP получает новый общий индекс через прежний3-argument API и сохраняет
+свои внешние current/key проверки; socket probe1мс не вводится в cache lock.
+При IO/iterator failure кэш остаётся optional miss, готовый полный тайл не
+отклоняется только из-за недоступного производного файла. Никакой новой
+долговременной cache policy, миграции проекта или background thread нет.
+
+`SqliteVectorTileSession` получает общий отменяемый допуск2 до отправки в shared
+IO dispatcher. Отменённые ожидающие SDK jobs не создают blocking payload каждый.
+Lease освобождается на IO после настоящего unwind и до Main, а predispatch cancel
+имеет идемпотентный fallback. Retry не держит permit; некооперативная активная
+работа сохраняет permit до выхода. SDK определяет нужные tiles, включая parent/
+fade/adjacent; age/zoom/density не используются для потери текущего результата.
+Pending SDK jobs и отдельные HTTP/line-label queues этим не ограничиваются.
+
+25 cache/7 admission tests (28 новых) и прежние content/lifecycle/gate проверки —
+техническая приёмка, не новый измеритель и не реальные smartphone timings.
+Владелец просит только обычный APK, сам установит его на телефон; ADB/native/
+Full/публикация в этом шаге не выполняются. Карточка:
+`maplib-20261028-tile-cache-queue`; central contract:
+`INV-LOCAL-TILE-CACHE-ADMISSION`.
+
+## Подробный локальный сбор ресурсов — opt-in, 2026-10-28
+
+`RenderResourceProfiler` по умолчанию выключен. Приватный app adapter явно
+вызывает `start(sessionId, version, build, revision, Sink)`; `Sink.offer` обязан
+только неблокирующе принять неизменяемую запись. Библиотека не создаёт файлов,
+не вызывает SDK, не делает новых SQL/memory reads и не управляет renderer/cache
+policy. Публичный `event(kind, numericFields)` принимает ограниченные числовые
+метрики и boolean, отбрасывает строки, координатные/URI/path/object-ID поля,
+невалидные числа и лишние поля. Сбор не добавляется в Sentry-журнал.
+
+Каждый `MapRuntimeDiagnostics.SqliteScope` получает независимый token, включая
+legacy-unobserved запросы: прежние cap16/cap32/10s throttle остаются прежними,
+но не ограничивают новый учёт. Хранятся до 256 слоёв и 512 подробных active
+tokens. Остальные запросы продолжают увеличивать общие и overflow-агрегаты;
+потеря подробных записей, отказ/ошибка sink и неизвестные слои явны.
+Requests, outcomes, work counts и суммы фаз учитываются до передачи raw записи
+и не зависят от заполненности очереди app writer. Никакая ошибка диагностики
+не должна превращать тайл в failure или успешный неполный результат.
+
+Wall clock — `SystemClock.elapsedRealtimeNanos`, включая suspend; CPU clock —
+`Debug.threadCpuTimeNanos` только между точками одного `Process.myTid`.
+Main→IO→Main интервалы имеют известное wall time и неизвестный CPU, а не
+разность часов разных потоков. Суммы elapsed разных запросов перекрываются
+и не являются временем сцены; histograms фаз описывают завершённые segments,
+а не p95 всего запроса. CPU включает overhead диагностических clocks/accounting.
+Process/SDK memory samples не являются удержанной памятью конкретного слоя.
+
+`stop(reason)` выключает только наблюдение и возвращает авторитетную bounded
+summary; `snapshot()` даёт такой же background checkpoint. App сохраняет summary
+отдельно от raw очереди. Незавершённые scopes остаются `active_at_snapshot`,
+не объявляются cancelled/finished, и после stop не меняют готовую summary.
+Summary содержит полные global totals/histograms, compact numeric rows всех
+отслеживаемых слоёв и точные phase arrays для top32 по CPU/elapsed; число слоёв
+без phase detail явно указано. Индивидуальные raw requests содержат все phase
+arrays, если очередь их сохранила. Это ограничение детализации не теряет общий
+знаменатель. Долговременный кеш и алгоритмы/данные карты этим шагом не меняются.
 
 ## Ограниченное чтение SQLite originals — MOB-04, 2026-10-28
 
@@ -346,6 +420,15 @@ recorders и precision leases. `getLastDisplayLocation` удерживает п�
 `GpsRecoveryPolicy` различает local delay и remote escalation, сохраняя episode
 identity/history и парный итог. Точные пороги и ограниченный retry описаны выше.
 Consuming app доставляет snapshot через свой diagnostics transport.
+Snapshot v4 добавляет `raw_fix_elapsed_realtime_ms`: время измерения текущего
+rawGps, включая существующий cache seed, с sentinel-1 при отсутствии. Поле не
+обозначает вход callback и не меняет acquisition/filter state. Consumer app
+сопоставляет его с пассивным system GPS cache только в уже отправляемом report;
+no-fix/local500ms ticks не запускают probe. Схемы прежних replay сохраняются.
+10 fixed numeric/enum witness fields и отсутствие координат/causal conclusions
+описаны в consuming [error-reporting](../../docs/architecture/error-reporting.md#пассивное-сравнение-с-системным-gps-cache--29-октября-2026).
+Это сбор недостающего свидетельства, не устранённый delivery stall. Таймаут
+синхронного platform getter не вводится; пороги/retry/owners/recording не меняются.
 Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.
 Явный выход consuming app снимает только его автоматические leases; recording
 listeners Track/Walk остаются независимыми и удерживают acquisition/wake lock.
@@ -954,3 +1037,29 @@ LayerDisplayPriority распознаёт линейную геометрию с
 stack не перестраивается. Схема, API payload и число проходов не меняются.
 Consuming Related track-candidates: 4/4 native PASS. Контракт — consuming
 архитектура track-controls.md. Runtime unit/build и полный набор отдельны.
+
+Регрессия ordinary SQLite native route29 октября: logical path недостаточен
+для поиска current SDK passes. Планировщик получает точные aliases logical,
+controller-owned current native source и отдельного line-label source; старое
+поколение и похожий prefix не включаются. Группы обходятся по canonical
+flattened LayerGroup снизу вверх, а не по insertion/reverse sourcesOrder cache.
+Это существенно для hot-add и standalone bind в произвольном порядке.
+Перестановка использует `Style.getLayer(id)` cached factory wrapper: свежие
+enumeration wrappers служат только метаданными, иначе теряется identity владельца
+hide/edit filter. Порядок восстанавливается в style-props, GeoJSON-source update,
+data-reload и private SQLite refresh; full/lite выполняют одну перестановку
+после batch. Cache/IO admission, epoch/cancellation и сами данные не меняются.
+Новая карточка: [maplib-20261029-sqlite-layer-display-priority](../update-reports/entries/maplib-20261029-sqlite-layer-display-priority.md).
+Первый app native запуск подтвердил реальный дефект взаимного порядка групп;
+после canonical model traversal исправления focused `sqlite-priority`1/1 PASS
+на T40/API30 (`priority-related-t40-02`), затем все10 distinct методов класса
+PASS (`sqlite-related-t40-03/result.json`). Final83 JVM/10classes PASS,
+0fail/error/skip. Обычный Lisa224/3.1.2.30 с окончательным исправлением собран и
+установлен поверх приложения T40 с прежней подписью и данными; SHA256
+`57a495854c9c18a5265bf42074101b9dd6d5750ad0fe5e3d6e606c5ef10984bd`.
+Normal variants/version matrix PASS; profiler/verification выключены,
+profileable отсутствует. Восстановленная карта14.2 визуально просмотрена;
+это normal smoke, не полнота/pixel приёмка реального проекта либо Full.
+UID logcat collector `--uid` на T40 не поддержан — отдельный diagnostic gap.
+Native nested/recreation остаются
+непроверенными; прежний4/4 classic-route PASS не является новой приёмкой.

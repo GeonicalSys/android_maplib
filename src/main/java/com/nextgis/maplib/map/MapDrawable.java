@@ -1407,6 +1407,7 @@ public class MapDrawable
                 if (map != null && map.getStyle() != null) {
                     applySqliteVectorLayer(layer, map.getStyle());
                     checkLayerVisibility(layer.getId());
+                    ensureUserLocationLayerOnTop(map.getStyle());
                 }
             });
             return;
@@ -1467,7 +1468,10 @@ public class MapDrawable
         if (style == null) {
             return;
         }
-        if (applySqliteVectorLayer(layer, style)) return;
+        if (applySqliteVectorLayer(layer, style)) {
+            ensureUserLocationLayerOnTop(style);
+            return;
+        }
 
         try (com.nextgis.maplib.util.MapRuntimeDiagnostics.SourceScope memory =
                      com.nextgis.maplib.util.MapRuntimeDiagnostics.source(layer.getId(), "classic", "native_update")) {
@@ -1621,6 +1625,7 @@ public class MapDrawable
                     sourceFeaturesHashMap.remove(layer.getId()); sourcesOrder.remove(layer.getId());
                 } else applySqliteVectorLayer(layer, map.getStyle());
                 checkLayerVisibility(layer.getId());
+                ensureUserLocationLayerOnTop(map.getStyle());
             };
             if (Looper.myLooper() == Looper.getMainLooper()) update.run(); else mainHandler.post(update);
             return;
@@ -5392,12 +5397,6 @@ public class MapDrawable
         return result;
     }
 
-    private static boolean isPointLayer(ILayer layer) {
-        if (!(layer instanceof VectorLayer)) return false;
-        int type = ((VectorLayer) layer).getGeometryType();
-        return type == GeoConstants.GTPoint || type == GeoConstants.GTMultiPoint;
-    }
-
     private static String vectorSourceId(Layer layer) {
         if (layer instanceof CircleLayer) return ((CircleLayer) layer).getSourceId();
         if (layer instanceof SymbolLayer) return ((SymbolLayer) layer).getSourceId();
@@ -5409,46 +5408,28 @@ public class MapDrawable
     /** Data stack: ordinary data, tracks, field lines, point groups, tools, location cursor. */
     private void ensureTrackAndPointOrder(@Nullable Style style) {
         if (style == null || style.getLayer("selected-dot-layer") == null) return;
-        List<Layer> existing = style.getLayers();
-        List<Layer> ordered = new ArrayList<>();
-        for (Layer layer : existing)
-            if (layer.getId().startsWith("track-line-") || layer.getId().startsWith("track-inprogress-"))
-                ordered.add(layer);
-        List<Integer> logicalIds = new ArrayList<>(sourcesOrder.keySet());
-        Collections.reverse(logicalIds);
-        Map<String, List<Layer>> pointGroups = new LinkedHashMap<>();
-        Map<String, List<Layer>> fieldLineGroups = new LinkedHashMap<>();
-        List<ILayer> logicalLayers = new ArrayList<>();
-        LayerGroup.getAllLayers(this, logicalLayers);
-        Map<Integer, ILayer> logicalById = new HashMap<>();
-        for (ILayer logical : logicalLayers) logicalById.put(logical.getId(), logical);
-        for (Integer id : logicalIds) {
-            ILayer logical = logicalById.get(id);
-            if (isPointLayer(logical)) pointGroups.put(logical.getPath().toString(), new ArrayList<>());
-            else if (logical instanceof VectorLayer && LayerDisplayPriority.isFieldLines(
-                    ((VectorLayer) logical).getGeometryType(), logical.getName())) {
-                fieldLineGroups.put(logical.getPath().toString(), new ArrayList<>());
-            }
+        List<LayerDisplayPriority.Pass> existing = new ArrayList<>();
+        // Enumeration wrappers are metadata only. The cached factory wrapper must survive a move
+        // so controller hide/edit filter identity continues to refer to the same Java layer.
+        for (Layer layer : style.getLayers())
+            existing.add(new LayerDisplayPriority.Pass(layer.getId(), vectorSourceId(layer)));
+        // Preparation/registration arrival order can differ after standalone hot binds. The
+        // canonical model tree alone owns relative data order, including nested groups.
+        List<ILayer> logicalLayers = LayerDisplayPriority.bottomToTop(getLayers(),
+                logical -> logical instanceof LayerGroup ? ((LayerGroup) logical).getLayers() : null);
+        List<LayerDisplayPriority.Group> groups = new ArrayList<>();
+        for (ILayer logical : logicalLayers) {
+            if (!(logical instanceof VectorLayer)) continue;
+            int geometry = ((VectorLayer) logical).getGeometryType();
+            if (!LayerDisplayPriority.hasPriority(geometry, logical.getName())) continue;
+            String path = logical.getPath().toString();
+            groups.add(new LayerDisplayPriority.Group(geometry, logical.getName(), path,
+                    SqliteVectorLayerController.nativeSourceId(style, path)));
         }
-        for (Layer layer : existing) {
-            String source = vectorSourceId(layer);
-            List<Layer> group = fieldLineGroups.get(source);
-            if (group == null && source != null && source.endsWith(MPLFeaturesUtils.source_polygon_text))
-                group = fieldLineGroups.get(source.substring(0, source.length() - MPLFeaturesUtils.source_polygon_text.length()));
-            if (group == null) group = pointGroups.get(source);
-            if (group != null) group.add(layer);
+        for (String id : LayerDisplayPriority.movesBeforeAnchor(existing, groups, "selected-dot-layer")) {
+            Layer actual = style.getLayer(id);
+            if (actual != null && style.removeLayer(actual)) style.addLayerBelow(actual, "selected-dot-layer");
         }
-        for (List<Layer> group : fieldLineGroups.values()) ordered.addAll(group);
-        for (List<Layer> group : pointGroups.values()) ordered.addAll(group);
-        int anchor = -1;
-        for (int i = 0; i < existing.size(); i++)
-            if ("selected-dot-layer".equals(existing.get(i).getId())) anchor = i;
-        boolean correct = anchor >= ordered.size();
-        for (int i = 0; correct && i < ordered.size(); i++)
-            correct = existing.get(anchor - ordered.size() + i).getId().equals(ordered.get(i).getId());
-        if (correct) return;
-        for (Layer layer : ordered) if (style.removeLayer(layer))
-            style.addLayerBelow(layer, "selected-dot-layer");
     }
 
     public void reloadCurrentTrackToMap() {
@@ -5896,6 +5877,7 @@ public class MapDrawable
         if (map == null || map.getStyle() == null || !(layer instanceof VectorLayer)) return;
         sqliteVectorSources.remove(layerId, map.getStyle(), sourceHashMap);
         applySqliteVectorLayer(layer, map.getStyle());
+        ensureUserLocationLayerOnTop(map.getStyle());
     }
 
 

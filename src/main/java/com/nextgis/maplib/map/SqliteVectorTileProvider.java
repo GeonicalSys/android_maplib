@@ -140,7 +140,7 @@ public final class SqliteVectorTileProvider implements SqliteVectorTileBackend {
             scope.phase(STYLE);
             requireCurrent(valid); requireStyleCurrent();
             scope.phase(CACHE_WRITE);
-            if (disk != null) { scope.count(CACHE_WRITE_CALLS, 1); disk.put(key, bytes, cacheBytes); }
+            if (disk != null) { scope.count(CACHE_WRITE_CALLS, 1); disk.put(key, bytes, cacheBytes, valid); }
             requireCurrent(valid);
             return bytes;
         }

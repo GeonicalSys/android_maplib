@@ -71,12 +71,27 @@ public final class MapRuntimeDiagnostics {
 
     /** Pure bounded counters: safe on Main; no memory, DB, URI, feature or SDK reads. */
     public static SqliteScope sqliteTile(int layerId, int zoom) {
-        try { return layerId < 0 ? SqliteScope.NONE : ENGINE.beginSqlite(layerId, zoom, "sqlite_native"); }
-        catch (RuntimeException unavailable) { return SqliteScope.NONE; }
+        return sqliteObserved(layerId, zoom, "sqlite_native");
     }
     public static SqliteScope sqliteLabels(int layerId) {
-        try { return layerId < 0 ? SqliteScope.NONE : ENGINE.beginSqlite(layerId, -1, "sqlite_line_labels"); }
-        catch (RuntimeException unavailable) { return SqliteScope.NONE; }
+        return sqliteObserved(layerId, -1, "sqlite_line_labels");
+    }
+    private static SqliteScope sqliteObserved(int layerId, int zoom, String kind) {
+        return sqliteObserved(ENGINE, layerId, zoom, kind);
+    }
+    static SqliteScope sqliteObserved(Engine observer, int layerId, int zoom, String kind) {
+        RenderResourceProfiler.Token detailed = RenderResourceProfiler.beginSqlite(layerId, zoom, kind);
+        SqliteScope legacy;
+        try { legacy = layerId < 0 ? SqliteScope.NONE : observer.beginSqlite(layerId, zoom, kind); }
+        catch (RuntimeException unavailable) { legacy = SqliteScope.NONE; }
+        if (detailed == null) return legacy;
+        try {
+            if (legacy == SqliteScope.NONE) return new SqliteScope(detailed);
+            legacy.detailed = detailed;
+        } catch (Throwable unavailable) {
+            detailed.finish(SqliteOutcome.ABANDONED);
+        }
+        return legacy;
     }
     public static void observeMemory(Map<String, Object> state) { ENGINE.observeMemory(state); }
     /** Includes a prior-process journal only when the event timestamp belongs to its recorded operation. */
@@ -109,9 +124,13 @@ public final class MapRuntimeDiagnostics {
         private SqliteOutcome outcome = SqliteOutcome.ACTIVE;
         private long phaseStarted, epoch, contentVersion;
         private boolean identified, closed, timingAvailable = true;
+        private RenderResourceProfiler.Token detailed;
         private SqliteScope() {
             engine = null; id = started = startedWall = 0; layerId = zoom = -1;
             kind = "disabled"; timings = counts = null;
+        }
+        private SqliteScope(RenderResourceProfiler.Token detailed) {
+            this(); this.detailed = detailed;
         }
         SqliteScope(Engine engine, int layerId, int zoom, String kind) {
             this.engine = engine; this.layerId = layerId; this.zoom = zoom; this.kind = kind;
@@ -120,11 +139,13 @@ public final class MapRuntimeDiagnostics {
             timings = new long[SqlitePhase.values().length]; counts = new long[SqliteCount.values().length];
         }
         public void identity(long epoch, long contentVersion) {
+            if (detailed != null) detailed.identity(epoch, contentVersion);
             if (engine == null) return;
             try { synchronized (this) { this.epoch = epoch; this.contentVersion = contentVersion; identified = true; } }
             catch (RuntimeException ignored) { }
         }
         public void phase(SqlitePhase next) {
+            if (detailed != null) detailed.phase(next);
             if (engine == null || next == null) return;
             try { synchronized (this) {
                 if (closed) return;
@@ -134,6 +155,7 @@ public final class MapRuntimeDiagnostics {
             } } catch (RuntimeException ignored) { synchronized (this) { timingAvailable = false; } }
         }
         public void count(SqliteCount key, long value) {
+            if (detailed != null) detailed.count(key, value);
             if (engine == null || key == null || value < 0) return;
             try { synchronized (this) {
                 if (!closed) counts[key.ordinal()] = Long.MAX_VALUE - counts[key.ordinal()] < value
@@ -141,6 +163,7 @@ public final class MapRuntimeDiagnostics {
             } } catch (RuntimeException ignored) { }
         }
         public void finish(SqliteOutcome result) {
+            if (detailed != null) detailed.finish(result);
             if (engine == null || result == null || result == SqliteOutcome.ACTIVE) return;
             boolean release = false;
             try {

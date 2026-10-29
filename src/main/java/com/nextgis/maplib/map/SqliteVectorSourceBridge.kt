@@ -18,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Semaphore
 import org.maplibre.android.style.sources.CustomVectorSource
 import org.maplibre.android.style.sources.CustomVectorTileProvider
 import org.maplibre.android.style.sources.TileData
@@ -106,7 +107,8 @@ internal class SqliteVectorTileSession(
     private val sourceCurrent: BooleanSupplier,
     mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     private val workDispatcher: CoroutineDispatcher = SharedSqliteTileIo.dispatcher,
-    private val diagnosticLayerId: Int = -1
+    private val diagnosticLayerId: Int = -1,
+    private val workAdmission: SqliteTileIoAdmission = SharedSqliteTileIo.admission
 ) {
     private val closed = AtomicBoolean(false)
     private val ownerJob = SupervisorJob()
@@ -134,20 +136,35 @@ internal class SqliteVectorTileSession(
                 ensureCurrent(requestJob, request)
                 try {
                     diagnostic.phase(SqlitePhase.IO_QUEUE)
-                    // Admission/byte budget belongs to the backend: no second gate here.
-                    val bytes = runInterruptible(workDispatcher) {
-                        diagnostic.phase(SqlitePhase.STYLE)
+                    // Suspend before dispatch: canceled SDK jobs do not leave a blocking-work
+                    // payload behind every older request in the shared IO dispatcher queue.
+                    val admission = workAdmission.acquire()
+                    val bytes = try {
                         ensureCurrent(requestJob, request)
-                        val snapshot = request ?: backend.snapshot(z, x, y).also { request = it }
-                        diagnostic.identity(snapshot.sourceEpoch, snapshot.contentVersion)
-                        ensureCurrent(requestJob, snapshot)
-                        val current = BooleanSupplier { isCurrent(requestJob, snapshot) }
-                        backend.load(snapshot, current, diagnostic).also {
-                            ioSuccessful.incrementAndGet()
-                            ensureCurrent(requestJob, snapshot)
-                            // Written on IO before resuming Main; a blocked Main is visible to the watcher.
-                            diagnostic.phase(SqlitePhase.MAIN_DISPATCH)
+                        runInterruptible(workDispatcher) {
+                            try {
+                                diagnostic.phase(SqlitePhase.STYLE)
+                                ensureCurrent(requestJob, request)
+                                val snapshot = request ?: backend.snapshot(z, x, y).also { request = it }
+                                diagnostic.identity(snapshot.sourceEpoch, snapshot.contentVersion)
+                                ensureCurrent(requestJob, snapshot)
+                                val current = BooleanSupplier { isCurrent(requestJob, snapshot) }
+                                backend.load(snapshot, current, diagnostic).also {
+                                    ioSuccessful.incrementAndGet()
+                                    ensureCurrent(requestJob, snapshot)
+                                    // Written on IO before resuming Main; a blocked Main is visible to the watcher.
+                                    diagnostic.phase(SqlitePhase.MAIN_DISPATCH)
+                                }
+                            } finally {
+                                // Own the permit until actual blocking work unwinds, even when
+                                // it ignores interruption; do not retain it until Main resumes.
+                                admission.release()
+                            }
                         }
+                    } finally {
+                        // Cancellation/current-check failure before the IO body starts has no
+                        // worker finally. The same lease makes both paths exact-once.
+                        admission.release()
                     }
                     // Main check still directly precedes return: no added suspension or native call.
                     ensureCurrent(requestJob, request)
@@ -224,4 +241,23 @@ internal class SqliteVectorTileSession(
 /** Shared across sources, so twenty layers do not create forty blocking workers. */
 private object SharedSqliteTileIo {
     val dispatcher = Dispatchers.IO.limitedParallelism(2)
+    val admission = SqliteTileIoAdmission(2)
+}
+
+/** The SDK owns pending demand; only two uncancelled blocking payloads enter IO at once. */
+internal class SqliteTileIoAdmission(permits: Int) {
+    private val semaphore = Semaphore(permits)
+
+    suspend fun acquire(): Lease {
+        semaphore.acquire()
+        return Lease(semaphore)
+    }
+
+    class Lease internal constructor(private val semaphore: Semaphore) {
+        private val released = AtomicBoolean(false)
+
+        fun release() {
+            if (released.compareAndSet(false, true)) semaphore.release()
+        }
+    }
 }
