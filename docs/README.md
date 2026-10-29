@@ -408,6 +408,42 @@ canonical workspace; библиотечный account adapter не пишет о
 Tracked URL читает часы своего проекта, с since=0 для неизвестного подтверждения.
 Регрессии: LocalChangesCommitTest и ProjectSyncStateTest, native consumer tests.
 
+
+## Подтверждённое время полного завершения проекта — 29 октября2026
+
+`ProjectSyncState.markComplete` делает новое время доступным через `lastComplete`
+только после успешного `SharedPreferences.commit`. Отказ или исключение сохраняет
+предыдущее подтверждённое значение для точного объекта настроек и canonical project.
+Первая запись устанавливает этот вид до `edit`/`putLong`; читатели не ждут writer
+monitor, удерживаемый на время дисковой записи. Вложенные listeners выбирают
+последнюю успешную invocation, включая положительное время меньше предыдущего
+после перевода часов. Другие проекты и равные, но разные объекты prefs изолированы.
+
+Имя preference-файла, canonical UUID-ключи, long-формат и статический API прежние;
+миграции, дополнительного commit, repair или async-записи нет. Framework может
+изменить cache до отказа, а диск при отказе может содержать старое либо новое
+значение. Успешная запись другого ключа способна записать и этот cache. Защита
+действует только для читателей API в текущем процессе, пока жив тот же prefs owner;
+рестарт или смена owner не получает гарантии отката. Записи namespace в исходниках
+ведёт только `ProjectSyncState`. Pair ACK, cleanup и расписание retry не меняются.
+
+Технические регрессии: новый `ProjectSyncStatePublicationTest` (16) и прежний
+`ProjectSyncStateTest` (3). На исходном коде RED: 10 FAIL из 19, после исправления
+GREEN: все 19 PASS, ошибки и пропуски — 0. Offline Gradle/JBR21 с существующим
+Robolectric4.16.1/API28 занял 31с; maplib main/test Java/Kotlin compile выполнен.
+Это модели Android cache/disk, не APK/device или приёмка реальной синхронизации.
+Статические consumers прежние: app `LayersFragment` и `MaintenanceReminders`,
+maplib `NGWVectorLayer` (скомпилирован в maplib debug/release). App Java/Kotlin
+compile выполнен offline для effective variants LisaDebug (42с) и BelkaRelease
+(46с), включая source dependencies. BelkaDebug намеренно отключён в
+`app/build.gradle:254–264` и не получает PASS вместо существующего варианта.
+В графах этих compile tasks нет CMake/NDK/assemble/APK/sign/minify/upload/device.
+Публичные `lastComplete(Context,String):long` и `markComplete(Context,String,long):boolean`
+не изменены. В поставке библиотека сначала сливается Merge Commit, затем root
+обновляет app submodule pointer; текущие app UI pins не переписываются ради local drift.
+[Карточка](../update-reports/entries/maplib-20261029-project-sync-clock-confirmation.md).
+
+
 ## Автоматический background lease и display-only Network
 
 `GpsEventSource.acquireBackgroundUpdates/releaseBackgroundUpdates` добавляют

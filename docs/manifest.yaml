@@ -134,7 +134,9 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/map/SharedTrackStoreTest.java
     responsibility: Verify actual DatabaseHelper filenames, collisions with post-update tracks, interrupted target rollback/retry, unchanged atomic backup/new files, lost replies, old schemas and bootstrap copy provenance.
   - path: maplib/src/main/java/com/nextgis/maplib/util/ProjectSyncState.java
-    responsibility: Persist verified full completion independently for canonical workspace paths without trusting old global clocks.
+    responsibility: Preserve canonical UUID full-project clocks and publish only successful commits through an exact weak-identity preferences-owner confirmed process view; retain prior confirmation on false/throw, reentrant successful invocation order and reads independent of the disk writer lock, without compensating writes or cross-process rollback guarantee.
+  - path: maplib/src/test/java/com/nextgis/maplib/util/ProjectSyncStatePublicationTest.java
+    responsibility: Assert cache-before-failed-commit visibility with held readers, editor/put/commit observer reentry, nested success/failure order, canonical aliases, distinct owner/project isolation, lower positive times, raw-reader recheck, exceptions and unchanged persistence format using technical SharedPreferences doubles.
   - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureChanges.java
     responsibility: Exclude separate feature and attachment Save flags when counting or selecting ready outbound changes.
   - path: maplib/src/test/java/com/nextgis/maplib/reliability/LocalChangesCommitTest.java
