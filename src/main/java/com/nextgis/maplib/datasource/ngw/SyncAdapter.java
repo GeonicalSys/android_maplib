@@ -152,6 +152,7 @@ public class SyncAdapter
         IGISApplication gisApp = (IGISApplication) getContext().getApplicationContext();
         mQueueOwnsLifecycle = bundle != null && bundle.getBoolean(EXTRA_QUEUE_OWNS_LIFECYCLE, false)
                 && com.nextgis.maplib.util.SyncWorkspaceSession.current() != null;
+        SyncResultUtil.clearAccountFailureSnapshot(bundle);
         Log.d("SSYNC", "super.onPerformSync for " + account.name);
         gisApp.setError(null, null, 0);
 
@@ -177,7 +178,7 @@ public class SyncAdapter
                     SyncResultUtil.markNetworkUnavailable(syncResult);
                     return;
                 }
-                SyncResultUtil.beginSync();
+                SyncResultUtil.beginSync(syncResult);
                 try {
                     gisApp.stopHandler();
                     if (!mQueueOwnsLifecycle) NGWSyncService.markSyncStarted();
@@ -190,6 +191,8 @@ public class SyncAdapter
                     completePerformSync(account, syncResult, (MapContentProviderHelper) MapBase.getInstance(), true);
                     finishBroadcast = true;
                 } finally {
+                    if (mQueueOwnsLifecycle)
+                        SyncResultUtil.exportAccountFailureSnapshot(bundle, syncResult);
                     SyncResultUtil.endSync();
                 }
                 return;
@@ -199,7 +202,7 @@ public class SyncAdapter
             HyperLog.v(Constants.TAG, "SyncAdapter: onPerformSync for" + account.name + " ngw part start manual=" + manualSync);
             Log.d(TAG, "onPerformSync");
 
-            SyncResultUtil.beginSync();
+            SyncResultUtil.beginSync(syncResult);
             try {
                 MapContentProviderHelper mapContentProviderHelper = (MapContentProviderHelper) MapBase.getInstance();
 
@@ -232,6 +235,8 @@ public class SyncAdapter
                 completePerformSync(account, syncResult, mapContentProviderHelper, manualSync);
                 finishBroadcast = true;
             } finally {
+                if (mQueueOwnsLifecycle)
+                    SyncResultUtil.exportAccountFailureSnapshot(bundle, syncResult);
                 SyncResultUtil.endSync();
             }
         } catch (Throwable t) {

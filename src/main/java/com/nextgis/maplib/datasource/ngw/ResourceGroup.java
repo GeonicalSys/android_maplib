@@ -114,16 +114,43 @@ public class ResourceGroup extends Resource {
         }
     }
 
+    /** Current invocation result only; contains no credentials, response body or exception text. */
+    public static final class ChildrenLoadResult {
+        private final int responseCode;
+        private final boolean successful;
+        private final boolean temporaryServerFailure;
+
+        ChildrenLoadResult(int responseCode, boolean successful, boolean temporaryServerFailure) {
+            this.responseCode = responseCode;
+            this.successful = successful;
+            this.temporaryServerFailure = temporaryServerFailure;
+        }
+        public int getResponseCode() { return responseCode; }
+        public boolean isSuccessful() { return successful; }
+        public boolean isTemporaryServerFailure() { return temporaryServerFailure; }
+    }
+
+    /** Compatibility entry: legacy callers keep their existing void/no-throw contract. */
     public void loadChildren(boolean skipSubLoad) {
+        loadChildrenWithResult(skipSubLoad);
+    }
+
+    public ChildrenLoadResult loadChildrenWithResult(boolean skipSubLoad) {
         if (mChildrenLoaded)
-            return;
+            return new ChildrenLoadResult(200, true, false);
 
         try {
             String sURL = NGWUtil.getResourceChildrenUrl(mConnection.getURL(), mRemoteId);
             HttpResponse response =
                     NetworkUtil.get(sURL, mConnection.getLogin(), mConnection.getPassword(), false);
-            if (!response.isOk())
-                return;
+            if (!response.isOk()) {
+                int code = response.getResponseCode();
+                boolean server = NetworkUtil.isTransientNgwHttpError(code,
+                        response.getResponseBody(), response.getResponseMessage())
+                        && NetworkUtil.isTemporaryNgwServerFailure(code,
+                        response.getResponseBody(), response.getResponseMessage());
+                return new ChildrenLoadResult(code, false, server);
+            }
 
             JSONArray children = new JSONArray(response.getResponseBody());
             for (int i = 0; i < children.length(); i++)
@@ -146,8 +173,10 @@ public class ResourceGroup extends Resource {
             });
 
             mChildrenLoaded = true;
+            return new ChildrenLoadResult(response.getResponseCode(), true, false);
         } catch (IOException | JSONException e) {
             e.printStackTrace();
+            return new ChildrenLoadResult(-1, false, false);
         }
     }
 

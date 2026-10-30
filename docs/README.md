@@ -1145,3 +1145,48 @@ owned Q helper, повторён dry-run, затем actual compile один р�
 [сигнал ошибки сохранения](../update-reports/entries/maplib-20261030-lookup-save-failure.md).
 UI/pins не менялись. Никакой SQL/full apply/device/native/real-server приёмки;
 предыдущие clock19/journal22/storage21/prefetch12 и desktop1117/1192 не запускались.
+
+
+## Сообщения о сбоях ВебГИС — source-срез30 октября2026
+
+SyncResultUtil сохраняет allowlisted причины отдельными metadata к прежним IO
+и Parse counters. Account adapter очищает и экспортирует их до endSync в local
+Bundle точного result owner. Consumer проверяет identity, version/bits и captured
+IO/Parse; поздние/смешанные/неизвестные ошибки не выдаются за чистую серверную.
+Четыре primitive поля плюс local Parcelable result token не пересылаются в Intent,
+IPC или persisted state. Legacy raw-string notifier остаётся безопасным generic.
+
+PUSH/lookup сохраняют прежние numeric counters; metadata-only markers не удваивают
+ошибки. SYNC_NONE metadata/count/fallback теперь отражают known temporary server
+failure в результате, сохраняя прежние null/UNKNOWN/zero→KEEP и optional full/deferred
+schema routes. Общий Core RU/EN server text объясняет возможные технические работы
+или перегрузку и предлагает повторить позже; это не диагноз planned maintenance.
+
+ResourceGroup/Connection.loadChildrenWithResult возвращают только code/success/
+temporary-server. Старый void loadChildren, успешный пустой список, сортировка,
+cache short-circuit и parcel layout сохранены. Initial feature HTTP failure
+использует NgwHttpException(IOException), initial metadata HTTP failure —
+NgwHttpResponseException(NGException); прежние diagnostic/localized messages и
+разные catch/retry boundaries сохранены. UI читает typed причину, не raw текст.
+
+Actual89 source checks PASS/0fail/errors/skips: Core46 (37 Robolectric API28 +
+9 plain JUnit) и App43 API28,11 XML10.995с, Gradle0/BUILD50с. Same literal4/6eb9
+GREEN0.434с включены в эти89; прежний pre-fix baseline3comparisonFAIL/1control
+3.180с/native1 сохранён отдельно. Первый общий85 остаётся NOT_PASS81/4assertFAIL/
+0errors/skips:3 failures выявили HTTP408+externalDB false-server classification,
+один stale Producer oracle8 противоречил исходному knownSERVER|OTHER12. Root
+вручную исправил только этот assert8→12; API7ec/Core16/App13 и остальные тесты
+не менялись. NetworkUtil теперь разрешает text recognition только422 после
+numeric429/5xx; retry predicates byte-exact. Добавлены4 неизменённых plain tests.
+BelkaRelease source compile0/BUILD59с (61.275с observed):100taskSET exact при ином
+порядке, CoreJava/UIJava/AppJava+Kotlin executed;4 Java JAR28/535/670/45 classes
+без native/product archives. Во время проверок68 inputs exact, все15 unit и13
+compile процессов завершились естественно. Это не native/mobile acceptance.
+Не классифицированы cookie/capability/TUS, malformed HTTP200 и все неоднозначные
+remote outcomes; сохранность исходных данных, реальные requests/device/native
+и large-font fitting не заявлены проверенными. Источник recipe и итоговые receipts:
+[карточка](../update-reports/entries/maplib-20261030-sync-error-provenance.md).
+
+При cached mChildrenLoaded=true outcome code200 — локальный success sentinel,
+не свидетельство нового GET. Connection.connect(false) и partial child parse/retry
+сохраняют прежнюю политику и остаются отдельными открытыми границами.

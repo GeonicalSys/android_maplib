@@ -236,6 +236,9 @@ public class NetworkUtil
         if (responseCode == 429 || (responseCode >= 500 && responseCode <= 599)) {
             return true;
         }
+        if (responseCode != 422) {
+            return false;
+        }
         String text = ((responseBody == null ? "" : responseBody) + " "
                 + (responseMessage == null ? "" : responseMessage)).toLowerCase();
         return text.contains("externaldatabaseerror")

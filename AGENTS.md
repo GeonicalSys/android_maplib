@@ -149,3 +149,28 @@ Core4 вызывают actual private downloader без SQLite/map/network; App1
 public sync с technical fill/save seams. Проверять compile consumers; source/JVM
 не заменяют device/NGW/restart acceptance. Точная recipe в новой Core карточке
 `update-reports/entries/maplib-20261030-full-snapshot-http206.md`.
+
+
+## Причина сбоя и пользовательское сообщение
+
+Читать consuming docs/architecture/ngw-sync-and-storage.md и UI contracts.
+Передавать только известную причину HTTP в текущем точном account/result owner;
+не определять её по локализованному сообщению. beginSync(result) и финальный
+account Bundle относятся к одному вызову. Четыре primitive поля и пятый local
+SyncResult Parcelable owner token не являются форматом IPC/Intent/хранения:
+parcel copy, чужой result, поздний IO/Parse или неизвестная причина дают generic.
+Очищать весь scope и output keys; не возвращать raw body, URL или exception в UI.
+
+PUSH и lookup добавляют только metadata после прежнего IO/Parse increment;
+SYNC_NONE известный server HTTP failure добавляет один IO за failed request,
+сохраняя null/UNKNOWN/zero→KEEP. Full/deferred optional schema wrappers прежние.
+ChildrenLoadResult отличает failed child list от successful empty и не меняет
+legacy void API/Parcelable/sort/cache. NgwHttpException остаётся IOException,
+NgwHttpResponseException — NGException: сохранять исходный diagnostic/localized
+message и прежние catch/retry boundaries. Общий RU/EN server body принадлежит
+Core error_server_temporarily_unavailable; возможные техработы не доказаны фактом5xx.
+Source/JVM проверки не заменяют device, живой NGW или импорт/SQLite acceptance.
+
+Temporary-server text recognition ограничена HTTP422; numeric429/5xx отдельны.
+HTTP408 остаётся transient для retry, но слова external database в его body
+не доказывают техработы. Не исправлять такой classifier ослаблением UI oracle.

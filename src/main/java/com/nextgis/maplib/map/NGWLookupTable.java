@@ -38,6 +38,7 @@ import com.nextgis.maplib.util.HttpResponse;
 import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.NetworkUtil;
+import com.nextgis.maplib.util.SyncResultUtil;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -69,6 +70,19 @@ public class NGWLookupTable extends Table
     protected static final String JSON_ACCOUNT_KEY = "account";
     protected static final String JSON_LT_DATA_KEY = "lookup_table";
     protected static final String JSON_SYNC_TYPE_KEY = "sync_type";
+
+    private static final class LookupHttpException extends NGException {
+        final boolean temporaryServerFailure;
+
+        LookupHttpException(Context context, HttpResponse response) {
+            super(NetworkUtil.getError(context, response.getResponseCode()));
+            temporaryServerFailure = NetworkUtil.isTransientNgwHttpError(
+                    response.getResponseCode(), response.getResponseBody(),
+                    response.getResponseMessage())
+                    && NetworkUtil.isTemporaryNgwServerFailure(response.getResponseCode(),
+                            response.getResponseBody(), response.getResponseMessage());
+        }
+    }
 
     public NGWLookupTable(Context context, File path) {
         super(context, path);
@@ -165,6 +179,10 @@ public class NGWLookupTable extends Table
                 Log.d(Constants.TAG, locMsg);
             }
             syncResult.stats.numParseExceptions++;
+            if (e instanceof LookupHttpException
+                    && ((LookupHttpException) e).temporaryServerFailure) {
+                SyncResultUtil.recordServerParseFailureReason(syncResult);
+            }
             return;
         }
 
@@ -247,7 +265,7 @@ public class NGWLookupTable extends Table
                 NetworkUtil.get(NGWUtil.getResourceUrl(mCacheUrl, mRemoteId), mCacheLogin,
                         mCachePassword, false);
         if (!response.isOk()) {
-            throw new NGException(NetworkUtil.getError(mContext, response.getResponseCode()));
+            throw new LookupHttpException(mContext, response);
         }
         JSONObject geoJSONObject = new JSONObject(response.getResponseBody());
         JSONObject lookupTable = geoJSONObject.getJSONObject("lookup_table");

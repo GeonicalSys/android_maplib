@@ -87,7 +87,7 @@
     <string name="sync_finished">Синхронизация завершена</string>
     <string name="text">Подпись</string>
     <string name="error_connect_failed">Соединение не установлено</string>
-    <string name="error_server_temporarily_unavailable">Сервер или внешняя база данных временно недоступны</string>
+    <string name="error_server_temporarily_unavailable">ВебГИС временно не может выполнить запрос. Возможно, ведутся технические работы или сервер перегружен. Попробуйте позже.</string>
     <string name="error_ngw_feature_count_mismatch">Данные слоя неполные: локально %1$d объектов, на сервере указано %2$d. Попробуйте загрузить слой снова.</string>
     <string name="error_403">Не хватает прав</string>
     <string name="error_404">Ресурс не найден</string>

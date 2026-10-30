@@ -94,7 +94,7 @@
     <string name="sync_error_conflict">Conflicts found</string>
     <string name="text">Text</string>
     <string name="error_connect_failed">Connect failed</string>
-    <string name="error_server_temporarily_unavailable">Server or external database is temporarily unavailable</string>
+    <string name="error_server_temporarily_unavailable">WebGIS cannot process the request right now. The server may be undergoing maintenance or be overloaded. Try again later.</string>
     <string name="error_ngw_feature_count_mismatch">Layer data incomplete: %1$d features stored locally, %2$d reported by server. Try downloading the layer again.</string>
     <string name="error_401">Authorization required</string>
     <string name="error_403">Forbidden</string>
