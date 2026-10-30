@@ -3028,6 +3028,10 @@ public class NGWVectorLayer
                 trace.stage("connect-" + attempt);
                 connection = getConnection(accountData);
                 int code = connection.getResponseCode();
+                if (code == HttpURLConnection.HTTP_PARTIAL) {
+                    syncResult.stats.numIoExceptions++;
+                    return FullSnapshotDownload.failed(code);
+                }
                 if (code < 200 || code >= 300) {
                     String responseMessage = connection.getResponseMessage();
                     String errorBody = null;

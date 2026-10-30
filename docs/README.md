@@ -1101,7 +1101,7 @@ UID logcat collector `--uid` на T40 не поддержан — отдельн
 Native nested/recreation остаются
 непроверенными; прежний4/4 classic-route PASS не является новой приёмкой.
 
-## Lookup-кеш: полный набор ключей и значения
+## Lookup-кеш: полный набор ключей и значения — исторический срез8ca/9
 
 `NGWLookupTable.sync` обновляет существующий map при изменении полного
 содержимого; одинаковое число строк не доказывает равенство ключей. Сравнение
@@ -1118,3 +1118,30 @@ GREEN9 PASS, LisaDebug current-source compile и BelkaRelease PASS37с.
 и не является принятой поставкой. Нативная/NGW/дисковая приёмка не выполнялась.
 В центральном контракте отдельно разобраны публикация памяти при save(false),
 повтор записи и жизненный цикл prefetch/delete/account; эти вопросы открыты.
+
+
+## Полный NGW pull и результат сохранения — текущий source-срез30 октября2026
+
+В собственном Draft PR #63 полный streamed downloader отклоняет только явный206:
+один IO error и failed206 до error/input stream, Content-Length и нового snapshot.
+Ранняя prefix-очистка до GET, прежний push, другие2xx/404/transient и tracked routes
+не меняются. Речь об отказе до применения этого полного снимка, не до всех SQL.
+Успешный200 не проверен на независимую полноту.
+
+В двух lookup ветвях save(false) теперь добавляет IO к результату прохода. Память
+остаётся новой в том же map; один save, throws и пропуск записи при равном следующем
+ответе прежние. Disk/retry/readiness вопросы открыты в
+[центральном контракте](../../docs/architecture/ngw-sync-and-storage.md).
+
+Core4+App15 исполнены совместно: baseline19/4 assertion FAIL/15 controls,
+затем19PASS/0errors/skips (Core1.905с/App2.298с, Gradle35с). App15 включает прежние
+8 controls, revised false-save и6 новых, а не прибавляется к прежним9.
+BelkaRelease Java/Kotlin source compile0/39с, exact100 task set при другом порядке;
+все7 процессов завершились естественно. Первый compile dry observer не сохранил
+native exit после postdiagnostic сбоя: он UNKNOWN/NOT_PASS; восстановлен только
+owned Q helper, повторён dry-run, затем actual compile один раз. Общего gate PASS нет.
+
+Карточки: [206 и полная recipe](../update-reports/entries/maplib-20261030-full-snapshot-http206.md),
+[сигнал ошибки сохранения](../update-reports/entries/maplib-20261030-lookup-save-failure.md).
+UI/pins не менялись. Никакой SQL/full apply/device/native/real-server приёмки;
+предыдущие clock19/journal22/storage21/prefetch12 и desktop1117/1192 не запускались.

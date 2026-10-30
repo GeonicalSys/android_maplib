@@ -125,15 +125,27 @@ installer сохраняет чужую конфигурацию hooks; её н�
 создаются отдельно по команде «зафиксируй отчёт». Правила источников и секретов
 применяются и к приложениям отчёта.
 
-## Lookup-кеш
+## Lookup-кеш и полный NGW snapshot
 
-Перед изменением NGWLookupTable.sync читать consuming
-`../docs/architecture/ngw-sync-and-storage.md` и INV-NGW-LOOKUP-CACHE-CONTENT.
-Equal size не означает equal key set. Сохранять remote Hashtable nonnull
-comparison, существующий map owner, no-write для равного содержимого,
-SYNC_NONE и сохранность старого кеша при обработанных IOException/NGException/
-JSONException. Успешно разобранный, но неполный/silent partial ответ не доказан
-полным: existing Root AUDIT-TODO-NGW-PARTIAL-SNAPSHOT остаётся UNKNOWN. Не превращать сохранённый
-save(false) в disk ACK или исправленный retry: политика остаётся в едином
-Root AUDIT-TODO-NGW-LOOKUP-CACHE-PERSISTENCE. Адресные App regression9 и
-source compile не заменяют NGW/device/restart acceptance.
+Перед изменением NGWLookupTable.sync или NGWVectorLayer.downloadFullSnapshot читать
+`../docs/architecture/ngw-sync-and-storage.md`,
+`../docs/guides/project-synchronization-user-guide.md` и связанные invariants.
+Equal size не означает equal key set; сохранять nonnull remote Hashtable comparison,
+тот же map owner, no-write для равного содержимого, SYNC_NONE и старый кеш при
+обработанных IOException/NGException/JSONException. В двух ветвях save()==false
+добавляет один numIoExceptions к текущему результату: память уже новая, один save,
+исключения и пропуск записи при следующем равном ответе прежние. Не называть это
+rollback, disk ACK или исправленным retry. Политика остаётся в центральном
+AUDIT-TODO-NGW-LOOKUP-CACHE-PERSISTENCE.
+
+Только полный streamed downloader отклоняет явный HTTP206 до error/input stream,
+Content-Length и нового stage. Его предшествующая очистка prefix-файлов до GET,
+предыдущая отправка правок и остальные response/404/transient/track routes прежние.
+Не утверждать отказ до всех SQL/cleanup или полноту успешного200. Сохранять
+AUDIT-TODO-NGW-PARTIAL-SNAPSHOT для остальных неизвестных ветвей.
+
+Исторические App9/8ca проверки отделены от текущих App15 и Core4 в shared19.
+Core4 вызывают actual private downloader без SQLite/map/network; App15 — actual
+public sync с technical fill/save seams. Проверять compile consumers; source/JVM
+не заменяют device/NGW/restart acceptance. Точная recipe в новой Core карточке
+`update-reports/entries/maplib-20261030-full-snapshot-http206.md`.

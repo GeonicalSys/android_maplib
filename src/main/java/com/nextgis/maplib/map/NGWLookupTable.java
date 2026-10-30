@@ -171,7 +171,7 @@ public class NGWLookupTable extends Table
         if(remoteData.size() != mData.size()){
             mData.clear();
             mData.putAll(remoteData);
-            save();
+            if (!save()) syncResult.stats.numIoExceptions++;
             Log.d(Constants.TAG, "Update lookup table " + getName() + " from server");
             HyperLog.v(Constants.TAG, "Lookup table: " + getName() + " update from server");
             return;
@@ -190,7 +190,7 @@ public class NGWLookupTable extends Table
         if(!isSame){
             mData.clear();
             mData.putAll(remoteData);
-            save();
+            if (!save()) syncResult.stats.numIoExceptions++;
             Log.d(Constants.TAG, "Update lookup table " + getName() + " from server");
             return;
         }
