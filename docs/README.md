@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-29
+last_verified: 2026-10-30
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -776,7 +776,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   Подробный контракт: [текущая позиция и запись GPS](../../docs/architecture/location-pipeline.md).
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
-  эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает
+  результат обычной эллипсоидальной inverse-ветки либо явного spherical fallback;
+  выбор nearest facet перед этим сделан в3857. `StakeoutGuidancePolicy` выбирает
   дистанционную звуковую зону с гистерезисом для GPS/mock precision fix;
 - `GpsEventSource` даёт owner-based high-frequency lease для foreground-выноса,
   не меняя сохранённые пользовательские параметры обычного местоположения;
@@ -1099,3 +1100,21 @@ profileable отсутствует. Восстановленная карта14.
 UID logcat collector `--uid` на T40 не поддержан — отдельный diagnostic gap.
 Native nested/recreation остаются
 непроверенными; прежний4/4 classic-route PASS не является новой приёмкой.
+
+## Lookup-кеш: полный набор ключей и значения
+
+`NGWLookupTable.sync` обновляет существующий map при изменении полного
+содержимого; одинаковое число строк не доказывает равенство ключей. Сравнение
+использует ненулевое remote значение из Hashtable, поэтому новый ключ не
+разыменовывает отсутствующее локальное значение. SYNC_NONE и сохранность
+старого кеша при обработанных IOException/NGException/JSONException оставлены.
+Синтаксически valid-but-incomplete/silent partial snapshot не проверен на
+полноту. Вопрос полноты остаётся UNKNOWN в
+[центральном контракте](../../docs/architecture/ngw-sync-and-storage.md). Порядок
+неизменённого кеша, API/version/clock и прежний save(false) оставлены.
+Actual public sync защищён9 App JVM методами; baseline1→0 AssertionFAIL,
+GREEN9 PASS, LisaDebug current-source compile и BelkaRelease PASS37с.
+Это контракт own live8ca; committed App F61 ещё не содержит исправление
+и не является принятой поставкой. Нативная/NGW/дисковая приёмка не выполнялась.
+В центральном контракте отдельно разобраны публикация памяти при save(false),
+повтор записи и жизненный цикл prefetch/delete/account; эти вопросы открыты.

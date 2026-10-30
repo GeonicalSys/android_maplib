@@ -180,7 +180,7 @@ public class NGWLookupTable extends Table
         // check key and values
         boolean isSame = true;
         for (Map.Entry<String, String> entry : remoteData.entrySet()) {
-            if(!mData.get(entry.getKey()).equals(entry.getValue())){
+            if(!entry.getValue().equals(mData.get(entry.getKey()))){
                 isSame = false;
                 break;
             }

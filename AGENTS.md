@@ -124,3 +124,16 @@ installer сохраняет чужую конфигурацию hooks; её н�
 Сохранение черновика не закрывает ID карточек: `reported/` и `letters/`
 создаются отдельно по команде «зафиксируй отчёт». Правила источников и секретов
 применяются и к приложениям отчёта.
+
+## Lookup-кеш
+
+Перед изменением NGWLookupTable.sync читать consuming
+`../docs/architecture/ngw-sync-and-storage.md` и INV-NGW-LOOKUP-CACHE-CONTENT.
+Equal size не означает equal key set. Сохранять remote Hashtable nonnull
+comparison, существующий map owner, no-write для равного содержимого,
+SYNC_NONE и сохранность старого кеша при обработанных IOException/NGException/
+JSONException. Успешно разобранный, но неполный/silent partial ответ не доказан
+полным: existing Root AUDIT-TODO-NGW-PARTIAL-SNAPSHOT остаётся UNKNOWN. Не превращать сохранённый
+save(false) в disk ACK или исправленный retry: политика остаётся в едином
+Root AUDIT-TODO-NGW-LOOKUP-CACHE-PERSISTENCE. Адресные App regression9 и
+source compile не заменяют NGW/device/restart acceptance.
