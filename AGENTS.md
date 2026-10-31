@@ -81,6 +81,19 @@ IDs, сохранность draft и реальный fill на изолиров
 затем layer alias; field key используется только при отсутствии обоих.
 
 
+
+`ProjectSyncState` публикует новое время только после `commit() == true` для
+точного объекта SharedPreferences и canonical project key. Сохранять подтверждённое
+значение до сборки владельца GC; identity registry не удерживает prefs/context/editor.
+Короткий lock состояния не вызывает preferences/editor/context; отдельный writer
+monitor не используется читателями. Вложенные вызовы выбирают последнюю успешную
+invocation, а не максимальный timestamp и не последний завершившийся callback.
+Не менять API, имя файла, UUID-ключи и long-формат; не добавлять компенсирующие
+записи. `false` может уже изменить cache и оставить на диске старое либо новое
+значение: защита чтения действует только в текущем процессе для этого владельца,
+не обещает межпроцессный rollback. Все записи этого namespace вести через API.
+
+
 ## Обязательный контроль реестра перед push
 
 Новая самостоятельная доработка получает новый ID карточки и `covers` с
@@ -111,3 +124,70 @@ installer сохраняет чужую конфигурацию hooks; её н�
 Сохранение черновика не закрывает ID карточек: `reported/` и `letters/`
 создаются отдельно по команде «зафиксируй отчёт». Правила источников и секретов
 применяются и к приложениям отчёта.
+
+## Lookup-кеш и полный NGW snapshot
+
+Перед изменением NGWLookupTable.sync или NGWVectorLayer.downloadFullSnapshot читать
+`../docs/architecture/ngw-sync-and-storage.md`,
+`../docs/guides/project-synchronization-user-guide.md` и связанные invariants.
+Equal size не означает equal key set; сохранять nonnull remote Hashtable comparison,
+тот же map owner, no-write для равного содержимого, SYNC_NONE и старый кеш при
+обработанных IOException/NGException/JSONException. В двух ветвях save()==false
+добавляет один numIoExceptions к текущему результату: память уже новая, один save,
+исключения и пропуск записи при следующем равном ответе прежние. Не называть это
+rollback, disk ACK или исправленным retry. Политика остаётся в центральном
+AUDIT-TODO-NGW-LOOKUP-CACHE-PERSISTENCE.
+
+Только полный streamed downloader отклоняет явный HTTP206 до error/input stream,
+Content-Length и нового stage. Его предшествующая очистка prefix-файлов до GET,
+предыдущая отправка правок и остальные response/404/transient/track routes прежние.
+Не утверждать отказ до всех SQL/cleanup или полноту успешного200. Сохранять
+AUDIT-TODO-NGW-PARTIAL-SNAPSHOT для остальных неизвестных ветвей.
+
+Исторические App9/8ca проверки отделены от текущих App15 и Core4 в shared19.
+Core4 вызывают actual private downloader без SQLite/map/network; App15 — actual
+public sync с technical fill/save seams. Проверять compile consumers; source/JVM
+не заменяют device/NGW/restart acceptance. Точная recipe в новой Core карточке
+`update-reports/entries/maplib-20261030-full-snapshot-http206.md`.
+
+
+## Причина сбоя и пользовательское сообщение
+
+Читать consuming docs/architecture/ngw-sync-and-storage.md и UI contracts.
+Передавать только известную причину HTTP в текущем точном account/result owner;
+не определять её по локализованному сообщению. beginSync(result) и финальный
+account Bundle относятся к одному вызову. Четыре primitive поля и пятый local
+SyncResult Parcelable owner token не являются форматом IPC/Intent/хранения:
+parcel copy, чужой result, поздний IO/Parse или неизвестная причина дают generic.
+Очищать весь scope и output keys; не возвращать raw body, URL или exception в UI.
+
+PUSH и lookup добавляют только metadata после прежнего IO/Parse increment;
+SYNC_NONE известный server HTTP failure добавляет один IO за failed request,
+сохраняя null/UNKNOWN/zero→KEEP. Full/deferred optional schema wrappers прежние.
+ChildrenLoadResult отличает failed child list от successful empty и не меняет
+legacy void API/Parcelable/sort/cache. NgwHttpException остаётся IOException,
+NgwHttpResponseException — NGException: сохранять исходный diagnostic/localized
+message и прежние catch/retry boundaries. Общий RU/EN server body принадлежит
+Core error_server_temporarily_unavailable; возможные техработы не доказаны фактом5xx.
+Source/JVM проверки не заменяют device, живой NGW или импорт/SQLite acceptance.
+
+Temporary-server text recognition ограничена HTTP422; numeric429/5xx отдельны.
+HTTP408 остаётся transient для retry, но слова external database в его body
+не доказывают техработы. Не исправлять такой classifier ослаблением UI oracle.
+
+
+## Derived spatial cache: импорт и восстановление
+
+Читать consuming docs/architecture/map-rendering.md и ngw-sync-and-storage.md,
+INV-VECTOR-SPATIAL-CACHE-RECOVERY. Fresh create допускает готовность только для
+проверенных empty SQL/cache с повторной проверкой cache identity/data generation; bulk/native
+и failure gates прежние. Не делать endBulkImport/finally доказательством успеха.
+Различать public clear dirty→same-path save и clean load reset. Missing/corrupt
+RTree не сохраняет старый size/partial nodes; valid legacy bytes/no-write load
+защищать отдельно. Header count не является ID/envelope oracle. GPX/GeoJSON/NGW,
+config fromJSON, properties count, manual rebuild и настоящий restart — разные
+границы. Source/JVM результаты не закрывают installed30/device риск; raw private
+GPX не коммитить. Test recipes/results принадлежат AUTO-VECTOR-SPATIAL-CACHE-RECOVERY;
+не подменять actual SQL originals счётчиком/готовым флагом или синтетической business
+геометрией. Сохранять Collector identity, layer order, rollback/cancel и partial
+subclass config protection. Card: maplib-20261030-vector-spatial-cache-recovery.

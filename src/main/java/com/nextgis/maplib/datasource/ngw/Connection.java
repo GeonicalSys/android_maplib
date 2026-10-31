@@ -322,6 +322,13 @@ public class Connection
         }
     }
 
+    /** Structured result for UI callers; the existing void method remains available. */
+    public ResourceGroup.ChildrenLoadResult loadChildrenWithResult(boolean skipSubLoad) {
+        return mRootResource == null
+                ? new ResourceGroup.ChildrenLoadResult(-1, false, false)
+                : mRootResource.loadChildrenWithResult(skipSubLoad);
+    }
+
 
     @Override
     public int describeContents()

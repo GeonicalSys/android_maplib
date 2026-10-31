@@ -5,6 +5,8 @@
 
 package com.nextgis.maplib.util;
 
+import android.content.SyncResult;
+
 import com.nextgis.maplib.datasource.Field;
 import com.nextgis.maplib.datasource.GeoGeometryFactory;
 import com.nextgis.maplib.map.VectorLayer;
@@ -91,6 +93,16 @@ public final class NGWLayerSchemaCompat {
             String login,
             String password)
     {
+        return fetchResourceMetaJson(resourceUrl, login, password, null);
+    }
+
+    /** Optional metadata fetch; only an explicit known server failure affects this result. */
+    public static JSONObject fetchResourceMetaJson(
+            String resourceUrl,
+            String login,
+            String password,
+            SyncResult syncResult)
+    {
         HttpResponse response;
         try {
             response = NetworkUtil.get(resourceUrl, login, password, false);
@@ -98,6 +110,13 @@ public final class NGWLayerSchemaCompat {
             return null;
         }
         if (!response.isOk()) {
+            if (syncResult != null
+                    && NetworkUtil.isTransientNgwHttpError(response.getResponseCode(),
+                            response.getResponseBody(), response.getResponseMessage())
+                    && NetworkUtil.isTemporaryNgwServerFailure(response.getResponseCode(),
+                            response.getResponseBody(), response.getResponseMessage())) {
+                SyncResultUtil.markServerTemporarilyUnavailable(syncResult);
+            }
             return null;
         }
         try {

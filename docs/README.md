@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-29
+last_verified: 2026-10-30
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -408,6 +408,42 @@ canonical workspace; библиотечный account adapter не пишет о
 Tracked URL читает часы своего проекта, с since=0 для неизвестного подтверждения.
 Регрессии: LocalChangesCommitTest и ProjectSyncStateTest, native consumer tests.
 
+
+## Подтверждённое время полного завершения проекта — 29 октября2026
+
+`ProjectSyncState.markComplete` делает новое время доступным через `lastComplete`
+только после успешного `SharedPreferences.commit`. Отказ или исключение сохраняет
+предыдущее подтверждённое значение для точного объекта настроек и canonical project.
+Первая запись устанавливает этот вид до `edit`/`putLong`; читатели не ждут writer
+monitor, удерживаемый на время дисковой записи. Вложенные listeners выбирают
+последнюю успешную invocation, включая положительное время меньше предыдущего
+после перевода часов. Другие проекты и равные, но разные объекты prefs изолированы.
+
+Имя preference-файла, canonical UUID-ключи, long-формат и статический API прежние;
+миграции, дополнительного commit, repair или async-записи нет. Framework может
+изменить cache до отказа, а диск при отказе может содержать старое либо новое
+значение. Успешная запись другого ключа способна записать и этот cache. Защита
+действует только для читателей API в текущем процессе, пока жив тот же prefs owner;
+рестарт или смена owner не получает гарантии отката. Записи namespace в исходниках
+ведёт только `ProjectSyncState`. Pair ACK, cleanup и расписание retry не меняются.
+
+Технические регрессии: новый `ProjectSyncStatePublicationTest` (16) и прежний
+`ProjectSyncStateTest` (3). На исходном коде RED: 10 FAIL из 19, после исправления
+GREEN: все 19 PASS, ошибки и пропуски — 0. Offline Gradle/JBR21 с существующим
+Robolectric4.16.1/API28 занял 31с; maplib main/test Java/Kotlin compile выполнен.
+Это модели Android cache/disk, не APK/device или приёмка реальной синхронизации.
+Статические consumers прежние: app `LayersFragment` и `MaintenanceReminders`,
+maplib `NGWVectorLayer` (скомпилирован в maplib debug/release). App Java/Kotlin
+compile выполнен offline для effective variants LisaDebug (42с) и BelkaRelease
+(46с), включая source dependencies. BelkaDebug намеренно отключён в
+`app/build.gradle:254–264` и не получает PASS вместо существующего варианта.
+В графах этих compile tasks нет CMake/NDK/assemble/APK/sign/minify/upload/device.
+Публичные `lastComplete(Context,String):long` и `markComplete(Context,String,long):boolean`
+не изменены. В поставке библиотека сначала сливается Merge Commit, затем root
+обновляет app submodule pointer; текущие app UI pins не переписываются ради local drift.
+[Карточка](../update-reports/entries/maplib-20261029-project-sync-clock-confirmation.md).
+
+
 ## Автоматический background lease и display-only Network
 
 `GpsEventSource.acquireBackgroundUpdates/releaseBackgroundUpdates` добавляют
@@ -740,7 +776,8 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   Подробный контракт: [текущая позиция и запись GPS](../../docs/architecture/location-pipeline.md).
 - `StakeoutGeometryTarget` один раз индексирует приватную Web Mercator-копию
   точки/линии/границы полигона, а каждый fix возвращает ближайшую WGS84-точку,
-  эллипсоидальное расстояние и азимут; `StakeoutGuidancePolicy` выбирает
+  результат обычной эллипсоидальной inverse-ветки либо явного spherical fallback;
+  выбор nearest facet перед этим сделан в3857. `StakeoutGuidancePolicy` выбирает
   дистанционную звуковую зону с гистерезисом для GPS/mock precision fix;
 - `GpsEventSource` даёт owner-based high-frequency lease для foreground-выноса,
   не меняя сохранённые пользовательские параметры обычного местоположения;
@@ -1063,3 +1100,136 @@ profileable отсутствует. Восстановленная карта14.
 UID logcat collector `--uid` на T40 не поддержан — отдельный diagnostic gap.
 Native nested/recreation остаются
 непроверенными; прежний4/4 classic-route PASS не является новой приёмкой.
+
+## Lookup-кеш: полный набор ключей и значения — исторический срез8ca/9
+
+`NGWLookupTable.sync` обновляет существующий map при изменении полного
+содержимого; одинаковое число строк не доказывает равенство ключей. Сравнение
+использует ненулевое remote значение из Hashtable, поэтому новый ключ не
+разыменовывает отсутствующее локальное значение. SYNC_NONE и сохранность
+старого кеша при обработанных IOException/NGException/JSONException оставлены.
+Синтаксически valid-but-incomplete/silent partial snapshot не проверен на
+полноту. Вопрос полноты остаётся UNKNOWN в
+[центральном контракте](../../docs/architecture/ngw-sync-and-storage.md). Порядок
+неизменённого кеша, API/version/clock и прежний save(false) оставлены.
+Actual public sync защищён9 App JVM методами; baseline1→0 AssertionFAIL,
+GREEN9 PASS, LisaDebug current-source compile и BelkaRelease PASS37с.
+Это контракт own live8ca; committed App F61 ещё не содержит исправление
+и не является принятой поставкой. Нативная/NGW/дисковая приёмка не выполнялась.
+В центральном контракте отдельно разобраны публикация памяти при save(false),
+повтор записи и жизненный цикл prefetch/delete/account; эти вопросы открыты.
+
+
+## Полный NGW pull и результат сохранения — текущий source-срез30 октября2026
+
+В собственном Draft PR #63 полный streamed downloader отклоняет только явный206:
+один IO error и failed206 до error/input stream, Content-Length и нового snapshot.
+Ранняя prefix-очистка до GET, прежний push, другие2xx/404/transient и tracked routes
+не меняются. Речь об отказе до применения этого полного снимка, не до всех SQL.
+Успешный200 не проверен на независимую полноту.
+
+В двух lookup ветвях save(false) теперь добавляет IO к результату прохода. Память
+остаётся новой в том же map; один save, throws и пропуск записи при равном следующем
+ответе прежние. Disk/retry/readiness вопросы открыты в
+[центральном контракте](../../docs/architecture/ngw-sync-and-storage.md).
+
+Core4+App15 исполнены совместно: baseline19/4 assertion FAIL/15 controls,
+затем19PASS/0errors/skips (Core1.905с/App2.298с, Gradle35с). App15 включает прежние
+8 controls, revised false-save и6 новых, а не прибавляется к прежним9.
+BelkaRelease Java/Kotlin source compile0/39с, exact100 task set при другом порядке;
+все7 процессов завершились естественно. Первый compile dry observer не сохранил
+native exit после postdiagnostic сбоя: он UNKNOWN/NOT_PASS; восстановлен только
+owned Q helper, повторён dry-run, затем actual compile один раз. Общего gate PASS нет.
+
+Карточки: [206 и полная recipe](../update-reports/entries/maplib-20261030-full-snapshot-http206.md),
+[сигнал ошибки сохранения](../update-reports/entries/maplib-20261030-lookup-save-failure.md).
+UI/pins не менялись. Никакой SQL/full apply/device/native/real-server приёмки;
+предыдущие clock19/journal22/storage21/prefetch12 и desktop1117/1192 не запускались.
+
+
+## Сообщения о сбоях ВебГИС — source-срез30 октября2026
+
+SyncResultUtil сохраняет allowlisted причины отдельными metadata к прежним IO
+и Parse counters. Account adapter очищает и экспортирует их до endSync в local
+Bundle точного result owner. Consumer проверяет identity, version/bits и captured
+IO/Parse; поздние/смешанные/неизвестные ошибки не выдаются за чистую серверную.
+Четыре primitive поля плюс local Parcelable result token не пересылаются в Intent,
+IPC или persisted state. Legacy raw-string notifier остаётся безопасным generic.
+
+PUSH/lookup сохраняют прежние numeric counters; metadata-only markers не удваивают
+ошибки. SYNC_NONE metadata/count/fallback теперь отражают known temporary server
+failure в результате, сохраняя прежние null/UNKNOWN/zero→KEEP и optional full/deferred
+schema routes. Общий Core RU/EN server text объясняет возможные технические работы
+или перегрузку и предлагает повторить позже; это не диагноз planned maintenance.
+
+ResourceGroup/Connection.loadChildrenWithResult возвращают только code/success/
+temporary-server. Старый void loadChildren, успешный пустой список, сортировка,
+cache short-circuit и parcel layout сохранены. Initial feature HTTP failure
+использует NgwHttpException(IOException), initial metadata HTTP failure —
+NgwHttpResponseException(NGException); прежние diagnostic/localized messages и
+разные catch/retry boundaries сохранены. UI читает typed причину, не raw текст.
+
+Actual89 source checks PASS/0fail/errors/skips: Core46 (37 Robolectric API28 +
+9 plain JUnit) и App43 API28,11 XML10.995с, Gradle0/BUILD50с. Same literal4/6eb9
+GREEN0.434с включены в эти89; прежний pre-fix baseline3comparisonFAIL/1control
+3.180с/native1 сохранён отдельно. Первый общий85 остаётся NOT_PASS81/4assertFAIL/
+0errors/skips:3 failures выявили HTTP408+externalDB false-server classification,
+один stale Producer oracle8 противоречил исходному knownSERVER|OTHER12. Root
+вручную исправил только этот assert8→12; API7ec/Core16/App13 и остальные тесты
+не менялись. NetworkUtil теперь разрешает text recognition только422 после
+numeric429/5xx; retry predicates byte-exact. Добавлены4 неизменённых plain tests.
+BelkaRelease source compile0/BUILD59с (61.275с observed):100taskSET exact при ином
+порядке, CoreJava/UIJava/AppJava+Kotlin executed;4 Java JAR28/535/670/45 classes
+без native/product archives. Во время проверок68 inputs exact, все15 unit и13
+compile процессов завершились естественно. Это не native/mobile acceptance.
+Не классифицированы cookie/capability/TUS, malformed HTTP200 и все неоднозначные
+remote outcomes; сохранность исходных данных, реальные requests/device/native
+и large-font fitting не заявлены проверенными. Источник recipe и итоговые receipts:
+[карточка](../update-reports/entries/maplib-20261030-sync-error-provenance.md).
+
+При cached mChildrenLoaded=true outcome code200 — локальный success sentinel,
+не свидетельство нового GET. Connection.connect(false) и partial child parse/retry
+сохраняют прежнюю политику и остаются отдельными открытыми границами.
+
+
+## Завершение и восстановление векторного spatial cache — 30 октября2026
+
+Обычный local/NGW vector импорт использует один VectorLayer lifecycle. После
+успешного create только проверенные zero SQL rows + zero live cache становятся
+готовой начальной точкой: count читается вне spatial lock, затем проверяются тот же
+cache object, data generation и нулевой size. Начатый bulk по-прежнему блокирует
+native reads. Готовность не устанавливается из finally и не выводится из одного
+совпадения ненулевых counts; failed/cancelled/nonempty/unknown-count случаи не
+получают новую гарантию commit/rollback или произвольного save после ошибки.
+
+GeometryRTree.clear удаляет nodes и size и помечает публичное изменение dirty:
+notifyDeleteAll → clear → save должен записать пустой cache в тот же путь. Load
+использует отдельный clean reset. Missing file даёт настоящий empty index; IOException,
+header/actual Entry cardinality mismatch или неверный child kind полностью сбрасывают
+прочитанный prefix. Счётчик проверяется обходом уже загруженных nodes без второго
+getAll/ID list. Валидный прежний binary layout, IDs/envelopes/search и clean same-path
+save сохраняются. Владелец VectorLayer при расхождении с SQL восстанавливает derived
+index из originals; частично загруженный subclass config при этом не сохраняется.
+
+Причина важна для нескольких входов: GPX/KML CoordinatePointLayerImporter и GeoJSON
+batch; initial NGW download через оба resource picker и Collector/form task; config
+fromJSON и properties getCount повторно читают index. Старый clear мог оставить
+header countN при уже пустом root; последующий save и новый load сохраняли равенство
+counts и пропускали repair. Native query и обычный hit-test имеют разные readiness
+gates. Смена стиля/видимости не строит spatial tree; manual rebuild создаёт новое
+дерево и extents из исходных ID/geometry BLOB, но не переписывает LOD geometry.
+
+Пользователь подтвердил: invisible local/NGW layers переживали restart, style edit
+и visibility toggle; помогал только manual rebuild. Эти исходные сведения сохранены
+как независимые условия регрессии. Повтор после нового исправления на устройстве
+не исполнен; точный installed version30/source commit и native результат для GPX20wpt
+и server import ещё не установлены. Это source-backed цепочка, не уже принятый
+post-fix результат телефона. Проверка header/cardinality
+не доказывает произвольную same-count ID/envelope целостность или disk power-failure
+durability. Private GPX names/coordinates не входят в Git и не становятся runtime
+dependency. Единый открытый риск: vector-spatial-cache-recovery in the canonical external root risk registry.
+
+Техническая проверка: Core29 фактически исполнен: исходный код —15 assertion FAIL/14 control PASS, после двух исправлений —29 PASS/0 failures/errors/skips; те же пять наборов и все Core test bytes/oracles сохранены. Это23 новые проверки (12 lifecycle +11 RTree) и6 прежних контролей (legacy1, concurrency1, spatial4):16 Robolectric API28 с технической SQLite и13 plain JUnit. Финальный запуск:5 XML/5.653s, Gradle exit0/BUILD40s (наблюдалось42.537s),105 входов неизменны во время запуска,10 собственных процессов завершены и отсутствие подтверждено. Финальная consumer source compile Belka: Gradle exit0, BUILD SUCCESSFUL in 1m 23s, 86.8108238s observed, 100 source-only tasks,120 inputs unchanged/all12 owned processes naturally stopped. Java/Kotlin source compilation; no APK/AAB/AAR/dex/NDK/install/publish or native Android/GPU/device acceptance. Receipt Q:\Codex\Scratch\lisa-ecosystem-depth-audit-20261029\evidence\resume-20261031-source-checkpoint\belka-resume-compile\final-result-source-stop.json SHA256 be7f54baa369662c2cd44a509c745fbc099f357a0df91c9a30a7d69a12008d1c. Это не55 PASS; App legacy25 PASS/1 path assertion не воспроизвёл обрезание подписей. Device/installed30/real GPX20wpt/NGW import/restart/native map acceptance не выполнялись.
+Исторические message89 и selector37 сохранены с их прежними source pins; они не
+перезапускались и не сертифицируют новые Core cache bytes. Caption/layout — отдельный
+срез. Wiki, APK/release/deploy и paused native stages не затронуты.

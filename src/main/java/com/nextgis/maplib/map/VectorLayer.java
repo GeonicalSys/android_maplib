@@ -425,8 +425,33 @@ public class VectorLayer
         SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
         db.execSQL(tableCreate);
         setDefaultRenderer();
+        markEmptySpatialCacheLoaded();
 
         save();
+    }
+
+    /** An empty table and empty live index form a complete starting point for a new batch. */
+    private void markEmptySpatialCacheLoaded() {
+        IGeometryCache cache;
+        long generation;
+        synchronized (mSpatialCacheLock) {
+            if (mCacheLoaded || mCache.size() != 0
+                    || (mIsCacheRebuilding && !mBulkImportMode)) {
+                return;
+            }
+            cache = mCache;
+            generation = getDataGeneration();
+        }
+        // Like native validation, do not wait for SQLite while holding the spatial writer lock.
+        if (getSqliteTableRowCount() != 0) {
+            return;
+        }
+        synchronized (mSpatialCacheLock) {
+            if (cache == mCache && generation == getDataGeneration() && mCache.size() == 0
+                    && (!mIsCacheRebuilding || mBulkImportMode)) {
+                mCacheLoaded = true;
+            }
+        }
     }
 
 

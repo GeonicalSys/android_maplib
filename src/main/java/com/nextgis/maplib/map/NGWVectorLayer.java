@@ -679,7 +679,7 @@ public class NGWVectorLayer
         if (!response.isOk()) {
             HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure("resourceMeta", getName(), mRemoteId, -1, -1,
                     response));
-            throw new NGException(NetworkUtil.getError(mContext, response.getResponseCode()));
+            throw new com.nextgis.maplib.util.NgwHttpResponseException(mContext, response);
         }
         geoJSONObject = new JSONObject(response.getResponseBody());
 
@@ -783,7 +783,9 @@ public class NGWVectorLayer
                 }
                 String error = NetworkUtil.getError(mContext, responseCode);
                 if (NetworkUtil.isTransientNgwHttpError(responseCode, errorBody, responseMessage)) {
-                    throw new IOException("NGW feature pull HTTP " + responseCode
+                    throw new com.nextgis.maplib.util.NgwHttpException(
+                            responseCode, errorBody, responseMessage,
+                            "NGW feature pull HTTP " + responseCode
                             + (TextUtils.isEmpty(responseMessage) ? "" : " " + responseMessage)
                             + " " + ProdLogUtil.scrubUrlForLog(sURL));
                 }
@@ -1126,7 +1128,7 @@ public class NGWVectorLayer
         Log.d("SSYNC", "sync of " + getName());
         if (0 != (mSyncType & Constants.SYNC_NONE) || mFields == null) {
             if (0 != (mSyncType & Constants.SYNC_NONE) && mFields != null) {
-                tryRefreshServerResourceMetaAndConfig();
+                tryRefreshServerResourceMetaAndConfig(syncResult);
             }
             if (Constants.DEBUG_MODE) {
                 Log.d(Constants.TAG,
@@ -1842,7 +1844,16 @@ public class NGWVectorLayer
             SyncResult syncResult,
             HttpResponse response) {
         if (response != null) {
+            long ioBefore = syncResult.stats.numIoExceptions;
             log(syncResult, String.valueOf(response.getResponseCode()));
+            if (ioBefore >= 0 && ioBefore < Long.MAX_VALUE
+                    && syncResult.stats.numIoExceptions == ioBefore + 1
+                    && NetworkUtil.isTransientNgwHttpError(response.getResponseCode(),
+                            response.getResponseBody(), response.getResponseMessage())
+                    && NetworkUtil.isTemporaryNgwServerFailure(response.getResponseCode(),
+                            response.getResponseBody(), response.getResponseMessage())) {
+                SyncResultUtil.recordServerTemporarilyUnavailableReason(syncResult);
+            }
         }
         HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure(operation, getName(), mRemoteId, featureId, attachId,
                 response));
@@ -2002,6 +2013,10 @@ public class NGWVectorLayer
      * are always applied.
      */
     private ConfigRefreshOutcome tryRefreshServerResourceMetaAndConfig() {
+        return tryRefreshServerResourceMetaAndConfig(null);
+    }
+
+    private ConfigRefreshOutcome tryRefreshServerResourceMetaAndConfig(SyncResult syncResult) {
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " network is unavailable -stop getChangesFromServer");
             return ConfigRefreshOutcome.NETWORK_UNAVAILABLE;
@@ -2029,7 +2044,7 @@ public class NGWVectorLayer
                 JSONObject resourceMeta = NGWLayerSchemaCompat.fetchResourceMetaJson(
                         getResourceMetaUrl(accountDataForSchema),
                         accountDataForSchema.login,
-                        accountDataForSchema.password);
+                        accountDataForSchema.password, syncResult);
                 NGWLayerSchemaCompat.SchemaComparison schemaComparison = null;
                 if (resourceMeta != null) {
                     schemaComparison = NGWLayerSchemaCompat.compareLocalWithServerMeta(
@@ -2171,7 +2186,7 @@ public class NGWVectorLayer
 
     public void syncNgwResourceConfigOnly(String authority, SyncResult syncResult,
                                          boolean forceRecheck) {
-        ConfigRefreshOutcome refreshOutcome = tryRefreshServerResourceMetaAndConfig();
+        ConfigRefreshOutcome refreshOutcome = tryRefreshServerResourceMetaAndConfig(syncResult);
         if (refreshOutcome == ConfigRefreshOutcome.NETWORK_UNAVAILABLE) {
             SyncResultUtil.markNetworkUnavailable(syncResult);
             return;
@@ -2258,6 +2273,11 @@ public class NGWVectorLayer
                         "featureCount", getName(), mRemoteId, -1, -1, response));
                 if (response.getResponseCode() == NetworkUtil.ERROR_CONNECT_FAILED) {
                     SyncResultUtil.markConnectFailed(syncResult);
+                } else if (NetworkUtil.isTransientNgwHttpError(response.getResponseCode(),
+                        response.getResponseBody(), response.getResponseMessage())
+                        && NetworkUtil.isTemporaryNgwServerFailure(response.getResponseCode(),
+                                response.getResponseBody(), response.getResponseMessage())) {
+                    SyncResultUtil.markServerTemporarilyUnavailable(syncResult);
                 }
                 return NgwFeatureCountParser.UNKNOWN;
             }
@@ -2307,6 +2327,10 @@ public class NGWVectorLayer
                 HttpResponse response = new HttpResponse(code, urlConnection.getResponseMessage());
                 HyperLog.w(Constants.TAG, ProdLogUtil.ngwHttpFailure(
                         "featureCountFallback", getName(), mRemoteId, -1, -1, response));
+                if (NetworkUtil.isTransientNgwHttpError(code, null, response.getResponseMessage())
+                        && NetworkUtil.isTemporaryNgwServerFailure(code, null, response.getResponseMessage())) {
+                    SyncResultUtil.markServerTemporarilyUnavailable(syncResult);
+                }
                 return NgwFeatureCountParser.UNKNOWN;
             }
             try (JsonReader reader = new JsonReader(new InputStreamReader(
@@ -3028,6 +3052,10 @@ public class NGWVectorLayer
                 trace.stage("connect-" + attempt);
                 connection = getConnection(accountData);
                 int code = connection.getResponseCode();
+                if (code == HttpURLConnection.HTTP_PARTIAL) {
+                    syncResult.stats.numIoExceptions++;
+                    return FullSnapshotDownload.failed(code);
+                }
                 if (code < 200 || code >= 300) {
                     String responseMessage = connection.getResponseMessage();
                     String errorBody = null;
