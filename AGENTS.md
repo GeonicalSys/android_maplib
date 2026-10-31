@@ -174,3 +174,20 @@ Source/JVM проверки не заменяют device, живой NGW или 
 Temporary-server text recognition ограничена HTTP422; numeric429/5xx отдельны.
 HTTP408 остаётся transient для retry, но слова external database в его body
 не доказывают техработы. Не исправлять такой classifier ослаблением UI oracle.
+
+
+## Derived spatial cache: импорт и восстановление
+
+Читать consuming docs/architecture/map-rendering.md и ngw-sync-and-storage.md,
+INV-VECTOR-SPATIAL-CACHE-RECOVERY. Fresh create допускает готовность только для
+проверенных empty SQL/cache с повторной проверкой cache identity/data generation; bulk/native
+и failure gates прежние. Не делать endBulkImport/finally доказательством успеха.
+Различать public clear dirty→same-path save и clean load reset. Missing/corrupt
+RTree не сохраняет старый size/partial nodes; valid legacy bytes/no-write load
+защищать отдельно. Header count не является ID/envelope oracle. GPX/GeoJSON/NGW,
+config fromJSON, properties count, manual rebuild и настоящий restart — разные
+границы. Source/JVM результаты не закрывают installed30/device риск; raw private
+GPX не коммитить. Test recipes/results принадлежат AUTO-VECTOR-SPATIAL-CACHE-RECOVERY;
+не подменять actual SQL originals счётчиком/готовым флагом или синтетической business
+геометрией. Сохранять Collector identity, layer order, rollback/cancel и partial
+subclass config protection. Card: maplib-20261030-vector-spatial-cache-recovery.

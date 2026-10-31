@@ -203,7 +203,7 @@ public class GeometryRTree implements IGeometryCache {
 
     @Override
     public synchronized void load(File path) {
-        clear();
+        resetTree();
 
         if (!path.exists()) {
             return;
@@ -216,17 +216,47 @@ public class GeometryRTree implements IGeometryCache {
         try (DataInputStream dataInputStream = new DataInputStream(
                 new BufferedInputStream(new FileInputStream(path), 64 * 1024))) {
 
-            maxEntries = dataInputStream.readInt();
-            minEntries = dataInputStream.readInt();
-            size = dataInputStream.readInt();
+            int loadedMaxEntries = dataInputStream.readInt();
+            int loadedMinEntries = dataInputStream.readInt();
+            int loadedSize = dataInputStream.readInt();
 
             dataInputStream.readBoolean();
             root = new Node();
             root.read(dataInputStream);
-
+            if (loadedSize < 0 || countEntries(root) != loadedSize) {
+                throw new IOException("Spatial cache entry count does not match its header");
+            }
+            maxEntries = loadedMaxEntries;
+            minEntries = loadedMinEntries;
+            size = loadedSize;
         } catch (IOException e) {
+            resetTree();
             e.printStackTrace();
         }
+    }
+
+    /** Counts the entries exposed by getAll without allocating another list for a loaded tree. */
+    private int countEntries(Node node) throws IOException {
+        int count = 0;
+        for (Node child : node.mChildren) {
+            int entries;
+            if (node.mLeaf) {
+                if (child.isNode()) {
+                    throw new IOException("Spatial cache leaf contains an internal node");
+                }
+                entries = 1;
+            } else {
+                if (!child.isNode()) {
+                    throw new IOException("Spatial cache internal node contains an entry");
+                }
+                entries = countEntries(child);
+            }
+            if (entries > Integer.MAX_VALUE - count) {
+                throw new IOException("Spatial cache entry count is out of range");
+            }
+            count += entries;
+        }
+        return count;
     }
 
     @Override
@@ -466,7 +496,13 @@ public class GeometryRTree implements IGeometryCache {
      * Empties the RTree
      */
     public synchronized void clear(){
+        resetTree();
+        mHasEdits = true;
+    }
+
+    private void resetTree() {
         root = buildRoot(true);
+        size = 0;
         mHasEdits = false;
         // let the GC take care of the rest.
     }
