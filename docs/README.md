@@ -1,7 +1,7 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-11-01
+last_verified: 2026-11-02
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
@@ -246,9 +246,9 @@ Clipper сохраняет multipart/holes/disconnected pieces, не добав�
 полную DB/styled geometry редактору. ORDER=FID стабилен между tiles. Host
 владеет fast editedFID filters, content/style source recreation и fallback.
 
-Прежний encoder остаётся compatibility foundation; его Rule-property loss
-не следует включать для поддерживаемых слоёв вместо нового route. Раздел
-compact GeoJSON ниже описывает сохранённый compatibility path. Новая схема
+Старый HTTP encoder удалён по поручению владельца2ноября. Раздел compact
+GeoJSON ниже описывает converter для explicit preview/overlay и неизвестных
+расширенных renderer, без локального сервера. Новая схема
 прошёл focused26JVM/Robolectric tests и main/test compile, но ещё требует
 native styles/edit/full-content и benchmark cold/
 warm/pan/pinch на том же787: скорость и2GiB/OOM безопасность не объявлены PASS.
@@ -365,7 +365,7 @@ TrackColorPalette назначает насыщенный цвет один ра
 
 ## Штриховки, контуры и живой образец
 
-PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые стили MVT используют classic fallback. Контракт — consuming docs/architecture/polygon-style-controls.md.
+PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые обычные стили остаются на прямом SQLite source. Контракт — consuming docs/architecture/polygon-style-controls.md.
 
 `PatternTilePeriod` уменьшает исходную512×512ARGB решётку только при точном
 совпадении повторяемого прямоугольного мотива во всех пикселях. Сохраняются
@@ -628,29 +628,16 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   а после `setStyle` удаляет ссылки на detached MapLibre source/layer wrappers;
   это ограничивает пиковую Java/native память больших Collector-проектов и не
   сохраняет данные удалённых слоёв между reload;
-- `LocalVectorTileProvider` / `LocalVectorTileEncoder` — ленивые MVT для
-  кварталов содержат один внутренний label anchor исходного объекта в том же
-  `features` source-layer. Фрагменты полигонов не несут подпись; служебная Point
-  запись с `_label_anchor=true` и исходным ID попадает только в один тайл без
-  учёта buffer. Используются прежние VectorSource, FillLayer, LineLayer и
-  SymbolLayer; отдельный объектный слой/GeoJsonSource не создаётся.
-  `LocalVectorTileLabelAnchor` учитывает отверстия, выбирает наибольшую пригодную
-  часть MultiPolygon и проверяет точку после округления в сетку MVT. Геометрии
-  без представимой внутренней точки на данном зуме не получают подпись.
-  Общие границы соседних тайлов вычисляются одной формулой без epsilon-overlap;
-  повторяющиеся IDs пространственного индекса обрабатываются один раз на тайл.
-  Тайл внутри квартала не требует пересечения с его границей: bbox-кандидаты
-  передаются непосредственно отсечению, иначе при увеличении масштаба исчезает
-  и заливка, и внутренняя подпись.
+- Direct SqliteVectorTileProvider / NativeVectorTileEncoder обслуживают полные
+  SQLite originals, все шесть геометрий и inline polygon label anchors. Старые
+  HTTP server/provider/encoder, request policy и URL style factories удалены.
+  LocalVectorTileDiskCache остаётся shared derived cache нового пути.
+- Старое mobile_render_mode/local_vector_tiles читается как metadata без
+  выбора renderer; schema/FID/geometry/rights/sync не мигрируют.
+- LayerIdentifyPolicy включает только видимые слои; old flag не разрешает
+  identify скрытого слоя. Unit policy и consumer DirectVectorTilesTest
+  скомпилированы, execution после удаления сервера NOT_RUN;
 
-- Поддерживаемые геометрии локальных MVT:
-  read-only polygon/multipolygon и простого `GTPoint` с кругом и подписью;
-  loopback-сервер допускает не более двух одновременных сборок и 16 ожидающих
-  запросов, сериализует тяжёлые тайлы одного слоя, отменяет очередь предыдущего
-  поколения карты и отвечает `503` при перегрузке либо остатке heap менее 64 МБ;
-- `LayerIdentifyPolicy` оставляет выключенные классические слои вне identify,
-  но разрешает просмотр локальных атрибутов выключенного слоя, настроенного на
-  `local_vector_tiles`, не включая его отрисовку;
 - `MapDrawable.finishCreateNewFeature` допускает отсутствие временной edit-сессии
   после cold form recovery; если новый id отсутствует в process-local GeoJSON,
   `reloadFeatureToMaplibre` перечитывает данные слоя, а не только стили;
@@ -850,9 +837,9 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - LayerGroup index `0` — bottom.
 - MBTiles local TMS path принимает только raster PNG/JPEG/WEBP с обязательными
   `tiles`/`metadata`; vector MBTiles и повреждённая SQLite отклоняются.
-- Точечный `local_vector_tiles` поддерживает только простой круговой marker и
-  подпись из одного поля/фиксированного текста; rule/icon/template/editable
-  варианты используют classic fallback.
+- Старые точечные local_vector_tiles конфиги используют direct SQLite;
+  editable/rule/icon/template поддерживаются его обычным style контрактом.
+
 - Автоматический topology repair разрешён только для точного типа слоя
   `GTMultiPolygon`; простой `GTPolygon` и линейные типы не обрабатываются.
 - Track start/end flag layers не включаются.
@@ -921,13 +908,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Слой был невидим при import и не появился после локального включения: проверить
   `MapLibre visibility enable requires data reload`; наличие записи в
   `sourceFeaturesHashMap` не заменяет source/layer в текущем live style.
-- Выключенный `local_vector_tiles` не попал в identify: проверить сохранённый
-  `layer_origin.render_mode` и `LayerIdentifyPolicy`; видимость слоя не должна
-  включаться ради чтения атрибутов.
-- После панорамирования/перезагрузок карты растут тормоза или возникает OOM в
-  `LocalVectorTileProvider.buildTile`: worker должен называться только
-  `LocalVectorTileWorker-1/2`; трёхзначный номер `pool-*-thread-*` означает
-  возврат неограниченного пула. Проверить также throttled-счётчик и heap headroom.
+- Выключенный слой отсутствует в identify: это текущая visible-only policy,
+  независимо от старого render mode; список атрибутов не включается скрыто.
+- При проблемах native SQLite tile work читать phase/counters/current epochs,
+  actual free headroom и независимые visible-ID/pixel evidence. HTTP worker
+  names/queue/503 больше не существуют в текущем renderer.
+
 - Пустой список треков после project switch: проверить строку
   `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;
 - Трек/обход замер на скорости: проверить `LocationTrackFilter` причины вместе с
@@ -1271,3 +1257,9 @@ dependency. Единый открытый риск: vector-spatial-cache-recover
 Исторические message89 и selector37 сохранены с их прежними source pins; они не
 перезапускались и не сертифицируют новые Core cache bytes. Caption/layout — отдельный
 срез. Wiki, APK/release/deploy и paused native stages не затронуты.
+
+Подготовка переноса Debug2ноября находится в принимающем app: source wire,
+RasterMbtilesWriter, shared catalog, y-flip и lease API здесь не менялись.
+Main consumers LisaDebug/LisaRelease/BelkaRelease и изменённые unit/native test
+sources скомпилированы. Новые tests execution отложены пользователем; снятие
+HTTP маршрута не является доказательством исправления прежних pixel/ID FAIL.

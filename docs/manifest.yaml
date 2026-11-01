@@ -2,13 +2,15 @@ schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
-last_verified: 2026-11-01
+last_verified: 2026-11-02
 entrypoints:
   - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
   - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
   - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
   - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
+  - path: maplib/src/test/java/com/nextgis/maplib/map/LayerIdentifyPolicyTest.java
+    responsibility: Prepared visible/hidden/null and old-render-metadata policy checks; source compilation only after HTTP removal.
   - path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorTileDiskCacheTest.java
     responsibility: Independently assert real temporary filesystem complete bytes, constant hot-path inventory/metadata work, canonical aliases and shared instances/registry eviction, 128-to32MiB and1024-file budgets, external cache deletion, iterator/write/rename/delete failures and cancellation publication guards; no native speed claim.
   - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileAdmissionTest.kt
@@ -38,13 +40,13 @@ key_components:
   - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelStreamingTest.java
     responsibility: Assert full-original streaming placement/style/dateline parity, candidate ownership without retained line geometry, late UI properties and cancellation before read/during scan/before publication.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileEncoder.java
-    responsibility: Encode scalar generic MVT2 properties and all six multipart geometry kinds with native8192 extent, stable identities/order and inline polygon anchor role, preserving the legacy encoder separately.
+    responsibility: Encode scalar generic MVT2 properties and all six multipart geometry kinds with native8192 extent, stable identities/order and inline polygon anchor role, with no HTTP legacy encoder.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTilePropertyCodec.java
     responsibility: Preserve typed scalar native consumers, flatten text/icon offsets for semiliteral X/Y factories, omit null under the known coalesce contract and fail explicitly for unexpected complex/nonfinite values.
   - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileClipper.java
     responsibility: Intersect full3857 geometry with buffered tile bounds using robust JTS multipart clipping, preserving holes/disconnected pieces without simplification or source mutation and bypassing overlay for contained/disjoint objects.
   - path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkLimiter.java
-    responsibility: Share one two-permit fair gate with HTTP MVT and direct native/visible-line IO and bound layer lock metadata to64 stripes rather than an unbounded global map.
+    responsibility: Share one two-permit fair gate for direct native/visible-line IO and bound layer lock metadata to64 stripes rather than an unbounded global map.
   - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileRequestTest.java
     responsibility: Assert independent cache identity changes, valid canonical addresses and bounded retry backoff before IO.
   - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileProviderTest.java
@@ -73,8 +75,6 @@ key_components:
     responsibility: Bound complete derived PBF by existing bytes/file/entry budgets through one per-operation canonical-root metadata ledger, bounded8-root registry and incremental recency; bootstrap/reconcile separately from hot put without per-put full scan/sort/regex, retain atomic publication, optional IO failure and native current guards without changing identities or authoritative data.
   - path: maplib/src/main/java/com/nextgis/maplib/util/RenderProcessMemory.java
     responsibility: Read optional self-process RSS/native and system-availability counters without enumerating other applications or reading heap contents.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorTileFullContentTest.java
-    responsibility: Decode every identity in a4097-simple-point complete tile and its disk-cache roundtrip, beyond the removed arbitrary2048 cutoff.
   - path: maplib/src/test/java/com/nextgis/maplib/map/RenderTileWorkGateTest.java
     responsibility: Assert normal two-builder throughput, exclusive fair constrained work and permit preservation after interruption, failure, double close, canceled job wait and a throwing current callback.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerDisplayPriority.java
@@ -321,16 +321,6 @@ key_components:
     responsibility: Encode and validate the last fully initialized NGW vector-layer identity for partial-config recovery.
   - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
     responsibility: Cache prepared vector rendering payload for map startup.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileProvider.java
-    responsibility: Query and clip SQLite geometry into lazy MVT, calculate polygon label anchors before clipping, and emit each original feature label only in its unbuffered owner tile.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileLabelAnchor.java
-    responsibility: Calculate one interior point on the largest usable original polygon part with holes, validate the snapped MVT grid position, and retain no source geometry or global point collection.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileServer.java
-    responsibility: Serve complete loopback MVT through a two-worker/sixteen-socket queue, per-layer serialization and a fair two-permit gate; serialize globally only from actual free-memory constraints, fence derived disk-cache entries and return explicit retryable 503 without caching incomplete output. This is no hard native-memory cap or verified SDK retry guarantee.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileRequestPolicy.java
-    responsibility: Define and unit-test local MVT concurrency, queue and minimum 64 MiB heap-headroom limits independently of Android runtime classes.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileEncoder.java
-    responsibility: Encode polygon fragments without text and marked label Point records in the same features source-layer, plus the unchanged simple Point layer payload.
   - path: maplib/src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java
     responsibility: Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers.
   - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectCompositionSync.java
