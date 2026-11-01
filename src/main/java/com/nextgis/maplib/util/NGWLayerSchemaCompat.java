@@ -33,6 +33,7 @@ public final class NGWLayerSchemaCompat {
     public static final class SchemaComparison {
         private final boolean mComparable;
         private final boolean mResourceClassMatches;
+        private final boolean mKnownResourceClassMismatch;
         private final boolean mGeometryMatches;
         private final boolean mSerializedFieldsMatch;
         private final boolean mSqliteFieldsMatch;
@@ -42,6 +43,7 @@ public final class NGWLayerSchemaCompat {
         private SchemaComparison(
                 boolean comparable,
                 boolean resourceClassMatches,
+                boolean knownResourceClassMismatch,
                 boolean geometryMatches,
                 boolean serializedFieldsMatch,
                 boolean sqliteFieldsMatch,
@@ -49,6 +51,7 @@ public final class NGWLayerSchemaCompat {
                 List<Field> remoteFields) {
             mComparable = comparable;
             mResourceClassMatches = resourceClassMatches;
+            mKnownResourceClassMismatch = knownResourceClassMismatch;
             mGeometryMatches = geometryMatches;
             mSerializedFieldsMatch = serializedFieldsMatch;
             mSqliteFieldsMatch = sqliteFieldsMatch;
@@ -72,8 +75,9 @@ public final class NGWLayerSchemaCompat {
         }
 
         public boolean isMetadataOnlyMismatch() {
-            return mComparable && mResourceClassMatches && mGeometryMatches
-                    && mSqliteFieldsMatch && !mSerializedFieldsMatch;
+            return mComparable && mGeometryMatches && mSqliteFieldsMatch
+                    && (mKnownResourceClassMismatch
+                    || (mResourceClassMatches && !mSerializedFieldsMatch));
         }
 
         public boolean isFullyCompatible() {
@@ -228,6 +232,9 @@ public final class NGWLayerSchemaCompat {
             return new SchemaComparison(
                     true,
                     resourceClassMatches,
+                    isKnownVectorClass(expectedResourceCls)
+                            && isKnownVectorClass(actualResourceCls)
+                            && !expectedResourceCls.equals(actualResourceCls),
                     geometryMatches,
                     serializedFieldsMatch,
                     sqliteFieldsMatch,
@@ -238,9 +245,13 @@ public final class NGWLayerSchemaCompat {
         }
     }
 
+    private static boolean isKnownVectorClass(String resourceClass) {
+        return "vector_layer".equals(resourceClass) || "postgis_layer".equals(resourceClass);
+    }
+
     private static SchemaComparison unparsed() {
         return new SchemaComparison(
-                false, true, true, true, true, "", java.util.Collections.emptyList());
+                false, true, false, true, true, true, "", java.util.Collections.emptyList());
     }
 
     /**

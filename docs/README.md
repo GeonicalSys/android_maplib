@@ -1,10 +1,48 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-10-30
+last_verified: 2026-11-01
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+## Класс NGW исправляется как metadata без refill — 1 ноября 2026
+
+При известном несовпадении vector_layer ↔ postgis_layer и совпадающих geometry
+и physical SQLite schema normal preflight теперь вызывает прежний verified
+metadata repair, даже когда serialized fields уже совпадают. Раньше needsRebuild
+правильно не требовал refill, но metadata-only predicate одновременно требовал
+равенства класса и пропускал исправление. Новый private flag относится только
+к двум разным поддержанным классам; public API и serialized format прежние.
+
+Прежняя ветвь field-only drift сохранена. Unknown/null/legacy empty class,
+неподдержанный actual class, unparsed metadata и geometry/physical mismatch
+не получают новой политики. Независимый physical mismatch по-прежнему ведёт
+к существующему staged rebuild. Геометрия, данные, NGW account/remote_id и настройки sync
+этой правкой не переписываются. Оба HTTP fetch overload остаются точными.
+
+Сохраняется существующий двухшаговый save: field metadata, затем class.
+False на первом save восстанавливает прежние поля; false на втором возвращает
+прежний class и откладывает pull, но первый save уже мог сохраниться.
+Следующий refresh повторяет class repair; atomic whole-operation rollback
+не обещается.
+
+NGWVectorLayerClassMetadataRepairTest проверяет actual comparison/private refresh
+и verified helper с technical transport/schema/save/rebuild seams, без DB или
+socket. До исправления: 6 ожидаемых assertion FAIL, 8 controls PASS, 0 errors/skips.
+После одной production правки те же frozen 11 новых методов и 3 прежних
+fingerprint tests дали 14 PASS, 0 failures/errors/skips. Исходный automated RED
+receipt ошибочно требовал точный AssertionError type: два String assertEquals
+вернули JUnit ComparisonFailure; исходный receipt и отдельное пояснение сохранены,
+ожидания тестов не менялись.
+
+Offline Java/Kotlin consumer compile прошёл для maplib/maplibui Debug и Release,
+App LisaDebug и BelkaRelease: 12 targeted tasks, 8 EXECUTED и 4 UP-TO-DATE.
+Actual graph192 совпал с dry-run, без CMake/NDK/assemble/APK/AAR/sign/minify/device.
+Jobs normal stop подтверждён. Это source/JVM/build проверки, не native/AVD,
+реальная DB/NGW/схема устройства или подтверждение текущего полевого инцидента.
+
+[Карточка исправления](../update-reports/entries/maplib-20261101-class-metadata-repair.md).
 
 ## Горячая запись PBF и отменяемый допуск к IO — MOB-04, 28 октября2026
 
