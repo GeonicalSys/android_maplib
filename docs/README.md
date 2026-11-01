@@ -382,7 +382,7 @@ children с общим picking/visibility/zoom. PointLayerFactory исключа
 из прежнего circle/SDF прохода. Прозрачное ядро не заполняется свечением.
 Подробности, ограничения и проверки — consuming docs/architecture/point-firefly.md.
 
-Diagnostic VERSION_NAME: release 3.1.2.30, debug 3.1.2.23. При подготовке
+Diagnostic VERSION_NAME: release 3.1.2.31, debug 3.1.2.23. При подготовке
 локального Lisa Release версия проверяется вместе с APK через consuming
 `tools/verify-apk-version-matrix.ps1 -LisaOnly`; публикация отдельно требует Full.
 
