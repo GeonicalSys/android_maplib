@@ -1,3 +1,55 @@
+# Shared LISA line-ending policy (keep identical in all six owner repositories).
+# Git stores normalized text as LF; checkout/export EOL does not depend on autocrlf.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Opaque resources must survive checkout, normalization and export byte-for-byte.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.7z binary
+*.gz binary
+*.xz binary
+*.qgz binary
+*.ngfp binary
+*.jar binary
+*.aar binary
+*.apk binary
+*.aab binary
+*.exe binary
+*.dll binary
+*.so binary
+*.class binary
+*.pyc binary
+*.rcc binary
+*.qm binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.gpkg binary
+*.qgd binary
+*.pbf binary
+*.xls binary
+*.xlsx binary
+*.xlsm binary
+*.doc binary
+*.docx binary
+*.mdb binary
+*.accdb binary
+
+# Repository-specific and nested exceptions follow and take precedence.
 # Preserve the reviewed official source subset byte-for-byte, including upstream whitespace.
 src/main/cpp/quickjs/* -text -whitespace
 .githooks/* text eol=lf
