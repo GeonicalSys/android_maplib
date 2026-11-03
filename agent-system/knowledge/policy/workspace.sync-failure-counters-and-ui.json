@@ -1,0 +1,65 @@
+{
+  "schema_version": 2,
+  "id": "lisa:maplib:contract:workspace.sync-failure-counters-and-ui",
+  "kind": "contract",
+  "owner": "android_projects/android_gisapp/maplib",
+  "topic": "policy-workspace",
+  "status": "active",
+  "execution_permission": false,
+  "applicability": {
+    "review_status": "reviewed",
+    "paths": [
+      {
+        "repository": "android_projects/android_gisapp/maplib",
+        "include": [
+          "."
+        ],
+        "exclude": []
+      }
+    ],
+    "scope_refs": [],
+    "conditions": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "source_verification": "NOT_APPLICABLE",
+    "merge": "not_applicable",
+    "runtime_verification": "NOT_APPLICABLE",
+    "release": "not_applicable",
+    "retention": "Retain editable logical subject and pinned provenance; product implementation/acceptance are separate records."
+  },
+  "facets": {
+    "body": {
+      "role": "standing_contract",
+      "value": "PUSH и lookup добавляют только metadata после прежнего IO/Parse increment;\nSYNC_NONE известный server HTTP failure добавляет один IO за failed request,\nсохраняя null/UNKNOWN/zero→KEEP. Full/deferred optional schema wrappers прежние.\nChildrenLoadResult отличает failed child list от successful empty и не меняет\nlegacy void API/Parcelable/sort/cache. NgwHttpException остаётся IOException,\nNgwHttpResponseException — NGException: сохранять исходный diagnostic/localized\nmessage и прежние catch/retry boundaries. Общий RU/EN server body принадлежит\nCore error_server_temporarily_unavailable; возможные техработы не доказаны фактом5xx.\nSource/JVM проверки не заменяют device, живой NGW или импорт/SQLite acceptance.\n"
+    },
+    "classification": {
+      "role": "reviewed_knowledge_class",
+      "value": "standing_contract"
+    },
+    "review": {
+      "role": "classification_reason",
+      "value": "Preserve existing PUSH/lookup increments, exact SYNC_NONE failure count, UNKNOWN/zero KEEP, optional wrappers, successful-empty distinction, legacy types/retry/diagnostics, Core text ownership and separate source/device/server acceptance."
+    },
+    "source_section": {
+      "role": "source_document_context",
+      "value": [
+        "# maplib — инструкции для ИИ-агентов",
+        "## Причина сбоя и пользовательское сообщение"
+      ]
+    },
+    "authority_limit": {
+      "role": "authority_and_acceptance_boundary",
+      "value": "Path applicability is reviewed separately from the rule's textual triggers. Every source condition and heading remains attached; no automatic predicate or lifecycle inference. Stored commands and dates do not grant current execution, freshness or product acceptance. Existing instruction clients/checkers remain effective until measured cutover."
+    }
+  },
+  "relations": [],
+  "provenance": {
+    "manifest": "agent-system/policy-migration.json",
+    "scopes": [
+      "lisa:maplib:contract:workspace.sync-failure-counters-and-ui"
+    ]
+  }
+}

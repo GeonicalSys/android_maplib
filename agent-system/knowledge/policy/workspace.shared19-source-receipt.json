@@ -1,0 +1,65 @@
+{
+  "schema_version": 2,
+  "id": "lisa:maplib:evidence:workspace.shared19-source-receipt",
+  "kind": "evidence",
+  "owner": "android_projects/android_gisapp/maplib",
+  "topic": "policy-workspace",
+  "status": "historical",
+  "execution_permission": false,
+  "applicability": {
+    "review_status": "reviewed",
+    "paths": [
+      {
+        "repository": "android_projects/android_gisapp/maplib",
+        "include": [
+          "."
+        ],
+        "exclude": []
+      }
+    ],
+    "scope_refs": [],
+    "conditions": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "source_verification": "UNKNOWN",
+    "merge": "unknown",
+    "runtime_verification": "UNKNOWN",
+    "release": "unknown",
+    "retention": "Retain exact source and individual review; historical narrative is not fresh evidence or authority."
+  },
+  "facets": {
+    "body": {
+      "role": "historical_receipt",
+      "value": "Исторические App9/8ca проверки отделены от текущих App15 и Core4 в shared19.\nCore4 вызывают actual private downloader без SQLite/map/network; App15 — actual\npublic sync с technical fill/save seams. "
+    },
+    "classification": {
+      "role": "reviewed_knowledge_class",
+      "value": "historical_receipt"
+    },
+    "review": {
+      "role": "classification_reason",
+      "value": "Individually separated former App9/8ca and shared19 App15/Core4 receipt and technical seams; no current test execution, merge, native or release acceptance."
+    },
+    "source_section": {
+      "role": "source_document_context",
+      "value": [
+        "# maplib — инструкции для ИИ-агентов",
+        "## Lookup-кеш и полный NGW snapshot"
+      ]
+    },
+    "authority_limit": {
+      "role": "authority_and_acceptance_boundary",
+      "value": "Path applicability is reviewed separately from the rule's textual triggers. Every source condition and heading remains attached; no automatic predicate or lifecycle inference. Stored commands and dates do not grant current execution, freshness or product acceptance. Existing instruction clients/checkers remain effective until measured cutover."
+    }
+  },
+  "relations": [],
+  "provenance": {
+    "manifest": "agent-system/policy-migration.json",
+    "scopes": [
+      "lisa:maplib:evidence:workspace.shared19-source-receipt"
+    ]
+  }
+}

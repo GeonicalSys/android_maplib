@@ -1,0 +1,38 @@
+{
+  "format": "lisa.agent-system.pack-review.v1",
+  "owner": "android_projects/android_gisapp/maplib",
+  "review": "One explicitly observed documentary contradiction during full mandatory-pack reading. Product implementation/applicability remains UNKNOWN; no audit frontier or instruction cutover.",
+  "questions": [
+    {
+      "id": "layer-identify-pack-wording",
+      "question": "lisa:maplib:question:migration.layer-identify-pack-wording",
+      "question_sha256": "8304edc9082438913a22a5e6e037085be5224123079bdc97a3d865f1f335c0b1",
+      "source_witnesses": [
+        {
+          "path": "docs/README.md",
+          "revision": "7152e3cd403f9020cebcf752b8299538a85136c1",
+          "blob": "1b9e458b3fc563398fb657d85000f8b9c2c4e152",
+          "sha256_utf8_lf": "41aad4ba7842237628b56fdd8c98fb529729e99b320d5084905c46fe5f08c5c2",
+          "address": {
+            "span": [
+              60849,
+              61001
+            ]
+          },
+          "value": "- Выключенный слой отсутствует в identify: это текущая visible-only policy,\n  независимо от старого render mode; список атрибутов не включается скрыто.\n"
+        },
+        {
+          "path": "docs/manifest.yaml",
+          "revision": "7152e3cd403f9020cebcf752b8299538a85136c1",
+          "blob": "b713fa79c5fdd0e20649015f03fe34b29df43728",
+          "sha256_utf8_lf": "6c52f116009ad4e8753c79e3661ef1073ba538e42e94c2e7a14fde97c1a14b9b",
+          "address": {
+            "pointer": "/key_components/156/responsibility"
+          },
+          "value": "Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers."
+        }
+      ],
+      "disposition": "OPEN_SOURCE_WORDING_NOT_PRODUCT_DEFECT"
+    }
+  ]
+}
