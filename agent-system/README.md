@@ -30,3 +30,13 @@ versions, data and app index pins are unchanged. Remaining contracts/resources/
 scenarios, tasks and independent lifecycle states, defects, risks/questions,
 decisions/notes/history/evidence, real clients and individual cleanup across ALL
 six owners remain required. This source migration does not finish the goal.
+
+The [module manifest records](knowledge/maplib-module-manifest) preserve 14
+ordered fields in 239 records. Their [provenance](provenance/maplib-module-manifest.json)
+binds the complete original YAML and every member to Git. The
+[local manifest](../docs/manifest.yaml) is the ordinary editing address during
+this preservation phase. The next gate checks the shared reader and authoring.
+
+The [pack review](migration/pack-review.json) retains the separate identify
+wording question. Its source witnesses and the ordered manifest values each
+keep their own address and review status.

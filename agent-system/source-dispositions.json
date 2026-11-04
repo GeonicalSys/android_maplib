@@ -13,7 +13,7 @@
     },
     {
       "path": "agent-system/README.md",
-      "sha256": "edfbd3146275d0741639257aa3970b7457e17ff69e6718835fd9381146a5bf86",
+      "sha256": "094ee6e652f35003388e72eb36b0ad5cdfab99bafa3c968f1437cff9e72f1d05",
       "sha256_scope": "utf8_lf",
       "category": "working_bridge",
       "applies_to": [
@@ -30,6 +30,26 @@
         "."
       ],
       "reason": "Pinned exact source excerpts and typed manifest address for one unresolved local-pack wording contradiction. Retain as migration provenance; product behavior is not reviewed, no exclusion or deletion authority."
+    },
+    {
+      "path": "docs/manifest.yaml",
+      "sha256": "6c52f116009ad4e8753c79e3661ef1073ba538e42e94c2e7a14fde97c1a14b9b",
+      "sha256_scope": "utf8_lf",
+      "category": "working_bridge",
+      "applies_to": [
+        "."
+      ],
+      "reason": "Existing YAML remains the ordinary module documentation route during typed preservation."
+    },
+    {
+      "path": "agent-system/provenance/maplib-module-manifest.json",
+      "sha256": "0985d17cb7aa70e14473a089ace6e1304ab37941fc2b00dd891eb115db6b8695",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "applies_to": [
+        "docs/manifest.yaml"
+      ],
+      "reason": "Original Git object, complete field spans and ordered module record witnesses."
     }
   ]
 }

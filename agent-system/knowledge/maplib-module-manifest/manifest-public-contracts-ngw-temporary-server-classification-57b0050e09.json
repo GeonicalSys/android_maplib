@@ -1,0 +1,51 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": {
+        "consumers": [
+          "maplib",
+          "maplibui",
+          "app"
+        ],
+        "id": "ngw-temporary-server-classification",
+        "path": "maplib/src/main/java/com/nextgis/maplib/util/NetworkUtil.java",
+        "symbol": "NetworkUtil.isTemporaryNgwServerFailure versus isTransientNgwHttpError/isTransientNetworkFailure"
+      }
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "public_contracts"
+    }
+  },
+  "id": "lisa:maplib:contract:manifest-public-contracts-ngw-temporary-server-classification-57b0050e09",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:contract:manifest-public-contracts-ngw-temporary-server-classification-57b0050e09"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}
