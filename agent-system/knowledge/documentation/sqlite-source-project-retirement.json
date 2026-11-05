@@ -1,0 +1,79 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-source-bridge.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Project replacement is stronger than Activity recreation.",
+        "`MapDrawable.retireSqliteVectorSources()` is terminal and safe from any thread,",
+        "including inside the application's synchronized map-switch boundary. It marks",
+        "the retirement fence first, cancels registered sessions/providers immediately,",
+        "and invalidates epochs without consulting `app.getMap()` or waiting for Main.",
+        "The bridge's `cancelPendingWork()` is the corresponding any-thread operation:",
+        "it touches only Java/coroutine state, never an SDK object. A race-safe",
+        "`SqliteSourceRetirement` registration also closes a source created concurrently",
+        "with retirement. Only releasing controller wrapper/filter references is posted",
+        "to Main. `GISApplication.resetMap/closeMapObj` retire the old drawable before",
+        "dropping it; sync-workspace maps and recording owners are not changed.",
+        "",
+        "Ordinary UI `closeSqliteVectorSourcesBeforeDetach()` does not retire the whole",
+        "project and permits a new bridge after Activity recreation. A retired controller",
+        "cannot bind again. Delayed bind requests must additionally prove exact canonical",
+        "model identity (`getLayerById(id) == model`), so a deleted/replaced layer cannot",
+        "reappear from an old callback. Temporary hide refreshes the source after content",
+        "version changes; feature-ID remap moves the exclusion only for the matching",
+        "active edited feature. Root host integration owns Save/Cancel/native validation.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Terminal project retirement and recoverable Activity detach"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-source-bridge.md"
+    }
+  },
+  "id": "lisa:maplib:contract:sqlite-source-project-retirement",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:sqlite-source-project-retirement"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

@@ -1,0 +1,67 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-tile-buffer.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "`NativeVectorTileEncoder.Bounds` now uses128/512 for all four query boundaries.",
+        "Both `SqliteVectorTileProvider`'s RTree envelope and `NativeVectorTileClipper`'s",
+        "full-precision intersection consume these same boundaries. Tile coordinates,",
+        "8192extent, complete candidate processing, original geometry, multipart/holes,",
+        "properties, source ownership and cancellation are unchanged. No simplification,",
+        "LOD, feature cutoff or layer disabling is introduced. Bounds for polygon anchor",
+        "ownership remain half-open tile ownership, independent of the geometry buffer.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Shared 128 px query and clipping envelope"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-tile-buffer.md"
+    }
+  },
+  "id": "lisa:maplib:contract:sqlite-tile-shared-128px-envelope",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:sqlite-tile-shared-128px-envelope"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

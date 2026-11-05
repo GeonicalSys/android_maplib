@@ -1,0 +1,181 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-source-bridge.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "",
+        "# SQLite → native MVT bridge",
+        "",
+        "`SqliteVectorSourceBridge` owns exactly one source generation and the coroutine",
+        "scope supplied to the unchanged official MapLibre OpenGL SDK13.7.1",
+        "`CustomVectorSource`. Its provider returns `TileData.Mvt` from the Java backend.",
+        "There is no HTTP server and no whole-project GeoJSON load in this bridge.",
+        "“Direct” means bounded SQLite tile reads followed by PBF transfer to the SDK;",
+        "JNI copies the byte array into native storage, so this is not zero-copy.",
+        ""
+      ]
+    },
+    "frontmatter": {
+      "role": "original_frontmatter_lines",
+      "value": [
+        "title: SQLite native vector source lifetime",
+        "module_id: maplib",
+        "last_verified: 2026-10-28",
+        "related_code:",
+        "  - src/main/java/com/nextgis/maplib/map/SqliteVectorSourceBridge.kt",
+        "  - src/main/java/com/nextgis/maplib/map/SqliteVectorTileBackend.java",
+        "  - src/main/java/com/nextgis/maplib/map/SqliteVectorTileRequest.java",
+        "  - src/main/java/com/nextgis/maplib/map/SqliteSourceRetirement.java",
+        "  - src/main/java/com/nextgis/maplib/map/SqliteVectorLayerController.java",
+        "  - src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java",
+        "  - src/main/java/com/nextgis/maplib/map/MapDrawable.java",
+        "  - src/main/java/com/nextgis/maplib/map/VectorLayer.java",
+        "  - src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java",
+        "  - src/test/java/com/nextgis/maplib/map/SqliteVectorSourceBridgeTest.kt",
+        "  - src/test/java/com/nextgis/maplib/map/VectorLayerVisibilityEpochTest.java"
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "SQLite native vector source lifetime and bridge scope"
+    },
+    "typed-frontmatter": {
+      "role": "reviewed_frontmatter_values",
+      "value": {
+        "last_verified": "2026-10-28",
+        "module_id": "maplib",
+        "related_code": [
+          "src/main/java/com/nextgis/maplib/map/SqliteVectorSourceBridge.kt",
+          "src/main/java/com/nextgis/maplib/map/SqliteVectorTileBackend.java",
+          "src/main/java/com/nextgis/maplib/map/SqliteVectorTileRequest.java",
+          "src/main/java/com/nextgis/maplib/map/SqliteSourceRetirement.java",
+          "src/main/java/com/nextgis/maplib/map/SqliteVectorLayerController.java",
+          "src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java",
+          "src/main/java/com/nextgis/maplib/map/MapDrawable.java",
+          "src/main/java/com/nextgis/maplib/map/VectorLayer.java",
+          "src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java",
+          "src/test/java/com/nextgis/maplib/map/SqliteVectorSourceBridgeTest.kt",
+          "src/test/java/com/nextgis/maplib/map/VectorLayerVisibilityEpochTest.java"
+        ],
+        "title": "SQLite native vector source lifetime"
+      }
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-source-bridge.md"
+    }
+  },
+  "id": "lisa:maplib:resource:sqlite-source-bridge",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:sqlite-source-bridge"
+    ]
+  },
+  "relations": [
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-provider-diagnostics",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:sqlite-source-same-id-history",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-logical-and-native-identities",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-initial-layer-binding",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-classic-detach",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-construction-snapshot",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-ui-detach",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-project-retirement",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-edit-mask",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-worker-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-retry-cancellation",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:risk:sqlite-source-native-acceptance-limits",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:sqlite-source-upstream-witnesses",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-source-build-profile",
+      "type": "contains"
+    }
+  ],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

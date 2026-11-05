@@ -1,0 +1,150 @@
+{
+  "owner": "android_projects/android_gisapp/maplib",
+  "schema_version": 1,
+  "sources": [
+    {
+      "blob": "275fbefd29df79d4b33584ccaf22d5aa35bd7e4d",
+      "bytes": 11671,
+      "id": "lisa:maplib:resource:sqlite-source-bridge",
+      "ordered_records_sha256": "513ee1899e956434c637bdfc196ad2c23a2dcce624edd9f3a9cd74239dc9683f",
+      "ordered_spans": [
+        {
+          "end_byte": 1355,
+          "id": "lisa:maplib:resource:sqlite-source-bridge",
+          "sha256": "419768fb38c9ea97571f3befd3a75b8391b08dbc35ef69756c32d80ce7920198",
+          "start_byte": 0
+        },
+        {
+          "end_byte": 2826,
+          "id": "lisa:maplib:contract:sqlite-source-provider-diagnostics",
+          "sha256": "4f527fc636b040cf66d9f301083b1f0ca95dfca552f7de4ca92c2133f1734bab",
+          "start_byte": 1355
+        },
+        {
+          "end_byte": 3379,
+          "id": "lisa:maplib:evidence:sqlite-source-same-id-history",
+          "sha256": "2939fad4ba7193e8a435e388f0cb915cf8a84f457c8e74333ddb3464a252942b",
+          "start_byte": 2826
+        },
+        {
+          "end_byte": 4074,
+          "id": "lisa:maplib:contract:sqlite-source-logical-and-native-identities",
+          "sha256": "122aacbec9bc2adb424c43b78ca129fbc34f9f6c5dcb4c80b68b718c7af42a88",
+          "start_byte": 3379
+        },
+        {
+          "end_byte": 4858,
+          "id": "lisa:maplib:contract:sqlite-source-initial-layer-binding",
+          "sha256": "313d41a2cbaf832638227b811d9a2690b729ca1ccdfc5eea349c5a132808a9aa",
+          "start_byte": 4074
+        },
+        {
+          "end_byte": 5392,
+          "id": "lisa:maplib:contract:sqlite-source-classic-detach",
+          "sha256": "cc89d453638d401aadcdb4a6fec1b23f2ce65f24a643a836aeaf659c2501349a",
+          "start_byte": 4858
+        },
+        {
+          "end_byte": 5907,
+          "id": "lisa:maplib:contract:sqlite-source-construction-snapshot",
+          "sha256": "e8b3fe27ffeb693d81edd41adb0fa27816cad46ac8f242f441c56a388e4eff1e",
+          "start_byte": 5392
+        },
+        {
+          "end_byte": 6465,
+          "id": "lisa:maplib:contract:sqlite-source-ui-detach",
+          "sha256": "bcae9fbc2c3166b57b4626d1749accf000205258a45ea589722610708cbe8c21",
+          "start_byte": 5907
+        },
+        {
+          "end_byte": 7857,
+          "id": "lisa:maplib:contract:sqlite-source-project-retirement",
+          "sha256": "1dae535375b8f9593d55e92b16c79282c566b5d4d63a64a1745f7c3ef32a46e0",
+          "start_byte": 6465
+        },
+        {
+          "end_byte": 9006,
+          "id": "lisa:maplib:contract:sqlite-source-edit-mask",
+          "sha256": "136f0a9be91c88b98f5c2805251d5625fef04ecb230f91596d8970ab4f42c06a",
+          "start_byte": 7857
+        },
+        {
+          "end_byte": 9589,
+          "id": "lisa:maplib:contract:sqlite-source-worker-ownership",
+          "sha256": "8bf227acbf0091173a09cc25cecd1faa3ee1ff130c915fa270acd6db83f12aa9",
+          "start_byte": 9006
+        },
+        {
+          "end_byte": 10174,
+          "id": "lisa:maplib:contract:sqlite-source-retry-cancellation",
+          "sha256": "660f405edca0b8e2e85e2823797c5bfddedd5ab372ae6e894a08b373ce7662e6",
+          "start_byte": 9589
+        },
+        {
+          "end_byte": 10660,
+          "id": "lisa:maplib:risk:sqlite-source-native-acceptance-limits",
+          "sha256": "7b5fc6125f1971f161880eaf5ab776ac64b276d9006d6fc7ac7ca8f7ab7dec40",
+          "start_byte": 10174
+        },
+        {
+          "end_byte": 11366,
+          "id": "lisa:maplib:resource:sqlite-source-upstream-witnesses",
+          "sha256": "ff3980cae781076f082afbeb55e60e8cfdce1f2ba1e19377409f22a4ed7c7011",
+          "start_byte": 10660
+        },
+        {
+          "end_byte": 11671,
+          "id": "lisa:maplib:contract:sqlite-source-build-profile",
+          "sha256": "af5827797fa1691fce19e4fd070be23dbc3c17875805e6c430c735d290bd2a80",
+          "start_byte": 11366
+        }
+      ],
+      "path": "docs/sqlite-vector-source-bridge.md",
+      "record": "sqlite-source-bridge.json",
+      "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
+      "sha256": "201a6f44e863c1b205c486984424391e3766f46accf9dcb73da6a480f1ee8b57"
+    },
+    {
+      "blob": "3755f84cd2d196c9e572a7b92df17740cea577d9",
+      "bytes": 4527,
+      "id": "lisa:maplib:resource:sqlite-tile-buffer",
+      "ordered_records_sha256": "b720a94db558f56f977b2d42541718ac55464a6cf457d9ba38a94ecd1b11d599",
+      "ordered_spans": [
+        {
+          "end_byte": 1461,
+          "id": "lisa:maplib:resource:sqlite-tile-buffer",
+          "sha256": "319274c417be67c47564ebe63c0357e348baf7e3d7b179c64934bfa6bdbba2a3",
+          "start_byte": 0
+        },
+        {
+          "end_byte": 2010,
+          "id": "lisa:maplib:evidence:sqlite-tile-64px-history",
+          "sha256": "d76de16ad423a3923cf1b6414e7ba368088e4c796a51d1e75dac5b466dca040a",
+          "start_byte": 1461
+        },
+        {
+          "end_byte": 2567,
+          "id": "lisa:maplib:contract:sqlite-tile-shared-128px-envelope",
+          "sha256": "2aba79be99a2857118fd9cbd44b38a3574f357022912e1ee68ea5a2b49bab8b7",
+          "start_byte": 2010
+        },
+        {
+          "end_byte": 3660,
+          "id": "lisa:maplib:contract:sqlite-tile-buffer-technical-oracles",
+          "sha256": "187caa5cb861869f4af6b51e4dda5fd65f5a3ddb3291cfd57cc71c80ffe13996",
+          "start_byte": 2567
+        },
+        {
+          "end_byte": 4527,
+          "id": "lisa:maplib:risk:sqlite-tile-style-reach-acceptance",
+          "sha256": "50ae3d5b02c329810d2b4073eb0c64c804d2d1aeefda2f63d5431775dc72dd92",
+          "start_byte": 3660
+        }
+      ],
+      "path": "docs/sqlite-vector-tile-buffer.md",
+      "record": "sqlite-tile-buffer.json",
+      "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
+      "sha256": "8189d59de7c826bd92127b78cd6c003632a19269906dad271ec08f0ba1d7e595"
+    }
+  ]
+}

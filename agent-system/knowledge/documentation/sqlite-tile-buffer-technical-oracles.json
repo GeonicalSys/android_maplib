@@ -1,0 +1,75 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-tile-buffer.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "The technical backend regression uses strict geometry-envelope filtering, rather",
+        "than returning every fixture regardless of the query. Four polygons90px beyond",
+        "different tile edges must reach the independently decoded PBF; a hole and an",
+        "original collinear vertex survive. The decoded centres with110px translations",
+        "must lie20px inside their corresponding edges. A separate polygon crossing the",
+        "128px boundary must clip at exactly-2048extent; a farther polygon must never be",
+        "read. All original WKT remains unchanged. These are unit expectations, not a",
+        "native renderer or real-project performance result.",
+        "",
+        "The existing disconnected-concave-clip regression retains its original U geometry",
+        "and independently expected output: two arms at x[0,2]/[4,6], y[2.75,5.25], area5",
+        "each/10 total. Its base tile Y bounds are now[19/6,29/6], so the128/512 expansion",
+        "produces that same reviewed effective clip window. This preserves and strengthens",
+        "the original area/validity/full-original expectations instead of accepting the",
+        "larger area12 produced by the old base bounds after the deliberate buffer change.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Independent edge decode and concave clipping test expectations"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-tile-buffer.md"
+    }
+  },
+  "id": "lisa:maplib:contract:sqlite-tile-buffer-technical-oracles",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:sqlite-tile-buffer-technical-oracles"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

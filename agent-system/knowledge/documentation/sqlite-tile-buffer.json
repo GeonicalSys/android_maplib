@@ -1,0 +1,126 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-tile-buffer.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "",
+        "# Preserve the classic source's128px margin",
+        "",
+        "The ordinary classic fallback in `MPLFeaturesUtils.createSourceForLayer` constructs",
+        "`GeoJsonSource` from its FeatureCollection without `GeoJsonOptions`. MapDrawable",
+        "does not override those options. The unchanged official Android13.7.1 SDK uses",
+        "[a128px default buffer](https://github.com/maplibre/maplibre-native/blob/android-v13.7.1/include/mln/style/sources/geojson_source.hpp#L23)",
+        "with [512px tiles and8192 extent](https://github.com/maplibre/maplibre-native/blob/android-v13.7.1/include/mln/util/constants.hpp#L13).",
+        "Its [GeoJSONVT setup](https://github.com/maplibre/maplibre-native/blob/android-v13.7.1/src/mln/style/sources/geojson_source_impl.cpp#L100)",
+        "multiplies the buffer by8192/512, producing2048 extent units beyond each tile edge.",
+        ""
+      ]
+    },
+    "frontmatter": {
+      "role": "original_frontmatter_lines",
+      "value": [
+        "title: SQLite native tile buffer parity",
+        "module_id: maplib",
+        "last_verified: 2026-10-28",
+        "related_code:",
+        "  - src/main/java/com/nextgis/maplib/map/NativeVectorTileEncoder.java",
+        "  - src/main/java/com/nextgis/maplib/map/NativeVectorTileClipper.java",
+        "  - src/main/java/com/nextgis/maplib/map/SqliteVectorTileProvider.java",
+        "  - src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java",
+        "  - src/main/java/com/nextgis/maplib/map/mpl/PolygonLayerFactory.java",
+        "  - src/main/java/com/nextgis/maplib/display/SimplePolygonStyle.java",
+        "  - src/test/java/com/nextgis/maplib/map/NativeVectorTileBufferParityTest.java",
+        "  - src/test/java/com/nextgis/maplib/map/NativeVectorTileClipperTest.java"
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "SQLite tile buffer parity and classic SDK baseline"
+    },
+    "typed-frontmatter": {
+      "role": "reviewed_frontmatter_values",
+      "value": {
+        "last_verified": "2026-10-28",
+        "module_id": "maplib",
+        "related_code": [
+          "src/main/java/com/nextgis/maplib/map/NativeVectorTileEncoder.java",
+          "src/main/java/com/nextgis/maplib/map/NativeVectorTileClipper.java",
+          "src/main/java/com/nextgis/maplib/map/SqliteVectorTileProvider.java",
+          "src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java",
+          "src/main/java/com/nextgis/maplib/map/mpl/PolygonLayerFactory.java",
+          "src/main/java/com/nextgis/maplib/display/SimplePolygonStyle.java",
+          "src/test/java/com/nextgis/maplib/map/NativeVectorTileBufferParityTest.java",
+          "src/test/java/com/nextgis/maplib/map/NativeVectorTileClipperTest.java"
+        ],
+        "title": "SQLite native tile buffer parity"
+      }
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-tile-buffer.md"
+    }
+  },
+  "id": "lisa:maplib:resource:sqlite-tile-buffer",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:sqlite-tile-buffer"
+    ]
+  },
+  "relations": [
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:sqlite-tile-64px-history",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-tile-shared-128px-envelope",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-tile-buffer-technical-oracles",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:risk:sqlite-tile-style-reach-acceptance",
+      "type": "contains"
+    }
+  ],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

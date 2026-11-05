@@ -37,6 +37,11 @@ binds the complete original YAML and every member to Git. The
 [local manifest](../docs/manifest.yaml) is the ordinary editing address during
 this preservation phase. The next gate checks the shared reader and authoring.
 
-The [pack review](migration/pack-review.json) retains the separate identify
-wording question. Its source witnesses and the ordered manifest values each
-keep their own address and review status.
+The [original pack review](migration/pack-review.json) retains both identify
+descriptions. The [source-version review](migration/identify-source-version-review.json)
+locates the older exception and confirms the visible-only rule in the App's
+pinned library source. Native verification remains open.
+
+The two SQLite guides have [20 typed records](knowledge/documentation) and
+a [byte-addressed source map](provenance/documentation.json). The original
+Markdown addresses remain the ordinary entry points during preservation.

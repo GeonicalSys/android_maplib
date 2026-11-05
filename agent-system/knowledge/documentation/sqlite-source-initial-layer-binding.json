@@ -1,0 +1,70 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-source-bridge.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Every newly added MVT base/outline/pattern/icon/dash layer and direct MVT",
+        "point/polygon label receives `source-layer=features` before its first native",
+        "`addLayer`. Rule geometry/label, polygon contour and Firefly children inherit",
+        "the base layer's nonempty source-layer before add. Classic null/empty stays",
+        "unset. The late binding pass remains responsible for MVT geometry/label filters",
+        "and offset expressions, rather than being the first initialization of source-layer.",
+        "SDK13.7.1 Fill/Line layout comparisons omit sourceLayer, so late mutation alone",
+        "cannot guarantee reparsing an already observed layer. This initialization",
+        "invariant does not by itself prove the cause of a native missing-bucket failure;",
+        "actual PBF contents and native IDs/pixels still need independent verification.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Initial source-layer binding and subsequent filters"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-source-bridge.md"
+    }
+  },
+  "id": "lisa:maplib:contract:sqlite-source-initial-layer-binding",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:sqlite-source-initial-layer-binding"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

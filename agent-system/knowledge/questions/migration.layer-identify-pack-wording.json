@@ -4,10 +4,10 @@
   "kind": "question",
   "owner": "android_projects/android_gisapp/maplib",
   "topic": "knowledge-pack-review",
-  "status": "active",
+  "status": "historical",
   "execution_permission": false,
   "applicability": {
-    "review_status": "unknown",
+    "review_status": "reviewed",
     "paths": [
       {
         "repository": "android_projects/android_gisapp/maplib",
@@ -22,13 +22,13 @@
     "unknown_behavior": "include_with_unknown_reason"
   },
   "lifecycle": {
-    "goal": "open",
+    "goal": "complete",
     "implementation": "not_applicable",
-    "source_verification": "UNKNOWN",
+    "source_verification": "PASS",
     "merge": "not_applicable",
-    "runtime_verification": "NOT_APPLICABLE",
+    "runtime_verification": "NOT_RUN",
     "release": "not_applicable",
-    "retention": "Retain both original owner-local assertions and this unresolved migration question until individually reconciled; no product behavior or native acceptance inferred."
+    "retention": "Retain both original documentary assertions and the exact source-version resolution. Device behavior is outside this source review."
   },
   "facets": {
     "title": {
@@ -74,6 +74,16 @@
           "value": "Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers."
         }
       ]
+    },
+    "resolution": {
+      "role": "source_version_review",
+      "value": {
+        "review": "agent-system/migration/identify-source-version-review.json",
+        "historical_policy_commit": "8b39e8b583bffe25c1c1ce06390d2ea255ea8610",
+        "replacement_commit": "803decb97348659bbc5dcf194b008fbbf976a058",
+        "summary": "Manifest responsibility describes a previous source rule. The README agrees with the current implementation and the App's exact pinned library source.",
+        "runtime_verification": "NOT_RUN"
+      }
     }
   },
   "relations": [],

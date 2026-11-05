@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-source-bridge.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "`SqliteVectorLayerController.nativeSourceId(style, logicalPath)` resolves the",
+        "current actual SDK ID, falling back to the logical path for classic sources;",
+        "`isStreaming` identifies this route. MPLFeaturesUtils supplies the resolved ID",
+        "to MplLayerBuildContext's existing source constructor parameter (`layerPath` in",
+        "that factory-only context). All geometry, dash, pattern, icon, outline and rule",
+        "children thereby use the same current native source. Polygon/point labels use",
+        "that ID; line auxiliary labels remain on `logicalPath + \"-text\"` GeoJSON.",
+        "The source-layer binding pass visits the actual native ID. DB ownership,",
+        "feature/layer IDs, user selection and saved state retain logical identity.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Logical layer identity and per-generation native source ID"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-source-bridge.md"
+    }
+  },
+  "id": "lisa:maplib:contract:sqlite-source-logical-and-native-identities",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:sqlite-source-logical-and-native-identities"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}
