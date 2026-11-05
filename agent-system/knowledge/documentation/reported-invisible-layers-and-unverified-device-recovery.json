@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Пользователь подтвердил: invisible local/NGW layers переживали restart, style edit",
+        "и visibility toggle; помогал только manual rebuild. Эти исходные сведения сохранены",
+        "как независимые условия регрессии. Повтор после нового исправления на устройстве",
+        "не исполнен; точный installed version30/source commit и native результат для GPX20wpt",
+        "и server import ещё не установлены. Это source-backed цепочка, не уже принятый",
+        "post-fix результат телефона. Проверка header/cardinality",
+        "не доказывает произвольную same-count ID/envelope целостность или disk power-failure",
+        "durability. Private GPX names/coordinates не входят в Git и не становятся runtime",
+        "dependency. Единый открытый риск: vector-spatial-cache-recovery in the canonical external root risk registry.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Reported invisible layers and unverified device recovery"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:risk:reported-invisible-layers-and-unverified-device-recovery",
+  "kind": "risk",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:risk:reported-invisible-layers-and-unverified-device-recovery"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

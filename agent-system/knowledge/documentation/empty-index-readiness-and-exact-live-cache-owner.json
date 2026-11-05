@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Завершение и восстановление векторного spatial cache — 30 октября2026",
+        "",
+        "Обычный local/NGW vector импорт использует один VectorLayer lifecycle. После",
+        "успешного create только проверенные zero SQL rows + zero live cache становятся",
+        "готовой начальной точкой: count читается вне spatial lock, затем проверяются тот же",
+        "cache object, data generation и нулевой size. Начатый bulk по-прежнему блокирует",
+        "native reads. Готовность не устанавливается из finally и не выводится из одного",
+        "совпадения ненулевых counts; failed/cancelled/nonempty/unknown-count случаи не",
+        "получают новую гарантию commit/rollback или произвольного save после ошибки.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Empty-index readiness and exact live cache owner"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:empty-index-readiness-and-exact-live-cache-owner",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:empty-index-readiness-and-exact-live-cache-owner"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

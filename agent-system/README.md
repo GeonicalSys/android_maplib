@@ -45,3 +45,9 @@ pinned library source. Native verification remains open.
 The two SQLite guides have [20 typed records](knowledge/documentation) and
 a [byte-addressed source map](provenance/documentation.json). The original
 Markdown addresses remain the ordinary entry points during preservation.
+
+The root and module READMEs have 133 reviewed [owner records](knowledge/documentation)
+and an [exact Git source map](provenance/documentation.json). Dated evidence,
+current contracts and mixed notes have separate statuses. Original Markdown
+addresses serve ordinary readers during preservation. Shared authoring and
+client acceptance are separate stages.

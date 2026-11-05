@@ -13,7 +13,7 @@
     },
     {
       "path": "agent-system/README.md",
-      "sha256": "c792b267668d451e337118d3c56df6fdd268e6fd682953688a37ebb2d69ed126",
+      "sha256": "e37c05f5893fca680fe68f25730a27bbb3069d76a48b6358feb69a735a649d11",
       "sha256_scope": "utf8_lf",
       "category": "working_bridge",
       "applies_to": [
@@ -73,12 +73,14 @@
     },
     {
       "path": "agent-system/provenance/documentation.json",
-      "sha256": "6b6119071d33daa399feffd66309f85bd8e752de1db67a15b3384ca8e741b53c",
+      "sha256": "5ce79c307e900163d179661e0f7e439f6fd85cc977ff4ee7de18f12a8bd2fd41",
       "sha256_scope": "utf8_lf",
       "category": "retained_evidence",
       "applies_to": [
         "docs/sqlite-vector-source-bridge.md",
-        "docs/sqlite-vector-tile-buffer.md"
+        "docs/sqlite-vector-tile-buffer.md",
+        "README.md",
+        "docs/README.md"
       ],
       "reason": "Exact original Git objects, reviewed Markdown byte spans and ordered record fingerprints."
     },
@@ -92,6 +94,26 @@
         "docs/manifest.yaml"
       ],
       "reason": "Individually verified historical and current source witnesses for identify visibility. Runtime acceptance remains open."
+    },
+    {
+      "path": "README.md",
+      "sha256": "64d8e6fa66b12f2ec274c958e9b8159dae3e87100a49585f680afc9097ec56ae",
+      "sha256_scope": "utf8_lf",
+      "category": "working_bridge",
+      "applies_to": [
+        "."
+      ],
+      "reason": "Complete original README reconstructed from reviewed owner records. This Markdown address serves the ordinary preservation route."
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "41aad4ba7842237628b56fdd8c98fb529729e99b320d5084905c46fe5f08c5c2",
+      "sha256_scope": "utf8_lf",
+      "category": "working_bridge",
+      "applies_to": [
+        "."
+      ],
+      "reason": "Complete original README reconstructed from reviewed owner records. This Markdown address serves the ordinary preservation route."
     }
   ]
 }

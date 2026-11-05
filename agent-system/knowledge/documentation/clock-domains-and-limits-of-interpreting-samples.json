@@ -1,0 +1,67 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Wall clock — `SystemClock.elapsedRealtimeNanos`, включая suspend; CPU clock —",
+        "`Debug.threadCpuTimeNanos` только между точками одного `Process.myTid`.",
+        "Main→IO→Main интервалы имеют известное wall time и неизвестный CPU, а не",
+        "разность часов разных потоков. Суммы elapsed разных запросов перекрываются",
+        "и не являются временем сцены; histograms фаз описывают завершённые segments,",
+        "а не p95 всего запроса. CPU включает overhead диагностических clocks/accounting.",
+        "Process/SDK memory samples не являются удержанной памятью конкретного слоя.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Clock domains and limits of interpreting samples"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:clock-domains-and-limits-of-interpreting-samples",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:clock-domains-and-limits-of-interpreting-samples"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

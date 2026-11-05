@@ -1,0 +1,74 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Потоковые viewport line labels — MOB-04, 2026-10-28",
+        "",
+        "Production line-label worker использует `visitVisibleLines` и подготовленный",
+        "`OriginalPlanner`: каждый full DB original сразу превращается в label candidate,",
+        "не собираясь в List всей видимой геометрии. Candidates содержат только props/id",
+        "и Point anchor; Label не удерживает исходный Feature. Mercator viewport готовится",
+        "один раз, exact clipping/axial direction/nearest anchor/upright/dateline/FID",
+        "семантика сохраняется. DB координаты и source geometry не изменяются.",
+        "Compatibility `readVisibleLines` и fragment-merging List planner оставлены;",
+        "streaming принимает полные originals, не native tile fragments.",
+        "Shared gate/lease и camera/data/owner/UI fences сохранены. Новые6tests проверяют",
+        "в том числе ownership без GC timing; compilation/native/performance требуют",
+        "fresh общей проверки, прежний26PASS checkpoint её не заменяет.",
+        "См. [точный scope](../update-reports/entries/maplib-20261028-streamed-line-labels.md).",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Viewport label streaming with full originals"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:viewport-label-streaming-with-full-originals",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:viewport-label-streaming-with-full-originals"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

@@ -1,0 +1,63 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Общее хранилище подложек",
+        "",
+        "SharedUnderlayCatalog/SharedUnderlayStore владеют общими NGRc/MBTiles и тонкими shared_underlay_id ссылками. NgrcArchive читает ZIP двумя потоковыми проходами и считает тайлы для прогресса импорта; RasterMbtilesWriter пишет одну базу без дерева файлов. Display name документа не берётся из SAF id вида `msf:308`. Legacy migration — rename с журналом, хеширование старых MBTiles отложено. UnderlayWorkspaceIndex меняет закрытые карты без MapBase singleton. Контракт и recovery: [shared-underlays](../../docs/architecture/shared-underlays.md).",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Shared underlay storage, stream import and project references"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:shared-underlay-storage-stream-import-and-project-references",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:shared-underlay-storage-stream-import-and-project-references"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

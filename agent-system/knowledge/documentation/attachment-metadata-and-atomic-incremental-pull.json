@@ -1,0 +1,67 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- server attachment metadata сверяется с `FeatureAttachments`, а не с",
+        "  необязательными локальными файлами/META: metadata-only pull не создаёт backup,",
+        "  и новые server features сразу получают online metadata без скачивания байтов;",
+        "- инкрементальный NGW pull работает как одна атомарная bulk-операция:",
+        "  построчные insert/update/delete broadcast подавлены, interruption откатывает",
+        "  общую SQLite-транзакцию, а после commit R-tree перестраивается и карта",
+        "  перезагружается один раз. Каталоги вложений удалённых объектов очищаются",
+        "  только после commit, поэтому rollback не восстанавливает строку без её файлов;"
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Attachment metadata and atomic incremental pull"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:attachment-metadata-and-atomic-incremental-pull",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:attachment-metadata-and-atomic-incremental-pull"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

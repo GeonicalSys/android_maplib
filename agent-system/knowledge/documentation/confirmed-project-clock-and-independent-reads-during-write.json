@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Подтверждённое время полного завершения проекта — 29 октября2026",
+        "",
+        "`ProjectSyncState.markComplete` делает новое время доступным через `lastComplete`",
+        "только после успешного `SharedPreferences.commit`. Отказ или исключение сохраняет",
+        "предыдущее подтверждённое значение для точного объекта настроек и canonical project.",
+        "Первая запись устанавливает этот вид до `edit`/`putLong`; читатели не ждут writer",
+        "monitor, удерживаемый на время дисковой записи. Вложенные listeners выбирают",
+        "последнюю успешную invocation, включая положительное время меньше предыдущего",
+        "после перевода часов. Другие проекты и равные, но разные объекты prefs изолированы.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Confirmed project clock and independent reads during write"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:confirmed-project-clock-and-independent-reads-during-write",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:confirmed-project-clock-and-independent-reads-during-write"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

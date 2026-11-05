@@ -1,0 +1,71 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- Импорт по URL: сначала проверить parser/server/account, затем response code,",
+        "  тип ресурса и `data.read`/`data.write` permissions.",
+        "- Локальный GeoJSON ошибочно отклонён как неподдерживаемый: проверить значение",
+        "  `crs.properties.name`; WGS 84 может быть без `crs`, как `CRS84`, `EPSG:4326`,",
+        "  EPSG URN или OGC definition URL. Другой EPSG-код действительно не поддержан.",
+        "- Импорт дошёл до SQLite, но сообщил `Safety level may not be changed inside a",
+        "  transaction`: проверить, что `DatabaseContext.getDbForLayer()` вызван до",
+        "  `beginTransaction()`, а внутри цикла используется уже полученный `dbTx`.",
+        "- NGW показывает небольшое число объектов, но полный fill зависает на",
+        "  MultiPolygon: считать координаты/части, а не только features; проверка серверной",
+        "  геометрии должна идти через `NgwFeatureGeometryValidator`, без legacy",
+        "  `GeoLinearRing.intersects()`."
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "URL, CRS, SQLite transaction and geometry diagnosis"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:url-crs-sqlite-transaction-and-geometry-diagnosis",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:url-crs-sqlite-transaction-and-geometry-diagnosis"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

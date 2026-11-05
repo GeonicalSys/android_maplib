@@ -1,0 +1,75 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## SQLite native vector tiles — MOB-04, 2026-10-28",
+        "",
+        "`SqliteVectorTileProvider` обслуживает полные PBF для CustomVectorSource прямо",
+        "из RTree/SQLite, без общего startup GeoJSON и коллекции всех styled features.",
+        "Public Backend/Request фиксируют canonical owner/source/content/style/excludedFID",
+        "generation; `close()` terminal и nonblocking. Native bridge владеет Main/IO",
+        "coroutine delivery, backend — единственным shared с HTTP MVT gate, полными",
+        "derived PBF и отменой. `isCurrent()` и feature loops используют дешёвые epochs;",
+        "renderer JSON проверяется на границах load. Free-only policy не меняется.",
+        "`queryForNativeRender` не принимает перестраиваемый/отменённый неполный RTree:",
+        "IDs читаются под spatial writer lock, COUNT validation один раз на tree/data/size",
+        "generation выполняется вне lock. Weak marker не удерживает старое дерево.",
+        "After-commit data generation защищает до UI broadcast; при неготовности bridge",
+        "повторяет запрос вместо successful partial PBF. COUNT не доказывает правильность",
+        "всех IDs в историческом индексе с тем же количеством записей.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Direct SQLite source ownership and version-limited HTTP reference"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:direct-sqlite-source-ownership-and-version-limited-http-reference",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:direct-sqlite-source-ownership-and-version-limited-http-reference"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

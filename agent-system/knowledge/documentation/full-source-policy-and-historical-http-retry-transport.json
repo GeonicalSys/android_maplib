@@ -1,0 +1,71 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Обычные слои и MVT используют полную исходную геометрию и весь подходящий набор",
+        "объектов. Отбора ID, новых LOD, скрытия/снятия регистрации слоёв и переписывания",
+        "SQLite/draft/visibility в этой защите нет. При действительном дефиците ресурсов",
+        "тайл откладывается через retryable503; неполный тайл никогда не становится200",
+        "или записью кэша. Штатные два builder сохраняются; при текущем дефиците",
+        "свободной системной либо Java памяти один builder занимает оба fair permits.",
+        "Переполнение очереди диагностируется отдельно: само по себе оно не доказывает",
+        "нехватку памяти и не вызывает memory warning или очистку кэшей.",
+        "Ответ503 сохраняет возможность повтора, однако восстановление тайла самим SDK",
+        "после освобождения памяти ещё требует native проверки. Успешный unit test",
+        "ответа не доказывает этот переход.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Full-source policy and historical HTTP retry transport"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:full-source-policy-and-historical-http-retry-transport",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:full-source-policy-and-historical-http-retry-transport"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

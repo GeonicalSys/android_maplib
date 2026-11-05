@@ -1,0 +1,70 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- Локальный GeoJSON поддерживает только WGS 84/EPSG:4326 и Web Mercator/EPSG:3857;",
+        "  другие системы координат отклоняются без попытки угадать преобразование.",
+        "- Упрощённый импорт KML/GPX считает координаты WGS 84 и не сохраняет исходные",
+        "  линии, полигоны, route/track topology, стили, ExtendedData, вложения, KMZ или",
+        "  KML `gx:Track`: каждый найденный поддерживаемый tuple становится точкой.",
+        "- Изменение public interface требует compile/manifest updates consumers.",
+        "- Debug `BuildConfig.VERSION_NAME` должен совпадать с Lisa Debug, release — с",
+        "  Lisa/Belka Release. На AGP 9.x library `buildTypes.versionName` не",
+        "  используется; variant coupling проверяет root script",
+        "  `tools/verify-apk-version-matrix.ps1`.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Import format constraints and consumer version matrix"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:import-format-constraints-and-consumer-version-matrix",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:import-format-constraints-and-consumer-version-matrix"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

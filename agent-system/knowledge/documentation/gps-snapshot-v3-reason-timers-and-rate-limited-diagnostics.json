@@ -1,0 +1,77 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## GPS diagnostic episodes",
+        "",
+        "Snapshot v3 records continuous reason_duration_ms, diagnostic_tick_gap_ms and",
+        "device_sleep_gap_ms in addition to the bounded history. No-fix/acquisition/filter",
+        "wait remain local regardless of length or recurrence. Callback stalls need 30 s",
+        "of that continuous reason; provider silence needs 60 s, invalid/stale/display",
+        "processing needs 15 s. Earlier reception waiting cannot trigger an immediate",
+        "callback-stall warning. Retry, recording and filter ownership remain unchanged.",
+        "Source integration regressions seed actual prior callback/status silence before",
+        "expecting a report; ordinary acquisition is not used as a delivery-fault fixture.",
+        "",
+        "Snapshot v3 separates reception loss, callback delivery and processing; bounded",
+        "24-sample history and correlated recovery/cancel preserve the episode UUID.",
+        "Reception gaps stay local; actual delivery/processing faults are rate limited. Only sustained",
+        "fresh used-in-fix statuses without callbacks allow one same-listener re-registration.",
+        "Recorders, Network, precision leases, wake lock, filtering and segment rules remain owned",
+        "by their existing controllers. See consuming root docs/architecture/location-pipeline.md.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "GPS snapshot v3 reason timers and rate-limited diagnostics"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:gps-snapshot-v3-reason-timers-and-rate-limited-diagnostics",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:gps-snapshot-v3-reason-timers-and-rate-limited-diagnostics"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

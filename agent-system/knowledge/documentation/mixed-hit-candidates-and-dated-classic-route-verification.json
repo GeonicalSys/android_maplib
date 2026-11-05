@@ -1,0 +1,71 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Полевые линии и mixed hit candidates",
+        "",
+        "queryTrackIds больше не исключает трек при попадании в точку. App объединяет",
+        "track IDs с векторными кандидатами; сегменты одного трека не дублируются.",
+        "LayerDisplayPriority распознаёт линейную геометрию с именем «Полевые линейные»",
+        "или field_lines. MapDrawable располагает body/labels этих групп над треками",
+        "и под Point/MultiPoint, включая derived label sources и вложенные logical",
+        "слои. Full/lite/style/reorder восстанавливают тот же порядок; already-correct",
+        "stack не перестраивается. Схема, API payload и число проходов не меняются.",
+        "Consuming Related track-candidates: 4/4 native PASS. Контракт — consuming",
+        "архитектура track-controls.md. Runtime unit/build и полный набор отдельны.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Mixed hit candidates and dated classic-route verification"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:mixed-hit-candidates-and-dated-classic-route-verification",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:mixed-hit-candidates-and-dated-classic-route-verification"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}
