@@ -1,563 +1,968 @@
+# Generated from agent-system/knowledge/maplib-module-manifest.
+# Edit the owner records, then run python -B docs/scripts/prose_knowledge.py --write --module maplib.
 schema_version: 1
 module_id: maplib
 repository_id: maplib
 maturity: maintained
 last_verified: 2026-11-02
 entrypoints:
-  - maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
-  - maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-  - maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
-  - maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
+- maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
+- maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+- maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
+- maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
 key_components:
-  - path: maplib/src/test/java/com/nextgis/maplib/map/LayerIdentifyPolicyTest.java
-    responsibility: Prepared visible/hidden/null and old-render-metadata policy checks; source compilation only after HTTP removal.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorTileDiskCacheTest.java
-    responsibility: Independently assert real temporary filesystem complete bytes, constant hot-path inventory/metadata work, canonical aliases and shared instances/registry eviction, 128-to32MiB and1024-file budgets, external cache deletion, iterator/write/rename/delete failures and cancellation publication guards; no native speed claim.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileAdmissionTest.kt
-    responsibility: Verify canceled SDK waiters avoid blocking dispatch, active noncooperative IO owns shared admission until unwind, worker release precedes blocked Main, predispatch cancel/current/snapshot failures release once and retry delay owns no permit.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/RenderResourceProfiler.java
-    responsibility: Default-off local numeric resource accounting independent of legacy SQLite observer limits; count every accepted scope through bounded layer/detail overflows, separate BOOTTIME wall and same-TID thread CPU, retain aggregates despite raw sink rejection, return a bounded final summary without owning files or cancelling rendering.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/RenderResourceProfilerTest.java
-    responsibility: Verify disabled mode, exact phase/count outcomes, cross-thread CPU unknowns, sink rejection/errors, duplicate finish, active/layer overflow, unfinished stop, privacy, actual legacy16-scope overflow fanout and bounded worst-value final summary.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorFeatureReader.java
-    responsibility: Visit eligible scoped original IDs through unchanged attributes-only cursors of at most32 rows in exact CASE order; on API28+ use a separate1MiB geometry window with at most32 whole small BLOBs<=16KiB, otherwise lazy full-PFD originals through one visit-owned statement. Preserve exact bytes/types/NULL/order/cardinality/current guards, close all resources on cancel/error and propagate real SQLite/resource failures.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorFeatureReaderTest.java
-    responsibility: Assert65 IDs/order/typedNULL/wide integers/full originals, three bounded small-geometry queries and no PFD for small buffers, exact16384/16385/multiMiB boundaries, API26/27 fallback versus API30 SQLite CASE, cancellation/cardinality/errors and no duplicate callbacks during mid-window fallback on technical fixtures only.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorSourceBridge.kt
-    responsibility: Admit at most two native blocking payloads through cancellable shared pre-dispatch permits, release after actual IO unwind before Main with exact-once cancellation fallback, preserve SDK Job demand and complete current tile bytes; return-to-SDK is never native-content acceptance.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorSourceBridgeTest.kt
-    responsibility: Assert IO/Main boundaries, late cancellation, retries and lifecycle plus unchanged one-read callback bytes with optional phase diagnostics.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileBufferParityTest.java
-    responsibility: Assert literal SDK128px/512px query and clipping parity through a strict candidate backend and independent PBF decode, preserving four translated edge polygons, holes, collinear vertices, typed properties and all originals.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorLayerController.java
-    responsibility: Own actual direct-SQLite native source generations, preserve geometry-role and edit/temporary-hide filters, and cancel before detach while fencing owner/model/style changes.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileBackend.java
-    responsibility: Define blocking complete PBF IO, immutable request snapshots, currentness and terminal close, separating bounded retryable pressure from explicit unsupported host fallback; retain the original backend seam through a default optional-diagnostics overload.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileRequest.java
-    responsibility: Fence canonical owner/source/content/style/excluded-edit/tile identity and process-local derived cache keys without business payload.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileProvider.java
-    responsibility: Read full SQLite originals via RTree on IO, emit complete styled PBF without startup GeoJSON and expose full editor originals. Visit viewport lines one at a time with epoch fences and bounded style serialization; keep the List collector only for compatibility.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelStreamingTest.java
-    responsibility: Assert full-original streaming placement/style/dateline parity, candidate ownership without retained line geometry, late UI properties and cancellation before read/during scan/before publication.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileEncoder.java
-    responsibility: Encode scalar generic MVT2 properties and all six multipart geometry kinds with native8192 extent, stable identities/order and inline polygon anchor role, with no HTTP legacy encoder.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTilePropertyCodec.java
-    responsibility: Preserve typed scalar native consumers, flatten text/icon offsets for semiliteral X/Y factories, omit null under the known coalesce contract and fail explicitly for unexpected complex/nonfinite values.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileClipper.java
-    responsibility: Intersect full3857 geometry with buffered tile bounds using robust JTS multipart clipping, preserving holes/disconnected pieces without simplification or source mutation and bypassing overlay for contained/disjoint objects.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkLimiter.java
-    responsibility: Share one two-permit fair gate for direct native/visible-line IO and bound layer lock metadata to64 stripes rather than an unbounded global map.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileRequestTest.java
-    responsibility: Assert independent cache identity changes, valid canonical addresses and bounded retry backoff before IO.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileProviderTest.java
-    responsibility: Decode4097 complete IDs and warm-cache reuse, preserve Rule scalars and full editor/viewport geometry, bound style serialization and reject canceled/stale/unsupported work without partial cache while checking one polygon label owner across4tiles.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTilePropertyCodecTest.java
-    responsibility: Assert scalar/unknown/explicit-false preservation, known offset pair transport, unchanged originals and explicit unsupported complex/nonfinite/collision failures.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileEncoderTest.java
-    responsibility: Independently decode protobuf geometry/values/extent for all six kinds, holes/multipart/retained collinear vertices and actual native Rule property names and typed offsets.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileClipperTest.java
-    responsibility: Assert disconnected concave intersections, holes, all six geometry kinds, clipping containment and unchanged original coordinates.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorSpatialQueryTest.java
-    responsibility: Race the actual SQLite/RTree rebuild against blocked native readers, reject partial PBF and canceled-index persistence, compare independent SQL IDs, check actual after-commit invalidation before UI notification and accept a legitimate newly empty table.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NativeFeaturePayload.java
-    responsibility: Project native-only GeoJSON properties without copying unused layout arrays or changing rich editor features, full geometry, IDs, unknown fields, actual paint/label gates and line fallback inputs.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/NativeFeaturePayloadTest.java
-    responsibility: Independently assert literal required/dead keys, all geometry kinds, IDs/bbox/unknown/original preservation, empty polygon labels, line-query fallback and exact uniform-default sparsity.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryGuard.java
-    responsibility: Decide owner-fenced cache economy and complete-work admission from actual free system/Java memory and OS low-memory state; retain used/native/RSS as diagnostics only, with no layer suppression or source reservations.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryPolicy.java
-    responsibility: Define actual free-headroom decisions, ordinary disk-cache and allocation-reserve sizing; device class or used/native/RSS never independently triggers a warning, economy or serialization, and no enforced native cap or content thinning is claimed.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/RenderMemoryGuardTest.java
-    responsibility: Check that queue delay alone does not produce a false low-memory notice on a roomy device and that actual low-free-memory delay notifies once; native delivery is a separate acceptance gate.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkGate.java
-    responsibility: Keep two normal builders and fairly serialize resource-constrained complete tile work with cancellable, idempotently released permits.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileDiskCache.java
-    responsibility: Bound complete derived PBF by existing bytes/file/entry budgets through one per-operation canonical-root metadata ledger, bounded8-root registry and incremental recency; bootstrap/reconcile separately from hot put without per-put full scan/sort/regex, retain atomic publication, optional IO failure and native current guards without changing identities or authoritative data.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/RenderProcessMemory.java
-    responsibility: Read optional self-process RSS/native and system-availability counters without enumerating other applications or reading heap contents.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/RenderTileWorkGateTest.java
-    responsibility: Assert normal two-builder throughput, exclusive fair constrained work and permit preservation after interruption, failure, double close, canceled job wait and a throwing current callback.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LayerDisplayPriority.java
-    responsibility: Plan whole field-line and Point/MultiPoint SDK pass groups using exact logical/current-controller/line-label aliases and canonical bottom-to-top model input; retain internal and relative group order, ignore stale/prefix-only aliases and polygon label anchors, and avoid moves for an already correct stack independently of tap eligibility.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/LayerDisplayPriorityTest.java
-    responsibility: Verify field name/geometry policy, exact current versus stale aliases, whole body/label/icon grouping, stable relative/internal order and no-op already-correct stacks; pure tests do not certify native nested-group or Activity recreation behavior.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelLayout.java
-    responsibility: Clip the true visible quadrilateral and plan one rigid point label per object, stream DB originals without retained geometry in candidates, preserve late UI properties and keep classic native-fragment merge/dedup compatibility.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java
-    responsibility: Coalesce camera/source updates, preserve classic snapshots and stream one full SQLite viewport line at a time into geometry-free label candidates; retain SDK access on UI and reject stale camera/map/view/style/source/provider/layer-content results.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelQuery.java
-    responsibility: Form finite Mercator envelopes with camera-relative dateline splitting, visit complete unclipped originals directly into prepared exact layout and cancel before read/scan/publication without collecting full viewport geometry; preserve the prior Reader API.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelQueryTest.java
-    responsibility: Independently assert projected rotated bounds, two narrow dateline windows, camera-relative wide bounds, complete LineString/MultiLineString preservation, exact quadrilateral clipping and before/after-read cancellation; technical units do not certify native SQLite rendering.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelLayoutTest.java
-    responsibility: Verify visible direction, winding geometry, multipart IDs, rotated clipping, dateline, upright and cancellation.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/LegacyTrackColorsTest.java
-    responsibility: Verify transactional v1 color upgrade, failure rollback and retry.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/TrackColorPalette.java
-    responsibility: Assign persistent saturated track colors without changing existing explicit colors.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/TrackMapStyle.java
-    responsibility: Own fixed track style passes with a 1.4-pixel core at 27 percent of the original RGB channels, original-hue 6.5-pixel glow with blur 3 and opacity .83, and the existing selected-session filter; retain the stored base color.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/PolygonPatternOptions.java
-    responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/PolygonOutlineOptions.java
-    responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/ConfigurablePolygonPatternRegistry.java
-    responsibility: Build exact color/alpha pattern bitmaps, crop only a pixel-identical repeating motif and retain the existing 4 MiB LRU and native image ownership.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/PatternTilePeriod.java
-    responsibility: Find a rectangular periodic ARGB motif by checking every original pixel; preserve the full 512-pixel texture when no smaller exact period exists.
-  - path: maplib/src/test/java/com/nextgis/maplib/display/PatternTilePeriodTest.java
-    responsibility: Independently reconstruct original pixels and enumerate all 65536 binary 4-by-4 matrices, including nonperiodic and invalid inputs.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/mpl/PolygonLayerFactory.java
-    responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/mpl/PolygonOutlineLayerFactory.java
-    responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/FireflyMarkerRegistry.java
-    responsibility: Render a crisp point core and outward-only RGBA glow with independent alpha, bounded CPU bitmaps and native-image ownership per logical layer.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/mpl/FireflyLayerFactory.java
-    responsibility: Build filtered non-SDF point rendering children with the existing layer lifecycle, collision groups, picking and zoom.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/SimpleMarkerStyle.java
-    responsibility: Persist marker types including Firefly type 9 and share its sprite with Canvas previews without changing the existing blur types.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryTransformGesture.java
-    responsibility: Own whole-object touch streams with fixed camera, no scale, exact cancel previews and one completed history step.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/GeometryTransform.java
-    responsibility: Copy and rigidly transform all projected components and rings without changing source geometry or CRS.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureCopyPolicy.java
-    responsibility: Match exact schema keys/types and losslessly adapt single/multi geometry for an independent new feature.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/MarkerIconRegistry.java
-    responsibility: Register bundled marker images with the native SDF edge and distance range so thin strokes remain visible at the requested size.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/RuleLabelLayouts.java
-    responsibility: Apply classic symbol data-constant settings using filtered layout groups, preserve logical visibility and remove obsolete groups on restyle or deletion.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/RuleGeometryLayouts.java
-    responsibility: Bind constant icon collision, line layout and polygon translation by rule category, preserving paint/layout routing, native filters and logical layer lifecycle.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/SharedTrackStore.java
-    responsibility: Own the installation track database; resolve actual layers.db through DatabaseContext and transactionally import missed history and crash checkpoints without modifying rollback sources or replacing new tracks.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/SharedTrackStoreTest.java
-    responsibility: Verify actual DatabaseHelper filenames, collisions with post-update tracks, interrupted target rollback/retry, unchanged atomic backup/new files, lost replies, old schemas and bootstrap copy provenance.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/ProjectSyncState.java
-    responsibility: Preserve canonical UUID full-project clocks and publish only successful commits through an exact weak-identity preferences-owner confirmed process view; retain prior confirmation on false/throw, reentrant successful invocation order and reads independent of the disk writer lock, without compensating writes or cross-process rollback guarantee.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/ProjectSyncStatePublicationTest.java
-    responsibility: Assert cache-before-failed-commit visibility with held readers, editor/put/commit observer reentry, nested success/failure order, canonical aliases, distinct owner/project isolation, lower positive times, raw-reader recheck, exceptions and unchanged persistence format using technical SharedPreferences doubles.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureChanges.java
-    responsibility: Exclude separate feature and attachment Save flags when counting or selecting ready outbound changes.
-  - path: maplib/src/test/java/com/nextgis/maplib/reliability/LocalChangesCommitTest.java
-    responsibility: Verify committed owning-map callbacks, rollback silence and draft Save scheduling with real SQLite.
-  - path: maplib/src/main/java/com/nextgis/maplib/location/GpsRecoveryPolicy.java
-    responsibility: Keep reception/acquisition/filter waits local, require a continuous faulty-reason threshold before reporting, correlate recovery/cancel, keep 24 history samples and gate one same-listener retry on sustained fresh used-in-fix statuses without callbacks; policy and reason/tick/sleep evidence remain unchanged when the source emits additive schema4 raw measurement time.
-  - path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
-    responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics; schema4 absent raw measurement remains sentinel-1 and recovered measurement time comes from the independently created Location rather than callback receipt age.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
-    responsibility: Observe stalled startup, render queries and tile stages independently of the UI, retain prior-process identity and the 16 KiB journal, keep free-headroom counters separate from used-memory diagnostics, and match event times. Export typed SQLite phases locally through one bounded observer/writer with at most16 active scopes,32 layer summaries and10s per-layer throttle, explicit observation loss and distinct provider/SDK-return/cancel/failure states, without Main-thread memory/DB/SDK reads or URI/coordinates/attributes.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/MapRuntimeDiagnosticsTest.java
-    responsibility: Verify fast-operation silence, non-returning query observation, independent rejection reasons, stage timing, startup stack/phase, retained free-headroom counters and journal identity/bounds; assert fixed SQLite phase timing/privacy, delayed cancelled outcomes, active/layer caps and overflow, inactive-summary reuse, and fail-open clock/writer/watch cleanup.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocalLogInitializer.java
-    responsibility: Initialize local HyperLog once per process after migrating its obsolete URL, retain custom format across app/base calls and preserve the log database and expiry contract.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LayerFormHashUtil.java
-    responsibility: Hash canonical form/meta JSON across downloaded and staged files, ignore object key order and whitespace, preserve values and array order and exclude only top-level ngw_connection.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/TrackSendSettings.java
-    responsibility: Keep upload intent enabled by default independently of tracker registration, migrate legacy registration-disabled flags once and preserve later explicit opt-out; consumers separately require confirmed server/UID registration for pending track badges.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/TrackSendSettingsTest.java
-    responsibility: Verify fresh default, one-time legacy migration and durable opt-out on Android 26 and 36.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/SyncWorkspaceSession.java
-    responsibility: Hold explicit map/project ownership through tracked threads, callbacks and live service/provider tokens; inherit cancellation and refuse closing a map with pending work.
-  - path: maplib/src/main/java/com/nextgis/maplib/forms/ConditionalRequiredRules.java
-    responsibility: Bounded v1/v2 native requirements and v2 field/element visibility with shared typed conditions, portable element IDs and common limits; never changes values or executes scripts.
-  - path: maplib/src/main/java/com/nextgis/maplib/forms/CascadingLists.java
-    responsibility: Parse declarative NGFP relation tables, sort an acyclic graph, filter by stable parent keys, resolve all valid ancestor tuples for explicit style-category defaults and preserve unchanged historical tuples.
-  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
-    responsibility: Bounded QuickJS Binder service under an isolated Android UID.
-  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java
-    responsibility: Read-only owning-project GIS broker with independent grants and SQL budgets.
-  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptSync.java
-    responsibility: Verified Collector package activation with previous-version retention.
-  - path: maplib/src/main/java/com/nextgis/maplib/scripts/ScriptPackage.java
-    responsibility: Source-only ZIP/API/hash and manifest validation.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/Field.java
-    responsibility: Preserve optional NGW required metadata through JSON and Parcel, defaulting legacy fields to false.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/FieldMetadataTest.java
-    responsibility: Verify required import, legacy compatibility, JSON and Parcel persistence, and metadata-only toggles without feature or outbox changes on API26 and API36.
-  - path: maplib/src/main/java/com/nextgis/maplib/location/LocationPowerPolicy.java
-    responsibility: Detect screen-off system GPS restrictions independently of Doze exemption, exclude native external GNSS and report actual power policy in GPS diagnostics.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDevice.java
-    responsibility: Keep endpoint identity independent from optional, non-persisted scan RSSI in dBm.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDeviceScanner.java
-    responsibility: Deliver BLE and paired Classic discovery RSSI, invalidate stale callbacks and release both scan types on stop; preserve unknown signal without inventing measurements.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDeviceScanResults.java
-    responsibility: Keep same-name devices separate by transport/address and replace signal measurements without reordering rows.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/CoalescingRefresh.java
-    responsibility: Bound incremental track refresh to one active read and one pending request per kind; release the slot after success, failure or stale UI result.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/Feature.java
-    responsibility: Compare mutable field schemas in linear field traversal without indexed LinkedList scans, preserving name, null, numeric, date and geometry equality semantics.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncIo.java
-    responsibility: Scope cancellation by sync generation, close active read-only HTTP connections without making remote mutations ambiguous, expose outbound-write state and preserve cancellation through the account adapter.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncProgress.java
-    responsibility: Session-scoped sync progress from weighted leaf layers and real push/download/apply fractions without inventing remaining work or percent text.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/NgwSyncProgressTest.java
-    responsibility: Lock session weights, intra-layer push/download hold, deferred retry, monotonic display, cancel and publish throttle.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncTrace.java
-    responsibility: Log bounded payload-free snapshot attempt, stage, elapsed time and progress.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSnapshotCheckpoint.java
-    responsibility: Reuse only committed fully explained missing-invalid counts in the same scope for one hour, with forced recheck support.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
-    responsibility: Durable asset index, publication and move recovery, format-aware dedup, repair of previously mislinked references and payload lifecycle; Asset.referenceConfig preserves project presentation and zoom limits.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
-    responsibility: Stream NGRc/MBTiles into the catalog and report tile or byte import progress without exposing URI or SAF ids.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayKind.java
-    responsibility: Classify NGRc, raster MBTiles and ZIP contents before shared-catalog import without extracting a tile tree.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
-    responsibility: Bounded two-pass NGRc reader with complete source hash, tile count for import progress, explicit tile scheme, case-insensitive Mapnik.json/config.json and Mapnik raster-path normalization, and ambiguous metadata rejection.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/FileUtil.java
-    responsibility: Resolve a human document display name and reject SAF MediaStore ids such as msf:308.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/FileUtilDisplayNameTest.java
-    responsibility: Lock rejection of empty names and SAF document ids without Android.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
-    responsibility: Shared batched raster database writer for NGRc and Debug streams.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/CameraZoom.java
-    responsibility: Clamp the MapLibre camera to 7.5 without changing layer DEFAULT_MIN_ZOOM.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/UnderlayWorkspaceIndex.java
-    responsibility: Closed workspace traversal and unlink without a MapBase singleton.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/WalkPreviewGeometry.java
-    responsibility: Build a passive walk preview from a private CRS-preserving copy, including incomplete rings and multipart geometry.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/UserLocationGeometry.java
-    responsibility: Build metric GPS accuracy and compass-uncertainty GeoJSON with role properties; keep a transparent 10.5 logical-pixel central hole in accuracy and start the heading sector at 13 pixels beneath the opaque Orbit rim, preserving the outer GPS radius and 56 logical-pixel sector length. Omit accuracy smaller than the hole, clamp half-angle 5вЂ“90В°, select compass-first direction with moving-course fallback, and preserve legacy stand/go type and six/seven-argument full-circle geometry overloads.
-  - path: maplib/src/main/res/drawable/ic_user_location_dot.xml
-    responsibility: Center an Orbit ring with a transparent 21 dp opening, a 5 dp blue position dot with a 2 dp white border, a blue rim grown outward to radius 13 dp and a white outer rim at radius 15.2 dp with a thin dark edge in a 72 dp viewport; oppositely wound annular paths preserve transparency without a clip-path dependency.
-  - path: maplib/src/main/res/drawable/ic_user_location_orbit.xml
-    responsibility: Share the same centred 72 dp canvas, transparent 21 dp ring opening, 5 dp blue dot with a 2 dp white border and thicker outward blue rim with the existing 16 by 14 dp directional triangle, white outline and dark outer edge for compass or movement course.
-  - path: maplib/src/test/java/com/nextgis/maplib/map/UserLocationGeometryTest.java
-    responsibility: Verify geodesic accuracy/uncertainty geometry, compass priority, moving-course fallback, legacy full circles and sectors, the independent outer metric GPS radius, 56 logical-pixel sector length, reversed inner accuracy winding and clear ring opening across scales, and omission of accuracy smaller than the opening.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationMotionFilter.java
-    responsibility: Separate the fresh display candidate from the recorder stop anchor and expose departure diagnostics.
-  - path: maplib/src/test/java/com/nextgis/maplib/util/LocationDepartureTest.java
-    responsibility: Verify handheld stationary multipath from anonymized A54 observations, uncertainty-aware departure, early-corner backfill and cancellation/session boundaries.
-  - path: maplib/src/main/java/com/nextgis/maplib/location/LocationSubscriptionController.java
-    responsibility: Reconcile independent GPS/network requests without GPS removal on screen lifecycle and retain resources until the final recorder leaves.
-  - path: maplib/src/main/java/com/nextgis/maplib/location/SensorMotionMonitor.java
-    responsibility: Acquire accelerometer evidence for the shared GNSS session without activity-recognition permission.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/DeviceMotionEvidence.java
-    responsibility: Classify bounded accelerometer windows and look up fresh evidence at GNSS measurement time.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSamplerCore.java
-    responsibility: Buffer tentative GNSS departures per recorder, backfill confirmed movement with original times and corners, and correct one stop vertex without inventing travelled distance.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
-    responsibility: Route provider writes, queries and revision-aware snapshots to SharedTrackStore; retain trackpoint segments and expose GeoMultiLineString without connecting gaps, with one common visibility preference.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationFixPolicy.java
-    responsibility: Monotonic freshness with a one-second future tolerance, optional max-age windows, position validity and GPS-first display (Network only when GPS is absent or stale).
-  - path: maplib/src/main/java/com/nextgis/maplib/util/DiagnosticLog.java
-    responsibility: Gate verbose GNSS HyperLog dumps on the verbose_log preference without writing coordinates by default.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationDiagnosticFormat.java
-    responsibility: Format verbose GNSS/stakeout HyperLog lines without Android UI types.
-  - path: maplib/src/main/java/com/nextgis/maplib/api/ExternalGnssKeepAliveHost.java
-    responsibility: Let the application host start a connected-device foreground service without maplib depending on maplibui.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSampler.java
-    responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex per stop; track-only mode gating belongs to the maplibui consumer before this sampler; mock GNSS is sampled no coarser than 2 s / 1 m.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
-    responsibility: Keep mock GPS Connector extras exclusive of the 47 m placeholder and phone chip; native NMEA uses the same dense 2 s / 1 m sampling.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssTransport.java
-    responsibility: Byte source and optional command sink; ComNav binary initialization capability defaults to false for unrelated transports.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaParser.java
-    responsibility: Talker-agnostic GGA/GST/GSA/RMC and ComNav/NovAtel BESTPOSA parsing with checksum, RTK quality and GST centimetre accuracy.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaLineBuffer.java
-    responsibility: Assemble $talker+type and #BESTPOS sentences; ignore $/# bytes inside ComNav binary.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/CnbFrameBuffer.java
-    responsibility: Assemble AA 44 12 ComNav frames with NovAtel CRC-32.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/CnbBestPos.java
-    responsibility: Parse BESTPOSB message 42 into WGS84 GnssFix (С„РёРєСЃ/РїР»Р°РІ/Р°РІС‚Рѕ).
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/ComNavAsciiCommands.java
-    responsibility: Optional GGA/GST/GSA/RMC logs and additive BESTPOSB initialization for an identified silent ComNav/Pigo UART, without unlogall or correction/configuration changes; longer BESTPOSB command requires sequential ATT fragments.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/BluetoothLeTransport.java
-    responsibility: Pair Nordic, HM-10 or identified ComNav/Pigo 3A20 (write 3A21, notify 3A22); validate CCCD success, receive notification snapshots and serialize writes with a five-second timeout; reject unrelated writable GATT fallback and stale callbacks, survive Bluetooth permission revocation.
-  - path: maplib/src/main/java/com/nextgis/maplib/gnss/ExternalGnssSession.java
-    responsibility: Own and fence one GNSS transport, parse CNB BESTPOSB, initialize a silent identified Pigo without altering a live stream, optionally request ASCII from other mixed receivers, reset stale quality after eight seconds, reconnect and publish Location without Mock Location independently of map listeners.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
-    responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and coherent reacquisition.
-  - path: maplib/build.gradle
-    responsibility: Keep release diagnostic VERSION_NAME 3.1.2.31 and debug VERSION_NAME 3.1.2.23 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.7.1 through the explicit OpenGL artifact without unsupported library build-type version DSL.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
-    responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project switches cannot retain a stale database.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    responsibility: MapLibre style, sources, layers and raster MBTiles URLs, all visible track hit IDs independent from point hits, field-line body/label group priority below points across reload/reorder, solid white Light background color without a repeated texture and preserved neutral/dark patterns, bounded full-reload feature/style-object cache lifetime, hidden-layer data-reload suppression with on-demand visibility recovery, hot add/reload coordination, lifecycle-safe touch dispatch that rejects events after map/view/host teardown and skips native picking for absent edit handles, tap-node and midpoint edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, transient azimuth line/start/target overlays restored across full/lite reload below the topmost location cursor with optional endpoint drag callbacks, thicker insertion-direction segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost centered Orbit ring with a transparent opening, 5 dp blue dot with a 2 dp white border and outward thicker blue rim, scale-derived central holes in the metric accuracy fill and a retained 56 logical-pixel compass uncertainty sector with white halo and blue outline immediately below it, all three hidden by default and controlled by the host through setCompassAccuracySectorVisible(boolean), retaining the selected visibility before layer creation and across reload, compass-first bearing with moving-course fallback and heading-only overlay rebuild from the last GPS fix, and null-safe SQLite-to-GeoJSON refresh after cold-restored form Save.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/GeometryEditFillPolicy.java
-    responsibility: Allow the shared edit fill only for Polygon and MultiPolygon so recovered line sketches cannot inherit polygon rendering state.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
-    responsibility: MapLibre style utilities, explicit polygon-ring closure for editable/draft GeoJSON, interior polygon and largest usable multipolygon-part label anchors that respect holes, rule-style apply/merge hooks, label zoom gate and raster sibling anchor resolution.
-  - path: maplib/src/main/java/com/nextgis/maplib/display/FieldStyleRule.java
-    responsibility: Rule categories plus other/default style; merge unset optional fields into the effective style at render time.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LayerGroup.java
-    responsibility: Maintain bottom-to-top model order, atomically reserve collision-free layer storage, reject a composition save when any child config failed, and insert mixed vector/raster Collector project layers below the top tracks layer.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
-    responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
-    responsibility: "Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector editability/outbound synchronization policy, finish only an already-started outbound mutation after cancellation, send pending edits before remote pull, three-way verify NGW class/geometry/fields against serialized metadata and physical SQLite, repair metadata-only drift without refill, keep server attachment metadata in SQLite without treating absent local bytes as destructive, stream full untracked snapshots from an app-owned disk stage through one SQLite transaction while skipping invalid geometries without deleting their prior local rows, execute tracked incremental pulls as one cancellable atomic SQLite transaction and one broadcast-free cache mutation, for SYNC_NONE compare filtered server feature counts with the local table and reload a full snapshot when they differ unless the server reports zero, expose transient pull failures for a deferred retry pass, bind fills to the layer-owning workspace database, validate very large server polygons with bounded-cost topology checks, fingerprint authoritative rebuild requests, and persist bounded failure diagnostics without feature payload. Refuse explicit HTTP206 only in the full streamed downloader, adding current IO before error/body/length/new stage; prior push/prefix cleanup and other response routes stay unchanged. Preserve known temporary-server reason after existing PUSH IO and report known SYNC_NONE metadata/count HTTP failures without changing UNKNOWN/zero→KEEP; initial feature IOException and metadata NGException retain typed HTTP provenance and their original diagnostic/catch/retry boundaries."
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncNoneReloadDecision.java
-    responsibility: Pure KEEP/RELOAD policy for SYNC_NONE count comparison; server count <= 0 keeps local data.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureCountParser.java
-    responsibility: Parse NGW feature_count JSON; with a where clause use filtered_count only, never unfiltered total_count.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/DistrictFilterUtil.java
-    responsibility: Opt-in Collector district subset uses NGW fld_district__like=%value% so comma-separated district lists match a project key; SQL LIKE wildcards in the key are escaped.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/RemoteAttachmentSyncPolicy.java
-    responsibility: Keep metadata-only attachment refresh outside the feature backup gate and compare persisted server metadata without byte-size noise.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
-    responsibility: "Synchronize account layers in order, own process-wide started/finished state for spinner reconciliation, refresh SYNC_NONE config and count-driven snapshot after the main pass, and retry only transiently failed vector pulls without repeating successful layers. Clear/export local account failure metadata before endSync, retaining exact result ownership and existing lifecycle/counter behavior."
-  - path: maplib/src/main/java/com/nextgis/maplib/service/NGWSyncService.java
-    responsibility: Host Android account synchronization without blocking the main thread while a worker finishes during service teardown.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
-    responsibility: "Create editable local vector layers, load configuration, route mutations through the owning database, suppress per-row cache notifications during bulk/rebuild, fail bulk fill on rejected inserts, persist attachment metadata transactionally and independent feature titles, and rebuild without incomplete subclass identity. Native spatial snapshots share writer locks, validate readiness/count metadata outside SQL lock inversion, reject canceled/failed partial indexes and preserve the previous valid RTree file; count equality alone is not an ID oracle. After successful create, admit a still-identical verified-empty SQL/cache at the same generation before batch writes; keep active bulk/native/count-unknown/nonempty/cancel guards and no finally success inference."
-  - path: maplib/src/main/java/com/nextgis/maplib/map/Table.java
-    responsibility: Persist map and layer JSON through Android AtomicFile so process death restores the previous complete configuration instead of exposing a truncated direct write.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeometryRTree.java
-    responsibility: "Serialize spatial-index reads and mutations so broadcast receivers, sync workers and cache rebuilds cannot expose partially tightened nodes. Read the existing binary tree through a 64 KiB buffer and always close its input without changing the persisted format. Public clear resets size and marks removal dirty; clean load rejects header/actual-entry count mismatch, wrong child kinds and partial IO without exposing prefix nodes, preserving valid legacy bytes and same-path no-write load."
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoEnvelope.java
-    responsibility: Keep uninitialized spatial bounds safe for defensive area/dimension calculations.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MapContentProviderHelper.java
-    responsibility: Open layers.db beside this map object's own map file and route vector data notifications to the owning layer without allowing one cache callback failure to terminate the Android main thread.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/GeoJSONUtil.java
-    responsibility: Import local GeoJSON in implicit WGS84, CRS84, common EPSG:4326 aliases or the supported EPSG:3857 path while rejecting other coordinate systems.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/DatabaseContext.java
-    responsibility: Resolve a layer's owning map through its parent chain, configure bulk-write SQLite PRAGMAs only outside active transactions and return that workspace database to layer importers.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointParser.java
-    responsibility: Securely stream standard KML coordinates and GPX waypoint, route-point and track-point coordinates in source order without retaining source topology.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointLayerImporter.java
-    responsibility: Convert streamed WGS84 KML/GPX coordinates and available metadata into one editable local point layer using bounded SQLite transactions.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-    responsibility: Encode and validate the last fully initialized NGW vector-layer identity for partial-config recovery.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
-    responsibility: Cache prepared vector rendering payload for map startup.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java
-    responsibility: Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectCompositionSync.java
-    responsibility: Compare and apply Collector composition with account-plus-remote-id uniqueness preflight, in-place origin repair and fail-closed conflict handling.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectItem.java
-    responsibility: Normalize a supported Collector vector or raster-style item, display state, identity and extent source.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorResource.java
-    responsibility: Resolve a complete Collector project snapshot containing vectors and already-supported QGIS styles, and reject incomplete referenced resources.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/TMSLayer.java
-    responsibility: Safely unpack local tile archives, atomically import one validated raster MBTiles database, and retain immutable NGRc plus duplicate-safe Debug migration provenance.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/MbTilesInfo.java
-    responsibility: Validate raster MBTiles SQLite structure, integrity, format, zoom range and optional bounds before publication or rendering.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LegacyTileMbtilesMath.java
-    responsibility: Convert legacy TMS/OSM rows to standard MBTiles rows and derive deterministic raster format and Web Mercator bounds without Android dependencies.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalog.java
-    responsibility: Parse NGW search and children JSON for the shared lisa catalog key and collector_project entries.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalogLookup.java
-    responsibility: Look up keyname lisa by search then subtree walk and list collector projects under that group.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
-    responsibility: "Load one target NGW resource and resolve QGIS style URLs to their parent layer. Expose immutable per-invocation child load outcome so failed requests differ from successful empty lists; retain legacy void API, sorting, cache and parcel layout."
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LayerConfigUtil.java
-    responsibility: Parse mobile render mode and layer origin configuration.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
-    responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, report insufficient ring positions separately, recover an unset collection CRS from nested geometry, and reject empty or non-polygonal repair results.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureGeometryValidator.java
-    responsibility: Validate streamed NGW Polygon and MultiPolygon members with JTS instead of the legacy quadratic segment-pair scan while preserving the previous member-by-member collection semantics.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoGeometryFactory.java
-    responsibility: Dispatch WKT geometry to the matching parser, including Polygon and MultiPolygon recovery paths.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoMultiPolygon.java
-    responsibility: Split WKT polygon members by parenthesis depth so multipart geometry, outer rings and real holes survive import and draft recovery.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PolygonEditClass.java
-    responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, retain existing rings, and publish the remaining background through the compact native projection.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPolygonEditClass.java
-    responsibility: Build one-node tap sketches, display insertion direction inside the selected ring, limit new MultiPolygon geometry to one polygon part without flattening existing geometry, and compact the remaining native background.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PointEditClass.java
-    responsibility: Retain rich selected point/editor state while publishing the remaining logical-layer background through the native payload projection.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPointEditClass.java
-    responsibility: Retain rich multipart point/editor state while compacting the remaining native background without changing its identities or geometry.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/LineEditClass.java
-    responsibility: Keep rich line/vertex editing and send remaining background features through the compact projection with label-query fallback inputs intact.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiLineEditClass.java
-    responsibility: Keep all line parts and rich editor/vertex state while compacting only the native logical-layer background and retaining label inputs.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
-    responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed polygon ring to its own first vertex.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
-    responsibility: Validate GNSS integrity and live batch timestamps, accept mock receiver extras without pedestrian smoothing, adapt the robust motion and delayed sequence filters for the phone chip, and expose accepted display estimates and recording points.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java
-    responsibility: Format map measurements, including explicit square-metre to hectare conversion for ruler area labels.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
-    responsibility: Retain valid movement through 160 km/h, reject corrupt fixes and material isolated spikes, and preserve delayed fixes across long sampling gaps without Android test dependencies.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiter.java
-    responsibility: Legacy provider-arbitration adapter retained for compatibility; active recording uses GpsEventSource GNSS-only output.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiterCore.java
-    responsibility: Legacy timed provider arbitration retained for compatibility and its historical tests; not used by track or walk recording.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
-    responsibility: Index a private geometry snapshot in3857, return its nearest facet through4326 and the ellipsoid inverse with explicit sphere nonconvergence fallback; retain no live layer/FID/workspace binding.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
-    responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes without Android dependencies.
-  - path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases; schema4 exposes current rawGps measurement milliseconds including existing seed without changing callback/retry/filter semantics; releasing app automatic owners on explicit exit preserves Track/Walk recording listeners and their wake lock.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/LayerDatabaseTransaction.java
-    responsibility: Managed transactions, nested failure fencing and publication only after commit.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/FeatureSaveJournal.java
-    responsibility: Owning-database UUID journal for retry-safe feature and attachment insert.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/PendingTrackPoints.java
-    responsibility: Bounded durable ordered track queue with AtomicFile recovery and idempotent acknowledgement.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/MapTapGesture.java
-    responsibility: Density-aware short tap slop with cancellation of drag, long press and multitouch.
-  - path: maplib/src/main/java/com/nextgis/maplib/map/NGWLookupTable.java
-    responsibility: "Compare account-owned lookup.items accepted by the current parser, including equal-count changed-key sets. Handled IOException/NGException/JSONException preserve prior sync cache; silent or syntactically valid incompleteness remains UNKNOWN in the central ngw-sync-and-storage contract. Preserve cache map identity and published-memory/single-save/throws/equal-next-no-write policy; save(false) adds current numIoExceptions at each of its two existing sites; remote Hashtable values are nonnull. Retain known HTTP-server provenance as metadata after the existing Parse increment; do not add a second error counter or change cache/save semantics."
-  - path: maplib/src/test/java/com/nextgis/maplib/map/NGWVectorLayerFullSnapshotHttpStatusTest.java
-    responsibility: Execute actual private full-snapshot downloader on SDK28:206 fails before streams/length/newstage;200
-      exact bytes,203 prior2xx and404 resource-gone controls. Technical account/connection and owned Q temp only;
-      no SQLite/map/socket/full apply/native acceptance.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/SyncResultUtil.java
-    responsibility: Classify current account IO/Parse metadata and export/read four primitive fields plus a local exact SyncResult owner token; malformed, stale, foreign or mixed failures remain generic with unchanged numeric counters.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NGWLayerSchemaCompat.java
-    responsibility: Keep optional three-argument metadata API and add a result-aware overload that signals only known temporary-server HTTP failure while preserving null/UNKNOWN semantics.
-  - path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
-    responsibility: Delegate structured child-load outcome to its root while retaining old void child-loading API and connection/cookie policy.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwHttpException.java
-    responsibility: Carry only status/server primitives plus the existing IOException diagnostic for transient initial feature GET; preserve existing retry classification.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NgwHttpResponseException.java
-    responsibility: Carry only status/server primitives with the same localized NGException message for initial resource metadata HTTP failure; preserve checked-exception retry/catch policy.
-  - path: maplib/src/main/java/com/nextgis/maplib/util/NetworkUtil.java
-    responsibility: 'Keep transient/retry policy distinct from proven temporary-server reason: numeric429/5xx remain server; external-database text is eligible only for422, never408/auth/missing/200. The three-line repair follows three actual false-maintenance assertions; request counters and retry predicates remain unchanged.'
-  - path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorBulkCacheReadinessTest.java
-    responsibility: Independent12 actual create/batch/SQL/native-readiness and new-object fromJSON repair controls,
-      technical SQLite/API28; no actual HTTP/GPX/native acceptance.
-  - path: maplib/src/test/java/com/nextgis/maplib/datasource/GeometryRTreeRecoveryTest.java
-    responsibility: Independent11 actual RTree/legacy binary file oracles for clear persistence, missing/invalid/truncated
-      load, wrong child kinds, clean no-write and fresh-object readback; plain JVM only.
+- path: maplib/src/test/java/com/nextgis/maplib/map/LayerIdentifyPolicyTest.java
+  responsibility: Prepared visible/hidden/null and old-render-metadata policy checks; source compilation only after HTTP removal.
+- path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorTileDiskCacheTest.java
+  responsibility: Independently assert real temporary filesystem complete bytes, constant hot-path inventory/metadata work,
+    canonical aliases and shared instances/registry eviction, 128-to32MiB and1024-file budgets, external cache deletion, iterator/write/rename/delete
+    failures and cancellation publication guards; no native speed claim.
+- path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileAdmissionTest.kt
+  responsibility: Verify canceled SDK waiters avoid blocking dispatch, active noncooperative IO owns shared admission until
+    unwind, worker release precedes blocked Main, predispatch cancel/current/snapshot failures release once and retry delay
+    owns no permit.
+- path: maplib/src/main/java/com/nextgis/maplib/util/RenderResourceProfiler.java
+  responsibility: Default-off local numeric resource accounting independent of legacy SQLite observer limits; count every
+    accepted scope through bounded layer/detail overflows, separate BOOTTIME wall and same-TID thread CPU, retain aggregates
+    despite raw sink rejection, return a bounded final summary without owning files or cancelling rendering.
+- path: maplib/src/test/java/com/nextgis/maplib/util/RenderResourceProfilerTest.java
+  responsibility: Verify disabled mode, exact phase/count outcomes, cross-thread CPU unknowns, sink rejection/errors, duplicate
+    finish, active/layer overflow, unfinished stop, privacy, actual legacy16-scope overflow fanout and bounded worst-value
+    final summary.
+- path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorFeatureReader.java
+  responsibility: Visit eligible scoped original IDs through unchanged attributes-only cursors of at most32 rows in exact
+    CASE order; on API28+ use a separate1MiB geometry window with at most32 whole small BLOBs<=16KiB, otherwise lazy full-PFD
+    originals through one visit-owned statement. Preserve exact bytes/types/NULL/order/cardinality/current guards, close all
+    resources on cancel/error and propagate real SQLite/resource failures.
+- path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorFeatureReaderTest.java
+  responsibility: Assert65 IDs/order/typedNULL/wide integers/full originals, three bounded small-geometry queries and no PFD
+    for small buffers, exact16384/16385/multiMiB boundaries, API26/27 fallback versus API30 SQLite CASE, cancellation/cardinality/errors
+    and no duplicate callbacks during mid-window fallback on technical fixtures only.
+- path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorSourceBridge.kt
+  responsibility: Admit at most two native blocking payloads through cancellable shared pre-dispatch permits, release after
+    actual IO unwind before Main with exact-once cancellation fallback, preserve SDK Job demand and complete current tile
+    bytes; return-to-SDK is never native-content acceptance.
+- path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorSourceBridgeTest.kt
+  responsibility: Assert IO/Main boundaries, late cancellation, retries and lifecycle plus unchanged one-read callback bytes
+    with optional phase diagnostics.
+- path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileBufferParityTest.java
+  responsibility: Assert literal SDK128px/512px query and clipping parity through a strict candidate backend and independent
+    PBF decode, preserving four translated edge polygons, holes, collinear vertices, typed properties and all originals.
+- path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorLayerController.java
+  responsibility: Own actual direct-SQLite native source generations, preserve geometry-role and edit/temporary-hide filters,
+    and cancel before detach while fencing owner/model/style changes.
+- path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileBackend.java
+  responsibility: Define blocking complete PBF IO, immutable request snapshots, currentness and terminal close, separating
+    bounded retryable pressure from explicit unsupported host fallback; retain the original backend seam through a default
+    optional-diagnostics overload.
+- path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileRequest.java
+  responsibility: Fence canonical owner/source/content/style/excluded-edit/tile identity and process-local derived cache keys
+    without business payload.
+- path: maplib/src/main/java/com/nextgis/maplib/map/SqliteVectorTileProvider.java
+  responsibility: Read full SQLite originals via RTree on IO, emit complete styled PBF without startup GeoJSON and expose
+    full editor originals. Visit viewport lines one at a time with epoch fences and bounded style serialization; keep the
+    List collector only for compatibility.
+- path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelStreamingTest.java
+  responsibility: Assert full-original streaming placement/style/dateline parity, candidate ownership without retained line
+    geometry, late UI properties and cancellation before read/during scan/before publication.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileEncoder.java
+  responsibility: Encode scalar generic MVT2 properties and all six multipart geometry kinds with native8192 extent, stable
+    identities/order and inline polygon anchor role, with no HTTP legacy encoder.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTilePropertyCodec.java
+  responsibility: Preserve typed scalar native consumers, flatten text/icon offsets for semiliteral X/Y factories, omit null
+    under the known coalesce contract and fail explicitly for unexpected complex/nonfinite values.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NativeVectorTileClipper.java
+  responsibility: Intersect full3857 geometry with buffered tile bounds using robust JTS multipart clipping, preserving holes/disconnected
+    pieces without simplification or source mutation and bypassing overlay for contained/disjoint objects.
+- path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkLimiter.java
+  responsibility: Share one two-permit fair gate for direct native/visible-line IO and bound layer lock metadata to64 stripes
+    rather than an unbounded global map.
+- path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileRequestTest.java
+  responsibility: Assert independent cache identity changes, valid canonical addresses and bounded retry backoff before IO.
+- path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorTileProviderTest.java
+  responsibility: Decode4097 complete IDs and warm-cache reuse, preserve Rule scalars and full editor/viewport geometry, bound
+    style serialization and reject canceled/stale/unsupported work without partial cache while checking one polygon label
+    owner across4tiles.
+- path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTilePropertyCodecTest.java
+  responsibility: Assert scalar/unknown/explicit-false preservation, known offset pair transport, unchanged originals and
+    explicit unsupported complex/nonfinite/collision failures.
+- path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileEncoderTest.java
+  responsibility: Independently decode protobuf geometry/values/extent for all six kinds, holes/multipart/retained collinear
+    vertices and actual native Rule property names and typed offsets.
+- path: maplib/src/test/java/com/nextgis/maplib/map/NativeVectorTileClipperTest.java
+  responsibility: Assert disconnected concave intersections, holes, all six geometry kinds, clipping containment and unchanged
+    original coordinates.
+- path: maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorSpatialQueryTest.java
+  responsibility: Race the actual SQLite/RTree rebuild against blocked native readers, reject partial PBF and canceled-index
+    persistence, compare independent SQL IDs, check actual after-commit invalidation before UI notification and accept a legitimate
+    newly empty table.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NativeFeaturePayload.java
+  responsibility: Project native-only GeoJSON properties without copying unused layout arrays or changing rich editor features,
+    full geometry, IDs, unknown fields, actual paint/label gates and line fallback inputs.
+- path: maplib/src/test/java/com/nextgis/maplib/map/NativeFeaturePayloadTest.java
+  responsibility: Independently assert literal required/dead keys, all geometry kinds, IDs/bbox/unknown/original preservation,
+    empty polygon labels, line-query fallback and exact uniform-default sparsity.
+- path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryGuard.java
+  responsibility: Decide owner-fenced cache economy and complete-work admission from actual free system/Java memory and OS
+    low-memory state; retain used/native/RSS as diagnostics only, with no layer suppression or source reservations.
+- path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryPolicy.java
+  responsibility: Define actual free-headroom decisions, ordinary disk-cache and allocation-reserve sizing; device class or
+    used/native/RSS never independently triggers a warning, economy or serialization, and no enforced native cap or content
+    thinning is claimed.
+- path: maplib/src/test/java/com/nextgis/maplib/map/RenderMemoryGuardTest.java
+  responsibility: Check that queue delay alone does not produce a false low-memory notice on a roomy device and that actual
+    low-free-memory delay notifies once; native delivery is a separate acceptance gate.
+- path: maplib/src/main/java/com/nextgis/maplib/map/RenderTileWorkGate.java
+  responsibility: Keep two normal builders and fairly serialize resource-constrained complete tile work with cancellable,
+    idempotently released permits.
+- path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileDiskCache.java
+  responsibility: Bound complete derived PBF by existing bytes/file/entry budgets through one per-operation canonical-root
+    metadata ledger, bounded8-root registry and incremental recency; bootstrap/reconcile separately from hot put without per-put
+    full scan/sort/regex, retain atomic publication, optional IO failure and native current guards without changing identities
+    or authoritative data.
+- path: maplib/src/main/java/com/nextgis/maplib/util/RenderProcessMemory.java
+  responsibility: Read optional self-process RSS/native and system-availability counters without enumerating other applications
+    or reading heap contents.
+- path: maplib/src/test/java/com/nextgis/maplib/map/RenderTileWorkGateTest.java
+  responsibility: Assert normal two-builder throughput, exclusive fair constrained work and permit preservation after interruption,
+    failure, double close, canceled job wait and a throwing current callback.
+- path: maplib/src/main/java/com/nextgis/maplib/map/LayerDisplayPriority.java
+  responsibility: Plan whole field-line and Point/MultiPoint SDK pass groups using exact logical/current-controller/line-label
+    aliases and canonical bottom-to-top model input; retain internal and relative group order, ignore stale/prefix-only aliases
+    and polygon label anchors, and avoid moves for an already correct stack independently of tap eligibility.
+- path: maplib/src/test/java/com/nextgis/maplib/map/LayerDisplayPriorityTest.java
+  responsibility: Verify field name/geometry policy, exact current versus stale aliases, whole body/label/icon grouping, stable
+    relative/internal order and no-op already-correct stacks; pure tests do not certify native nested-group or Activity recreation
+    behavior.
+- path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelLayout.java
+  responsibility: Clip the true visible quadrilateral and plan one rigid point label per object, stream DB originals without
+    retained geometry in candidates, preserve late UI properties and keep classic native-fragment merge/dedup compatibility.
+- path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelController.java
+  responsibility: Coalesce camera/source updates, preserve classic snapshots and stream one full SQLite viewport line at a
+    time into geometry-free label candidates; retain SDK access on UI and reject stale camera/map/view/style/source/provider/layer-content
+    results.
+- path: maplib/src/main/java/com/nextgis/maplib/map/VisibleLineLabelQuery.java
+  responsibility: Form finite Mercator envelopes with camera-relative dateline splitting, visit complete unclipped originals
+    directly into prepared exact layout and cancel before read/scan/publication without collecting full viewport geometry;
+    preserve the prior Reader API.
+- path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelQueryTest.java
+  responsibility: Independently assert projected rotated bounds, two narrow dateline windows, camera-relative wide bounds,
+    complete LineString/MultiLineString preservation, exact quadrilateral clipping and before/after-read cancellation; technical
+    units do not certify native SQLite rendering.
+- path: maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelLayoutTest.java
+  responsibility: Verify visible direction, winding geometry, multipart IDs, rotated clipping, dateline, upright and cancellation.
+- path: maplib/src/test/java/com/nextgis/maplib/map/LegacyTrackColorsTest.java
+  responsibility: Verify transactional v1 color upgrade, failure rollback and retry.
+- path: maplib/src/main/java/com/nextgis/maplib/map/TrackColorPalette.java
+  responsibility: Assign persistent saturated track colors without changing existing explicit colors.
+- path: maplib/src/main/java/com/nextgis/maplib/map/TrackMapStyle.java
+  responsibility: Own fixed track style passes with a 1.4-pixel core at 27 percent of the original RGB channels, original-hue
+    6.5-pixel glow with blur 3 and opacity .83, and the existing selected-session filter; retain the stored base color.
+- path: maplib/src/main/java/com/nextgis/maplib/display/PolygonPatternOptions.java
+  responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
+- path: maplib/src/main/java/com/nextgis/maplib/display/PolygonOutlineOptions.java
+  responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
+- path: maplib/src/main/java/com/nextgis/maplib/display/ConfigurablePolygonPatternRegistry.java
+  responsibility: Build exact color/alpha pattern bitmaps, crop only a pixel-identical repeating motif and retain the existing
+    4 MiB LRU and native image ownership.
+- path: maplib/src/main/java/com/nextgis/maplib/display/PatternTilePeriod.java
+  responsibility: Find a rectangular periodic ARGB motif by checking every original pixel; preserve the full 512-pixel texture
+    when no smaller exact period exists.
+- path: maplib/src/test/java/com/nextgis/maplib/display/PatternTilePeriodTest.java
+  responsibility: Independently reconstruct original pixels and enumerate all 65536 binary 4-by-4 matrices, including nonperiodic
+    and invalid inputs.
+- path: maplib/src/main/java/com/nextgis/maplib/map/mpl/PolygonLayerFactory.java
+  responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
+- path: maplib/src/main/java/com/nextgis/maplib/map/mpl/PolygonOutlineLayerFactory.java
+  responsibility: Own the polygon pattern, advanced contour or live native preview contract described in polygon-style-controls.md.
+- path: maplib/src/main/java/com/nextgis/maplib/display/FireflyMarkerRegistry.java
+  responsibility: Render a crisp point core and outward-only RGBA glow with independent alpha, bounded CPU bitmaps and native-image
+    ownership per logical layer.
+- path: maplib/src/main/java/com/nextgis/maplib/map/mpl/FireflyLayerFactory.java
+  responsibility: Build filtered non-SDF point rendering children with the existing layer lifecycle, collision groups, picking
+    and zoom.
+- path: maplib/src/main/java/com/nextgis/maplib/display/SimpleMarkerStyle.java
+  responsibility: Persist marker types including Firefly type 9 and share its sprite with Canvas previews without changing
+    the existing blur types.
+- path: maplib/src/main/java/com/nextgis/maplib/map/GeometryTransformGesture.java
+  responsibility: Own whole-object touch streams with fixed camera, no scale, exact cancel previews and one completed history
+    step.
+- path: maplib/src/main/java/com/nextgis/maplib/util/GeometryTransform.java
+  responsibility: Copy and rigidly transform all projected components and rings without changing source geometry or CRS.
+- path: maplib/src/main/java/com/nextgis/maplib/util/FeatureCopyPolicy.java
+  responsibility: Match exact schema keys/types and losslessly adapt single/multi geometry for an independent new feature.
+- path: maplib/src/main/java/com/nextgis/maplib/display/MarkerIconRegistry.java
+  responsibility: Register bundled marker images with the native SDF edge and distance range so thin strokes remain visible
+    at the requested size.
+- path: maplib/src/main/java/com/nextgis/maplib/map/RuleLabelLayouts.java
+  responsibility: Apply classic symbol data-constant settings using filtered layout groups, preserve logical visibility and
+    remove obsolete groups on restyle or deletion.
+- path: maplib/src/main/java/com/nextgis/maplib/map/RuleGeometryLayouts.java
+  responsibility: Bind constant icon collision, line layout and polygon translation by rule category, preserving paint/layout
+    routing, native filters and logical layer lifecycle.
+- path: maplib/src/main/java/com/nextgis/maplib/map/SharedTrackStore.java
+  responsibility: Own the installation track database; resolve actual layers.db through DatabaseContext and transactionally
+    import missed history and crash checkpoints without modifying rollback sources or replacing new tracks.
+- path: maplib/src/test/java/com/nextgis/maplib/map/SharedTrackStoreTest.java
+  responsibility: Verify actual DatabaseHelper filenames, collisions with post-update tracks, interrupted target rollback/retry,
+    unchanged atomic backup/new files, lost replies, old schemas and bootstrap copy provenance.
+- path: maplib/src/main/java/com/nextgis/maplib/util/ProjectSyncState.java
+  responsibility: Preserve canonical UUID full-project clocks and publish only successful commits through an exact weak-identity
+    preferences-owner confirmed process view; retain prior confirmation on false/throw, reentrant successful invocation order
+    and reads independent of the disk writer lock, without compensating writes or cross-process rollback guarantee.
+- path: maplib/src/test/java/com/nextgis/maplib/util/ProjectSyncStatePublicationTest.java
+  responsibility: Assert cache-before-failed-commit visibility with held readers, editor/put/commit observer reentry, nested
+    success/failure order, canonical aliases, distinct owner/project isolation, lower positive times, raw-reader recheck,
+    exceptions and unchanged persistence format using technical SharedPreferences doubles.
+- path: maplib/src/main/java/com/nextgis/maplib/util/FeatureChanges.java
+  responsibility: Exclude separate feature and attachment Save flags when counting or selecting ready outbound changes.
+- path: maplib/src/test/java/com/nextgis/maplib/reliability/LocalChangesCommitTest.java
+  responsibility: Verify committed owning-map callbacks, rollback silence and draft Save scheduling with real SQLite.
+- path: maplib/src/main/java/com/nextgis/maplib/location/GpsRecoveryPolicy.java
+  responsibility: Keep reception/acquisition/filter waits local, require a continuous faulty-reason threshold before reporting,
+    correlate recovery/cancel, keep 24 history samples and gate one same-listener retry on sustained fresh used-in-fix statuses
+    without callbacks; policy and reason/tick/sleep evidence remain unchanged when the source emits additive schema4 raw measurement
+    time.
+- path: maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java
+  responsibility: Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership
+    and structured diagnostics; schema4 absent raw measurement remains sentinel-1 and recovered measurement time comes from
+    the independently created Location rather than callback receipt age.
+- path: maplib/src/main/java/com/nextgis/maplib/util/MapRuntimeDiagnostics.java
+  responsibility: Observe stalled startup, render queries and tile stages independently of the UI, retain prior-process identity
+    and the 16 KiB journal, keep free-headroom counters separate from used-memory diagnostics, and match event times. Export
+    typed SQLite phases locally through one bounded observer/writer with at most16 active scopes,32 layer summaries and10s
+    per-layer throttle, explicit observation loss and distinct provider/SDK-return/cancel/failure states, without Main-thread
+    memory/DB/SDK reads or URI/coordinates/attributes.
+- path: maplib/src/test/java/com/nextgis/maplib/util/MapRuntimeDiagnosticsTest.java
+  responsibility: Verify fast-operation silence, non-returning query observation, independent rejection reasons, stage timing,
+    startup stack/phase, retained free-headroom counters and journal identity/bounds; assert fixed SQLite phase timing/privacy,
+    delayed cancelled outcomes, active/layer caps and overflow, inactive-summary reuse, and fail-open clock/writer/watch cleanup.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocalLogInitializer.java
+  responsibility: Initialize local HyperLog once per process after migrating its obsolete URL, retain custom format across
+    app/base calls and preserve the log database and expiry contract.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LayerFormHashUtil.java
+  responsibility: Hash canonical form/meta JSON across downloaded and staged files, ignore object key order and whitespace,
+    preserve values and array order and exclude only top-level ngw_connection.
+- path: maplib/src/main/java/com/nextgis/maplib/util/TrackSendSettings.java
+  responsibility: Keep upload intent enabled by default independently of tracker registration, migrate legacy registration-disabled
+    flags once and preserve later explicit opt-out; consumers separately require confirmed server/UID registration for pending
+    track badges.
+- path: maplib/src/test/java/com/nextgis/maplib/util/TrackSendSettingsTest.java
+  responsibility: Verify fresh default, one-time legacy migration and durable opt-out on Android 26 and 36.
+- path: maplib/src/main/java/com/nextgis/maplib/util/SyncWorkspaceSession.java
+  responsibility: Hold explicit map/project ownership through tracked threads, callbacks and live service/provider tokens;
+    inherit cancellation and refuse closing a map with pending work.
+- path: maplib/src/main/java/com/nextgis/maplib/forms/ConditionalRequiredRules.java
+  responsibility: Bounded v1/v2 native requirements and v2 field/element visibility with shared typed conditions, portable
+    element IDs and common limits; never changes values or executes scripts.
+- path: maplib/src/main/java/com/nextgis/maplib/forms/CascadingLists.java
+  responsibility: Parse declarative NGFP relation tables, sort an acyclic graph, filter by stable parent keys, resolve all
+    valid ancestor tuples for explicit style-category defaults and preserve unchanged historical tuples.
+- path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptService.java
+  responsibility: Bounded QuickJS Binder service under an isolated Android UID.
+- path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java
+  responsibility: Read-only owning-project GIS broker with independent grants and SQL budgets.
+- path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptSync.java
+  responsibility: Verified Collector package activation with previous-version retention.
+- path: maplib/src/main/java/com/nextgis/maplib/scripts/ScriptPackage.java
+  responsibility: Source-only ZIP/API/hash and manifest validation.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/Field.java
+  responsibility: Preserve optional NGW required metadata through JSON and Parcel, defaulting legacy fields to false.
+- path: maplib/src/test/java/com/nextgis/maplib/util/FieldMetadataTest.java
+  responsibility: Verify required import, legacy compatibility, JSON and Parcel persistence, and metadata-only toggles without
+    feature or outbox changes on API26 and API36.
+- path: maplib/src/main/java/com/nextgis/maplib/location/LocationPowerPolicy.java
+  responsibility: Detect screen-off system GPS restrictions independently of Doze exemption, exclude native external GNSS
+    and report actual power policy in GPS diagnostics.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDevice.java
+  responsibility: Keep endpoint identity independent from optional, non-persisted scan RSSI in dBm.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDeviceScanner.java
+  responsibility: Deliver BLE and paired Classic discovery RSSI, invalidate stale callbacks and release both scan types on
+    stop; preserve unknown signal without inventing measurements.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssDeviceScanResults.java
+  responsibility: Keep same-name devices separate by transport/address and replace signal measurements without reordering
+    rows.
+- path: maplib/src/main/java/com/nextgis/maplib/util/CoalescingRefresh.java
+  responsibility: Bound incremental track refresh to one active read and one pending request per kind; release the slot after
+    success, failure or stale UI result.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/Feature.java
+  responsibility: Compare mutable field schemas in linear field traversal without indexed LinkedList scans, preserving name,
+    null, numeric, date and geometry equality semantics.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncIo.java
+  responsibility: Scope cancellation by sync generation, close active read-only HTTP connections without making remote mutations
+    ambiguous, expose outbound-write state and preserve cancellation through the account adapter.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncProgress.java
+  responsibility: Session-scoped sync progress from weighted leaf layers and real push/download/apply fractions without inventing
+    remaining work or percent text.
+- path: maplib/src/test/java/com/nextgis/maplib/util/NgwSyncProgressTest.java
+  responsibility: Lock session weights, intra-layer push/download hold, deferred retry, monotonic display, cancel and publish
+    throttle.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncTrace.java
+  responsibility: Log bounded payload-free snapshot attempt, stage, elapsed time and progress.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwSnapshotCheckpoint.java
+  responsibility: Reuse only committed fully explained missing-invalid counts in the same scope for one hour, with forced
+    recheck support.
+- path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayCatalog.java
+  responsibility: Durable asset index, publication and move recovery, format-aware dedup, repair of previously mislinked references
+    and payload lifecycle; Asset.referenceConfig preserves project presentation and zoom limits.
+- path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayStore.java
+  responsibility: Stream NGRc/MBTiles into the catalog and report tile or byte import progress without exposing URI or SAF
+    ids.
+- path: maplib/src/main/java/com/nextgis/maplib/util/SharedUnderlayKind.java
+  responsibility: Classify NGRc, raster MBTiles and ZIP contents before shared-catalog import without extracting a tile tree.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgrcArchive.java
+  responsibility: Bounded two-pass NGRc reader with complete source hash, tile count for import progress, explicit tile scheme,
+    case-insensitive Mapnik.json/config.json and Mapnik raster-path normalization, and ambiguous metadata rejection.
+- path: maplib/src/main/java/com/nextgis/maplib/util/FileUtil.java
+  responsibility: Resolve a human document display name and reject SAF MediaStore ids such as msf:308.
+- path: maplib/src/test/java/com/nextgis/maplib/util/FileUtilDisplayNameTest.java
+  responsibility: Lock rejection of empty names and SAF document ids without Android.
+- path: maplib/src/main/java/com/nextgis/maplib/util/RasterMbtilesWriter.java
+  responsibility: Shared batched raster database writer for NGRc and Debug streams.
+- path: maplib/src/main/java/com/nextgis/maplib/util/CameraZoom.java
+  responsibility: Clamp the MapLibre camera to 7.5 without changing layer DEFAULT_MIN_ZOOM.
+- path: maplib/src/main/java/com/nextgis/maplib/util/UnderlayWorkspaceIndex.java
+  responsibility: Closed workspace traversal and unlink without a MapBase singleton.
+- path: maplib/src/main/java/com/nextgis/maplib/map/WalkPreviewGeometry.java
+  responsibility: Build a passive walk preview from a private CRS-preserving copy, including incomplete rings and multipart
+    geometry.
+- path: maplib/src/main/java/com/nextgis/maplib/map/UserLocationGeometry.java
+  responsibility: Build metric GPS accuracy and compass-uncertainty GeoJSON with role properties; keep a transparent 10.5
+    logical-pixel central hole in accuracy and start the heading sector at 13 pixels beneath the opaque Orbit rim, preserving
+    the outer GPS radius and 56 logical-pixel sector length. Omit accuracy smaller than the hole, clamp half-angle 5вЂ“90В°,
+    select compass-first direction with moving-course fallback, and preserve legacy stand/go type and six/seven-argument full-circle
+    geometry overloads.
+- path: maplib/src/main/res/drawable/ic_user_location_dot.xml
+  responsibility: Center an Orbit ring with a transparent 21 dp opening, a 5 dp blue position dot with a 2 dp white border,
+    a blue rim grown outward to radius 13 dp and a white outer rim at radius 15.2 dp with a thin dark edge in a 72 dp viewport;
+    oppositely wound annular paths preserve transparency without a clip-path dependency.
+- path: maplib/src/main/res/drawable/ic_user_location_orbit.xml
+  responsibility: Share the same centred 72 dp canvas, transparent 21 dp ring opening, 5 dp blue dot with a 2 dp white border
+    and thicker outward blue rim with the existing 16 by 14 dp directional triangle, white outline and dark outer edge for
+    compass or movement course.
+- path: maplib/src/test/java/com/nextgis/maplib/map/UserLocationGeometryTest.java
+  responsibility: Verify geodesic accuracy/uncertainty geometry, compass priority, moving-course fallback, legacy full circles
+    and sectors, the independent outer metric GPS radius, 56 logical-pixel sector length, reversed inner accuracy winding
+    and clear ring opening across scales, and omission of accuracy smaller than the opening.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationMotionFilter.java
+  responsibility: Separate the fresh display candidate from the recorder stop anchor and expose departure diagnostics.
+- path: maplib/src/test/java/com/nextgis/maplib/util/LocationDepartureTest.java
+  responsibility: Verify handheld stationary multipath from anonymized A54 observations, uncertainty-aware departure, early-corner
+    backfill and cancellation/session boundaries.
+- path: maplib/src/main/java/com/nextgis/maplib/location/LocationSubscriptionController.java
+  responsibility: Reconcile independent GPS/network requests without GPS removal on screen lifecycle and retain resources
+    until the final recorder leaves.
+- path: maplib/src/main/java/com/nextgis/maplib/location/SensorMotionMonitor.java
+  responsibility: Acquire accelerometer evidence for the shared GNSS session without activity-recognition permission.
+- path: maplib/src/main/java/com/nextgis/maplib/util/DeviceMotionEvidence.java
+  responsibility: Classify bounded accelerometer windows and look up fresh evidence at GNSS measurement time.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSamplerCore.java
+  responsibility: Buffer tentative GNSS departures per recorder, backfill confirmed movement with original times and corners,
+    and correct one stop vertex without inventing travelled distance.
+- path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
+  responsibility: Route provider writes, queries and revision-aware snapshots to SharedTrackStore; retain trackpoint segments
+    and expose GeoMultiLineString without connecting gaps, with one common visibility preference.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationFixPolicy.java
+  responsibility: Monotonic freshness with a one-second future tolerance, optional max-age windows, position validity and
+    GPS-first display (Network only when GPS is absent or stale).
+- path: maplib/src/main/java/com/nextgis/maplib/util/DiagnosticLog.java
+  responsibility: Gate verbose GNSS HyperLog dumps on the verbose_log preference without writing coordinates by default.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationDiagnosticFormat.java
+  responsibility: Format verbose GNSS/stakeout HyperLog lines without Android UI types.
+- path: maplib/src/main/java/com/nextgis/maplib/api/ExternalGnssKeepAliveHost.java
+  responsibility: Let the application host start a connected-device foreground service without maplib depending on maplibui.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationRecordingSampler.java
+  responsibility: Per-recorder time/distance decimation retaining corners, validated final points and one revisable vertex
+    per stop; track-only mode gating belongs to the maplibui consumer before this sampler; mock GNSS is sampled no coarser
+    than 2 s / 1 m.
+- path: maplib/src/main/java/com/nextgis/maplib/util/ExternalGnssFixPolicy.java
+  responsibility: Keep mock GPS Connector extras exclusive of the 47 m placeholder and phone chip; native NMEA uses the same
+    dense 2 s / 1 m sampling.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/GnssTransport.java
+  responsibility: Byte source and optional command sink; ComNav binary initialization capability defaults to false for unrelated
+    transports.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaParser.java
+  responsibility: Talker-agnostic GGA/GST/GSA/RMC and ComNav/NovAtel BESTPOSA parsing with checksum, RTK quality and GST centimetre
+    accuracy.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/NmeaLineBuffer.java
+  responsibility: Assemble $talker+type and
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/CnbFrameBuffer.java
+  responsibility: Assemble AA 44 12 ComNav frames with NovAtel CRC-32.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/CnbBestPos.java
+  responsibility: Parse BESTPOSB message 42 into WGS84 GnssFix (С„РёРєСЃ/РїР»Р°РІ/Р°РІС‚Рѕ).
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/ComNavAsciiCommands.java
+  responsibility: Optional GGA/GST/GSA/RMC logs and additive BESTPOSB initialization for an identified silent ComNav/Pigo
+    UART, without unlogall or correction/configuration changes; longer BESTPOSB command requires sequential ATT fragments.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/BluetoothLeTransport.java
+  responsibility: Pair Nordic, HM-10 or identified ComNav/Pigo 3A20 (write 3A21, notify 3A22); validate CCCD success, receive
+    notification snapshots and serialize writes with a five-second timeout; reject unrelated writable GATT fallback and stale
+    callbacks, survive Bluetooth permission revocation.
+- path: maplib/src/main/java/com/nextgis/maplib/gnss/ExternalGnssSession.java
+  responsibility: Own and fence one GNSS transport, parse CNB BESTPOSB, initialize a silent identified Pigo without altering
+    a live stream, optionally request ASCII from other mixed receivers, reset stale quality after eight seconds, reconnect
+    and publish Location without Mock Location independently of map listeners.
+- path: maplib/src/main/java/com/nextgis/maplib/util/AdaptiveLocationFilterCore.java
+  responsibility: Platform-independent robust position/velocity filter, stationary anchoring, course-change adaptation and
+    coherent reacquisition.
+- path: maplib/build.gradle
+  responsibility: Keep release diagnostic VERSION_NAME 3.1.2.31 and debug VERSION_NAME 3.1.2.23 coupled to their consuming
+    application variants, provide the shared JTS topology runtime, and select MapLibre 13.7.1 through the explicit OpenGL
+    artifact without unsupported library build-type version DSL.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/LayerContentProvider.java
+  responsibility: Resolve the live application map for every feature and track ContentProvider operation so in-process project
+    switches cannot retain a stale database.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+  responsibility: MapLibre style, sources, layers and raster MBTiles URLs, all visible track hit IDs independent from point
+    hits, field-line body/label group priority below points across reload/reorder, solid white Light background color without
+    a repeated texture and preserved neutral/dark patterns, bounded full-reload feature/style-object cache lifetime, hidden-layer
+    data-reload suppression with on-demand visibility recovery, hot add/reload coordination, lifecycle-safe touch dispatch
+    that rejects events after map/view/host teardown and skips native picking for absent edit handles, tap-node and midpoint
+    edit dispatch, active measurement geometry snapshot/restore for ruler Undo/Redo, transient azimuth line/start/target overlays
+    restored across full/lite reload below the topmost location cursor with optional endpoint drag callbacks, thicker insertion-direction
+    segment rendering, edit/view unselection primitives used by the app host's terminal successful-save cleanup, deferred
+    cold-walk overlay recovery that waits for edit sources owned by the current style while preserving edit properties and
+    selecting polygon fill strictly by current geometry/layer type, isolated sequential style-property snapshots, post-fill
+    visible-vector source verification, live-style recovery when a previously hidden layer is enabled, topmost centered Orbit
+    ring with a transparent opening, 5 dp blue dot with a 2 dp white border and outward thicker blue rim, scale-derived central
+    holes in the metric accuracy fill and a retained 56 logical-pixel compass uncertainty sector with white halo and blue
+    outline immediately below it, all three hidden by default and controlled by the host through setCompassAccuracySectorVisible(boolean),
+    retaining the selected visibility before layer creation and across reload, compass-first bearing with moving-course fallback
+    and heading-only overlay rebuild from the last GPS fix, and null-safe SQLite-to-GeoJSON refresh after cold-restored form
+    Save.
+- path: maplib/src/main/java/com/nextgis/maplib/map/GeometryEditFillPolicy.java
+  responsibility: Allow the shared edit fill only for Polygon and MultiPolygon so recovered line sketches cannot inherit polygon
+    rendering state.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MPLFeaturesUtils.java
+  responsibility: MapLibre style utilities, explicit polygon-ring closure for editable/draft GeoJSON, interior polygon and
+    largest usable multipolygon-part label anchors that respect holes, rule-style apply/merge hooks, label zoom gate and raster
+    sibling anchor resolution.
+- path: maplib/src/main/java/com/nextgis/maplib/display/FieldStyleRule.java
+  responsibility: Rule categories plus other/default style; merge unset optional fields into the effective style at render
+    time.
+- path: maplib/src/main/java/com/nextgis/maplib/map/LayerGroup.java
+  responsibility: Maintain bottom-to-top model order, atomically reserve collision-free layer storage, reject a composition
+    save when any child config failed, and insert mixed vector/raster Collector project layers below the top tracks layer.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
+  responsibility: Persist NGW raster identity, separate extent resource identity and Collector project origin metadata.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NGWVectorLayer.java
+  responsibility: Preserve durable NGW/project identity, defer managed 404 decisions to composition sync, apply Collector
+    editability/outbound synchronization policy, finish only an already-started outbound mutation after cancellation, send
+    pending edits before remote pull, three-way verify NGW class/geometry/fields against serialized metadata and physical
+    SQLite, repair metadata-only drift without refill, keep server attachment metadata in SQLite without treating absent local
+    bytes as destructive, stream full untracked snapshots from an app-owned disk stage through one SQLite transaction while
+    skipping invalid geometries without deleting their prior local rows, execute tracked incremental pulls as one cancellable
+    atomic SQLite transaction and one broadcast-free cache mutation, for SYNC_NONE compare filtered server feature counts
+    with the local table and reload a full snapshot when they differ unless the server reports zero, expose transient pull
+    failures for a deferred retry pass, bind fills to the layer-owning workspace database, validate very large server polygons
+    with bounded-cost topology checks, fingerprint authoritative rebuild requests, and persist bounded failure diagnostics
+    without feature payload. Refuse explicit HTTP206 only in the full streamed downloader, adding current IO before error/body/length/new
+    stage; prior push/prefix cleanup and other response routes stay unchanged. Preserve known temporary-server reason after
+    existing PUSH IO and report known SYNC_NONE metadata/count HTTP failures without changing UNKNOWN/zero→KEEP; initial feature
+    IOException and metadata NGException retain typed HTTP provenance and their original diagnostic/catch/retry boundaries.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncNoneReloadDecision.java
+  responsibility: Pure KEEP/RELOAD policy for SYNC_NONE count comparison; server count <= 0 keeps local data.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureCountParser.java
+  responsibility: Parse NGW feature_count JSON; with a where clause use filtered_count only, never unfiltered total_count.
+- path: maplib/src/main/java/com/nextgis/maplib/util/DistrictFilterUtil.java
+  responsibility: Opt-in Collector district subset uses NGW fld_district__like=%value% so comma-separated district lists match
+    a project key; SQL LIKE wildcards in the key are escaped.
+- path: maplib/src/main/java/com/nextgis/maplib/util/RemoteAttachmentSyncPolicy.java
+  responsibility: Keep metadata-only attachment refresh outside the feature backup gate and compare persisted server metadata
+    without byte-size noise.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/SyncAdapter.java
+  responsibility: Synchronize account layers in order, own process-wide started/finished state for spinner reconciliation,
+    refresh SYNC_NONE config and count-driven snapshot after the main pass, and retry only transiently failed vector pulls
+    without repeating successful layers. Clear/export local account failure metadata before endSync, retaining exact result
+    ownership and existing lifecycle/counter behavior.
+- path: maplib/src/main/java/com/nextgis/maplib/service/NGWSyncService.java
+  responsibility: Host Android account synchronization without blocking the main thread while a worker finishes during service
+    teardown.
+- path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
+  responsibility: Create editable local vector layers, load configuration, route mutations through the owning database, suppress
+    per-row cache notifications during bulk/rebuild, fail bulk fill on rejected inserts, persist attachment metadata transactionally
+    and independent feature titles, and rebuild without incomplete subclass identity. Native spatial snapshots share writer
+    locks, validate readiness/count metadata outside SQL lock inversion, reject canceled/failed partial indexes and preserve
+    the previous valid RTree file; count equality alone is not an ID oracle. After successful create, admit a still-identical
+    verified-empty SQL/cache at the same generation before batch writes; keep active bulk/native/count-unknown/nonempty/cancel
+    guards and no finally success inference.
+- path: maplib/src/main/java/com/nextgis/maplib/map/Table.java
+  responsibility: Persist map and layer JSON through Android AtomicFile so process death restores the previous complete configuration
+    instead of exposing a truncated direct write.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/GeometryRTree.java
+  responsibility: Serialize spatial-index reads and mutations so broadcast receivers, sync workers and cache rebuilds cannot
+    expose partially tightened nodes. Read the existing binary tree through a 64 KiB buffer and always close its input without
+    changing the persisted format. Public clear resets size and marks removal dirty; clean load rejects header/actual-entry
+    count mismatch, wrong child kinds and partial IO without exposing prefix nodes, preserving valid legacy bytes and same-path
+    no-write load.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoEnvelope.java
+  responsibility: Keep uninitialized spatial bounds safe for defensive area/dimension calculations.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MapContentProviderHelper.java
+  responsibility: Open layers.db beside this map object's own map file and route vector data notifications to the owning layer
+    without allowing one cache callback failure to terminate the Android main thread.
+- path: maplib/src/main/java/com/nextgis/maplib/util/GeoJSONUtil.java
+  responsibility: Import local GeoJSON in implicit WGS84, CRS84, common EPSG:4326 aliases or the supported EPSG:3857 path
+    while rejecting other coordinate systems.
+- path: maplib/src/main/java/com/nextgis/maplib/util/DatabaseContext.java
+  responsibility: Resolve a layer's owning map through its parent chain, configure bulk-write SQLite PRAGMAs only outside
+    active transactions and return that workspace database to layer importers.
+- path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointParser.java
+  responsibility: Securely stream standard KML coordinates and GPX waypoint, route-point and track-point coordinates in source
+    order without retaining source topology.
+- path: maplib/src/main/java/com/nextgis/maplib/util/CoordinatePointLayerImporter.java
+  responsibility: Convert streamed WGS84 KML/GPX coordinates and available metadata into one editable local point layer using
+    bounded SQLite transactions.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
+  responsibility: Encode and validate the last fully initialized NGW vector-layer identity for partial-config recovery.
+- path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayerRenderCache.java
+  responsibility: Cache prepared vector rendering payload for map startup.
+- path: maplib/src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java
+  responsibility: Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden
+    classic layers.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectCompositionSync.java
+  responsibility: Compare and apply Collector composition with account-plus-remote-id uniqueness preflight, in-place origin
+    repair and fail-closed conflict handling.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorProjectItem.java
+  responsibility: Normalize a supported Collector vector or raster-style item, display state, identity and extent source.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/CollectorResource.java
+  responsibility: Resolve a complete Collector project snapshot containing vectors and already-supported QGIS styles, and
+    reject incomplete referenced resources.
+- path: maplib/src/main/java/com/nextgis/maplib/map/TMSLayer.java
+  responsibility: Safely unpack local tile archives, atomically import one validated raster MBTiles database, and retain immutable
+    NGRc plus duplicate-safe Debug migration provenance.
+- path: maplib/src/main/java/com/nextgis/maplib/util/MbTilesInfo.java
+  responsibility: Validate raster MBTiles SQLite structure, integrity, format, zoom range and optional bounds before publication
+    or rendering.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LegacyTileMbtilesMath.java
+  responsibility: Convert legacy TMS/OSM rows to standard MBTiles rows and derive deterministic raster format and Web Mercator
+    bounds without Android dependencies.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalog.java
+  responsibility: Parse NGW search and children JSON for the shared lisa catalog key and collector_project entries.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LisaCatalogLookup.java
+  responsibility: Look up keyname lisa by search then subtree walk and list collector projects under that group.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
+  responsibility: Load one target NGW resource and resolve QGIS style URLs to their parent layer. Expose immutable per-invocation
+    child load outcome so failed requests differ from successful empty lists; retain legacy void API, sorting, cache and parcel
+    layout.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LayerConfigUtil.java
+  responsibility: Parse mobile render mode and layer origin configuration.
+- path: maplib/src/main/java/com/nextgis/maplib/util/MultiPolygonGeometryRepair.java
+  responsibility: Validate and repair only GeoMultiPolygon topology into one valid multi-part feature, report insufficient
+    ring positions separately, recover an unset collection CRS from nested geometry, and reject empty or non-polygonal repair
+    results.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureGeometryValidator.java
+  responsibility: Validate streamed NGW Polygon and MultiPolygon members with JTS instead of the legacy quadratic segment-pair
+    scan while preserving the previous member-by-member collection semantics.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoGeometryFactory.java
+  responsibility: Dispatch WKT geometry to the matching parser, including Polygon and MultiPolygon recovery paths.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/GeoMultiPolygon.java
+  responsibility: Split WKT polygon members by parenthesis depth so multipart geometry, outer rings and real holes survive
+    import and draft recovery.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PolygonEditClass.java
+  responsibility: Build a one-node tap sketch, insert subsequent/midpoint nodes in the selected ring, retain existing rings,
+    and publish the remaining background through the compact native projection.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPolygonEditClass.java
+  responsibility: Build one-node tap sketches, display insertion direction inside the selected ring, limit new MultiPolygon
+    geometry to one polygon part without flattening existing geometry, and compact the remaining native background.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MLP/PointEditClass.java
+  responsibility: Retain rich selected point/editor state while publishing the remaining logical-layer background through
+    the native payload projection.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiPointEditClass.java
+  responsibility: Retain rich multipart point/editor state while compacting the remaining native background without changing
+    its identities or geometry.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MLP/LineEditClass.java
+  responsibility: Keep rich line/vertex editing and send remaining background features through the compact projection with
+    label-query fallback inputs intact.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MLP/MultiLineEditClass.java
+  responsibility: Keep all line parts and rich editor/vertex state while compacting only the native logical-layer background
+    and retaining label inputs.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MLP/EditDirectionPolicy.java
+  responsibility: Resolve the ordered insertion successor without crossing an open line-part boundary, while wrapping a closed
+    polygon ring to its own first vertex.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilter.java
+  responsibility: Validate GNSS integrity and live batch timestamps, accept mock receiver extras without pedestrian smoothing,
+    adapt the robust motion and delayed sequence filters for the phone chip, and expose accepted display estimates and recording
+    points.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationUtil.java
+  responsibility: Format map measurements, including explicit square-metre to hectare conversion for ruler area labels.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationTrackFilterCore.java
+  responsibility: Retain valid movement through 160 km/h, reject corrupt fixes and material isolated spikes, and preserve
+    delayed fixes across long sampling gaps without Android test dependencies.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiter.java
+  responsibility: Legacy provider-arbitration adapter retained for compatibility; active recording uses GpsEventSource GNSS-only
+    output.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LocationProviderArbiterCore.java
+  responsibility: Legacy timed provider arbitration retained for compatibility and its historical tests; not used by track
+    or walk recording.
+- path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
+  responsibility: Index a private geometry snapshot in3857, return its nearest facet through4326 and the ellipsoid inverse
+    with explicit sphere nonconvergence fallback; retain no live layer/FID/workspace binding.
+- path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGuidancePolicy.java
+  responsibility: Select distance-based sound bands with outward hysteresis for caller-approved GPS or mock precision fixes
+    without Android dependencies.
+- path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
+  responsibility: Own application-wide GNSS and display-only network acquisition, GPS-first current-fix expiry, keep-alive
+    external NMEA without map listeners, shared filtered recording including mock receiver extras and native NMEA, original
+    GNSS/mock/NMEA precision subscriptions and owner-based high-frequency leases; schema4 exposes current rawGps measurement
+    milliseconds including existing seed without changing callback/retry/filter semantics; releasing app automatic owners
+    on explicit exit preserves Track/Walk recording listeners and their wake lock.
+- path: maplib/src/main/java/com/nextgis/maplib/util/LayerDatabaseTransaction.java
+  responsibility: Managed transactions, nested failure fencing and publication only after commit.
+- path: maplib/src/main/java/com/nextgis/maplib/util/FeatureSaveJournal.java
+  responsibility: Owning-database UUID journal for retry-safe feature and attachment insert.
+- path: maplib/src/main/java/com/nextgis/maplib/util/PendingTrackPoints.java
+  responsibility: Bounded durable ordered track queue with AtomicFile recovery and idempotent acknowledgement.
+- path: maplib/src/main/java/com/nextgis/maplib/map/MapTapGesture.java
+  responsibility: Density-aware short tap slop with cancellation of drag, long press and multitouch.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NGWLookupTable.java
+  responsibility: Compare account-owned lookup.items accepted by the current parser, including equal-count changed-key sets.
+    Handled IOException/NGException/JSONException preserve prior sync cache; silent or syntactically valid incompleteness
+    remains UNKNOWN in the central ngw-sync-and-storage contract. Preserve cache map identity and published-memory/single-save/throws/equal-next-no-write
+    policy; save(false) adds current numIoExceptions at each of its two existing sites; remote Hashtable values are nonnull.
+    Retain known HTTP-server provenance as metadata after the existing Parse increment; do not add a second error counter
+    or change cache/save semantics.
+- path: maplib/src/test/java/com/nextgis/maplib/map/NGWVectorLayerFullSnapshotHttpStatusTest.java
+  responsibility: Execute actual private full-snapshot downloader on SDK28:206 fails before streams/length/newstage;200 exact
+    bytes,203 prior2xx and404 resource-gone controls. Technical account/connection and owned Q temp only; no SQLite/map/socket/full
+    apply/native acceptance.
+- path: maplib/src/main/java/com/nextgis/maplib/util/SyncResultUtil.java
+  responsibility: Classify current account IO/Parse metadata and export/read four primitive fields plus a local exact SyncResult
+    owner token; malformed, stale, foreign or mixed failures remain generic with unchanged numeric counters.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NGWLayerSchemaCompat.java
+  responsibility: Keep optional three-argument metadata API and add a result-aware overload that signals only known temporary-server
+    HTTP failure while preserving null/UNKNOWN semantics.
+- path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/Connection.java
+  responsibility: Delegate structured child-load outcome to its root while retaining old void child-loading API and connection/cookie
+    policy.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwHttpException.java
+  responsibility: Carry only status/server primitives plus the existing IOException diagnostic for transient initial feature
+    GET; preserve existing retry classification.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwHttpResponseException.java
+  responsibility: Carry only status/server primitives with the same localized NGException message for initial resource metadata
+    HTTP failure; preserve checked-exception retry/catch policy.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NetworkUtil.java
+  responsibility: 'Keep transient/retry policy distinct from proven temporary-server reason: numeric429/5xx remain server;
+    external-database text is eligible only for422, never408/auth/missing/200. The three-line repair follows three actual
+    false-maintenance assertions; request counters and retry predicates remain unchanged.'
+- path: maplib/src/test/java/com/nextgis/maplib/map/LocalVectorBulkCacheReadinessTest.java
+  responsibility: Independent12 actual create/batch/SQL/native-readiness and new-object fromJSON repair controls, technical
+    SQLite/API28; no actual HTTP/GPX/native acceptance.
+- path: maplib/src/test/java/com/nextgis/maplib/datasource/GeometryRTreeRecoveryTest.java
+  responsibility: Independent11 actual RTree/legacy binary file oracles for clear persistence, missing/invalid/truncated load,
+    wrong child kinds, clean no-write and fresh-object readback; plain JVM only.
 public_contracts:
-  - id: render-resource-economy
-    symbol: MapDrawable.getRenderMemoryGuard, retryMemoryLimitedLayers and RenderMemoryGuard snapshot/hasResourceNotice/restrictions
-    path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryGuard.java
-    consumers: [app]
-  - id: point-firefly
-    symbol: SimpleMarkerStyle.MarkerStyleFirefly type 9
-    path: maplib/src/main/java/com/nextgis/maplib/display/SimpleMarkerStyle.java
-    consumers: [maplibui, app]
-  - id: compass-sector-visibility
-    symbol: MapDrawable.setCompassAccuracySectorVisible
-    path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    consumers: [app]
-  - id: track-send-settings
-    symbol: TrackSendSettings.isEnabled and migrateDefault
-    path: maplib/src/main/java/com/nextgis/maplib/util/TrackSendSettings.java
-    consumers: [maplibui, app]
-  - id: sync-workspace-session
-    symbol: SyncWorkspaceSession.enter, post, execute, start, bindUri and external delivery tickets
-    path: maplib/src/main/java/com/nextgis/maplib/util/SyncWorkspaceSession.java
-    consumers: [app, maplibui]
-  - id: project-script-host-api
-    symbol: ScriptReference, ScriptPackage and ProjectScriptHost API v1
-    path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java
-    consumers: [maplibui, app]
-  - id: ngw-required-fields
-    symbol: Field.isRequired
-    path: maplib/src/main/java/com/nextgis/maplib/datasource/Field.java
-    consumers: [maplibui]
-  - id: local-write-commit
-    symbol: LayerDatabaseTransaction.run and afterCommit
-    path: maplib/src/main/java/com/nextgis/maplib/util/LayerDatabaseTransaction.java
-    consumers: [maplib, maplibui]
-  - id: track-retry
-    symbol: PendingTrackPoints.drain and TrackLayer.insert
-    path: maplib/src/main/java/com/nextgis/maplib/util/PendingTrackPoints.java
-    consumers: [maplibui]
-  - id: asynchronous-track-refresh
-    symbol: MapDrawable.reloadCurrentTrackToMap and reloadTrackListToMap
-    path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    consumers: [app, maplibui]
-  - id: passive-walk-preview
-    symbol: MapDrawable.showWalkPreview
-    path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
-    consumers: [app]
-  - id: current-location-recording
-    symbol: GpsEventSource.RecordingListener, acquireBackgroundUpdates/releaseBackgroundUpdates, getLastDisplayLocation, setRecoveryReporter and GpsEventListener.onLocationUnavailable
-    path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
-    consumers: [app, maplibui]
-  - id: segmented-tracks
-    symbol: TrackLayer.getTracks returns GeoMultiLineString values
-    path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
-    consumers: [maplibui]
-  - id: map-host
-    symbol: MaplibreMapInteraction including transient azimuth endpoint drag and foreground resource-economy callbacks
-    path: maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java
-    consumers: [app, maplibui]
-  - id: gis-application
-    symbol: IGISApplication
-    path: maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
-    consumers: [maplibui, app]
-  - id: collector-metadata
-    symbol: CollectorProjectMetadata
-    path: maplib/src/main/java/com/nextgis/maplib/map/CollectorProjectMetadata.java
-    consumers: [maplibui, app]
-  - id: ngw-resource-url
-    symbol: NGWResourceUrl and ResourceGroup.loadTargetResource
-    path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
-    consumers: [app, maplibui]
-  - id: stakeout-geometry
-    symbol: StakeoutGeometryTarget and StakeoutGuidancePolicy
-    path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
-    consumers: [app]
-  - id: ngw-lookup-cache-content
-    symbol: NGWLookupTable.sync(String, Pair<Integer, Integer>, SyncResult)
-    path: maplib/src/main/java/com/nextgis/maplib/map/NGWLookupTable.java
-    consumers:
-    - maplibui
-    - app
-  - id: sync-failure-reasons
-    symbol: SyncResultUtil.beginSync(result), exportAccountFailureSnapshot, readAccountFailureReasons and endSync
-    path: maplib/src/main/java/com/nextgis/maplib/util/SyncResultUtil.java
-    consumers:
-    - app
-  - id: ngw-child-load-result
-    symbol: ResourceGroup.ChildrenLoadResult and ResourceGroup/Connection.loadChildrenWithResult
-    path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
-    consumers:
-    - maplibui
-    - app
-  - id: ngw-http-failure-provenance
-    symbol: NgwHttpException and NgwHttpResponseException status/server provenance; original checked exception types retained
-    path: maplib/src/main/java/com/nextgis/maplib/util/NgwHttpException.java
-    consumers:
-    - maplibui
-  - id: ngw-temporary-server-classification
-    symbol: NetworkUtil.isTemporaryNgwServerFailure versus isTransientNgwHttpError/isTransientNetworkFailure
-    path: maplib/src/main/java/com/nextgis/maplib/util/NetworkUtil.java
-    consumers:
-    - maplib
-    - maplibui
-    - app
-  - id: vector-spatial-cache-recovery
-    symbol: VectorLayer.create plus existing GeometryRTree.clear/load/save lifecycle; no new public API
-    path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
-    consumers:
-    - maplibui
-    - app
-settings_refs: [map-runtime-diagnostics, track_send, track_send_default_enabled_v1, lisa_project_scripts, scripts_expected, scripts_active, scripts_status, project_scripts_cache, feature_label_field, mobile_render_mode, render_mode, layer_origin, mobile, ngw_identity_backup, ngrc_provenance, legacy_underlay_migration, feature-save-journal, pending-track-points]
+- id: render-resource-economy
+  symbol: MapDrawable.getRenderMemoryGuard, retryMemoryLimitedLayers and RenderMemoryGuard snapshot/hasResourceNotice/restrictions
+  path: maplib/src/main/java/com/nextgis/maplib/map/RenderMemoryGuard.java
+  consumers:
+  - app
+- id: point-firefly
+  symbol: SimpleMarkerStyle.MarkerStyleFirefly type 9
+  path: maplib/src/main/java/com/nextgis/maplib/display/SimpleMarkerStyle.java
+  consumers:
+  - maplibui
+  - app
+- id: compass-sector-visibility
+  symbol: MapDrawable.setCompassAccuracySectorVisible
+  path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+  consumers:
+  - app
+- id: track-send-settings
+  symbol: TrackSendSettings.isEnabled and migrateDefault
+  path: maplib/src/main/java/com/nextgis/maplib/util/TrackSendSettings.java
+  consumers:
+  - maplibui
+  - app
+- id: sync-workspace-session
+  symbol: SyncWorkspaceSession.enter, post, execute, start, bindUri and external delivery tickets
+  path: maplib/src/main/java/com/nextgis/maplib/util/SyncWorkspaceSession.java
+  consumers:
+  - app
+  - maplibui
+- id: project-script-host-api
+  symbol: ScriptReference, ScriptPackage and ProjectScriptHost API v1
+  path: maplib/src/main/java/com/nextgis/maplib/scripts/ProjectScriptHost.java
+  consumers:
+  - maplibui
+  - app
+- id: ngw-required-fields
+  symbol: Field.isRequired
+  path: maplib/src/main/java/com/nextgis/maplib/datasource/Field.java
+  consumers:
+  - maplibui
+- id: local-write-commit
+  symbol: LayerDatabaseTransaction.run and afterCommit
+  path: maplib/src/main/java/com/nextgis/maplib/util/LayerDatabaseTransaction.java
+  consumers:
+  - maplib
+  - maplibui
+- id: track-retry
+  symbol: PendingTrackPoints.drain and TrackLayer.insert
+  path: maplib/src/main/java/com/nextgis/maplib/util/PendingTrackPoints.java
+  consumers:
+  - maplibui
+- id: asynchronous-track-refresh
+  symbol: MapDrawable.reloadCurrentTrackToMap and reloadTrackListToMap
+  path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+  consumers:
+  - app
+  - maplibui
+- id: passive-walk-preview
+  symbol: MapDrawable.showWalkPreview
+  path: maplib/src/main/java/com/nextgis/maplib/map/MapDrawable.java
+  consumers:
+  - app
+- id: current-location-recording
+  symbol: GpsEventSource.RecordingListener, acquireBackgroundUpdates/releaseBackgroundUpdates, getLastDisplayLocation, setRecoveryReporter
+    and GpsEventListener.onLocationUnavailable
+  path: maplib/src/main/java/com/nextgis/maplib/location/GpsEventSource.java
+  consumers:
+  - app
+  - maplibui
+- id: segmented-tracks
+  symbol: TrackLayer.getTracks returns GeoMultiLineString values
+  path: maplib/src/main/java/com/nextgis/maplib/map/TrackLayer.java
+  consumers:
+  - maplibui
+- id: map-host
+  symbol: MaplibreMapInteraction including transient azimuth endpoint drag and foreground resource-economy callbacks
+  path: maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java
+  consumers:
+  - app
+  - maplibui
+- id: gis-application
+  symbol: IGISApplication
+  path: maplib/src/main/java/com/nextgis/maplib/api/IGISApplication.java
+  consumers:
+  - maplibui
+  - app
+- id: collector-metadata
+  symbol: CollectorProjectMetadata
+  path: maplib/src/main/java/com/nextgis/maplib/map/CollectorProjectMetadata.java
+  consumers:
+  - maplibui
+  - app
+- id: ngw-resource-url
+  symbol: NGWResourceUrl and ResourceGroup.loadTargetResource
+  path: maplib/src/main/java/com/nextgis/maplib/util/NGWResourceUrl.java
+  consumers:
+  - app
+  - maplibui
+- id: stakeout-geometry
+  symbol: StakeoutGeometryTarget and StakeoutGuidancePolicy
+  path: maplib/src/main/java/com/nextgis/maplib/util/StakeoutGeometryTarget.java
+  consumers:
+  - app
+- id: ngw-lookup-cache-content
+  symbol: NGWLookupTable.sync(String, Pair<Integer, Integer>, SyncResult)
+  path: maplib/src/main/java/com/nextgis/maplib/map/NGWLookupTable.java
+  consumers:
+  - maplibui
+  - app
+- id: sync-failure-reasons
+  symbol: SyncResultUtil.beginSync(result), exportAccountFailureSnapshot, readAccountFailureReasons and endSync
+  path: maplib/src/main/java/com/nextgis/maplib/util/SyncResultUtil.java
+  consumers:
+  - app
+- id: ngw-child-load-result
+  symbol: ResourceGroup.ChildrenLoadResult and ResourceGroup/Connection.loadChildrenWithResult
+  path: maplib/src/main/java/com/nextgis/maplib/datasource/ngw/ResourceGroup.java
+  consumers:
+  - maplibui
+  - app
+- id: ngw-http-failure-provenance
+  symbol: NgwHttpException and NgwHttpResponseException status/server provenance; original checked exception types retained
+  path: maplib/src/main/java/com/nextgis/maplib/util/NgwHttpException.java
+  consumers:
+  - maplibui
+- id: ngw-temporary-server-classification
+  symbol: NetworkUtil.isTemporaryNgwServerFailure versus isTransientNgwHttpError/isTransientNetworkFailure
+  path: maplib/src/main/java/com/nextgis/maplib/util/NetworkUtil.java
+  consumers:
+  - maplib
+  - maplibui
+  - app
+- id: vector-spatial-cache-recovery
+  symbol: VectorLayer.create plus existing GeometryRTree.clear/load/save lifecycle; no new public API
+  path: maplib/src/main/java/com/nextgis/maplib/map/VectorLayer.java
+  consumers:
+  - maplibui
+  - app
+settings_refs:
+- map-runtime-diagnostics
+- track_send
+- track_send_default_enabled_v1
+- lisa_project_scripts
+- scripts_expected
+- scripts_active
+- scripts_status
+- project_scripts_cache
+- feature_label_field
+- mobile_render_mode
+- render_mode
+- layer_origin
+- mobile
+- ngw_identity_backup
+- ngrc_provenance
+- legacy_underlay_migration
+- feature-save-journal
+- pending-track-points
 storage_contracts:
-  - id: local-vector-tile-derived-cache
-    path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileDiskCache.java
-  - id: project_scripts_cache
-    path: maplib/src/main/java/com/nextgis/maplib/scripts/ScriptPackageStore.java
-  - id: feature-save-journal
-    path: maplib/src/main/java/com/nextgis/maplib/util/FeatureSaveJournal.java
-  - id: pending-track-points
-    path: maplib/src/main/java/com/nextgis/maplib/util/PendingTrackPoints.java
-  - id: ngw-snapshot-count-checkpoint
-    path: maplib/src/main/java/com/nextgis/maplib/util/NgwSnapshotCheckpoint.java
-  - id: layer-json
-    path: maplib/src/main/java/com/nextgis/maplib/map/Layer.java
-  - id: ngw-raster-layer-json
-    path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
-  - id: ngw-vector-identity-backup
-    path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
-invariant_refs: [INV-SQLITE-BOUNDED-ORIGINAL-READS, INV-SQLITE-PHASE-DIAGNOSTICS, INV-SQLITE-NATIVE-VECTORS, INV-RENDER-MEMORY-PRESSURE, INV-NATIVE-GEOJSON-PAYLOAD, INV-RENDER-MEMORY-NOTICE, INV-POINT-FIREFLY, INV-FEATURE-COPY, INV-WHOLE-OBJECT-TRANSFORM, INV-LOCAL-LOG-STARTUP, INV-TRACK-DELIVERY, INV-CONDITIONAL-REQUIRED, INV-PROJECT-SCRIPTS, INV-REQUIRED-FIELDS, INV-LAYER-ORDER, INV-TRACK-LAYER-TOP, INV-HOT-ADD-CONSISTENCY, INV-SPATIAL-CACHE-CONSISTENCY, INV-HIDDEN-VECTOR-TILE-IDENTIFY, INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS, INV-LOCAL-VECTOR-TILE-LABELS, INV-NO-TRACK-FLAGS, INV-LOCATION-CURSOR-TOP, INV-MAP-CAMERA-CONTROLS, INV-UNDERLAY-DISPLAY, INV-MAPLIBRE-BACKEND-COMPATIBILITY, INV-MAPLIBRE-VIEW-LIFECYCLE, INV-COLLECTOR-RESOURCE, INV-COLLECTOR-LAYER-IDENTITY, INV-COLLECTOR-RASTER-STYLES, INV-COLLECTOR-ISOLATION, INV-COLLECTOR-EDITABILITY, INV-COLLECTOR-RESUMABLE, INV-COLLECTOR-FORM-ATOMIC, INV-PROJECT-OPERATION-EXCLUSION, INV-NGRC-PRESERVE, INV-LEGACY-UNDERLAY-MIGRATION, INV-SYNC-ACCOUNT-ISOLATION, INV-VERSION-COUPLING, INV-CRASH-DRAFT-RECOVERY, INV-MULTIPOLYGON-REPAIR, INV-GEOMETRY-SKETCH-WORKFLOW, INV-GPS-TRACK-FILTER, INV-STAKEOUT-GUIDANCE, INV-LOCAL-VECTOR-LAYERS, INV-LOCAL-WRITE-COMMIT, INV-TRACK-RETRY, INV-TOOL-TAP-TOLERANCE, INV-NGW-LOOKUP-CACHE-CONTENT, INV-NGW-FULL-SNAPSHOT-ADMISSION, INV-NGW-USER-MESSAGES, INV-VECTOR-SPATIAL-CACHE-RECOVERY]
+- id: local-vector-tile-derived-cache
+  path: maplib/src/main/java/com/nextgis/maplib/map/LocalVectorTileDiskCache.java
+- id: project_scripts_cache
+  path: maplib/src/main/java/com/nextgis/maplib/scripts/ScriptPackageStore.java
+- id: feature-save-journal
+  path: maplib/src/main/java/com/nextgis/maplib/util/FeatureSaveJournal.java
+- id: pending-track-points
+  path: maplib/src/main/java/com/nextgis/maplib/util/PendingTrackPoints.java
+- id: ngw-snapshot-count-checkpoint
+  path: maplib/src/main/java/com/nextgis/maplib/util/NgwSnapshotCheckpoint.java
+- id: layer-json
+  path: maplib/src/main/java/com/nextgis/maplib/map/Layer.java
+- id: ngw-raster-layer-json
+  path: maplib/src/main/java/com/nextgis/maplib/map/NGWRasterLayer.java
+- id: ngw-vector-identity-backup
+  path: maplib/src/main/java/com/nextgis/maplib/map/NgwLayerIdentityBackup.java
+invariant_refs:
+- INV-SQLITE-BOUNDED-ORIGINAL-READS
+- INV-SQLITE-PHASE-DIAGNOSTICS
+- INV-SQLITE-NATIVE-VECTORS
+- INV-RENDER-MEMORY-PRESSURE
+- INV-NATIVE-GEOJSON-PAYLOAD
+- INV-RENDER-MEMORY-NOTICE
+- INV-POINT-FIREFLY
+- INV-FEATURE-COPY
+- INV-WHOLE-OBJECT-TRANSFORM
+- INV-LOCAL-LOG-STARTUP
+- INV-TRACK-DELIVERY
+- INV-CONDITIONAL-REQUIRED
+- INV-PROJECT-SCRIPTS
+- INV-REQUIRED-FIELDS
+- INV-LAYER-ORDER
+- INV-TRACK-LAYER-TOP
+- INV-HOT-ADD-CONSISTENCY
+- INV-SPATIAL-CACHE-CONSISTENCY
+- INV-HIDDEN-VECTOR-TILE-IDENTIFY
+- INV-LOCAL-VECTOR-TILE-RESOURCE-BOUNDS
+- INV-LOCAL-VECTOR-TILE-LABELS
+- INV-NO-TRACK-FLAGS
+- INV-LOCATION-CURSOR-TOP
+- INV-MAP-CAMERA-CONTROLS
+- INV-UNDERLAY-DISPLAY
+- INV-MAPLIBRE-BACKEND-COMPATIBILITY
+- INV-MAPLIBRE-VIEW-LIFECYCLE
+- INV-COLLECTOR-RESOURCE
+- INV-COLLECTOR-LAYER-IDENTITY
+- INV-COLLECTOR-RASTER-STYLES
+- INV-COLLECTOR-ISOLATION
+- INV-COLLECTOR-EDITABILITY
+- INV-COLLECTOR-RESUMABLE
+- INV-COLLECTOR-FORM-ATOMIC
+- INV-PROJECT-OPERATION-EXCLUSION
+- INV-NGRC-PRESERVE
+- INV-LEGACY-UNDERLAY-MIGRATION
+- INV-SYNC-ACCOUNT-ISOLATION
+- INV-VERSION-COUPLING
+- INV-CRASH-DRAFT-RECOVERY
+- INV-MULTIPOLYGON-REPAIR
+- INV-GEOMETRY-SKETCH-WORKFLOW
+- INV-GPS-TRACK-FILTER
+- INV-STAKEOUT-GUIDANCE
+- INV-LOCAL-VECTOR-LAYERS
+- INV-LOCAL-WRITE-COMMIT
+- INV-TRACK-RETRY
+- INV-TOOL-TAP-TOLERANCE
+- INV-NGW-LOOKUP-CACHE-CONTENT
+- INV-NGW-FULL-SNAPSHOT-ADMISSION
+- INV-NGW-USER-MESSAGES
+- INV-VECTOR-SPATIAL-CACHE-RECOVERY
 global_docs:
-  - docs/architecture/point-firefly.md
-  - docs/architecture/feature-copy-transform.md
-  - docs/guides/project-synchronization-user-guide.md
-  - docs/architecture/conditional-form-rules.md
-  - docs/guides/form-behavior-user-guide.md
-  - docs/architecture/project-scripts.md
-  - docs/guides/project-scripts-user-guide.md
-  - docs/reference/project-scripts-verification.md
-  - docs/architecture/location-pipeline.md
-  - docs/architecture/map-rendering.md
-  - docs/architecture/collector-projects.md
-  - docs/architecture/ngw-sync-and-storage.md
-  - docs/architecture/crash-recovery.md
-  - docs/architecture/stakeout.md
-  - docs/reference/build-matrix.md
-  - docs/reference/flavors-and-versioning.md
-smoke_tests: [AUTO-SQLITE-ORIGINAL-BATCH-UNITS, AUTO-SQLITE-PHASE-UNITS, SMOKE-SQLITE-PHASE-TABLET, AUTO-SQLITE-NATIVE-VECTORS, AUTO-RENDER-MEMORY-UNITS, AUTO-RENDER-MEMORY, SMOKE-RENDER-MEMORY-NATIVE, AUTO-POLYGON-STYLE-CONTROLS, AUTO-POINT-FIREFLY, AUTO-FEATURE-EDITING, SMOKE-FEATURE-COPY-TRANSFORM, SMOKE-MAP-RUNTIME-DIAGNOSTICS, SMOKE-TRACK-DELIVERY, SMOKE-FORM-APPEARANCE, SMOKE-CONDITIONAL-REQUIRED, SMOKE-FORM-NAVIGATION, SMOKE-PROJECT-SCRIPTS, SMOKE-REQUIRED-FIELDS, AUTO-MAPLIB-UNIT, AUTO-APP-DEBUG, AUTO-APP-VERSION-MATRIX, SMOKE-MAP-COLD-START, SMOKE-POLYGON-LABEL-ANCHOR, SMOKE-MAP-OPENGL-COMPATIBILITY, SMOKE-MAP-SURFACE-LIFECYCLE, SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY, SMOKE-LOCAL-VECTOR-TILE-STRESS, SMOKE-LOCATION-CURSOR-TOP, SMOKE-MAP-CAMERA-CONTROLS, SMOKE-UNDERLAY-DISPLAY, SMOKE-NGRC-ORDER, SMOKE-NGRC-PRESERVE, SMOKE-UPDATE-DATA-PRESERVE, SMOKE-DEBUG-UNDERLAY-MIGRATION, SMOKE-HOT-RASTER, SMOKE-COLLECTOR-IMPORT, SMOKE-LAYER-SYNC-SETTINGS, SMOKE-COLLECTOR-IDENTITY, SMOKE-COLLECTOR-RESUME, SMOKE-COLLECTOR-INCOMPLETE, SMOKE-COLLECTOR-SWITCH, SMOKE-PROJECT-MANAGEMENT, SMOKE-SCHEMA-REBUILD-GUARD, SMOKE-FORM-ROLLBACK, SMOKE-MULTI-ACCOUNT-SYNC, SMOKE-SYNC-INTERRUPT-ACTION, SMOKE-NGW-LARGE-PULL-CACHE, SMOKE-NGW-URL-IMPORT, SMOKE-LOCAL-VECTOR-LAYERS, SMOKE-WALK, SMOKE-GPS-RECORDING, SMOKE-MULTIPOLYGON-REPAIR, SMOKE-GEOMETRY-SKETCH-WORKFLOW, SMOKE-TRACK-NO-FLAGS, SMOKE-CRASH-DRAFT-RECOVERY, SMOKE-STAKEOUT, AUTO-RELIABILITY-NATIVE, SMOKE-RELIABILITY-FAILURES, SMOKE-TOOL-TAP, SMOKE-NGID-AND-RESOURCE-ICONS, AUTO-NGW-LOOKUP-CACHE-SYNC, AUTO-NGW-SYNC-ADMISSION, AUTO-NGW-USER-MESSAGES, AUTO-VECTOR-SPATIAL-CACHE-RECOVERY]
-upstream_hotspots: [POLYGON-STYLE-CONTROLS, MAP-DRAWABLE, RASTER-ANCHOR, RASTER-MBTILES, MAP-HOST, MAPLIBRE-BACKEND, COLLECTOR-RESOURCE]
-
-# Consumer verification preserves library identities, version mapping and GIS contracts; see docs/runbooks/automated-tests.md.
+- docs/architecture/point-firefly.md
+- docs/architecture/feature-copy-transform.md
+- docs/guides/project-synchronization-user-guide.md
+- docs/architecture/conditional-form-rules.md
+- docs/guides/form-behavior-user-guide.md
+- docs/architecture/project-scripts.md
+- docs/guides/project-scripts-user-guide.md
+- docs/reference/project-scripts-verification.md
+- docs/architecture/location-pipeline.md
+- docs/architecture/map-rendering.md
+- docs/architecture/collector-projects.md
+- docs/architecture/ngw-sync-and-storage.md
+- docs/architecture/crash-recovery.md
+- docs/architecture/stakeout.md
+- docs/reference/build-matrix.md
+- docs/reference/flavors-and-versioning.md
+smoke_tests:
+- AUTO-SQLITE-ORIGINAL-BATCH-UNITS
+- AUTO-SQLITE-PHASE-UNITS
+- SMOKE-SQLITE-PHASE-TABLET
+- AUTO-SQLITE-NATIVE-VECTORS
+- AUTO-RENDER-MEMORY-UNITS
+- AUTO-RENDER-MEMORY
+- SMOKE-RENDER-MEMORY-NATIVE
+- AUTO-POLYGON-STYLE-CONTROLS
+- AUTO-POINT-FIREFLY
+- AUTO-FEATURE-EDITING
+- SMOKE-FEATURE-COPY-TRANSFORM
+- SMOKE-MAP-RUNTIME-DIAGNOSTICS
+- SMOKE-TRACK-DELIVERY
+- SMOKE-FORM-APPEARANCE
+- SMOKE-CONDITIONAL-REQUIRED
+- SMOKE-FORM-NAVIGATION
+- SMOKE-PROJECT-SCRIPTS
+- SMOKE-REQUIRED-FIELDS
+- AUTO-MAPLIB-UNIT
+- AUTO-APP-DEBUG
+- AUTO-APP-VERSION-MATRIX
+- SMOKE-MAP-COLD-START
+- SMOKE-POLYGON-LABEL-ANCHOR
+- SMOKE-MAP-OPENGL-COMPATIBILITY
+- SMOKE-MAP-SURFACE-LIFECYCLE
+- SMOKE-HIDDEN-VECTOR-TILE-IDENTIFY
+- SMOKE-LOCAL-VECTOR-TILE-STRESS
+- SMOKE-LOCATION-CURSOR-TOP
+- SMOKE-MAP-CAMERA-CONTROLS
+- SMOKE-UNDERLAY-DISPLAY
+- SMOKE-NGRC-ORDER
+- SMOKE-NGRC-PRESERVE
+- SMOKE-UPDATE-DATA-PRESERVE
+- SMOKE-DEBUG-UNDERLAY-MIGRATION
+- SMOKE-HOT-RASTER
+- SMOKE-COLLECTOR-IMPORT
+- SMOKE-LAYER-SYNC-SETTINGS
+- SMOKE-COLLECTOR-IDENTITY
+- SMOKE-COLLECTOR-RESUME
+- SMOKE-COLLECTOR-INCOMPLETE
+- SMOKE-COLLECTOR-SWITCH
+- SMOKE-PROJECT-MANAGEMENT
+- SMOKE-SCHEMA-REBUILD-GUARD
+- SMOKE-FORM-ROLLBACK
+- SMOKE-MULTI-ACCOUNT-SYNC
+- SMOKE-SYNC-INTERRUPT-ACTION
+- SMOKE-NGW-LARGE-PULL-CACHE
+- SMOKE-NGW-URL-IMPORT
+- SMOKE-LOCAL-VECTOR-LAYERS
+- SMOKE-WALK
+- SMOKE-GPS-RECORDING
+- SMOKE-MULTIPOLYGON-REPAIR
+- SMOKE-GEOMETRY-SKETCH-WORKFLOW
+- SMOKE-TRACK-NO-FLAGS
+- SMOKE-CRASH-DRAFT-RECOVERY
+- SMOKE-STAKEOUT
+- AUTO-RELIABILITY-NATIVE
+- SMOKE-RELIABILITY-FAILURES
+- SMOKE-TOOL-TAP
+- SMOKE-NGID-AND-RESOURCE-ICONS
+- AUTO-NGW-LOOKUP-CACHE-SYNC
+- AUTO-NGW-SYNC-ADMISSION
+- AUTO-NGW-USER-MESSAGES
+- AUTO-VECTOR-SPATIAL-CACHE-RECOVERY
+upstream_hotspots:
+- POLYGON-STYLE-CONTROLS
+- MAP-DRAWABLE
+- RASTER-ANCHOR
+- RASTER-MBTILES
+- MAP-HOST
+- MAPLIBRE-BACKEND
+- COLLECTOR-RESOURCE

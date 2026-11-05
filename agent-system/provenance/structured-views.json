@@ -1,0 +1,17 @@
+{
+  "format": "lisa.agent-system.module-structured-views.v1",
+  "owner": "android_projects/android_gisapp/maplib",
+  "views": {
+    "docs/manifest.yaml": {
+      "layout_id": "lisa:maplib:metadata:maplib-module-manifest",
+      "sha256_utf8_lf": "20002e9b9212e7e1624eddfd40b2d3aac34dd92ad2a905dd4113d8ff97452520",
+      "source_fingerprints": {
+        "agent-system/provenance/maplib-module-manifest.json": "0985d17cb7aa70e14473a089ace6e1304ab37941fc2b00dd891eb115db6b8695",
+        "docs/scripts/module_manifest_knowledge.py": "6010dfb9a7cfc2cfe4f1afbfde9d865f9d225f07878bac5cf1e99d3ade68405c",
+        "docs/scripts/structured_view_proof.py": "bae9d5c0273dbe26bfa4c4467c2c7210cbc75c1677cc25a9a6a4cf347b6bb54c"
+      },
+      "ordered_records_sha256": "d575b545bb8c624ee21d53e9ee3244f00c780164026fa1c51e2d3c8fb3a06d53",
+      "ordered_count": 239
+    }
+  }
+}

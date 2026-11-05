@@ -33,9 +33,7 @@ six owners remain required. This source migration does not finish the goal.
 
 The [module manifest records](knowledge/maplib-module-manifest) preserve 14
 ordered fields in 239 records. Their [provenance](provenance/maplib-module-manifest.json)
-binds the complete original YAML and every member to Git. The
-[local manifest](../docs/manifest.yaml) is the ordinary editing address during
-this preservation phase. The next gate checks the shared reader and authoring.
+binds the complete original YAML and every member to Git. The [local manifest](../docs/manifest.yaml) is generated from those records.
 
 The [original pack review](migration/pack-review.json) retains both identify
 descriptions. The [source-version review](migration/identify-source-version-review.json)
@@ -44,10 +42,22 @@ pinned library source. Native verification remains open.
 
 The two SQLite guides have [20 typed records](knowledge/documentation) and
 a [byte-addressed source map](provenance/documentation.json). The original
-Markdown addresses remain the ordinary entry points during preservation.
+Markdown addresses continue to serve ordinary readers.
 
 The root and module READMEs have 133 reviewed [owner records](knowledge/documentation)
 and an [exact Git source map](provenance/documentation.json). Dated evidence,
-current contracts and mixed notes have separate statuses. Original Markdown
-addresses serve ordinary readers during preservation. Shared authoring and
-client acceptance are separate stages.
+current contracts and mixed notes have separate statuses. The same Markdown
+addresses serve ordinary readers.
+
+The ordinary App tools generate the library's declared Markdown and YAML
+views from these records. Run them from the Android App repository root.
+
+```powershell
+py -3.13 -B docs/scripts/prose_knowledge.py --write --module maplib
+py -3.13 -B docs/scripts/structured_view_proof.py --write --module maplib
+py -3.13 -B docs/scripts/validate_docs.py --module maplib --require-pack
+```
+
+Commit record edits, refreshed views and the proof together. Original Git
+objects remain available through their source maps. Client acceptance and
+dependency adoption have separate gates.

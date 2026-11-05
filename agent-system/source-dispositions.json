@@ -13,7 +13,7 @@
     },
     {
       "path": "agent-system/README.md",
-      "sha256": "e37c05f5893fca680fe68f25730a27bbb3069d76a48b6358feb69a735a649d11",
+      "sha256": "696ea40cfd6e73ce8b8102b047e0dbe8bcf88fb2dfffbe4f4446b21ece5fe38b",
       "sha256_scope": "utf8_lf",
       "category": "working_bridge",
       "applies_to": [
@@ -32,16 +32,6 @@
       "reason": "Pinned exact source excerpts and typed manifest address for one unresolved local-pack wording contradiction. Retain as migration provenance; product behavior is not reviewed, no exclusion or deletion authority."
     },
     {
-      "path": "docs/manifest.yaml",
-      "sha256": "6c52f116009ad4e8753c79e3661ef1073ba538e42e94c2e7a14fde97c1a14b9b",
-      "sha256_scope": "utf8_lf",
-      "category": "working_bridge",
-      "applies_to": [
-        "."
-      ],
-      "reason": "Existing YAML remains the ordinary module documentation route during typed preservation."
-    },
-    {
       "path": "agent-system/provenance/maplib-module-manifest.json",
       "sha256": "0985d17cb7aa70e14473a089ace6e1304ab37941fc2b00dd891eb115db6b8695",
       "sha256_scope": "utf8_lf",
@@ -50,26 +40,6 @@
         "docs/manifest.yaml"
       ],
       "reason": "Original Git object, complete field spans and ordered module record witnesses."
-    },
-    {
-      "path": "docs/sqlite-vector-source-bridge.md",
-      "sha256": "201a6f44e863c1b205c486984424391e3766f46accf9dcb73da6a480f1ee8b57",
-      "sha256_scope": "utf8_lf",
-      "category": "working_bridge",
-      "applies_to": [
-        "."
-      ],
-      "reason": "Individually reviewed complete owner guide with an exact typed inverse. This Markdown address remains the ordinary source entrance during preservation."
-    },
-    {
-      "path": "docs/sqlite-vector-tile-buffer.md",
-      "sha256": "8189d59de7c826bd92127b78cd6c003632a19269906dad271ec08f0ba1d7e595",
-      "sha256_scope": "utf8_lf",
-      "category": "working_bridge",
-      "applies_to": [
-        "."
-      ],
-      "reason": "Individually reviewed complete owner guide with an exact typed inverse. This Markdown address remains the ordinary source entrance during preservation."
     },
     {
       "path": "agent-system/provenance/documentation.json",
@@ -94,26 +64,6 @@
         "docs/manifest.yaml"
       ],
       "reason": "Individually verified historical and current source witnesses for identify visibility. Runtime acceptance remains open."
-    },
-    {
-      "path": "README.md",
-      "sha256": "64d8e6fa66b12f2ec274c958e9b8159dae3e87100a49585f680afc9097ec56ae",
-      "sha256_scope": "utf8_lf",
-      "category": "working_bridge",
-      "applies_to": [
-        "."
-      ],
-      "reason": "Complete original README reconstructed from reviewed owner records. This Markdown address serves the ordinary preservation route."
-    },
-    {
-      "path": "docs/README.md",
-      "sha256": "41aad4ba7842237628b56fdd8c98fb529729e99b320d5084905c46fe5f08c5c2",
-      "sha256_scope": "utf8_lf",
-      "category": "working_bridge",
-      "applies_to": [
-        "."
-      ],
-      "reason": "Complete original README reconstructed from reviewed owner records. This Markdown address serves the ordinary preservation route."
     }
   ]
 }
