@@ -1,7 +1,7 @@
 # maplib knowledge sources
 
 This physical owner participates in the WHOLE six-owner LISA restructuring.
-The complete unchanged [AGENTS](../AGENTS.md) is authored as logical policy,
+The original AGENTS.md is authored as logical policy,
 contracts and individually separated historical evidence in [knowledge/policy](knowledge/policy).
 The [inverse map](policy-migration.json) pins the original Git object and covers
 every normalized character. Equal-looking text in another owner is not merged
@@ -23,8 +23,8 @@ when LISA is absent; do not create a private scanner or claim an unchecked repla
 The default foreign-owner basis is committed HEAD; builds/checks over uncommitted
 owner changes must explicitly declare this owner live in the shared protocol.
 
-Existing AGENTS, Cursor rules, validators and hooks remain effective until actual
-measured client cutover. Library Merge Commit precedes a fetched merged app
+The [working entrance](../AGENTS.md) and Cursor rule open the shared scoped reader.
+Existing validators and hooks still apply. Library Merge Commit precedes a fetched merged app
 gitlink; this open-PR source is not an adopted app dependency. Product code,
 versions, data and app index pins are unchanged. Remaining contracts/resources/
 scenarios, tasks and independent lifecycle states, defects, risks/questions,
