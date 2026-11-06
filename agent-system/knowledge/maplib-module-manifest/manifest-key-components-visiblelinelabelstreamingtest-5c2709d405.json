@@ -1,0 +1,45 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": {
+        "path": "maplib/src/test/java/com/nextgis/maplib/map/VisibleLineLabelStreamingTest.java",
+        "responsibility": "Assert full-original streaming placement/style/dateline parity, candidate ownership without retained line geometry, late UI properties and cancellation before read/during scan/before publication."
+      }
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "key_components"
+    }
+  },
+  "id": "lisa:maplib:contract:manifest-key-components-visiblelinelabelstreamingtest-5c2709d405",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:contract:manifest-key-components-visiblelinelabelstreamingtest-5c2709d405"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

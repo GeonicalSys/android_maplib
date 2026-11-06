@@ -1,0 +1,78 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- `GpsEventSource` владеет общим потоком позиции и отдельным GNSS-only выходом",
+        "  записи. Карта получает свежий GPS (чип или mock) и Network только без GPS,",
+        "  метрический круг accuracy и",
+        "  геодезический сектор точности компаса (`UserLocationGeometry`) длиной 56",
+        "  логических пикселей при текущем zoom. Заливка сектора 0.24 дополнена белым",
+        "  контуром 2.8 px с синим контуром 1.2 px поверх него. «Орбита-кольцо»",
+        "  оставляет прозрачное окно диаметром 21 dp с синей точкой 5 dp с белой обводкой 2 dp в центре.",
+        "  Синий обод имеет внешний радиус 13 dp: он утолщён на 1 dp наружу за счёт",
+        "  белого обода, чей внешний радиус 15.2 dp и тонкая тёмная кромка сохранены.",
+        "  Заливки accuracy и компаса также освобождают окно; внутренний контур сектора",
+        "  скрыт под непрозрачным ободом. Треугольник остаётся 16 × 14 dp.",
+        "  Общий canvas 72 dp центрирован на фиксе",
+        "  и содержит треугольник при любом повороте. Компас приоритетен",
+        "  даже на остановке, при его недоступности — курс движущегося фикса; без обоих",
+        "  направлений остаётся круг. Legacy type=stand/go сохранён, has_direction",
+        "  выбирает ресурс, bearing — вычисленное направление. Host обновляет сектор",
+        "  и треугольник без нового GPS, в том числе при expiry компаса и смене камеры.",
+        "  GPS bearing не создаёт сектор компаса. Источник очищает устаревшую",
+        "  позицию по монотонному времени, в том числе после сна."
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "GPS display, cursor geometry and independent recording stream"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:gps-display-cursor-geometry-and-independent-recording-stream",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:gps-display-cursor-geometry-and-independent-recording-stream"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

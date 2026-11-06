@@ -1,0 +1,78 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Lookup-кеш: полный набор ключей и значения — исторический срез8ca/9",
+        "",
+        "`NGWLookupTable.sync` обновляет существующий map при изменении полного",
+        "содержимого; одинаковое число строк не доказывает равенство ключей. Сравнение",
+        "использует ненулевое remote значение из Hashtable, поэтому новый ключ не",
+        "разыменовывает отсутствующее локальное значение. SYNC_NONE и сохранность",
+        "старого кеша при обработанных IOException/NGException/JSONException оставлены.",
+        "Синтаксически valid-but-incomplete/silent partial snapshot не проверен на",
+        "полноту. Вопрос полноты остаётся UNKNOWN в",
+        "[центральном контракте](../../docs/architecture/ngw-sync-and-storage.md). Порядок",
+        "неизменённого кеша, API/version/clock и прежний save(false) оставлены.",
+        "Actual public sync защищён9 App JVM методами; baseline1→0 AssertionFAIL,",
+        "GREEN9 PASS, LisaDebug current-source compile и BelkaRelease PASS37с.",
+        "Это контракт own live8ca; committed App F61 ещё не содержит исправление",
+        "и не является принятой поставкой. Нативная/NGW/дисковая приёмка не выполнялась.",
+        "В центральном контракте отдельно разобраны публикация памяти при save(false),",
+        "повтор записи и жизненный цикл prefetch/delete/account; эти вопросы открыты.",
+        "",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Historical lookup-key repair and open full-snapshot limits"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:historical-lookup-key-repair-and-open-full-snapshot-limits",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:historical-lookup-key-repair-and-open-full-snapshot-limits"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

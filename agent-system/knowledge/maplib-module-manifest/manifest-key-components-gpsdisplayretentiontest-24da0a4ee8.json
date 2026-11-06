@@ -1,0 +1,45 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": {
+        "path": "maplib/src/test/java/com/nextgis/maplib/location/GpsDisplayRetentionTest.java",
+        "responsibility": "Verify unchanged network timestamps and accuracy, stale recording rejection, shared automatic ownership and structured diagnostics; schema4 absent raw measurement remains sentinel-1 and recovered measurement time comes from the independently created Location rather than callback receipt age."
+      }
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "key_components"
+    }
+  },
+  "id": "lisa:maplib:contract:manifest-key-components-gpsdisplayretentiontest-24da0a4ee8",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:contract:manifest-key-components-gpsdisplayretentiontest-24da0a4ee8"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

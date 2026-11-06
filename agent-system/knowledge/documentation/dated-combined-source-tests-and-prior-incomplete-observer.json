@@ -1,0 +1,73 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Core4+App15 исполнены совместно: baseline19/4 assertion FAIL/15 controls,",
+        "затем19PASS/0errors/skips (Core1.905с/App2.298с, Gradle35с). App15 включает прежние",
+        "8 controls, revised false-save и6 новых, а не прибавляется к прежним9.",
+        "BelkaRelease Java/Kotlin source compile0/39с, exact100 task set при другом порядке;",
+        "все7 процессов завершились естественно. Первый compile dry observer не сохранил",
+        "native exit после postdiagnostic сбоя: он UNKNOWN/NOT_PASS; восстановлен только",
+        "owned Q helper, повторён dry-run, затем actual compile один раз. Общего gate PASS нет.",
+        "",
+        "Карточки: [206 и полная recipe](../update-reports/entries/maplib-20261030-full-snapshot-http206.md),",
+        "[сигнал ошибки сохранения](../update-reports/entries/maplib-20261030-lookup-save-failure.md).",
+        "UI/pins не менялись. Никакой SQL/full apply/device/native/real-server приёмки;",
+        "предыдущие clock19/journal22/storage21/prefetch12 и desktop1117/1192 не запускались.",
+        "",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Dated combined source tests and prior incomplete observer"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:evidence:dated-combined-source-tests-and-prior-incomplete-observer",
+  "kind": "evidence",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:evidence:dated-combined-source-tests-and-prior-incomplete-observer"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "documentation"
+}

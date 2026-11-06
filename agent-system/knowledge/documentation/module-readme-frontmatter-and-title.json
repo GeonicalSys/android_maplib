@@ -1,0 +1,734 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "",
+        "# maplib — GIS model, storage, NGW и MapLibre",
+        ""
+      ]
+    },
+    "frontmatter": {
+      "role": "original_frontmatter_lines",
+      "value": [
+        "title: maplib — GIS model, storage, NGW и MapLibre",
+        "module_id: maplib",
+        "last_verified: 2026-11-02"
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Module README frontmatter and title"
+    },
+    "typed-frontmatter": {
+      "role": "reviewed_frontmatter_values",
+      "value": {
+        "last_verified": "2026-11-02",
+        "module_id": "maplib",
+        "title": "maplib — GIS model, storage, NGW и MapLibre"
+      }
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:module-readme-frontmatter-and-title",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:module-readme-frontmatter-and-title"
+    ]
+  },
+  "relations": [
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:known-ngw-class-drift-takes-the-verified-metadata-repair-route",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:two-save-metadata-order-and-retry-after-partial-persistence",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-jvm-red-green-assertion-subtype-and-consumer-compile",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:dated-pbf-disk-cache-changes-with-historical-http-compatibility-wording",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:cancellable-bounded-sqlite-session-admission",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-technical-tests-and-historical-apk-request",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:opt-in-render-profiler-with-bounded-safe-fields",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:bounded-per-request-and-aggregate-diagnostic-accounting",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:clock-domains-and-limits-of-interpreting-samples",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:stop-snapshot-active-scopes-and-summary-denominators",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-all-maplib-gate-independent-dense-run-and-limits",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:sqlite-typed-attributes-and-bounded-full-original-reads",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:small-blob-window-algorithm-and-dated-tablet-observations",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:local-phase-diagnostics-bounded-scopes-and-safe-payload",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:callback-observation-boundary-and-historical-phase-measurements",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:classic-equivalent-tile-query-buffer-and-native-limits",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:viewport-label-streaming-with-full-originals",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:direct-sqlite-source-ownership-and-version-limited-http-reference",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:mvt-property-codec-supported-renderers-and-explicit-refusal",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:full-geometry-anchors-line-labels-and-host-edit-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-http-removal-and-targeted-tests-with-native-gates-open",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:historical-payload-profile-and-compatibility-projection-contract",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:default-sparsity-limits-and-full-edit-payload",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:risk:map-memory-and-native-renderer-acceptance-boundaries",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:live-memory-guard-policy-and-meaning-of-counters",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:full-source-policy-and-historical-http-retry-transport",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:bounded-derived-disk-cache-and-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:map-lifecycle-and-memory-notification-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:diagnostics-measure-process-counters-without-per-layer-allocation-proof",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:empty-renderer-handles-and-legacy-index-contract-with-dated-crash-scope",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:track-color-ownership-and-exact-core-and-glow-settings",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:independent-pattern-and-outline-settings-and-native-image-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:pixel-exact-repeated-motif-reduction-and-full-fallback",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:firefly-marker-compatibility-and-native-source-children",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:historical-debug-and-release-version-mapping",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:geometry-copy-transform-and-gesture-boundaries",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:compass-sector-preference-and-preserved-cursor-properties",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:gps-snapshot-v3-reason-timers-and-rate-limited-diagnostics",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:shared-track-store-and-lossless-legacy-migration",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:after-commit-ready-change-selection-and-full-clock-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:confirmed-project-clock-and-independent-reads-during-write",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:persistent-format-compatibility-and-limited-failed-write-guarantee",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-19-test-clock-result-and-variant-specific-compile",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:background-acquisition-and-display-only-network-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:gps-snapshot-v4-passive-probe-and-unconfirmed-causal-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:watchdog-boundaries-and-historical-http-diagnostic-field",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:local-only-logging-and-canonical-form-pair-hashing",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:track-intent-and-independent-server-registration",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:cascade-initial-selections-and-exact-style-preview-reuse",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:bounded-conditional-rules-parser-and-unsupported-input-refusal",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:cascading-lookup-keys-and-supported-historical-values",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:lower-library-domain-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-consumer-diagnostic-version-mapping",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:ngw-required-field-metadata-persistence-and-ui-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:gps-power-policy-separate-from-app-exemption",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:nullable-rssi-and-isolated-device-scan-identities",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:track-only-mode-scope-and-captured-map-history-refresh",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:feature-equality-and-name-key-indexing",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:snapshot-timeouts-read-only-cancellation-and-mutation-completion",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:full-snapshot-checkpoint-eligibility-and-sync-owner",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:rendering-module-background-modes-and-opengl-compatibility",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:independent-style-data-and-hot-add-apply-barrier",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:style-replacement-releases-detached-source-generations",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:direct-sqlite-originals-legacy-metadata-and-visible-only-identify",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:cold-form-recovery-and-live-touch-host-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:rule-styles-label-zoom-and-interior-geometry-anchors",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:cursor-overlay-order-and-derived-azimuth-layers",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:owning-map-resolution-account-retry-and-sync-progress-scope",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:schema-metadata-repair-and-full-streamed-ngw-pull",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:attachment-metadata-and-atomic-incremental-pull",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:hidden-vector-reload-resource-url-and-catalogue-traversal",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:collector-composition-and-separate-server-style-identity",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:editable-flag-sync-direction-and-bounded-full-fill-diagnostics",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:fingerprint-aware-schema-rebuild-and-local-geojson-policy",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:bounded-kml-gpx-point-import-and-independent-index-recovery",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:atomic-layer-configuration-and-spatial-reader-writer-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:feature-display-name-and-precise-topology-repair-scope",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:tap-sketch-vertices-wkt-geometry-and-cold-recovery",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:metric-area-and-current-maplibre-measurement-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:gps-display-cursor-geometry-and-independent-recording-stream",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:external-gnss-origin-transport-framing-and-lifecycle",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:nearest-facet-projection-and-independent-foreground-precision-lease",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:unique-layer-storage-and-owning-workspace-database",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:server-geometry-validation-and-preserved-layer-order",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:raster-mbtiles-validation-and-legacy-tile-coordinate-conversion",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:dependency-direction-opengl-and-supported-raster-formats",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:topology-repair-and-recording-geometry-guardrails",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:stakeout-crs-collector-support-and-resource-url-restrictions",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:import-format-constraints-and-consumer-version-matrix",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:rendering-order-and-opengl-dependency-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:style-inheritance-zoom-gates-and-cursor-stacking-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:cold-save-destroyed-renderer-and-topology-error-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:ngw-fill-deferred-style-reload-and-local-visibility-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:visible-only-identify-and-direct-sqlite-diagnostics",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:track-ownership-provider-filtering-and-distance-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:spatial-cache-style-concurrency-and-temporary-server-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:url-crs-sqlite-transaction-and-geometry-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:editable-flags-collector-composition-and-style-identity-diagnosis",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:owned-source-tests-and-native-smoke-entry-references",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:gps-background-ownership-and-stationary-correction",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:confirmed-movement-and-bounded-original-sample-buffer",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:independent-walk-preview-and-reserved-layer-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:display-candidate-versus-confirmed-movement",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:shared-underlay-storage-stream-import-and-project-references",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:reference-repair-and-preserved-project-properties",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:legacy-ngrc-paths-and-main-thread-cleanup",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:owned-local-transaction-outbox-and-retry-identity",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:map-gesture-admission-authentication-scope-and-wkt-iteration",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:storage-verification-routes-and-git-adoption-order",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:project-script-package-isolated-runtime-and-limited-broker",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:all-project-sync-map-callback-and-service-ownership",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:opt-in-verification-identities-and-full-consumer-test-scope",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:startup-diagnostic-observer-and-bounded-original-journal",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:update-cards-and-pre-push-registration",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:shared-track-color-migration-and-effective-line-labels",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:mixed-hit-candidates-and-dated-classic-route-verification",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:exact-sqlite-source-aliases-and-canonical-layer-priority",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-tablet-priority-jvm-and-normal-install-observations",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:note:historical-lookup-key-repair-and-open-full-snapshot-limits",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:full-snapshot-http-206-and-lookup-save-failure-boundaries",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-combined-source-tests-and-prior-incomplete-observer",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:typed-ngw-provenance-and-exact-result-owner",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:optional-typed-reasons-and-resource-child-transport",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-source-error-cohorts-oracle-correction-and-compile-scope",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:cached-child-success-and-open-partial-parse-semantics",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:empty-index-readiness-and-exact-live-cache-owner",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:rtree-clean-reset-load-validation-and-original-bytes",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:affected-import-entries-and-separate-readiness-gates",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:risk:reported-invisible-layers-and-unverified-device-recovery",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-spatial-cache-source-tests-and-separate-failed-cohort",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:evidence:dated-underlay-transfer-preparation-and-pending-native-proof",
+      "type": "contains"
+    }
+  ],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

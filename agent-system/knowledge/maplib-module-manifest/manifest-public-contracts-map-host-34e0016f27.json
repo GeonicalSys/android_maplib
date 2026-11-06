@@ -1,0 +1,50 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": {
+        "consumers": [
+          "app",
+          "maplibui"
+        ],
+        "id": "map-host",
+        "path": "maplib/src/main/java/com/nextgis/maplib/map/MaplibreMapInteraction.java",
+        "symbol": "MaplibreMapInteraction including transient azimuth endpoint drag and foreground resource-economy callbacks"
+      }
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "public_contracts"
+    }
+  },
+  "id": "lisa:maplib:contract:manifest-public-contracts-map-host-34e0016f27",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:contract:manifest-public-contracts-map-host-34e0016f27"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

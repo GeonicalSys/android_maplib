@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Подробный локальный сбор ресурсов — opt-in, 2026-10-28",
+        "",
+        "`RenderResourceProfiler` по умолчанию выключен. Приватный app adapter явно",
+        "вызывает `start(sessionId, version, build, revision, Sink)`; `Sink.offer` обязан",
+        "только неблокирующе принять неизменяемую запись. Библиотека не создаёт файлов,",
+        "не вызывает SDK, не делает новых SQL/memory reads и не управляет renderer/cache",
+        "policy. Публичный `event(kind, numericFields)` принимает ограниченные числовые",
+        "метрики и boolean, отбрасывает строки, координатные/URI/path/object-ID поля,",
+        "невалидные числа и лишние поля. Сбор не добавляется в Sentry-журнал.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Opt-in render profiler with bounded safe fields"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:opt-in-render-profiler-with-bounded-safe-fields",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:opt-in-render-profiler-with-bounded-safe-fields"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

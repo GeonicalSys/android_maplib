@@ -1,0 +1,68 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-source-bridge.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Requests start and finish on `Dispatchers.Main.immediate`. Blocking snapshot",
+        "and load work uses `runInterruptible` on one shared `Dispatchers.IO` dispatcher",
+        "limited to two workers across all sources. The backend owns its existing",
+        "admission/byte budget; the bridge does not acquire a second gate. Each current",
+        "predicate includes the individual SDK request Job, parent Job, closed state,",
+        "source owner and immutable backend stamp. Canceling one tile therefore does",
+        "not close other tiles or the source. A final current check on Main precedes",
+        "the SDK handoff without another suspension.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Bounded worker admission and final current-source check"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-source-bridge.md"
+    }
+  },
+  "id": "lisa:maplib:contract:sqlite-source-worker-ownership",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:sqlite-source-worker-ownership"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

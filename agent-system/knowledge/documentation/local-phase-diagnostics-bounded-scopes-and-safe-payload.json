@@ -1,0 +1,78 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Локальные SQLite phase timings — MOB-04, 2026-10-28",
+        "",
+        "Для разбора задержки полного содержимого на T40 Plus/API30 добавлен отдельный",
+        "`MapRuntimeDiagnostics.SqliteScope`. Локальный logcat tag `LISA-SqlitePhase`",
+        "разделяет ожидание IO/слоя/gate/cache, RTree query, чтение атрибутов/BLOB,",
+        "декодирование original geometry, style/clip/anchors/PBF/cache write и возврат",
+        "на Main. Записи содержат только числовые layer/epoch/content IDs, zoom без",
+        "tile X/Y, длительности и counts; URI, координаты, значения полей и exception",
+        "message не передаются. Это не новый sender событий GlitchTip.",
+        "",
+        "Наблюдаются максимум16 активных scopes и32 layer summaries; один observer",
+        "использует существующий bounded writer. Text log — не чаще10s/слой; suppressed",
+        "финал получает отложенный flush. Потеря наблюдений при saturation учитывается",
+        "для слоёв с snapshot; unobserved-only layer без первого snapshot пока может",
+        "не опубликовать counters, поэтому reported-layer суммы не process-global.",
+        "Завершённые inactive summaries переиспользуются после throttle interval.",
+        "Main не читает память/БД/MapLibre ради diagnostics. Ошибки clock/writer/watch",
+        "не меняют исходные bytes, cancellation или currentness checks.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Local phase diagnostics, bounded scopes and safe payload"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:local-phase-diagnostics-bounded-scopes-and-safe-payload",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:local-phase-diagnostics-bounded-scopes-and-safe-payload"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

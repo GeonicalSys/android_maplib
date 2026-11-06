@@ -1,0 +1,74 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Snapshot v4 добавляет `raw_fix_elapsed_realtime_ms`: время измерения текущего",
+        "rawGps, включая существующий cache seed, с sentinel-1 при отсутствии. Поле не",
+        "обозначает вход callback и не меняет acquisition/filter state. Consumer app",
+        "сопоставляет его с пассивным system GPS cache только в уже отправляемом report;",
+        "no-fix/local500ms ticks не запускают probe. Схемы прежних replay сохраняются.",
+        "10 fixed numeric/enum witness fields и отсутствие координат/causal conclusions",
+        "описаны в consuming [error-reporting](../../docs/architecture/error-reporting.md#пассивное-сравнение-с-системным-gps-cache--29-октября-2026).",
+        "Это сбор недостающего свидетельства, не устранённый delivery stall. Таймаут",
+        "синхронного platform getter не вводится; пороги/retry/owners/recording не меняются.",
+        "Регрессии: GpsDisplayRetentionTest и GpsRecoveryPolicyTest.",
+        "Явный выход consuming app снимает только его автоматические leases; recording",
+        "listeners Track/Walk остаются независимыми и удерживают acquisition/wake lock.",
+        "Minimize и explicit close различает app controller; API нижней библиотеки прежний.",
+        "",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "GPS snapshot v4 passive probe and unconfirmed causal diagnosis"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:gps-snapshot-v4-passive-probe-and-unconfirmed-causal-diagnosis",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:gps-snapshot-v4-passive-probe-and-unconfirmed-causal-diagnosis"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

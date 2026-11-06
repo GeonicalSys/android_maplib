@@ -1,0 +1,45 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": {
+        "path": "maplib/src/test/java/com/nextgis/maplib/map/SqliteVectorSourceBridgeTest.kt",
+        "responsibility": "Assert IO/Main boundaries, late cancellation, retries and lifecycle plus unchanged one-read callback bytes with optional phase diagnostics."
+      }
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "key_components"
+    }
+  },
+  "id": "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridgetest-e7a56ff3be",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridgetest-e7a56ff3be"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

@@ -1,0 +1,98 @@
+{
+  "format": "lisa.agent-system.source-dispositions.v1",
+  "entries": [
+    {
+      "path": "agent-system/policy-migration.json",
+      "sha256": "a874b9ecea973cae09124e7115ec97ed43547e18fdee332b6eeafb5ad4cb43c5",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "applies_to": [
+        "."
+      ],
+      "reason": "Individually authored complete original AGENTS Git/source/character and logical-unit inverse map, including the within-line historical/lasting boundary; retain provenance without active-prose or deletion authority."
+    },
+    {
+      "path": "agent-system/migration/pack-review.json",
+      "sha256": "04e0b808874cf1c1d0d3668ded513b45d9da90e773cca6e6e37e60f63733a18f",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "applies_to": [
+        "."
+      ],
+      "reason": "Pinned exact source excerpts and typed manifest address for one unresolved local-pack wording contradiction. Retain as migration provenance; product behavior is not reviewed, no exclusion or deletion authority."
+    },
+    {
+      "path": "agent-system/provenance/maplib-module-manifest.json",
+      "sha256": "0985d17cb7aa70e14473a089ace6e1304ab37941fc2b00dd891eb115db6b8695",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "applies_to": [
+        "docs/manifest.yaml"
+      ],
+      "reason": "Original Git object, complete field spans and ordered module record witnesses."
+    },
+    {
+      "path": "agent-system/provenance/documentation.json",
+      "sha256": "7c93cf171d3fa3e55faf0faf82f3d123cff810ee68d5db15ae8057741322f3f0",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "applies_to": [
+        "docs/sqlite-vector-source-bridge.md",
+        "docs/sqlite-vector-tile-buffer.md",
+        "README.md",
+        "docs/README.md",
+        "agent-system/README.md"
+      ],
+      "reason": "Exact original Git objects, reviewed Markdown byte spans and ordered record fingerprints."
+    },
+    {
+      "path": "agent-system/migration/identify-source-version-review.json",
+      "sha256": "803a8d5c9066356032bdf020cdea01547f72c5e7cc3586cd311647985d7937f0",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "applies_to": [
+        "docs/README.md",
+        "docs/manifest.yaml"
+      ],
+      "reason": "Individually verified historical and current source witnesses for identify visibility. Runtime acceptance remains open."
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "046f49325a61f67f6dedfbd5070c74024097e6412c8f695d584abf686ab534c4",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "reason": "Keep the maplib repository's LGPL version 3 license text at its published Git address.",
+      "applies_to": [
+        "LICENSE",
+        "README.md"
+      ]
+    },
+    {
+      "path": "src/main/cpp/README.md",
+      "sha256": "b0aa4c253b01a73ad2629cb765685f2cbca597071f080ce571e31da21f54141e",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "reason": "Retain the recorded QuickJS archive version and checksum, interpreter linkage boundary, JNI UTF-8 contract and native update checks with the vendored source.",
+      "applies_to": [
+        "src/main/cpp/README.md",
+        "src/main/cpp/CMakeLists.txt",
+        "src/main/cpp/script_engine.c",
+        "src/main/cpp/quickjs",
+        "docs/README.md"
+      ]
+    },
+    {
+      "path": "src/main/cpp/quickjs/LICENSE",
+      "sha256": "598fd7fc928e4350abce36e337ba5a1346923c5c692f5be92c3d8e29ddd7c18d",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "reason": "Retain the vendored QuickJS license text and copyright notices beside the interpreter sources linked by maplib.",
+      "applies_to": [
+        "src/main/cpp/quickjs/LICENSE",
+        "src/main/cpp/quickjs",
+        "src/main/cpp/CMakeLists.txt",
+        "src/main/cpp/README.md"
+      ]
+    }
+  ]
+}

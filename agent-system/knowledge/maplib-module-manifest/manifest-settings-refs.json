@@ -1,0 +1,61 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": [
+        "map-runtime-diagnostics",
+        "track_send",
+        "track_send_default_enabled_v1",
+        "lisa_project_scripts",
+        "scripts_expected",
+        "scripts_active",
+        "scripts_status",
+        "project_scripts_cache",
+        "feature_label_field",
+        "mobile_render_mode",
+        "render_mode",
+        "layer_origin",
+        "mobile",
+        "ngw_identity_backup",
+        "ngrc_provenance",
+        "legacy_underlay_migration",
+        "feature-save-journal",
+        "pending-track-points"
+      ]
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "settings_refs"
+    }
+  },
+  "id": "lisa:maplib:resource:manifest-settings-refs",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:resource:manifest-settings-refs"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

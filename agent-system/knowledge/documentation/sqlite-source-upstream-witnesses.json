@@ -1,0 +1,65 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/sqlite-vector-source-bridge.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Exact upstream witnesses:",
+        "",
+        "- [CustomVectorSource13.7.1](https://github.com/maplibre/maplibre-native/blob/android-v13.7.1/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/style/sources/CustomVectorSource.kt): supplied scope, per-tile jobs, cancellation/error handling and removal callback.",
+        "- [JNI source13.7.1](https://github.com/maplibre/maplibre-native/blob/android-v13.7.1/platform/android/MapLibreAndroid/src/cpp/style/sources/custom_vector_source.cpp): byte copying and native peer lifetime.",
+        "- [Native custom vector tile13.7.1](https://github.com/maplibre/maplibre-native/blob/android-v13.7.1/src/mln/tile/custom_vector_tile.cpp): MVT tile data instead of a global GeoJSONVT index.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "The checked scope is the original Git documentation span. See separate source witnesses and runtime acceptance boundaries."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Pinned MapLibre 13.7.1 witness references"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/sqlite-vector-source-bridge.md"
+    }
+  },
+  "id": "lisa:maplib:resource:sqlite-source-upstream-witnesses",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the exact source span and reviewed classification with the owning maplib documentation.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:sqlite-source-upstream-witnesses"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

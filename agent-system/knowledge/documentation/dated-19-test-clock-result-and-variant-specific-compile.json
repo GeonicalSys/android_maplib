@@ -1,0 +1,76 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Технические регрессии: новый `ProjectSyncStatePublicationTest` (16) и прежний",
+        "`ProjectSyncStateTest` (3). На исходном коде RED: 10 FAIL из 19, после исправления",
+        "GREEN: все 19 PASS, ошибки и пропуски — 0. Offline Gradle/JBR21 с существующим",
+        "Robolectric4.16.1/API28 занял 31с; maplib main/test Java/Kotlin compile выполнен.",
+        "Это модели Android cache/disk, не APK/device или приёмка реальной синхронизации.",
+        "Статические consumers прежние: app `LayersFragment` и `MaintenanceReminders`,",
+        "maplib `NGWVectorLayer` (скомпилирован в maplib debug/release). App Java/Kotlin",
+        "compile выполнен offline для effective variants LisaDebug (42с) и BelkaRelease",
+        "(46с), включая source dependencies. BelkaDebug намеренно отключён в",
+        "`app/build.gradle:254–264` и не получает PASS вместо существующего варианта.",
+        "В графах этих compile tasks нет CMake/NDK/assemble/APK/sign/minify/upload/device.",
+        "Публичные `lastComplete(Context,String):long` и `markComplete(Context,String,long):boolean`",
+        "не изменены. В поставке библиотека сначала сливается Merge Commit, затем root",
+        "обновляет app submodule pointer; текущие app UI pins не переписываются ради local drift.",
+        "[Карточка](../update-reports/entries/maplib-20261029-project-sync-clock-confirmation.md).",
+        "",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Dated 19-test clock result and variant-specific compile"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:evidence:dated-19-test-clock-result-and-variant-specific-compile",
+  "kind": "evidence",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:evidence:dated-19-test-clock-result-and-variant-specific-compile"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "documentation"
+}

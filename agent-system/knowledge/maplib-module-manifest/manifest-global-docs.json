@@ -1,0 +1,59 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": [
+        "docs/architecture/point-firefly.md",
+        "docs/architecture/feature-copy-transform.md",
+        "docs/guides/project-synchronization-user-guide.md",
+        "docs/architecture/conditional-form-rules.md",
+        "docs/guides/form-behavior-user-guide.md",
+        "docs/architecture/project-scripts.md",
+        "docs/guides/project-scripts-user-guide.md",
+        "docs/reference/project-scripts-verification.md",
+        "docs/architecture/location-pipeline.md",
+        "docs/architecture/map-rendering.md",
+        "docs/architecture/collector-projects.md",
+        "docs/architecture/ngw-sync-and-storage.md",
+        "docs/architecture/crash-recovery.md",
+        "docs/architecture/stakeout.md",
+        "docs/reference/build-matrix.md",
+        "docs/reference/flavors-and-versioning.md"
+      ]
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "global_docs"
+    }
+  },
+  "id": "lisa:maplib:resource:manifest-global-docs",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:resource:manifest-global-docs"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

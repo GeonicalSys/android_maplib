@@ -1,0 +1,72 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- Объект после cold form recovery выбирается, но не виден до restart: проверить",
+        "  `MapLibre feature missing after form Save` и следующий полный data reload слоя.",
+        "- После успешного Save объект остаётся выбранным или видны edit sources: app host",
+        "  обязан сначала завершить `cancelFeatureEdit(false)`, затем перейти в normal mode",
+        "  и вызвать view unselect; `MapDrawable` не владеет политикой нижних панелей.",
+        "- Crash из `MapDrawable.onTouch` после `MapLibreMapView.onDestroy`: проверить, что",
+        "  host очистил map/view ссылки, а touch guard завершил событие до",
+        "  `queryRenderedFeatures`.",
+        "- Мультиполигон не сохранился: проверить безопасный HyperLog-код",
+        "  `MultiPolygon geometry repair failed`; исходная геометрия должна остаться в",
+        "  редакторе, а координаты в журнал не записываются. Причина",
+        "  `converted repair is empty or invalid` после ручного MapLibre-редактирования",
+        "  является регрессией CRS."
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Cold Save, destroyed renderer and topology error diagnosis"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:cold-save-destroyed-renderer-and-topology-error-diagnosis",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:cold-save-destroyed-renderer-and-topology-error-diagnosis"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

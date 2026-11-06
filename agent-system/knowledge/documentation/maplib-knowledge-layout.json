@@ -1,0 +1,76 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "reviewed",
+    "scope_refs": [
+      "lisa:maplib:resource:maplib-knowledge-home"
+    ],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "markdown_body_lines",
+      "value": [
+        "The [module manifest records](knowledge/maplib-module-manifest) preserve 14",
+        "ordered fields in 239 records. Their [provenance](provenance/maplib-module-manifest.json)",
+        "binds the complete original YAML and every member to Git. The [local manifest](../docs/manifest.yaml) is generated from those records.",
+        "",
+        "The [original pack review](migration/pack-review.json) retains both identify",
+        "descriptions. The [source-version review](migration/identify-source-version-review.json)",
+        "locates the older exception and confirms the visible-only rule in the App's",
+        "pinned library source. Native verification remains open.",
+        "",
+        "The two SQLite guides have [20 typed records](knowledge/documentation) and",
+        "a [byte-addressed source map](provenance/documentation.json). The original",
+        "Markdown addresses continue to serve ordinary readers.",
+        "",
+        "The root and module READMEs have 133 reviewed [owner records](knowledge/documentation)",
+        "and an [exact Git source map](provenance/documentation.json). Dated evidence,",
+        "current contracts and mixed notes have separate statuses. The same Markdown",
+        "addresses serve ordinary readers.",
+        "",
+        "The ordinary App tools generate the library's declared Markdown and YAML",
+        "views from these records. Run them from the Android App repository root.",
+        "",
+        "```powershell",
+        "py -3.13 -B docs/scripts/prose_knowledge.py --write --module maplib",
+        "py -3.13 -B docs/scripts/structured_view_proof.py --write --module maplib",
+        "py -3.13 -B docs/scripts/validate_docs.py --module maplib --require-pack",
+        "```",
+        "",
+        "Commit record edits, refreshed views and the proof together. Original Git",
+        "objects remain available through their source maps. Client acceptance and",
+        "dependency adoption have separate gates.",
+        ""
+      ]
+    },
+    "view-path": {
+      "role": "published_markdown_path",
+      "value": "agent-system/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:maplib-knowledge-layout",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Keep the established owner documentation address and exact original Git range.",
+    "runtime_verification": "NOT_APPLICABLE",
+    "source_verification": "NOT_APPLICABLE"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:maplib-knowledge-layout"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

@@ -1,0 +1,67 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- горячее обновление style применяет вычисляемые свойства только к независимому",
+        "  snapshot из `VectorLayerRenderCache` в общей последовательной очереди; worker",
+        "  не изменяет опубликованные в MapLibre `Feature.properties`;",
+        "- после batch fill `MapDrawable` проверяет, что для каждого видимого vector layer",
+        "  в новом MapLibre style существуют source и style layer; при неполном apply",
+        "  выполняется один полный повтор, а completion callback до этого не публикуется;",
+        "  локальное включение ранее невидимого слоя сверяет тот же live style и при",
+        "  отсутствии source/layer загружает данные независимо от старого process-кэша;"
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Independent style data and hot-add apply barrier"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:independent-style-data-and-hot-add-apply-barrier",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:independent-style-data-and-hot-add-apply-barrier"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

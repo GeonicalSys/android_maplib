@@ -1,0 +1,67 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- `user-location-layer` остаётся служебным верхним overlay независимо от порядка",
+        "  пользовательских слоёв; геодезический круг `user-location-accuracy`, сектор",
+        "  направления `user-location-heading` и его контуры `user-location-heading-halo` /",
+        "  `user-location-heading-outline` лежат непосредственно под ним (роль Polygon",
+        "  `accuracy`/`heading`); непостоянные `azimuth-measurement-*` line/point layers",
+        "  для измерения свободных точек восстанавливаются при full/lite reload строго под ним,",
+        "  не входят в `LayerGroup`, не сохраняются как прикладные данные и передают drag",
+        "  редактируемых концов линии host-экрану;"
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Cursor overlay order and derived azimuth layers"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:cursor-overlay-order-and-derived-azimuth-layers",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:cursor-overlay-order-and-derived-azimuth-layers"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

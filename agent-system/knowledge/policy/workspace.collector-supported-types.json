@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "id": "lisa:maplib:contract:workspace.collector-supported-types",
+  "kind": "contract",
+  "owner": "android_projects/android_gisapp/maplib",
+  "topic": "policy-workspace",
+  "status": "active",
+  "execution_permission": false,
+  "applicability": {
+    "review_status": "reviewed",
+    "paths": [
+      {
+        "repository": "android_projects/android_gisapp/maplib",
+        "include": [
+          "."
+        ],
+        "exclude": []
+      }
+    ],
+    "scope_refs": [],
+    "conditions": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "source_verification": "NOT_APPLICABLE",
+    "merge": "not_applicable",
+    "runtime_verification": "NOT_APPLICABLE",
+    "release": "not_applicable",
+    "retention": "Retain editable logical subject and pinned provenance; product implementation/acceptance are separate records."
+  },
+  "facets": {
+    "body": {
+      "role": "standing_contract",
+      "value": "Collector snapshot поддерживает только уже известные `Connection` типы:\nvector/PostGIS и `qgis_vector_style`/`qgis_raster_style`. Style resource имеет\nсобственный remote id для tile URL/identity, parent id только для extent и\nникогда не становится редактируемым. Не добавляй в `Connection.java` новые\nresource classes ради Collector без отдельного продуктового решения.\n"
+    },
+    "classification": {
+      "role": "reviewed_knowledge_class",
+      "value": "standing_contract"
+    },
+    "review": {
+      "role": "classification_reason",
+      "value": "Keep exact supported vector/PostGIS/style classes, separate style identity and parent extent, no editing or speculative Connection classes."
+    },
+    "source_section": {
+      "role": "source_document_context",
+      "value": [
+        "# maplib — инструкции для ИИ-агентов"
+      ]
+    },
+    "authority_limit": {
+      "role": "authority_and_acceptance_boundary",
+      "value": "Path applicability is reviewed separately from the rule's textual triggers. Every source condition and heading remains attached; no automatic predicate or lifecycle inference. Stored commands and dates do not grant current execution, freshness or product acceptance. Existing instruction clients/checkers remain effective until measured cutover."
+    }
+  },
+  "relations": [],
+  "provenance": {
+    "manifest": "agent-system/policy-migration.json",
+    "scopes": [
+      "lisa:maplib:contract:workspace.collector-supported-types"
+    ]
+  }
+}

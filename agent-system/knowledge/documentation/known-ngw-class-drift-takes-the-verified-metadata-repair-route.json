@@ -1,0 +1,74 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Класс NGW исправляется как metadata без refill — 1 ноября 2026",
+        "",
+        "При известном несовпадении vector_layer ↔ postgis_layer и совпадающих geometry",
+        "и physical SQLite schema normal preflight теперь вызывает прежний verified",
+        "metadata repair, даже когда serialized fields уже совпадают. Раньше needsRebuild",
+        "правильно не требовал refill, но metadata-only predicate одновременно требовал",
+        "равенства класса и пропускал исправление. Новый private flag относится только",
+        "к двум разным поддержанным классам; public API и serialized format прежние.",
+        "",
+        "Прежняя ветвь field-only drift сохранена. Unknown/null/legacy empty class,",
+        "неподдержанный actual class, unparsed metadata и geometry/physical mismatch",
+        "не получают новой политики. Независимый physical mismatch по-прежнему ведёт",
+        "к существующему staged rebuild. Геометрия, данные, NGW account/remote_id и настройки sync",
+        "этой правкой не переписываются. Оба HTTP fetch overload остаются точными.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Known NGW class drift takes the verified metadata repair route"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:known-ngw-class-drift-takes-the-verified-metadata-repair-route",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:known-ngw-class-drift-takes-the-verified-metadata-repair-route"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

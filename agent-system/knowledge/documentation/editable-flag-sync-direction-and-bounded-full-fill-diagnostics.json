@@ -1,0 +1,73 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- `NGWVectorLayer` применяет для managed Collector-слоя проектный editable-флаг",
+        "  вместе с исходящим направлением sync; обычные слои сохраняют общий",
+        "  `is_editable` gate; возможность изменить направление sync использует тот же",
+        "  owning policy и не зависит от текущего направления, чтобы слой можно было",
+        "  вернуть из server-only в двусторонний режим; managed HTTP 404 не меняет тип",
+        "  слоя, а полная NGW identity сохраняется отдельно для восстановления частичной",
+        "  конфигурации; первый сбой чтения или записи объекта при полном fill сохраняет",
+        "  в HyperLog имя слоя, remote id, нулевой индекс объекта в исходном массиве,",
+        "  класс/сообщение ошибки и ограниченный стек без координат и значений полей;",
+        "  opt-in фильтр `resmeta.items.district` ищет вхождение ключа в поле `district`",
+        "  через `fld_district__like=%value%` (список районов через запятую с пробелом,",
+        "  не точное равенство); для `SYNC_NONE` сравнивается отфильтрованный server",
+        "  count с локальным `COUNT(*)`, и при расхождении (если сервер не пуст) слой",
+        "  пересобирается полным snapshot;"
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Editable flag, sync direction and bounded full-fill diagnostics"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:editable-flag-sync-direction-and-bounded-full-fill-diagnostics",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:editable-flag-sync-direction-and-bounded-full-fill-diagnostics"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

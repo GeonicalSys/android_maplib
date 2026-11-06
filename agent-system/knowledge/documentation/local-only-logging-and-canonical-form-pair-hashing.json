@@ -1,0 +1,66 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "`LocalLogInitializer` выполняет один local-only HyperLog initialize на процесс,",
+        "мигрируя устаревший `HyperLog/URL` до чтения библиотекой. Локальная база и формат",
+        "сохраняются; последующие app/GIS вызовы не запускают подготовку remote uploads.",
+        "`LayerFormHashUtil` канонизирует form/meta JSON: порядок ключей/пробелы не меняют",
+        "hash, но значения, идентичности, правила и порядок массивов остаются значимыми.",
+        "Это сохраняет snapshot/download/staging guard без ложных mismatches между NGW workers.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Local-only logging and canonical form-pair hashing"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:local-only-logging-and-canonical-form-pair-hashing",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:local-only-logging-and-canonical-form-pair-hashing"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

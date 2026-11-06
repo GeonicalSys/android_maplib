@@ -1,0 +1,7 @@
+---
+description: Load the LISA scoped context entrance
+alwaysApply: true
+---
+
+Follow the generated AGENTS.md for this repository. Use its scoped context
+workflow and current task authority before changing any affected paths.

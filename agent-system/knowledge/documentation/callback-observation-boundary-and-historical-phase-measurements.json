@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "`returned_to_sdk` означает только Java callback return, не native acceptance",
+        "и не готовность всех объектов/подписей. `provider_returned`, `cancelled`,",
+        "`failed` и активное ожидание различаются. Старый HTTP queue counter не выдаётся",
+        "за очередь SQLite. Focused39 PASS и ordinary all3 build57s/version matrix PASS",
+        "дали private843d. В нём один startup tile3051 объектов занял9.909s, включая",
+        "5.281s attributes и1.548s BLOB; другие tiles ждали IO до3.432s. Это подтверждённый",
+        "application read hot path на11.7, не готовность native/full contents или закрытие",
+        "reported12.1 delay. Новая bounded-read правка ещё требует своего tablet route.",
+        "См. [точный scope](../update-reports/entries/maplib-20261028-sqlite-phase-diagnostics.md).",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Callback observation boundary and historical phase measurements"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:callback-observation-boundary-and-historical-phase-measurements",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:callback-observation-boundary-and-historical-phase-measurements"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

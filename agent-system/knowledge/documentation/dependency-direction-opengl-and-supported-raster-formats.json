@@ -1,0 +1,70 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Ограничения",
+        "",
+        "- Нет imports из `maplibui`/`app`.",
+        "- MapLibre backend должен оставаться согласованным с `maplibui` и `app`:",
+        "  `org.maplibre.gl:android-sdk-opengl:13.7.1` во всех трёх модулях.",
+        "- LayerGroup index `0` — bottom.",
+        "- MBTiles local TMS path принимает только raster PNG/JPEG/WEBP с обязательными",
+        "  `tiles`/`metadata`; vector MBTiles и повреждённая SQLite отклоняются.",
+        "- Старые точечные local_vector_tiles конфиги используют direct SQLite;",
+        "  editable/rule/icon/template поддерживаются его обычным style контрактом.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Dependency direction, OpenGL and supported raster formats"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:dependency-direction-opengl-and-supported-raster-formats",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:dependency-direction-opengl-and-supported-raster-formats"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

@@ -1,0 +1,71 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      },
+      {
+        "exclude": [],
+        "include": [
+          "app/src/main/java/com/nextgis/mobile/fragment/MapFragment.kt"
+        ],
+        "repository": "android_projects/android_gisapp"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "source_backed_contract",
+      "value": "In the pinned current library source, the identify policy admits a non-null visible VectorLayer. The three examined App vector attribute-query paths apply this policy before querying. Legacy local-vector-tile metadata no longer grants access to a hidden layer."
+    },
+    "original-wording": {
+      "role": "historical_description",
+      "value": "The original module manifest still describes the earlier local-vector-tile visibility exception. Keep its exact value with the original source frame and dated resolution."
+    },
+    "scope": {
+      "role": "verification_boundary",
+      "value": "Source review covers the exact App revision, its committed maplib pin and the examined call sites. Device execution was not run."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Identify considers visible vector layers"
+    }
+  },
+  "id": "lisa:maplib:contract:layer-identify-visible-only",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "implemented",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the source-version boundary with the original manifest wording and consumer witnesses.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/migration/identify-source-version-review.json",
+    "scopes": [
+      "lisa:maplib:contract:layer-identify-visible-only"
+    ]
+  },
+  "relations": [
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:question:migration.layer-identify-pack-wording",
+      "type": "evidenced_by"
+    }
+  ],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "knowledge-pack-review"
+}

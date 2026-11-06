@@ -1,0 +1,45 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "definition": {
+      "role": "module_manifest_definition",
+      "value": {
+        "path": "maplib/src/main/java/com/nextgis/maplib/map/RuleLabelLayouts.java",
+        "responsibility": "Apply classic symbol data-constant settings using filtered layout groups, preserve logical visibility and remove obsolete groups on restyle or deletion."
+      }
+    },
+    "manifest-field": {
+      "role": "module_manifest_manifest_field",
+      "value": "key_components"
+    }
+  },
+  "id": "lisa:maplib:contract:manifest-key-components-rulelabellayouts-167f84e02d",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:contract:manifest-key-components-rulelabellayouts-167f84e02d"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

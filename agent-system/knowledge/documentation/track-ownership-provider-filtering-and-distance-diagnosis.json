@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- Пустой список треков после project switch: проверить строку",
+        "  `LayerContentProvider bound to active map path=...` и соответствие пути активному workspace;",
+        "- Трек/обход замер на скорости: проверить `LocationTrackFilter` причины вместе с",
+        "  `provider` и причины фильтра; у сервиса счётчик accepted относится к выходу общего GNSS-потока.",
+        "  Для валидного движения до 160 км/ч не должно быть каскада `drop:speed_dist`.",
+        "- Курсор карты движется, но у завершённого трека `accepted=0`:",
+        "  фильтр вообще не получил координат; проверять фактический запуск",
+        "  `TrackerService`, а не ослаблять accuracy/speed ограничения.",
+        "- Неверное расстояние выноса: проверить CRS исходной геометрии и ближайшую точку",
+        "  `StakeoutGeometryTarget`; пользователю нельзя выдавать плоское расстояние 3857."
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Track ownership, provider filtering and distance diagnosis"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:track-ownership-provider-filtering-and-distance-diagnosis",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:track-ownership-provider-filtering-and-distance-diagnosis"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

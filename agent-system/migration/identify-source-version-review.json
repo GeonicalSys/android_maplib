@@ -1,0 +1,108 @@
+{
+  "format": "lisa.agent-system.layer-identify-source-version-review.v1",
+  "question": "lisa:maplib:question:migration.layer-identify-pack-wording",
+  "status": "SOURCE_VERSION_RECONCILED",
+  "recorded_on": "2026-11-05",
+  "historical_description": "Retain the exact historical value and source identity. Keep the applicability distinction in typed migration records.",
+  "source_resolution": "Manifest responsibility describes a previous source rule. The README agrees with the current implementation and the App's exact pinned library source.",
+  "consumer_boundary": "The three examined MapFragment vector identify/attribute-query call sites gate candidates by the same visible-only layer policy.",
+  "runtime_verification": "NOT_RUN",
+  "execution_permission": false,
+  "witnesses": [
+    {
+      "owner": "android_projects/android_gisapp/maplib",
+      "revision": "8b39e8b583bffe25c1c1ce06390d2ea255ea8610",
+      "path": "src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java",
+      "blob": "55dba97d6e7efbe1e3b41d543ee72d0ebbc509b9",
+      "sha256": "164f9b0b853aaef388b7f49abbc9ea72101c071106037a03b6e5cc29b69d19ef",
+      "matches": {
+        "return visible || localVectorTilesRequested;": [
+          22
+        ]
+      }
+    },
+    {
+      "owner": "android_projects/android_gisapp/maplib",
+      "revision": "8b39e8b583bffe25c1c1ce06390d2ea255ea8610",
+      "path": "docs/manifest.yaml",
+      "blob": "061ebee9fb9bc6f0dc0ec0f9b7c3bbe4231a5fdb",
+      "sha256": "89d411db492716df351aabdb2565b787c3a200779e5d0e3dfc095a64af29e640",
+      "matches": {
+        "Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers.": [
+          54
+        ]
+      }
+    },
+    {
+      "owner": "android_projects/android_gisapp/maplib",
+      "revision": "803decb97348659bbc5dcf194b008fbbf976a058",
+      "path": "src/main/java/com/nextgis/maplib/map/LayerIdentifyPolicy.java",
+      "blob": "f76fec9d3149de763a5f26ee642651e8729029f4",
+      "sha256": "498995a7b2d31f63a94bfa800289efb162554413426a3cf2e53d119aaf79aece",
+      "matches": {
+        "return layer != null && layer.isVisible();": [
+          16
+        ]
+      }
+    },
+    {
+      "owner": "android_projects/android_gisapp/maplib",
+      "revision": "18d6ed488398db6ee92a0a057a7499d8916aa087",
+      "path": "docs/manifest.yaml",
+      "blob": "b713fa79c5fdd0e20649015f03fe34b29df43728",
+      "sha256": "6c52f116009ad4e8753c79e3661ef1073ba538e42e94c2e7a14fde97c1a14b9b",
+      "matches": {
+        "Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers.": [
+          325
+        ]
+      }
+    },
+    {
+      "owner": "android_projects/android_gisapp/maplib",
+      "revision": "18d6ed488398db6ee92a0a057a7499d8916aa087",
+      "path": "docs/README.md",
+      "blob": "1b9e458b3fc563398fb657d85000f8b9c2c4e152",
+      "sha256": "41aad4ba7842237628b56fdd8c98fb529729e99b320d5084905c46fe5f08c5c2",
+      "matches": {
+        "Выключенный слой отсутствует в identify: это текущая visible-only policy": [
+          911
+        ]
+      }
+    },
+    {
+      "owner": "android_projects/android_gisapp/maplib",
+      "revision": "7152e3cd403f9020cebcf752b8299538a85136c1",
+      "path": "src/test/java/com/nextgis/maplib/map/LayerIdentifyPolicyTest.java",
+      "blob": "25cb091bd6b137a1744d005712b66c0a6e210fe8",
+      "sha256": "eaf193d2644b4f4dce781d5e7c804e55aa10853cfdf63e9c705a7e86642bb717",
+      "matches": {
+        "hiddenClassicLayerIsExcluded": [
+          24
+        ],
+        "legacyRenderModeCannotMakeAHiddenLayerSelectable": [
+          29
+        ],
+        "visibleLegacyConfiguredLayerIsIncluded": [
+          35
+        ],
+        "missingLayerIsExcluded": [
+          40
+        ]
+      }
+    },
+    {
+      "owner": "android_projects/android_gisapp",
+      "revision": "045ec87c048c69b02f696dc35f27bbc66a80637c",
+      "path": "app/src/main/java/com/nextgis/mobile/fragment/MapFragment.kt",
+      "blob": "dff5caaa62d59c1aa0fea50be894dea581a0cb9c",
+      "sha256": "0b75167d3525050ecb363cdd46db32efbb058ff8e5ed543a8e13fe4217824a6e",
+      "matches": {
+        "if (!LayerIdentifyPolicy.shouldInclude(vectorLayer)) continue": [
+          4436,
+          4802,
+          4958
+        ]
+      }
+    }
+  ]
+}

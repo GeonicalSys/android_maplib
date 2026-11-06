@@ -1,0 +1,70 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Пустые handles и загрузка индекса — 2026-10-27",
+        "",
+        "MapDrawable не обращается к native renderer для пустого marker collection и",
+        "vertex-layer без editingObject. Заполненные handles, линейка и обычный picking",
+        "сохраняются. GeometryRTree читает прежний бинарный формат через буфер 64 KiB;",
+        "legacy persistence regression проверяет ID/координаты/поиск и точные байты.",
+        "Новый snapshot повторного startup/render_query сохраняется и внутри текстового",
+        "rate limit: ограничение сообщений не оставляет на диске прежний зависший запрос.",
+        "Это адресная работа по MOB-02, не доказательство устранения всех native crash.",
+        "Разбор и native-проверки — consuming docs/reference/mobile-crash-224-2026-10-27.md.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Empty renderer handles and legacy index contract with dated crash scope"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:empty-renderer-handles-and-legacy-index-contract-with-dated-crash-scope",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:empty-renderer-handles-and-legacy-index-contract-with-dated-crash-scope"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

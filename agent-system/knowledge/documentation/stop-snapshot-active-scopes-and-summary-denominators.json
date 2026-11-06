@@ -1,0 +1,69 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "`stop(reason)` выключает только наблюдение и возвращает авторитетную bounded",
+        "summary; `snapshot()` даёт такой же background checkpoint. App сохраняет summary",
+        "отдельно от raw очереди. Незавершённые scopes остаются `active_at_snapshot`,",
+        "не объявляются cancelled/finished, и после stop не меняют готовую summary.",
+        "Summary содержит полные global totals/histograms, compact numeric rows всех",
+        "отслеживаемых слоёв и точные phase arrays для top32 по CPU/elapsed; число слоёв",
+        "без phase detail явно указано. Индивидуальные raw requests содержат все phase",
+        "arrays, если очередь их сохранила. Это ограничение детализации не теряет общий",
+        "знаменатель. Долговременный кеш и алгоритмы/данные карты этим шагом не меняются.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Stop, snapshot, active scopes and summary denominators"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:stop-snapshot-active-scopes-and-summary-denominators",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:stop-snapshot-active-scopes-and-summary-denominators"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

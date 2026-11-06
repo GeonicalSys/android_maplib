@@ -1,0 +1,2074 @@
+{
+  "consumer_source_witnesses": [
+    {
+      "blob": "846afc11fb076659c41e08b411d5d9d6da9eb12d",
+      "line": 24,
+      "marker": "include ':app', ':maplib', ':maplibui'",
+      "meaning": "App includes both consuming library modules",
+      "owner": "android_projects/android_gisapp",
+      "path": "settings.gradle",
+      "revision": "045ec87c048c69b02f696dc35f27bbc66a80637c",
+      "source_sha256": "51ef1a71d62047d7de59be52f5fb2f531049825d29e68e6a3e10c0258c46cc8c"
+    },
+    {
+      "blob": "256f4a1a9b8e84615327b758c47826d450f1846f",
+      "line": 99,
+      "marker": "api project(':maplib')",
+      "meaning": "maplibui exports maplib's API to App",
+      "owner": "android_projects/android_gisapp/maplibui",
+      "path": "build.gradle",
+      "revision": "99e0013f1efd56747c92a1ca2ee118b9605028b7",
+      "source_sha256": "76b48c1a6ba60dd2b039f33f1ee851819b5fef4c26ec56df4927e9f203d7f524"
+    }
+  ],
+  "dependency_plan": {
+    "compressed_sha256": "b5000dfee6634aba3ded9b4e47862d66d498f9b9e6d0cb861964699ff295f8fe",
+    "coverage": "UNKNOWN",
+    "library_path_count": 390,
+    "path_count": 394,
+    "review_links": 4067192,
+    "source_context": {
+      "repositories": {
+        ".": {
+          "basis": "working_tree"
+        },
+        "android_projects/android_gisapp": {
+          "basis": "working_tree"
+        },
+        "android_projects/android_gisapp/easypicker": {
+          "basis": "working_tree"
+        },
+        "android_projects/android_gisapp/maplib": {
+          "basis": "working_tree"
+        },
+        "android_projects/android_gisapp/maplibui": {
+          "basis": "working_tree"
+        },
+        "android_projects/upload_mobile": {
+          "basis": "working_tree"
+        }
+      },
+      "schema_version": 1
+    },
+    "source_sha256": "25736afb96bbafc6e99d134d627e086a50fab4591b6253b5a5d701e651e98c25"
+  },
+  "format": "lisa.agent-system.module-manifest-preservation.v1",
+  "known_source_wording_question": {
+    "disposition": "OPEN_SOURCE_WORDING_NOT_PRODUCT_DEFECT",
+    "id": "lisa:maplib:question:migration.layer-identify-pack-wording",
+    "manifest_record": "lisa:maplib:contract:manifest-key-components-layeridentifypolicy-cc391da9df",
+    "review": "agent-system/migration/pack-review.json"
+  },
+  "layout_id": "lisa:maplib:metadata:maplib-module-manifest",
+  "ordered_records": [
+    "lisa:maplib:metadata:maplib-module-manifest",
+    "lisa:maplib:resource:manifest-entrypoints",
+    "lisa:maplib:contract:manifest-key-components-layeridentifypolicytest-1315540af0",
+    "lisa:maplib:contract:manifest-key-components-localvectortilediskcachetest-d6afc7203f",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectortileadmissiontest-05442f8d1d",
+    "lisa:maplib:contract:manifest-key-components-renderresourceprofiler-fb2db21585",
+    "lisa:maplib:contract:manifest-key-components-renderresourceprofilertest-2ff7c36e5f",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectorfeaturereader-5c3d9c84df",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectorfeaturereadertest-bd935b3f30",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridge-e54ae4e865",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridgetest-e7a56ff3be",
+    "lisa:maplib:contract:manifest-key-components-nativevectortilebufferparitytest-3611b51b1c",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectorlayercontroller-0935646f34",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectortilebackend-dead10fc7c",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectortilerequest-36506e3249",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectortileprovider-ed199289ac",
+    "lisa:maplib:contract:manifest-key-components-visiblelinelabelstreamingtest-5c2709d405",
+    "lisa:maplib:contract:manifest-key-components-nativevectortileencoder-07280c85cc",
+    "lisa:maplib:contract:manifest-key-components-nativevectortilepropertycodec-113a9405a6",
+    "lisa:maplib:contract:manifest-key-components-nativevectortileclipper-e6e34f2513",
+    "lisa:maplib:contract:manifest-key-components-rendertileworklimiter-d342d15fa7",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectortilerequesttest-4c5d24a995",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectortileprovidertest-7ab6ee5d96",
+    "lisa:maplib:contract:manifest-key-components-nativevectortilepropertycodectest-334adbc4a8",
+    "lisa:maplib:contract:manifest-key-components-nativevectortileencodertest-7075ef2283",
+    "lisa:maplib:contract:manifest-key-components-nativevectortileclippertest-5b3353acf9",
+    "lisa:maplib:contract:manifest-key-components-sqlitevectorspatialquerytest-ac4c3be704",
+    "lisa:maplib:contract:manifest-key-components-nativefeaturepayload-a6b56d10c4",
+    "lisa:maplib:contract:manifest-key-components-nativefeaturepayloadtest-e49a587c7a",
+    "lisa:maplib:contract:manifest-key-components-rendermemoryguard-f833d7a258",
+    "lisa:maplib:contract:manifest-key-components-rendermemorypolicy-efd7ee8fe2",
+    "lisa:maplib:contract:manifest-key-components-rendermemoryguardtest-ca979b5c1c",
+    "lisa:maplib:contract:manifest-key-components-rendertileworkgate-4db837c96a",
+    "lisa:maplib:contract:manifest-key-components-localvectortilediskcache-249c52edfa",
+    "lisa:maplib:contract:manifest-key-components-renderprocessmemory-59de825d72",
+    "lisa:maplib:contract:manifest-key-components-rendertileworkgatetest-a7f99e54a5",
+    "lisa:maplib:contract:manifest-key-components-layerdisplaypriority-c834b85493",
+    "lisa:maplib:contract:manifest-key-components-layerdisplayprioritytest-ddaf126e86",
+    "lisa:maplib:contract:manifest-key-components-visiblelinelabellayout-0dcd0bd8cc",
+    "lisa:maplib:contract:manifest-key-components-visiblelinelabelcontroller-b894c18912",
+    "lisa:maplib:contract:manifest-key-components-visiblelinelabelquery-ce61fa8233",
+    "lisa:maplib:contract:manifest-key-components-visiblelinelabelquerytest-133f61ea1e",
+    "lisa:maplib:contract:manifest-key-components-visiblelinelabellayouttest-420caabb8c",
+    "lisa:maplib:contract:manifest-key-components-legacytrackcolorstest-a7dce33a7a",
+    "lisa:maplib:contract:manifest-key-components-trackcolorpalette-12641dd12c",
+    "lisa:maplib:contract:manifest-key-components-trackmapstyle-eae6139c81",
+    "lisa:maplib:contract:manifest-key-components-polygonpatternoptions-f456b5f2c7",
+    "lisa:maplib:contract:manifest-key-components-polygonoutlineoptions-55002f28f9",
+    "lisa:maplib:contract:manifest-key-components-configurablepolygonpatternregistry-7d3033d657",
+    "lisa:maplib:contract:manifest-key-components-patterntileperiod-850e1166ba",
+    "lisa:maplib:contract:manifest-key-components-patterntileperiodtest-13fd9f9f44",
+    "lisa:maplib:contract:manifest-key-components-polygonlayerfactory-6de3076b7f",
+    "lisa:maplib:contract:manifest-key-components-polygonoutlinelayerfactory-63007e38ce",
+    "lisa:maplib:contract:manifest-key-components-fireflymarkerregistry-7d6820a3bd",
+    "lisa:maplib:contract:manifest-key-components-fireflylayerfactory-bf8e57460c",
+    "lisa:maplib:contract:manifest-key-components-simplemarkerstyle-1759ea254e",
+    "lisa:maplib:contract:manifest-key-components-geometrytransformgesture-0546059c25",
+    "lisa:maplib:contract:manifest-key-components-geometrytransform-03b5026204",
+    "lisa:maplib:contract:manifest-key-components-featurecopypolicy-88fad33287",
+    "lisa:maplib:contract:manifest-key-components-markericonregistry-fa63ec7d27",
+    "lisa:maplib:contract:manifest-key-components-rulelabellayouts-167f84e02d",
+    "lisa:maplib:contract:manifest-key-components-rulegeometrylayouts-2578b2e0e3",
+    "lisa:maplib:contract:manifest-key-components-sharedtrackstore-54132a2007",
+    "lisa:maplib:contract:manifest-key-components-sharedtrackstoretest-a86108cdeb",
+    "lisa:maplib:contract:manifest-key-components-projectsyncstate-ad3cb0d2a8",
+    "lisa:maplib:contract:manifest-key-components-projectsyncstatepublicationtest-504c527af6",
+    "lisa:maplib:contract:manifest-key-components-featurechanges-7fced72b8b",
+    "lisa:maplib:contract:manifest-key-components-localchangescommittest-e9589dfab7",
+    "lisa:maplib:contract:manifest-key-components-gpsrecoverypolicy-44aeb5d127",
+    "lisa:maplib:contract:manifest-key-components-gpsdisplayretentiontest-24da0a4ee8",
+    "lisa:maplib:contract:manifest-key-components-mapruntimediagnostics-b584bbe83e",
+    "lisa:maplib:contract:manifest-key-components-mapruntimediagnosticstest-b21e27e71f",
+    "lisa:maplib:contract:manifest-key-components-localloginitializer-3343b59399",
+    "lisa:maplib:contract:manifest-key-components-layerformhashutil-334732c03c",
+    "lisa:maplib:contract:manifest-key-components-tracksendsettings-b658a5eea0",
+    "lisa:maplib:contract:manifest-key-components-tracksendsettingstest-6bb22c2ba2",
+    "lisa:maplib:contract:manifest-key-components-syncworkspacesession-58f33d7e0b",
+    "lisa:maplib:contract:manifest-key-components-conditionalrequiredrules-7c07776b96",
+    "lisa:maplib:contract:manifest-key-components-cascadinglists-aca3c26642",
+    "lisa:maplib:contract:manifest-key-components-projectscriptservice-f6a546f564",
+    "lisa:maplib:contract:manifest-key-components-projectscripthost-6a7596c638",
+    "lisa:maplib:contract:manifest-key-components-projectscriptsync-3a85f5ba02",
+    "lisa:maplib:contract:manifest-key-components-scriptpackage-9086d85818",
+    "lisa:maplib:contract:manifest-key-components-field-df4bc62ff5",
+    "lisa:maplib:contract:manifest-key-components-fieldmetadatatest-e3d1cf9f67",
+    "lisa:maplib:contract:manifest-key-components-locationpowerpolicy-22003259c9",
+    "lisa:maplib:contract:manifest-key-components-gnssdevice-e15d15e28d",
+    "lisa:maplib:contract:manifest-key-components-gnssdevicescanner-9b47655551",
+    "lisa:maplib:contract:manifest-key-components-gnssdevicescanresults-d5380e3815",
+    "lisa:maplib:contract:manifest-key-components-coalescingrefresh-e427d9a9cd",
+    "lisa:maplib:contract:manifest-key-components-feature-2e5b5c5566",
+    "lisa:maplib:contract:manifest-key-components-ngwsyncio-3329ebfbdc",
+    "lisa:maplib:contract:manifest-key-components-ngwsyncprogress-96f81ac920",
+    "lisa:maplib:contract:manifest-key-components-ngwsyncprogresstest-e2d5492baa",
+    "lisa:maplib:contract:manifest-key-components-ngwsynctrace-1738662326",
+    "lisa:maplib:contract:manifest-key-components-ngwsnapshotcheckpoint-17ef4f6b87",
+    "lisa:maplib:contract:manifest-key-components-sharedunderlaycatalog-0ac8bb27ef",
+    "lisa:maplib:contract:manifest-key-components-sharedunderlaystore-6a11b8e8e4",
+    "lisa:maplib:contract:manifest-key-components-sharedunderlaykind-c6a1ced6a8",
+    "lisa:maplib:contract:manifest-key-components-ngrcarchive-83596eb97e",
+    "lisa:maplib:contract:manifest-key-components-fileutil-3da0fd8ba0",
+    "lisa:maplib:contract:manifest-key-components-fileutildisplaynametest-75aabe8820",
+    "lisa:maplib:contract:manifest-key-components-rastermbtileswriter-098b697e3a",
+    "lisa:maplib:contract:manifest-key-components-camerazoom-f265356636",
+    "lisa:maplib:contract:manifest-key-components-underlayworkspaceindex-611452ed96",
+    "lisa:maplib:contract:manifest-key-components-walkpreviewgeometry-898b133bf3",
+    "lisa:maplib:contract:manifest-key-components-userlocationgeometry-a628c349bf",
+    "lisa:maplib:contract:manifest-key-components-ic-user-location-dot-20e67979dc",
+    "lisa:maplib:contract:manifest-key-components-ic-user-location-orbit-5285a7cae0",
+    "lisa:maplib:contract:manifest-key-components-userlocationgeometrytest-27afba6274",
+    "lisa:maplib:contract:manifest-key-components-locationmotionfilter-658d49a6ac",
+    "lisa:maplib:contract:manifest-key-components-locationdeparturetest-5b3d0b6416",
+    "lisa:maplib:contract:manifest-key-components-locationsubscriptioncontroller-026ba8382e",
+    "lisa:maplib:contract:manifest-key-components-sensormotionmonitor-ae4cdd0012",
+    "lisa:maplib:contract:manifest-key-components-devicemotionevidence-d058a17f0c",
+    "lisa:maplib:contract:manifest-key-components-locationrecordingsamplercore-2ef4104dcb",
+    "lisa:maplib:contract:manifest-key-components-tracklayer-a3e2195fdd",
+    "lisa:maplib:contract:manifest-key-components-locationfixpolicy-c1c58c9746",
+    "lisa:maplib:contract:manifest-key-components-diagnosticlog-7bb185a795",
+    "lisa:maplib:contract:manifest-key-components-locationdiagnosticformat-9e08c96a8e",
+    "lisa:maplib:contract:manifest-key-components-externalgnsskeepalivehost-8dccbef0e5",
+    "lisa:maplib:contract:manifest-key-components-locationrecordingsampler-dc23468ac5",
+    "lisa:maplib:contract:manifest-key-components-externalgnssfixpolicy-238461c3bf",
+    "lisa:maplib:contract:manifest-key-components-gnsstransport-e35795ac1a",
+    "lisa:maplib:contract:manifest-key-components-nmeaparser-e3f7a06512",
+    "lisa:maplib:contract:manifest-key-components-nmealinebuffer-0bcdadd142",
+    "lisa:maplib:contract:manifest-key-components-cnbframebuffer-dcda8b938b",
+    "lisa:maplib:contract:manifest-key-components-cnbbestpos-6b4658564c",
+    "lisa:maplib:contract:manifest-key-components-comnavasciicommands-56239442d6",
+    "lisa:maplib:contract:manifest-key-components-bluetoothletransport-41ae28a2f0",
+    "lisa:maplib:contract:manifest-key-components-externalgnsssession-0c581d9bba",
+    "lisa:maplib:contract:manifest-key-components-adaptivelocationfiltercore-8e5526fb4e",
+    "lisa:maplib:contract:manifest-key-components-build-a47ff6d32a",
+    "lisa:maplib:contract:manifest-key-components-layercontentprovider-e27073dc28",
+    "lisa:maplib:contract:manifest-key-components-mapdrawable-8a756a9bf1",
+    "lisa:maplib:contract:manifest-key-components-geometryeditfillpolicy-1c63e87344",
+    "lisa:maplib:contract:manifest-key-components-mplfeaturesutils-3ec8ad13df",
+    "lisa:maplib:contract:manifest-key-components-fieldstylerule-bee6fcf164",
+    "lisa:maplib:contract:manifest-key-components-layergroup-0eb29b1eac",
+    "lisa:maplib:contract:manifest-key-components-ngwrasterlayer-a64043756e",
+    "lisa:maplib:contract:manifest-key-components-ngwvectorlayer-66f4602770",
+    "lisa:maplib:contract:manifest-key-components-ngwsyncnonereloaddecision-bf1976e326",
+    "lisa:maplib:contract:manifest-key-components-ngwfeaturecountparser-650a446564",
+    "lisa:maplib:contract:manifest-key-components-districtfilterutil-acb3a5709b",
+    "lisa:maplib:contract:manifest-key-components-remoteattachmentsyncpolicy-229e87c238",
+    "lisa:maplib:contract:manifest-key-components-syncadapter-c362e19f10",
+    "lisa:maplib:contract:manifest-key-components-ngwsyncservice-69142af855",
+    "lisa:maplib:contract:manifest-key-components-vectorlayer-7cab7c403f",
+    "lisa:maplib:contract:manifest-key-components-table-7d2b584a25",
+    "lisa:maplib:contract:manifest-key-components-geometryrtree-4a061321b0",
+    "lisa:maplib:contract:manifest-key-components-geoenvelope-c8405b123b",
+    "lisa:maplib:contract:manifest-key-components-mapcontentproviderhelper-c7ae7492f8",
+    "lisa:maplib:contract:manifest-key-components-geojsonutil-caa8763a09",
+    "lisa:maplib:contract:manifest-key-components-databasecontext-1586929db9",
+    "lisa:maplib:contract:manifest-key-components-coordinatepointparser-a95f9aaf46",
+    "lisa:maplib:contract:manifest-key-components-coordinatepointlayerimporter-4d74883ec5",
+    "lisa:maplib:contract:manifest-key-components-ngwlayeridentitybackup-33f8bfe0ec",
+    "lisa:maplib:contract:manifest-key-components-vectorlayerrendercache-a6279d4f1e",
+    "lisa:maplib:contract:manifest-key-components-layeridentifypolicy-cc391da9df",
+    "lisa:maplib:contract:manifest-key-components-collectorprojectcompositionsync-5b3d967ffc",
+    "lisa:maplib:contract:manifest-key-components-collectorprojectitem-9e478c227a",
+    "lisa:maplib:contract:manifest-key-components-collectorresource-bb0b5c041e",
+    "lisa:maplib:contract:manifest-key-components-tmslayer-bf271622db",
+    "lisa:maplib:contract:manifest-key-components-mbtilesinfo-50b3ac2f40",
+    "lisa:maplib:contract:manifest-key-components-legacytilembtilesmath-d8c2f8d9b3",
+    "lisa:maplib:contract:manifest-key-components-lisacatalog-5247e60115",
+    "lisa:maplib:contract:manifest-key-components-lisacataloglookup-157f537a24",
+    "lisa:maplib:contract:manifest-key-components-resourcegroup-2c946894de",
+    "lisa:maplib:contract:manifest-key-components-layerconfigutil-93dbbaa18a",
+    "lisa:maplib:contract:manifest-key-components-multipolygongeometryrepair-666f218647",
+    "lisa:maplib:contract:manifest-key-components-ngwfeaturegeometryvalidator-8c1287baf6",
+    "lisa:maplib:contract:manifest-key-components-geogeometryfactory-784781a977",
+    "lisa:maplib:contract:manifest-key-components-geomultipolygon-532bdeaa42",
+    "lisa:maplib:contract:manifest-key-components-polygoneditclass-6eab5e7f97",
+    "lisa:maplib:contract:manifest-key-components-multipolygoneditclass-4aeb6ddcc8",
+    "lisa:maplib:contract:manifest-key-components-pointeditclass-b1f1c05318",
+    "lisa:maplib:contract:manifest-key-components-multipointeditclass-f27e41d734",
+    "lisa:maplib:contract:manifest-key-components-lineeditclass-58a0051593",
+    "lisa:maplib:contract:manifest-key-components-multilineeditclass-17fe40312c",
+    "lisa:maplib:contract:manifest-key-components-editdirectionpolicy-66a4ba2b31",
+    "lisa:maplib:contract:manifest-key-components-locationtrackfilter-5c659b0b22",
+    "lisa:maplib:contract:manifest-key-components-locationutil-24ca218697",
+    "lisa:maplib:contract:manifest-key-components-locationtrackfiltercore-3926220e04",
+    "lisa:maplib:contract:manifest-key-components-locationproviderarbiter-5dab405ef3",
+    "lisa:maplib:contract:manifest-key-components-locationproviderarbitercore-9b5c8496ea",
+    "lisa:maplib:contract:manifest-key-components-stakeoutgeometrytarget-801a811880",
+    "lisa:maplib:contract:manifest-key-components-stakeoutguidancepolicy-d98e2b7fdd",
+    "lisa:maplib:contract:manifest-key-components-gpseventsource-9027bd6b65",
+    "lisa:maplib:contract:manifest-key-components-layerdatabasetransaction-79749439e9",
+    "lisa:maplib:contract:manifest-key-components-featuresavejournal-0a6de20538",
+    "lisa:maplib:contract:manifest-key-components-pendingtrackpoints-42493fcb67",
+    "lisa:maplib:contract:manifest-key-components-maptapgesture-88c35eaa75",
+    "lisa:maplib:contract:manifest-key-components-ngwlookuptable-bc356b8e64",
+    "lisa:maplib:contract:manifest-key-components-ngwvectorlayerfullsnapshothttpstatustest-7d047f383a",
+    "lisa:maplib:contract:manifest-key-components-syncresultutil-c0de82c903",
+    "lisa:maplib:contract:manifest-key-components-ngwlayerschemacompat-b55fd85f5c",
+    "lisa:maplib:contract:manifest-key-components-connection-b01ac003e3",
+    "lisa:maplib:contract:manifest-key-components-ngwhttpexception-dfecfefa3d",
+    "lisa:maplib:contract:manifest-key-components-ngwhttpresponseexception-735ef742b9",
+    "lisa:maplib:contract:manifest-key-components-networkutil-857fd5c80f",
+    "lisa:maplib:contract:manifest-key-components-localvectorbulkcachereadinesstest-38a13c44b4",
+    "lisa:maplib:contract:manifest-key-components-geometryrtreerecoverytest-1f56a7161a",
+    "lisa:maplib:contract:manifest-public-contracts-render-resource-economy-2c6382b96a",
+    "lisa:maplib:contract:manifest-public-contracts-point-firefly-e94484c889",
+    "lisa:maplib:contract:manifest-public-contracts-compass-sector-visibility-074ae4a8f9",
+    "lisa:maplib:contract:manifest-public-contracts-track-send-settings-a20ac20056",
+    "lisa:maplib:contract:manifest-public-contracts-sync-workspace-session-b6b7e0b5b6",
+    "lisa:maplib:contract:manifest-public-contracts-project-script-host-api-541dcc34d8",
+    "lisa:maplib:contract:manifest-public-contracts-ngw-required-fields-a84512e23b",
+    "lisa:maplib:contract:manifest-public-contracts-local-write-commit-9cc626d90d",
+    "lisa:maplib:contract:manifest-public-contracts-track-retry-37e9bbfc63",
+    "lisa:maplib:contract:manifest-public-contracts-asynchronous-track-refresh-ce771aa3a8",
+    "lisa:maplib:contract:manifest-public-contracts-passive-walk-preview-bbc57ac598",
+    "lisa:maplib:contract:manifest-public-contracts-current-location-recording-772d8b2753",
+    "lisa:maplib:contract:manifest-public-contracts-segmented-tracks-ce3d65fb67",
+    "lisa:maplib:contract:manifest-public-contracts-map-host-34e0016f27",
+    "lisa:maplib:contract:manifest-public-contracts-gis-application-b33dc451d3",
+    "lisa:maplib:contract:manifest-public-contracts-collector-metadata-5226114757",
+    "lisa:maplib:contract:manifest-public-contracts-ngw-resource-url-6480545fb1",
+    "lisa:maplib:contract:manifest-public-contracts-stakeout-geometry-21d9cfd12b",
+    "lisa:maplib:contract:manifest-public-contracts-ngw-lookup-cache-content-b87bdf4ce7",
+    "lisa:maplib:contract:manifest-public-contracts-sync-failure-reasons-16941d5906",
+    "lisa:maplib:contract:manifest-public-contracts-ngw-child-load-result-e9e76037fd",
+    "lisa:maplib:contract:manifest-public-contracts-ngw-http-failure-provenance-f2a33a61af",
+    "lisa:maplib:contract:manifest-public-contracts-ngw-temporary-server-classification-57b0050e09",
+    "lisa:maplib:contract:manifest-public-contracts-vector-spatial-cache-recovery-532cdaba6a",
+    "lisa:maplib:resource:manifest-settings-refs",
+    "lisa:maplib:contract:manifest-storage-contracts-local-vector-tile-derived-cache-377000e4fd",
+    "lisa:maplib:contract:manifest-storage-contracts-project-scripts-cache-5f6e42ccb0",
+    "lisa:maplib:contract:manifest-storage-contracts-feature-save-journal-e1dc0608ce",
+    "lisa:maplib:contract:manifest-storage-contracts-pending-track-points-5f69fe91dd",
+    "lisa:maplib:contract:manifest-storage-contracts-ngw-snapshot-count-checkpoint-41610d91e9",
+    "lisa:maplib:contract:manifest-storage-contracts-layer-json-c9f47d11a9",
+    "lisa:maplib:contract:manifest-storage-contracts-ngw-raster-layer-json-15b4f7c0b1",
+    "lisa:maplib:contract:manifest-storage-contracts-ngw-vector-identity-backup-0e719d6c77",
+    "lisa:maplib:resource:manifest-invariant-refs",
+    "lisa:maplib:resource:manifest-global-docs",
+    "lisa:maplib:resource:manifest-smoke-tests",
+    "lisa:maplib:resource:manifest-upstream-hotspots"
+  ],
+  "ordered_records_sha256": "d575b545bb8c624ee21d53e9ee3244f00c780164026fa1c51e2d3c8fb3a06d53",
+  "original": {
+    "blob": "b713fa79c5fdd0e20649015f03fe34b29df43728",
+    "bytes": 70302,
+    "fields": [
+      {
+        "end_byte": 18,
+        "key": "schema_version",
+        "sha256": "5c9536c0f64193f535c425baf9f2c7431b89eb46bab5fb85d4bfcffabb565f43",
+        "start_byte": 0
+      },
+      {
+        "end_byte": 36,
+        "key": "module_id",
+        "sha256": "4ede3c2e0d3a408ffadbbea30a840b231d0d0dd32437048cb2686992eb250989",
+        "start_byte": 18
+      },
+      {
+        "end_byte": 58,
+        "key": "repository_id",
+        "sha256": "60d2f6e6ce37dbd1cf17337837390452d059789705d7fb78f00a852857ac9649",
+        "start_byte": 36
+      },
+      {
+        "end_byte": 79,
+        "key": "maturity",
+        "sha256": "4a5426b15627f803f4ed5a207530e9b88a6253192b7bb78c4a67925fdf99dcc2",
+        "start_byte": 58
+      },
+      {
+        "end_byte": 105,
+        "key": "last_verified",
+        "sha256": "6d8dca772370985c7bc3565ef60a1ccca24c69c98fb0d133421826d476b892a9",
+        "start_byte": 79
+      },
+      {
+        "end_byte": 405,
+        "key": "entrypoints",
+        "sha256": "1a8a4f819310a4bc553ad55544f07da20e5895a5075b9b2fd3da4ebea5706024",
+        "start_byte": 105
+      },
+      {
+        "end_byte": 59823,
+        "key": "key_components",
+        "sha256": "2c6bd1c66993cd981049b8064173ecf56d51354993fcc61964dc1819e36d81cc",
+        "start_byte": 405
+      },
+      {
+        "end_byte": 65051,
+        "key": "public_contracts",
+        "sha256": "0fb05b1319339d376317824fa01f2ed07c2b679ff404f50f1bae8e78e62993e4",
+        "start_byte": 59823
+      },
+      {
+        "end_byte": 65415,
+        "key": "settings_refs",
+        "sha256": "4ba87bc3c26ffea6322d538409fc972864f95e799dea63b663ee11826c1440e7",
+        "start_byte": 65051
+      },
+      {
+        "end_byte": 66311,
+        "key": "storage_contracts",
+        "sha256": "cc024f2d665649ef001a377a6a01d119bbfc71bfaa67a19072b907ad499a86a0",
+        "start_byte": 65415
+      },
+      {
+        "end_byte": 67688,
+        "key": "invariant_refs",
+        "sha256": "2d123ab8e1e4f0194bff2c4733427fabe0f2e435cba099ffcd7f242174f57cb7",
+        "start_byte": 66311
+      },
+      {
+        "end_byte": 68398,
+        "key": "global_docs",
+        "sha256": "8cc86bc4746ba14b00dfd27455195f9d531663a500a716b9cfb0e08b66239268",
+        "start_byte": 67688
+      },
+      {
+        "end_byte": 70037,
+        "key": "smoke_tests",
+        "sha256": "b1dc09c461e4925843792f22b5786c10e9e976f86fb5ba692da92ac4c57b42c1",
+        "start_byte": 68398
+      },
+      {
+        "end_byte": 70302,
+        "key": "upstream_hotspots",
+        "sha256": "8bace23b976083d2be33ac32d568e705ba0d282fee76057ed7a21866a410d3b6",
+        "start_byte": 70037
+      }
+    ],
+    "path": "docs/manifest.yaml",
+    "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
+    "sha256": "6c52f116009ad4e8753c79e3661ef1073ba538e42e94c2e7a14fde97c1a14b9b"
+  },
+  "original_record_spans": [
+    {
+      "end_byte": 105,
+      "id": "lisa:maplib:metadata:maplib-module-manifest",
+      "pointer": "/",
+      "sha256": "5fe3285b16d046ae29bb6d7e537c91bbce64dd87dc1c05606bf14fff21f6af9e",
+      "start_byte": 0
+    },
+    {
+      "end_byte": 405,
+      "id": "lisa:maplib:resource:manifest-entrypoints",
+      "pointer": "/entrypoints",
+      "sha256": "9165e9367aad0825d5c4e047e87ba7ac588a78f55ec13f6376de16e48d22fe97",
+      "start_byte": 120
+    },
+    {
+      "end_byte": 638,
+      "id": "lisa:maplib:contract:manifest-key-components-layeridentifypolicytest-1315540af0",
+      "pointer": "/key_components/0",
+      "sha256": "1d06ba02deb0b4eea5a5bd3a5c8621cdad93b3077c29fea3660551354fbecccf",
+      "start_byte": 425
+    },
+    {
+      "end_byte": 1067,
+      "id": "lisa:maplib:contract:manifest-key-components-localvectortilediskcachetest-d6afc7203f",
+      "pointer": "/key_components/1",
+      "sha256": "89055e8a10c7993ccd4af15304cf8fa333dad46b00e0ebfee81332e9e6069349",
+      "start_byte": 640
+    },
+    {
+      "end_byte": 1416,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectortileadmissiontest-05442f8d1d",
+      "pointer": "/key_components/2",
+      "sha256": "5aed8ce967349372bb518f7c521a19ea8e3fe33e26edb23467fbad7020bc1ea7",
+      "start_byte": 1069
+    },
+    {
+      "end_byte": 1849,
+      "id": "lisa:maplib:contract:manifest-key-components-renderresourceprofiler-fb2db21585",
+      "pointer": "/key_components/3",
+      "sha256": "8106c4928201e700582c605d1a3d09c70ed1260c2f0efe60ad1379560cf68cc6",
+      "start_byte": 1418
+    },
+    {
+      "end_byte": 2200,
+      "id": "lisa:maplib:contract:manifest-key-components-renderresourceprofilertest-2ff7c36e5f",
+      "pointer": "/key_components/4",
+      "sha256": "9b8a024d672c10791008286e4ad835a5e934e8b0e571ed15f72475ffdc3dbc8d",
+      "start_byte": 1851
+    },
+    {
+      "end_byte": 2723,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectorfeaturereader-5c3d9c84df",
+      "pointer": "/key_components/5",
+      "sha256": "61cdc781a2bd746c786119c79edbe043d9a558e2908d35738050470c5a7146f4",
+      "start_byte": 2202
+    },
+    {
+      "end_byte": 3154,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectorfeaturereadertest-bd935b3f30",
+      "pointer": "/key_components/6",
+      "sha256": "68f76e2abaf677ec87b27b62d779654120ced1588c7f850961a714b8310113d5",
+      "start_byte": 2725
+    },
+    {
+      "end_byte": 3537,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridge-e54ae4e865",
+      "pointer": "/key_components/7",
+      "sha256": "476846c3b427ee9f23dfd8d9c88d7932aa257b1c89d99af9e4de47a6184873a0",
+      "start_byte": 3156
+    },
+    {
+      "end_byte": 3783,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridgetest-e7a56ff3be",
+      "pointer": "/key_components/8",
+      "sha256": "71c89d63b254333d861bebf829cb402cb63f2cf461c53ce9984321a792ca1ace",
+      "start_byte": 3539
+    },
+    {
+      "end_byte": 4119,
+      "id": "lisa:maplib:contract:manifest-key-components-nativevectortilebufferparitytest-3611b51b1c",
+      "pointer": "/key_components/9",
+      "sha256": "dcfad966864fe5462f88613630cbd51cd7d9dbe7046501bfabc653605bf56784",
+      "start_byte": 3785
+    },
+    {
+      "end_byte": 4400,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectorlayercontroller-0935646f34",
+      "pointer": "/key_components/10",
+      "sha256": "c8479df95219537d928b1d1788d1213bb1752da71e5cae87abd1bc71048a3aeb",
+      "start_byte": 4121
+    },
+    {
+      "end_byte": 4758,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectortilebackend-dead10fc7c",
+      "pointer": "/key_components/11",
+      "sha256": "6828ec2d2f93aed10cdf625d2acd99e6bbaf3fb7c94bbc05d9082d7a2bdeb4ca",
+      "start_byte": 4402
+    },
+    {
+      "end_byte": 4995,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectortilerequest-36506e3249",
+      "pointer": "/key_components/12",
+      "sha256": "21f506b206c679f2267e6e6957746c136de4fe2f9d779abe89712f08eb3993ae",
+      "start_byte": 4760
+    },
+    {
+      "end_byte": 5360,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectortileprovider-ed199289ac",
+      "pointer": "/key_components/13",
+      "sha256": "59ed4a1130f35e08a81900eb847b3624b95ffa4771213529780370188a85c7a6",
+      "start_byte": 4997
+    },
+    {
+      "end_byte": 5665,
+      "id": "lisa:maplib:contract:manifest-key-components-visiblelinelabelstreamingtest-5c2709d405",
+      "pointer": "/key_components/14",
+      "sha256": "321279b557ae554304a9dcb5063676f6b0628f0ee0d9265e4b9eb30dd2aaf62c",
+      "start_byte": 5362
+    },
+    {
+      "end_byte": 5952,
+      "id": "lisa:maplib:contract:manifest-key-components-nativevectortileencoder-07280c85cc",
+      "pointer": "/key_components/15",
+      "sha256": "878f9075fd82397bda13e694ceffbaaaf4ab3196ebb25e92f8722cb07a899cba",
+      "start_byte": 5667
+    },
+    {
+      "end_byte": 6263,
+      "id": "lisa:maplib:contract:manifest-key-components-nativevectortilepropertycodec-113a9405a6",
+      "pointer": "/key_components/16",
+      "sha256": "bb29fea631070a5ee5771fc34dd3c41f272648a0faf161615ce73bb97e7096f0",
+      "start_byte": 5954
+    },
+    {
+      "end_byte": 6590,
+      "id": "lisa:maplib:contract:manifest-key-components-nativevectortileclipper-e6e34f2513",
+      "pointer": "/key_components/17",
+      "sha256": "2f86248ede9f01a69771e12343055c561cb22e3d4979d1555091b14c7daa0555",
+      "start_byte": 6265
+    },
+    {
+      "end_byte": 6836,
+      "id": "lisa:maplib:contract:manifest-key-components-rendertileworklimiter-d342d15fa7",
+      "pointer": "/key_components/18",
+      "sha256": "fff21116e7fc48169a2e576e8cb2567b4c9906af9d037a5f8ebe8073decdccf9",
+      "start_byte": 6592
+    },
+    {
+      "end_byte": 7049,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectortilerequesttest-4c5d24a995",
+      "pointer": "/key_components/19",
+      "sha256": "e54000902e3f46da811dbb91520ca241ec46ce6bac4e9e1a8812316464890783",
+      "start_byte": 6838
+    },
+    {
+      "end_byte": 7404,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectortileprovidertest-7ab6ee5d96",
+      "pointer": "/key_components/20",
+      "sha256": "5cd6fb138b9f381a6232b8b2c434b9da203b321a780d5b080c959f65ed8d60e9",
+      "start_byte": 7051
+    },
+    {
+      "end_byte": 7680,
+      "id": "lisa:maplib:contract:manifest-key-components-nativevectortilepropertycodectest-334adbc4a8",
+      "pointer": "/key_components/21",
+      "sha256": "b3b50e97aafe489fd7d250f7d93d301ae04963975004b41e82d5418a19afc567",
+      "start_byte": 7406
+    },
+    {
+      "end_byte": 7960,
+      "id": "lisa:maplib:contract:manifest-key-components-nativevectortileencodertest-7075ef2283",
+      "pointer": "/key_components/22",
+      "sha256": "f17d800205e61e796083a4d50d693d4f52773ac718c262661e14cbd1435a89a7",
+      "start_byte": 7682
+    },
+    {
+      "end_byte": 8198,
+      "id": "lisa:maplib:contract:manifest-key-components-nativevectortileclippertest-5b3353acf9",
+      "pointer": "/key_components/23",
+      "sha256": "3ccd3c2874052e320a199a30b9bc527e11e50ef9b5f37f932eeea42c806a6e05",
+      "start_byte": 7962
+    },
+    {
+      "end_byte": 8560,
+      "id": "lisa:maplib:contract:manifest-key-components-sqlitevectorspatialquerytest-ac4c3be704",
+      "pointer": "/key_components/24",
+      "sha256": "dafa0e929b4618641ac6613b1edfeca1d4961d67024fefbbb12f5c35159f9c63",
+      "start_byte": 8200
+    },
+    {
+      "end_byte": 8857,
+      "id": "lisa:maplib:contract:manifest-key-components-nativefeaturepayload-a6b56d10c4",
+      "pointer": "/key_components/25",
+      "sha256": "4de6a10f8bacb374d65b656242473f0ff918bc7e1c8b64967e1438b981619bd3",
+      "start_byte": 8562
+    },
+    {
+      "end_byte": 9148,
+      "id": "lisa:maplib:contract:manifest-key-components-nativefeaturepayloadtest-e49a587c7a",
+      "pointer": "/key_components/26",
+      "sha256": "59a2fe52001387a1d95347fab13bc26f8dadae88c8e4ffbc3468b390374faee1",
+      "start_byte": 8859
+    },
+    {
+      "end_byte": 9462,
+      "id": "lisa:maplib:contract:manifest-key-components-rendermemoryguard-f833d7a258",
+      "pointer": "/key_components/27",
+      "sha256": "a5df5f1433f63504f2dcd2b452c5a9a6fa7398410f6da90ce698f6ed4e41ed14",
+      "start_byte": 9150
+    },
+    {
+      "end_byte": 9807,
+      "id": "lisa:maplib:contract:manifest-key-components-rendermemorypolicy-efd7ee8fe2",
+      "pointer": "/key_components/28",
+      "sha256": "370efad994b56fb4f352d24e533654704a8b0cef6ef155d7974182c0be1145b4",
+      "start_byte": 9464
+    },
+    {
+      "end_byte": 10098,
+      "id": "lisa:maplib:contract:manifest-key-components-rendermemoryguardtest-ca979b5c1c",
+      "pointer": "/key_components/29",
+      "sha256": "d92c4cc7b69e6072d153bf64ec6ffcef153adcaa4780826208db35f174ef76cd",
+      "start_byte": 9809
+    },
+    {
+      "end_byte": 10331,
+      "id": "lisa:maplib:contract:manifest-key-components-rendertileworkgate-4db837c96a",
+      "pointer": "/key_components/30",
+      "sha256": "a00097210aa6ae309dcab4db23847b2259b8002a7b77b9a5c2937742a6f38c8b",
+      "start_byte": 10100
+    },
+    {
+      "end_byte": 10811,
+      "id": "lisa:maplib:contract:manifest-key-components-localvectortilediskcache-249c52edfa",
+      "pointer": "/key_components/31",
+      "sha256": "2420ec383587346e8dba2e8cdfaaf3c885379e578e5fd511086c715cdb8ecf9f",
+      "start_byte": 10333
+    },
+    {
+      "end_byte": 11047,
+      "id": "lisa:maplib:contract:manifest-key-components-renderprocessmemory-59de825d72",
+      "pointer": "/key_components/32",
+      "sha256": "d4fbd59bf7f669ad608b45124ff2a8999e718acc75fbe3dfd1f4604635dc399f",
+      "start_byte": 10813
+    },
+    {
+      "end_byte": 11337,
+      "id": "lisa:maplib:contract:manifest-key-components-rendertileworkgatetest-a7f99e54a5",
+      "pointer": "/key_components/33",
+      "sha256": "75836c91ae5bedf692066fccb8089855a4805f58579eb8b84dceea331f5f380a",
+      "start_byte": 11049
+    },
+    {
+      "end_byte": 11776,
+      "id": "lisa:maplib:contract:manifest-key-components-layerdisplaypriority-c834b85493",
+      "pointer": "/key_components/34",
+      "sha256": "1b31e6e830094b4dcfbc3cadede27afde1cc69163548920745ced97da702bf8e",
+      "start_byte": 11339
+    },
+    {
+      "end_byte": 12127,
+      "id": "lisa:maplib:contract:manifest-key-components-layerdisplayprioritytest-ddaf126e86",
+      "pointer": "/key_components/35",
+      "sha256": "3d3fcc93e4322914527411e662b7b3f53e83855444ee5500abe19a60183b5a04",
+      "start_byte": 11778
+    },
+    {
+      "end_byte": 12457,
+      "id": "lisa:maplib:contract:manifest-key-components-visiblelinelabellayout-0dcd0bd8cc",
+      "pointer": "/key_components/36",
+      "sha256": "eee55129d765c37098d356de22ea47077fd20c2679b27bf9f6b33a3e6de0bee3",
+      "start_byte": 12129
+    },
+    {
+      "end_byte": 12812,
+      "id": "lisa:maplib:contract:manifest-key-components-visiblelinelabelcontroller-b894c18912",
+      "pointer": "/key_components/37",
+      "sha256": "9f17796f4b7f6fdaaa62b3deb6326f14815e199a9ffbe884cf19c4b363bc5c3e",
+      "start_byte": 12459
+    },
+    {
+      "end_byte": 13170,
+      "id": "lisa:maplib:contract:manifest-key-components-visiblelinelabelquery-ce61fa8233",
+      "pointer": "/key_components/38",
+      "sha256": "8f5e37810ad7baf6ec0b5b3b6f31aa82ef1d82b65fdbd75fefb9e3e236a925b5",
+      "start_byte": 12814
+    },
+    {
+      "end_byte": 13551,
+      "id": "lisa:maplib:contract:manifest-key-components-visiblelinelabelquerytest-133f61ea1e",
+      "pointer": "/key_components/39",
+      "sha256": "dda76d84efe1666141de5974bbef6c68e422c24081995e272c248f193e190a32",
+      "start_byte": 13172
+    },
+    {
+      "end_byte": 13770,
+      "id": "lisa:maplib:contract:manifest-key-components-visiblelinelabellayouttest-420caabb8c",
+      "pointer": "/key_components/40",
+      "sha256": "8ab89ef070988d1a8eb1e3aeabcc15b1d8df4b350e5d287cddde09e2de15ef26",
+      "start_byte": 13553
+    },
+    {
+      "end_byte": 13938,
+      "id": "lisa:maplib:contract:manifest-key-components-legacytrackcolorstest-a7dce33a7a",
+      "pointer": "/key_components/41",
+      "sha256": "09f481dff65ad1374d57977dc2b5c806ef53293317b2e9c5c98a404b1eb3ce5a",
+      "start_byte": 13772
+    },
+    {
+      "end_byte": 14119,
+      "id": "lisa:maplib:contract:manifest-key-components-trackcolorpalette-12641dd12c",
+      "pointer": "/key_components/42",
+      "sha256": "e2c08c6bcf490c031cebaa0f93a899aa2312f00e8dd8ed1d6fc39c2da00fb304",
+      "start_byte": 13940
+    },
+    {
+      "end_byte": 14436,
+      "id": "lisa:maplib:contract:manifest-key-components-trackmapstyle-eae6139c81",
+      "pointer": "/key_components/43",
+      "sha256": "39155ed8f79216b38e551a471fe6b74e12ed767c9f398af8a0d7c08387bc17ec",
+      "start_byte": 14121
+    },
+    {
+      "end_byte": 14655,
+      "id": "lisa:maplib:contract:manifest-key-components-polygonpatternoptions-f456b5f2c7",
+      "pointer": "/key_components/44",
+      "sha256": "069850e4611043b5b5ab7ae7cb7d50bd24a73ae4cad2958f343bb274123abdd7",
+      "start_byte": 14438
+    },
+    {
+      "end_byte": 14874,
+      "id": "lisa:maplib:contract:manifest-key-components-polygonoutlineoptions-55002f28f9",
+      "pointer": "/key_components/45",
+      "sha256": "25a851ad0041fff105a0d5a080004044dba3a38d0101343edb2ad8ab9c03f64b",
+      "start_byte": 14657
+    },
+    {
+      "end_byte": 15139,
+      "id": "lisa:maplib:contract:manifest-key-components-configurablepolygonpatternregistry-7d3033d657",
+      "pointer": "/key_components/46",
+      "sha256": "91949153e3d30ec0cb4ce056627c495b04b65e04c5c2179abef12bfcf8e8373c",
+      "start_byte": 14876
+    },
+    {
+      "end_byte": 15386,
+      "id": "lisa:maplib:contract:manifest-key-components-patterntileperiod-850e1166ba",
+      "pointer": "/key_components/47",
+      "sha256": "cfde9dd33b515daf0ac8f74ea1f54523fd7c1cce8292e605c3cfbce1681072bd",
+      "start_byte": 15141
+    },
+    {
+      "end_byte": 15623,
+      "id": "lisa:maplib:contract:manifest-key-components-patterntileperiodtest-13fd9f9f44",
+      "pointer": "/key_components/48",
+      "sha256": "c6e8836ddb8ef37443d5588394197db86c0980e7538f33c3801a7394bb1bcfd6",
+      "start_byte": 15388
+    },
+    {
+      "end_byte": 15840,
+      "id": "lisa:maplib:contract:manifest-key-components-polygonlayerfactory-6de3076b7f",
+      "pointer": "/key_components/49",
+      "sha256": "1ff706f03c10d54d1849a48ea17aa8989216cc73087c815e9d119bf1b2f20fa3",
+      "start_byte": 15625
+    },
+    {
+      "end_byte": 16064,
+      "id": "lisa:maplib:contract:manifest-key-components-polygonoutlinelayerfactory-63007e38ce",
+      "pointer": "/key_components/50",
+      "sha256": "9a75872ea4c80bc1710cb2e1109e59464ea2eb576f31c47497008e7883409f4f",
+      "start_byte": 15842
+    },
+    {
+      "end_byte": 16312,
+      "id": "lisa:maplib:contract:manifest-key-components-fireflymarkerregistry-7d6820a3bd",
+      "pointer": "/key_components/51",
+      "sha256": "9a4e09581cb46543043ca6996e7e0f3a2db8ab19e2a907f6f2546f3aec5b1592",
+      "start_byte": 16066
+    },
+    {
+      "end_byte": 16534,
+      "id": "lisa:maplib:contract:manifest-key-components-fireflylayerfactory-bf8e57460c",
+      "pointer": "/key_components/52",
+      "sha256": "14a9dd6bc99463a95e21dcdb87029dfbe4fe36c978bfc171240c70f23f258181",
+      "start_byte": 16314
+    },
+    {
+      "end_byte": 16765,
+      "id": "lisa:maplib:contract:manifest-key-components-simplemarkerstyle-1759ea254e",
+      "pointer": "/key_components/53",
+      "sha256": "3a2e17f69fe5e95ce812a5576a23488ea0cd6115cfa3fb5e30b3363c4a77f2c0",
+      "start_byte": 16536
+    },
+    {
+      "end_byte": 16983,
+      "id": "lisa:maplib:contract:manifest-key-components-geometrytransformgesture-0546059c25",
+      "pointer": "/key_components/54",
+      "sha256": "68838b7f494500ccc28d19c9462324dcd347426b87a443c15172ad1fbade92cd",
+      "start_byte": 16767
+    },
+    {
+      "end_byte": 17184,
+      "id": "lisa:maplib:contract:manifest-key-components-geometrytransform-03b5026204",
+      "pointer": "/key_components/55",
+      "sha256": "670d9105270cae81d5dd4e52174d6c6863c3736a80fb1c7ca0ffd00ae0ce5d6a",
+      "start_byte": 16985
+    },
+    {
+      "end_byte": 17387,
+      "id": "lisa:maplib:contract:manifest-key-components-featurecopypolicy-88fad33287",
+      "pointer": "/key_components/56",
+      "sha256": "a6eeb76ebcf3061d73382da3f318172e4187ccaf0295f8362056547e94d8125c",
+      "start_byte": 17186
+    },
+    {
+      "end_byte": 17618,
+      "id": "lisa:maplib:contract:manifest-key-components-markericonregistry-fa63ec7d27",
+      "pointer": "/key_components/57",
+      "sha256": "46534cd4523caa7ae8335a1c99d58669061a15c2de7f6e0c37859a2b29cbb7c8",
+      "start_byte": 17389
+    },
+    {
+      "end_byte": 17867,
+      "id": "lisa:maplib:contract:manifest-key-components-rulelabellayouts-167f84e02d",
+      "pointer": "/key_components/58",
+      "sha256": "640bb5e2fc918488301e6b12ff70720cae3b3ff23c85369e3f5eb72ff7413c01",
+      "start_byte": 17620
+    },
+    {
+      "end_byte": 18127,
+      "id": "lisa:maplib:contract:manifest-key-components-rulegeometrylayouts-2578b2e0e3",
+      "pointer": "/key_components/59",
+      "sha256": "7adaafdd429de8dc988e9e886544a430577501408c9179674c837bc3dd51b3f7",
+      "start_byte": 17869
+    },
+    {
+      "end_byte": 18433,
+      "id": "lisa:maplib:contract:manifest-key-components-sharedtrackstore-54132a2007",
+      "pointer": "/key_components/60",
+      "sha256": "6f4e535bcd1721b7e48bb3879e9ee083ecf7499499db5df548b1af1717755685",
+      "start_byte": 18129
+    },
+    {
+      "end_byte": 18736,
+      "id": "lisa:maplib:contract:manifest-key-components-sharedtrackstoretest-a86108cdeb",
+      "pointer": "/key_components/61",
+      "sha256": "0c3b772108949c0fadeca077e73e4adfe4b955f4a9e8e520c0c1bebb7f64c746",
+      "start_byte": 18435
+    },
+    {
+      "end_byte": 19178,
+      "id": "lisa:maplib:contract:manifest-key-components-projectsyncstate-ad3cb0d2a8",
+      "pointer": "/key_components/62",
+      "sha256": "af91ac25497f72ed78e8958b5270d257a5857c6eed346b7bf1ca5fca7ff41d0c",
+      "start_byte": 18738
+    },
+    {
+      "end_byte": 19602,
+      "id": "lisa:maplib:contract:manifest-key-components-projectsyncstatepublicationtest-504c527af6",
+      "pointer": "/key_components/63",
+      "sha256": "932f8782a9046b72c9c0f62de81038ea26657a4b6172e8fa5886cdad7a16ec36",
+      "start_byte": 19180
+    },
+    {
+      "end_byte": 19799,
+      "id": "lisa:maplib:contract:manifest-key-components-featurechanges-7fced72b8b",
+      "pointer": "/key_components/64",
+      "sha256": "406ac075cab43ac58845531763808205b90c1d95ed04b7c1367813429f66973a",
+      "start_byte": 19604
+    },
+    {
+      "end_byte": 20009,
+      "id": "lisa:maplib:contract:manifest-key-components-localchangescommittest-e9589dfab7",
+      "pointer": "/key_components/65",
+      "sha256": "166ed24ce9f0f00d9c000911b5a325b28dbf569564424a03cb9d501ceff0f04b",
+      "start_byte": 19801
+    },
+    {
+      "end_byte": 20480,
+      "id": "lisa:maplib:contract:manifest-key-components-gpsrecoverypolicy-44aeb5d127",
+      "pointer": "/key_components/66",
+      "sha256": "64dc12e6f42221d704d591abd02f12b7f1b90aa6023a8f15aca61413b64c0750",
+      "start_byte": 20011
+    },
+    {
+      "end_byte": 20881,
+      "id": "lisa:maplib:contract:manifest-key-components-gpsdisplayretentiontest-24da0a4ee8",
+      "pointer": "/key_components/67",
+      "sha256": "b3db9bc50a95f4575591d243dcf4d32c415b68e7bdba2cf216808f81d9c0e8fb",
+      "start_byte": 20482
+    },
+    {
+      "end_byte": 21507,
+      "id": "lisa:maplib:contract:manifest-key-components-mapruntimediagnostics-b584bbe83e",
+      "pointer": "/key_components/68",
+      "sha256": "a0dc9124a1a8fc2885e1a6fc86e33b332c4d88d5f8cbfe3f74a43ccb59cc2d51",
+      "start_byte": 20883
+    },
+    {
+      "end_byte": 21972,
+      "id": "lisa:maplib:contract:manifest-key-components-mapruntimediagnosticstest-b21e27e71f",
+      "pointer": "/key_components/69",
+      "sha256": "187e86c14396f854d9cbe24335defcfad03f4a702b90766b543903a6c1fd2c7b",
+      "start_byte": 21509
+    },
+    {
+      "end_byte": 22243,
+      "id": "lisa:maplib:contract:manifest-key-components-localloginitializer-3343b59399",
+      "pointer": "/key_components/70",
+      "sha256": "1be73bb05e68afd0140a685c8c8a0fdd0eb9dadcb8c7b074bacd45e65fe97e0e",
+      "start_byte": 21974
+    },
+    {
+      "end_byte": 22522,
+      "id": "lisa:maplib:contract:manifest-key-components-layerformhashutil-334732c03c",
+      "pointer": "/key_components/71",
+      "sha256": "bd1d13f3ca1dd5dc08c33aad133a9259b5b61b36487b66d50e006a40624338b5",
+      "start_byte": 22245
+    },
+    {
+      "end_byte": 22871,
+      "id": "lisa:maplib:contract:manifest-key-components-tracksendsettings-b658a5eea0",
+      "pointer": "/key_components/72",
+      "sha256": "e2958ff3330ae1f0fba4724368a9a0e21f52a6a4db43ef18699badc8fee323c1",
+      "start_byte": 22524
+    },
+    {
+      "end_byte": 23063,
+      "id": "lisa:maplib:contract:manifest-key-components-tracksendsettingstest-6bb22c2ba2",
+      "pointer": "/key_components/73",
+      "sha256": "c37634164a9bda4629a9ca192d42c859cf9f3941a323cac54419ee9297b9fbf2",
+      "start_byte": 22873
+    },
+    {
+      "end_byte": 23334,
+      "id": "lisa:maplib:contract:manifest-key-components-syncworkspacesession-58f33d7e0b",
+      "pointer": "/key_components/74",
+      "sha256": "a44f29035a42868135ee726c2c87b41c1d89d0fe460bfed9168f5b1ea358848d",
+      "start_byte": 23065
+    },
+    {
+      "end_byte": 23618,
+      "id": "lisa:maplib:contract:manifest-key-components-conditionalrequiredrules-7c07776b96",
+      "pointer": "/key_components/75",
+      "sha256": "acdf7f4382cc0245d0614e7129f88b6746ee56e846321f45709502097f6a5ad8",
+      "start_byte": 23336
+    },
+    {
+      "end_byte": 23920,
+      "id": "lisa:maplib:contract:manifest-key-components-cascadinglists-aca3c26642",
+      "pointer": "/key_components/76",
+      "sha256": "683f844c823c53161ce9a8e2ca699d0cc0451eaf121a931a8325f1c57ca51e7d",
+      "start_byte": 23620
+    },
+    {
+      "end_byte": 24086,
+      "id": "lisa:maplib:contract:manifest-key-components-projectscriptservice-f6a546f564",
+      "pointer": "/key_components/77",
+      "sha256": "9d460d5b53adfd28e63e9d354dd23c8215c1b4212ffcfcc027047c90289d947d",
+      "start_byte": 23922
+    },
+    {
+      "end_byte": 24264,
+      "id": "lisa:maplib:contract:manifest-key-components-projectscripthost-6a7596c638",
+      "pointer": "/key_components/78",
+      "sha256": "533b76a58ae1e9831aea36a35686d95fd99aa9d78c762e40bd8c04a020064f10",
+      "start_byte": 24088
+    },
+    {
+      "end_byte": 24436,
+      "id": "lisa:maplib:contract:manifest-key-components-projectscriptsync-3a85f5ba02",
+      "pointer": "/key_components/79",
+      "sha256": "de5af2d93f3d61a44e0d9e8399d8d64d0cbb23d29caf98e1c325e632bb135ed7",
+      "start_byte": 24266
+    },
+    {
+      "end_byte": 24583,
+      "id": "lisa:maplib:contract:manifest-key-components-scriptpackage-9086d85818",
+      "pointer": "/key_components/80",
+      "sha256": "447f81468c2dd8e747ff4696c261a96306cea82db2f28b9a2f6092e03fa66100",
+      "start_byte": 24438
+    },
+    {
+      "end_byte": 24775,
+      "id": "lisa:maplib:contract:manifest-key-components-field-df4bc62ff5",
+      "pointer": "/key_components/81",
+      "sha256": "3d42ed4d21a35e52440ece2790771c42d73306f8b2ba671b7d406b69cfc0e9bd",
+      "start_byte": 24585
+    },
+    {
+      "end_byte": 25028,
+      "id": "lisa:maplib:contract:manifest-key-components-fieldmetadatatest-e3d1cf9f67",
+      "pointer": "/key_components/82",
+      "sha256": "250528f0662577248d6b08ca09b16735269b8d77441f93721ebca7415c87d206",
+      "start_byte": 24777
+    },
+    {
+      "end_byte": 25287,
+      "id": "lisa:maplib:contract:manifest-key-components-locationpowerpolicy-22003259c9",
+      "pointer": "/key_components/83",
+      "sha256": "3573bfffc260de27e766821ef53f451e21d9a3c99a319cf4f5f98d51b5a49bfa",
+      "start_byte": 25030
+    },
+    {
+      "end_byte": 25460,
+      "id": "lisa:maplib:contract:manifest-key-components-gnssdevice-e15d15e28d",
+      "pointer": "/key_components/84",
+      "sha256": "0c9f4add1c69d6c64ca0de38258797615c2306a391a69d14e8aae773a944e402",
+      "start_byte": 25289
+    },
+    {
+      "end_byte": 25725,
+      "id": "lisa:maplib:contract:manifest-key-components-gnssdevicescanner-9b47655551",
+      "pointer": "/key_components/85",
+      "sha256": "4d7e8aa4dfdbbd48e093cd0392e767975e898ea3a7cd9bac635711ff2d330e1d",
+      "start_byte": 25462
+    },
+    {
+      "end_byte": 25937,
+      "id": "lisa:maplib:contract:manifest-key-components-gnssdevicescanresults-d5380e3815",
+      "pointer": "/key_components/86",
+      "sha256": "f41b9e32fccef9b251e2cbdaa2d4d014acfd9951a433f9a6f78a7fb935ecae93",
+      "start_byte": 25727
+    },
+    {
+      "end_byte": 26180,
+      "id": "lisa:maplib:contract:manifest-key-components-coalescingrefresh-e427d9a9cd",
+      "pointer": "/key_components/87",
+      "sha256": "977df6818676122af9d38f8d57a52205965d2738c8d13de6f8e5b61137b2aa48",
+      "start_byte": 25939
+    },
+    {
+      "end_byte": 26434,
+      "id": "lisa:maplib:contract:manifest-key-components-feature-2e5b5c5566",
+      "pointer": "/key_components/88",
+      "sha256": "f972b2c48daeb001d8751674a7b28cec63a218ef452bf6a9f62a7f8c4fbbb8ab",
+      "start_byte": 26182
+    },
+    {
+      "end_byte": 26729,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwsyncio-3329ebfbdc",
+      "pointer": "/key_components/89",
+      "sha256": "1ca8fcd6408110f94fd1ac484395d2d8e0d74b598e715eb6973caf98e61fc04d",
+      "start_byte": 26436
+    },
+    {
+      "end_byte": 26969,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwsyncprogress-96f81ac920",
+      "pointer": "/key_components/90",
+      "sha256": "e37386b803789d271d94ffc91dd98867d1914797b7c3281d38fbda4a08c98d3f",
+      "start_byte": 26731
+    },
+    {
+      "end_byte": 27187,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwsyncprogresstest-e2d5492baa",
+      "pointer": "/key_components/91",
+      "sha256": "65b0afc5517f6a12b7ca2057185c93e40d9006609dcf6f2436b84ba6375f7c2b",
+      "start_byte": 26971
+    },
+    {
+      "end_byte": 27357,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwsynctrace-1738662326",
+      "pointer": "/key_components/92",
+      "sha256": "1ddc0e939dd2774f8e3602c2056f0f59fa69fbec77e1e4e1470a2eb9c9ef3f01",
+      "start_byte": 27189
+    },
+    {
+      "end_byte": 27580,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwsnapshotcheckpoint-17ef4f6b87",
+      "pointer": "/key_components/93",
+      "sha256": "5ec707b6c72785dcc8ce012ba18dde70a368a04f5c1bc675c183f8dbab6478ef",
+      "start_byte": 27359
+    },
+    {
+      "end_byte": 27889,
+      "id": "lisa:maplib:contract:manifest-key-components-sharedunderlaycatalog-0ac8bb27ef",
+      "pointer": "/key_components/94",
+      "sha256": "489909880685bb257ee0bd46406f77d29f1aa45ec57974d0818cbd05fd372c9a",
+      "start_byte": 27582
+    },
+    {
+      "end_byte": 28099,
+      "id": "lisa:maplib:contract:manifest-key-components-sharedunderlaystore-6a11b8e8e4",
+      "pointer": "/key_components/95",
+      "sha256": "3087b3ba6b18d4e2b4bf5ed26011e1a638ca902dadc5f1f0df96dc96f518e868",
+      "start_byte": 27891
+    },
+    {
+      "end_byte": 28306,
+      "id": "lisa:maplib:contract:manifest-key-components-sharedunderlaykind-c6a1ced6a8",
+      "pointer": "/key_components/96",
+      "sha256": "c4f9712ab791dd63e8ea59f8269ef41945148fee58ad8fa8404f4be7f983e3b0",
+      "start_byte": 28101
+    },
+    {
+      "end_byte": 28621,
+      "id": "lisa:maplib:contract:manifest-key-components-ngrcarchive-83596eb97e",
+      "pointer": "/key_components/97",
+      "sha256": "43eecee19351e23d4b69caf85bcc9fe32e09cb8b4dc5196814df37546463ad71",
+      "start_byte": 28308
+    },
+    {
+      "end_byte": 28795,
+      "id": "lisa:maplib:contract:manifest-key-components-fileutil-3da0fd8ba0",
+      "pointer": "/key_components/98",
+      "sha256": "9ce27330673a74953522195d7db47d8751bdfbe8b8124ed192ed3b715f31492f",
+      "start_byte": 28623
+    },
+    {
+      "end_byte": 28967,
+      "id": "lisa:maplib:contract:manifest-key-components-fileutildisplaynametest-75aabe8820",
+      "pointer": "/key_components/99",
+      "sha256": "b60bdd238f0f71b3f3e942bec2e01d154183fdc10589ca49793924961299d4c0",
+      "start_byte": 28797
+    },
+    {
+      "end_byte": 29133,
+      "id": "lisa:maplib:contract:manifest-key-components-rastermbtileswriter-098b697e3a",
+      "pointer": "/key_components/100",
+      "sha256": "a37e95ef1509b7cd9875341fa998849e4807eb93a2cc2494323b118537a92d55",
+      "start_byte": 28969
+    },
+    {
+      "end_byte": 29298,
+      "id": "lisa:maplib:contract:manifest-key-components-camerazoom-f265356636",
+      "pointer": "/key_components/101",
+      "sha256": "a7926252ce396c2c0af07bbfd7d255ab7dc2f7da274ef20b5e15a2a8efabc031",
+      "start_byte": 29135
+    },
+    {
+      "end_byte": 29468,
+      "id": "lisa:maplib:contract:manifest-key-components-underlayworkspaceindex-611452ed96",
+      "pointer": "/key_components/102",
+      "sha256": "ce8068f030c179cd8a32f40bd398e8ae4f3f912f407593e443df264d1bb81a02",
+      "start_byte": 29300
+    },
+    {
+      "end_byte": 29683,
+      "id": "lisa:maplib:contract:manifest-key-components-walkpreviewgeometry-898b133bf3",
+      "pointer": "/key_components/103",
+      "sha256": "7deaee0123b4df1cb2ee5db20700adc0acd87bb3b02487d42601407fff92b6f8",
+      "start_byte": 29470
+    },
+    {
+      "end_byte": 30285,
+      "id": "lisa:maplib:contract:manifest-key-components-userlocationgeometry-a628c349bf",
+      "pointer": "/key_components/104",
+      "sha256": "ff4b61c40f656e3c3e989de368aec70669b1fbe4787297a06d0a707de525993a",
+      "start_byte": 29685
+    },
+    {
+      "end_byte": 30684,
+      "id": "lisa:maplib:contract:manifest-key-components-ic-user-location-dot-20e67979dc",
+      "pointer": "/key_components/105",
+      "sha256": "eae8ff0a1f4c61167465be67689ef4936029d9b9139530e8eaf9b7deb60526f2",
+      "start_byte": 30287
+    },
+    {
+      "end_byte": 31025,
+      "id": "lisa:maplib:contract:manifest-key-components-ic-user-location-orbit-5285a7cae0",
+      "pointer": "/key_components/106",
+      "sha256": "8b20c01106818e171c946ea6a0d87be2f6d673cb4109407fecb31f0d32a5e7f0",
+      "start_byte": 30686
+    },
+    {
+      "end_byte": 31445,
+      "id": "lisa:maplib:contract:manifest-key-components-userlocationgeometrytest-27afba6274",
+      "pointer": "/key_components/107",
+      "sha256": "a1823e4d8aa982c7d22956053cd20f3bba38cb36933a9c93381f3f4f21d11bf8",
+      "start_byte": 31027
+    },
+    {
+      "end_byte": 31647,
+      "id": "lisa:maplib:contract:manifest-key-components-locationmotionfilter-658d49a6ac",
+      "pointer": "/key_components/108",
+      "sha256": "6fabe0a7fc4b4c638e414fdce425d6771c4af6a662342115331d98fadf2f2268",
+      "start_byte": 31447
+    },
+    {
+      "end_byte": 31908,
+      "id": "lisa:maplib:contract:manifest-key-components-locationdeparturetest-5b3d0b6416",
+      "pointer": "/key_components/109",
+      "sha256": "17b7d31fc302a3c292cde3b70600d8ff49f8e93ac3f42d985dce4066cd66bb1d",
+      "start_byte": 31649
+    },
+    {
+      "end_byte": 32160,
+      "id": "lisa:maplib:contract:manifest-key-components-locationsubscriptioncontroller-026ba8382e",
+      "pointer": "/key_components/110",
+      "sha256": "9cd1293bf5eb8d7fd9df7ec61a2e36f0abe8929c8d7cc990943515992f2429a7",
+      "start_byte": 31910
+    },
+    {
+      "end_byte": 32364,
+      "id": "lisa:maplib:contract:manifest-key-components-sensormotionmonitor-ae4cdd0012",
+      "pointer": "/key_components/111",
+      "sha256": "253d1956507d4709c1c397933888298322d99bcaecbdc3597b02478ecf96370c",
+      "start_byte": 32162
+    },
+    {
+      "end_byte": 32557,
+      "id": "lisa:maplib:contract:manifest-key-components-devicemotionevidence-d058a17f0c",
+      "pointer": "/key_components/112",
+      "sha256": "810b58436ecac4d6989cf236f00f18665cb3a44331d7eccac2016df9262e36fe",
+      "start_byte": 32366
+    },
+    {
+      "end_byte": 32840,
+      "id": "lisa:maplib:contract:manifest-key-components-locationrecordingsamplercore-2ef4104dcb",
+      "pointer": "/key_components/113",
+      "sha256": "3e4633e2bf0d7bee5bf166d1974cda40c426b7a03291a86e0d9c0201b1731715",
+      "start_byte": 32559
+    },
+    {
+      "end_byte": 33132,
+      "id": "lisa:maplib:contract:manifest-key-components-tracklayer-a3e2195fdd",
+      "pointer": "/key_components/114",
+      "sha256": "a37bc877b2de616b911c8af7f3dc2998947fc5da2e7f7bc440c21156d4554ab5",
+      "start_byte": 32842
+    },
+    {
+      "end_byte": 33396,
+      "id": "lisa:maplib:contract:manifest-key-components-locationfixpolicy-c1c58c9746",
+      "pointer": "/key_components/115",
+      "sha256": "89e5a0585f56593b20a7a4b9de5f8fd07868d65183bfae3dd9f95e2a6f1b9bc1",
+      "start_byte": 33134
+    },
+    {
+      "end_byte": 33593,
+      "id": "lisa:maplib:contract:manifest-key-components-diagnosticlog-7bb185a795",
+      "pointer": "/key_components/116",
+      "sha256": "71ffe50fd479beb51058828ffd2a7a0a6f1fedee13217ca58f32e077bdbf8363",
+      "start_byte": 33398
+    },
+    {
+      "end_byte": 33768,
+      "id": "lisa:maplib:contract:manifest-key-components-locationdiagnosticformat-9e08c96a8e",
+      "pointer": "/key_components/117",
+      "sha256": "404f6cb348687f7cbbc674e3a943c61ef6cd4aaca934eb028a11354a3f9b414c",
+      "start_byte": 33595
+    },
+    {
+      "end_byte": 33980,
+      "id": "lisa:maplib:contract:manifest-key-components-externalgnsskeepalivehost-8dccbef0e5",
+      "pointer": "/key_components/118",
+      "sha256": "1ad55bb0c4e55908db36684310af1f4afeebb235b33d269c32d9e57cca82a161",
+      "start_byte": 33770
+    },
+    {
+      "end_byte": 34325,
+      "id": "lisa:maplib:contract:manifest-key-components-locationrecordingsampler-dc23468ac5",
+      "pointer": "/key_components/119",
+      "sha256": "7da870ccb6a9ad2fe8888191dbb150abdbee19854da3ca37cae1c3d3585818e9",
+      "start_byte": 33982
+    },
+    {
+      "end_byte": 34560,
+      "id": "lisa:maplib:contract:manifest-key-components-externalgnssfixpolicy-238461c3bf",
+      "pointer": "/key_components/120",
+      "sha256": "688e4acb90429be250f03963fae07892e08f7f22e1cf5443b6b14ca741d60832",
+      "start_byte": 34327
+    },
+    {
+      "end_byte": 34777,
+      "id": "lisa:maplib:contract:manifest-key-components-gnsstransport-e35795ac1a",
+      "pointer": "/key_components/121",
+      "sha256": "e80f68133508f082620e1d59f80abffb8983a1c125ae356b3854a48cc1a649ff",
+      "start_byte": 34562
+    },
+    {
+      "end_byte": 34992,
+      "id": "lisa:maplib:contract:manifest-key-components-nmeaparser-e3f7a06512",
+      "pointer": "/key_components/122",
+      "sha256": "b8e9ef2528320ddaedf3bfd854b6317addb48439197469aa98c528e470dd371f",
+      "start_byte": 34779
+    },
+    {
+      "end_byte": 35172,
+      "id": "lisa:maplib:contract:manifest-key-components-nmealinebuffer-0bcdadd142",
+      "pointer": "/key_components/123",
+      "sha256": "835b9200a64fe31dc5f660fc54a511a31a3808ddf472ffffed709c94bd3225d8",
+      "start_byte": 34994
+    },
+    {
+      "end_byte": 35320,
+      "id": "lisa:maplib:contract:manifest-key-components-cnbframebuffer-dcda8b938b",
+      "pointer": "/key_components/124",
+      "sha256": "f63bbefc52a0529076635a4f5fee68e1cfbbbc06758aef8d3d9acb1722d60731",
+      "start_byte": 35174
+    },
+    {
+      "end_byte": 35512,
+      "id": "lisa:maplib:contract:manifest-key-components-cnbbestpos-6b4658564c",
+      "pointer": "/key_components/125",
+      "sha256": "b96a7f260ed1bd198e45a2a14f09836dbe6f1299eb1ebdd95670bbcdbc4b3b3e",
+      "start_byte": 35322
+    },
+    {
+      "end_byte": 35835,
+      "id": "lisa:maplib:contract:manifest-key-components-comnavasciicommands-56239442d6",
+      "pointer": "/key_components/126",
+      "sha256": "2b549ad0197d75aaf59223ae2dcc02e129b096d7c54308a4ce219d0a8c1cd387",
+      "start_byte": 35514
+    },
+    {
+      "end_byte": 36218,
+      "id": "lisa:maplib:contract:manifest-key-components-bluetoothletransport-41ae28a2f0",
+      "pointer": "/key_components/127",
+      "sha256": "ae4fe0a09e55cf259c5ddd82e5c9aea6b7c71c5dc41b4871844ba1b8804bac86",
+      "start_byte": 35837
+    },
+    {
+      "end_byte": 36619,
+      "id": "lisa:maplib:contract:manifest-key-components-externalgnsssession-0c581d9bba",
+      "pointer": "/key_components/128",
+      "sha256": "341b911f28db40f0814c373df3e0115e0d60c984c8b2e76c5f8d44d98250f4c9",
+      "start_byte": 36220
+    },
+    {
+      "end_byte": 36855,
+      "id": "lisa:maplib:contract:manifest-key-components-adaptivelocationfiltercore-8e5526fb4e",
+      "pointer": "/key_components/129",
+      "sha256": "d1a7f33543765a2dff1b8cb9338f7ceff5044c1e503a2f783e456148e70974d0",
+      "start_byte": 36621
+    },
+    {
+      "end_byte": 37189,
+      "id": "lisa:maplib:contract:manifest-key-components-build-a47ff6d32a",
+      "pointer": "/key_components/130",
+      "sha256": "50fa8a8126af0eccbce11534fda4725007ea94f8543aabcf4c12b834f45392e3",
+      "start_byte": 36857
+    },
+    {
+      "end_byte": 37446,
+      "id": "lisa:maplib:contract:manifest-key-components-layercontentprovider-e27073dc28",
+      "pointer": "/key_components/131",
+      "sha256": "9afd52ab9f04820f2ab1c1574950ef24ea3d899e3711aca486013fd35c147940",
+      "start_byte": 37191
+    },
+    {
+      "end_byte": 39499,
+      "id": "lisa:maplib:contract:manifest-key-components-mapdrawable-8a756a9bf1",
+      "pointer": "/key_components/132",
+      "sha256": "cd6e0aef63a3bf12ac73d70ee70074ca6ab7347cf4beacfa3dffa17734425d64",
+      "start_byte": 37448
+    },
+    {
+      "end_byte": 39729,
+      "id": "lisa:maplib:contract:manifest-key-components-geometryeditfillpolicy-1c63e87344",
+      "pointer": "/key_components/133",
+      "sha256": "81ca5e8bca51eb73ca977ea4bae1fb86581ec812df0bc7a3efd80d9253392811",
+      "start_byte": 39501
+    },
+    {
+      "end_byte": 40081,
+      "id": "lisa:maplib:contract:manifest-key-components-mplfeaturesutils-3ec8ad13df",
+      "pointer": "/key_components/134",
+      "sha256": "6f93474bc38b90e5392abf3e969a5c0d57b3597f254c24de1769859b967aab49",
+      "start_byte": 39731
+    },
+    {
+      "end_byte": 40290,
+      "id": "lisa:maplib:contract:manifest-key-components-fieldstylerule-bee6fcf164",
+      "pointer": "/key_components/135",
+      "sha256": "19a613846ca33282d0b9fe22e1fd93595f3f7a3fc9a20735cc1c47aafa4ed1bf",
+      "start_byte": 40083
+    },
+    {
+      "end_byte": 40605,
+      "id": "lisa:maplib:contract:manifest-key-components-layergroup-0eb29b1eac",
+      "pointer": "/key_components/136",
+      "sha256": "7805161b64d8d86bfefaf4c6e5062d629ad60ec31af782e6fee99efdd13f5812",
+      "start_byte": 40292
+    },
+    {
+      "end_byte": 40801,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwrasterlayer-a64043756e",
+      "pointer": "/key_components/137",
+      "sha256": "1c8a163bab0208f53e69173eb4c9367e89c7cfa8795c8c4e997d4848e70804b5",
+      "start_byte": 40607
+    },
+    {
+      "end_byte": 42583,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwvectorlayer-66f4602770",
+      "pointer": "/key_components/138",
+      "sha256": "444bf45902f188e074b8f1054a31ae70ffecb0225bd64e848b5bd1393e0751d7",
+      "start_byte": 40803
+    },
+    {
+      "end_byte": 42781,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwsyncnonereloaddecision-bf1976e326",
+      "pointer": "/key_components/139",
+      "sha256": "7bb25c652da3ebee5b8a7cc9f4e6597e4080e8c27e8b13e4d859723c0a99e68e",
+      "start_byte": 42585
+    },
+    {
+      "end_byte": 42988,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwfeaturecountparser-650a446564",
+      "pointer": "/key_components/140",
+      "sha256": "b5729ab685ce9db2bb838cf2734ab981fa6c483220c4712ff72cef5ebf5288d2",
+      "start_byte": 42783
+    },
+    {
+      "end_byte": 43254,
+      "id": "lisa:maplib:contract:manifest-key-components-districtfilterutil-acb3a5709b",
+      "pointer": "/key_components/141",
+      "sha256": "b76b49e1223906a7f578eb625c81bceb8b1e418a7a3903ffc92a3acb09a854fd",
+      "start_byte": 42990
+    },
+    {
+      "end_byte": 43494,
+      "id": "lisa:maplib:contract:manifest-key-components-remoteattachmentsyncpolicy-229e87c238",
+      "pointer": "/key_components/142",
+      "sha256": "95c064837c375e200932f4f6c3fc07a41c10b458d086f6c9c8cfbbec7da6f9dc",
+      "start_byte": 43256
+    },
+    {
+      "end_byte": 43993,
+      "id": "lisa:maplib:contract:manifest-key-components-syncadapter-c362e19f10",
+      "pointer": "/key_components/143",
+      "sha256": "7f9ea38e869b8b79b8693dd582219a11c336dd6384de036983574af56c9cc5df",
+      "start_byte": 43496
+    },
+    {
+      "end_byte": 44210,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwsyncservice-69142af855",
+      "pointer": "/key_components/144",
+      "sha256": "b200c9fbab0d6de4b390c3d1c81804a5148eae569e4d9c6456d909bfe191ba51",
+      "start_byte": 43995
+    },
+    {
+      "end_byte": 45070,
+      "id": "lisa:maplib:contract:manifest-key-components-vectorlayer-7cab7c403f",
+      "pointer": "/key_components/145",
+      "sha256": "0801fc7004b550efb9ba76e21f7c973a088276ef0778c99e73d4acbb2d4a19a6",
+      "start_byte": 44212
+    },
+    {
+      "end_byte": 45317,
+      "id": "lisa:maplib:contract:manifest-key-components-table-7d2b584a25",
+      "pointer": "/key_components/146",
+      "sha256": "7a46fd4ed798ce191e65291a5fb2e198c641c87027c60c8e056b892133a8ff5f",
+      "start_byte": 45072
+    },
+    {
+      "end_byte": 45908,
+      "id": "lisa:maplib:contract:manifest-key-components-geometryrtree-4a061321b0",
+      "pointer": "/key_components/147",
+      "sha256": "8df4b220df7894e5c5ac5769390777a30cdeb55d3496d6c630cd511cc887a038",
+      "start_byte": 45319
+    },
+    {
+      "end_byte": 46088,
+      "id": "lisa:maplib:contract:manifest-key-components-geoenvelope-c8405b123b",
+      "pointer": "/key_components/148",
+      "sha256": "664e331043aca2246b9f3fa6ab147366d4bb3e6daae8ebba6b8208d2a9ed2c63",
+      "start_byte": 45910
+    },
+    {
+      "end_byte": 46383,
+      "id": "lisa:maplib:contract:manifest-key-components-mapcontentproviderhelper-c7ae7492f8",
+      "pointer": "/key_components/149",
+      "sha256": "c7a11d7d08125187e1110446b34b5f6059fa05e7ee6ab2bba5fafdf91a5d7a1d",
+      "start_byte": 46090
+    },
+    {
+      "end_byte": 46621,
+      "id": "lisa:maplib:contract:manifest-key-components-geojsonutil-caa8763a09",
+      "pointer": "/key_components/150",
+      "sha256": "43eb265c4894aca634747aca88faae22a78ea0f6bcbfd78977714cee777cfd0e",
+      "start_byte": 46385
+    },
+    {
+      "end_byte": 46896,
+      "id": "lisa:maplib:contract:manifest-key-components-databasecontext-1586929db9",
+      "pointer": "/key_components/151",
+      "sha256": "12941f4db250bb937c9207c1a681f6729b97977b2ebae174b252f5db8a9773ac",
+      "start_byte": 46623
+    },
+    {
+      "end_byte": 47148,
+      "id": "lisa:maplib:contract:manifest-key-components-coordinatepointparser-a95f9aaf46",
+      "pointer": "/key_components/152",
+      "sha256": "2a42b0b5f8444f8d6e298c7378295ec4366a4fa94c4e4e59353b47c32b15cbce",
+      "start_byte": 46898
+    },
+    {
+      "end_byte": 47394,
+      "id": "lisa:maplib:contract:manifest-key-components-coordinatepointlayerimporter-4d74883ec5",
+      "pointer": "/key_components/153",
+      "sha256": "38fd6ef4e88bd5a660c458178637e528f64fd8254d3ad849cf6271468a3c417a",
+      "start_byte": 47150
+    },
+    {
+      "end_byte": 47598,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwlayeridentitybackup-33f8bfe0ec",
+      "pointer": "/key_components/154",
+      "sha256": "9747deea462d6b00556710e07202e98b0c537a938859c28fb03ca3ff20432675",
+      "start_byte": 47396
+    },
+    {
+      "end_byte": 47757,
+      "id": "lisa:maplib:contract:manifest-key-components-vectorlayerrendercache-a6279d4f1e",
+      "pointer": "/key_components/155",
+      "sha256": "a98649de2058900f3572dcdb9c553897dee4dc12f595c4cec5b9cbda53cface6",
+      "start_byte": 47600
+    },
+    {
+      "end_byte": 47981,
+      "id": "lisa:maplib:contract:manifest-key-components-layeridentifypolicy-cc391da9df",
+      "pointer": "/key_components/156",
+      "sha256": "da6a21b407e3354a2e93c3385127101f2e3140ba7567c7d93ffa3bfe75845e7f",
+      "start_byte": 47759
+    },
+    {
+      "end_byte": 48251,
+      "id": "lisa:maplib:contract:manifest-key-components-collectorprojectcompositionsync-5b3d967ffc",
+      "pointer": "/key_components/157",
+      "sha256": "1073609477cf67a20467e50881f853426cee7267abd554778c4b59c23e70af5e",
+      "start_byte": 47983
+    },
+    {
+      "end_byte": 48466,
+      "id": "lisa:maplib:contract:manifest-key-components-collectorprojectitem-9e478c227a",
+      "pointer": "/key_components/158",
+      "sha256": "3a4f099abb7e81fd6873367425b4ee8051f50dfd9cfc02895afaa6ca6a21eb2c",
+      "start_byte": 48253
+    },
+    {
+      "end_byte": 48718,
+      "id": "lisa:maplib:contract:manifest-key-components-collectorresource-bb0b5c041e",
+      "pointer": "/key_components/159",
+      "sha256": "36fa5b0d47ba5dab176dd1f0d03b75f64a15fd7147e47e1e7a1d9192f40ae352",
+      "start_byte": 48468
+    },
+    {
+      "end_byte": 48972,
+      "id": "lisa:maplib:contract:manifest-key-components-tmslayer-bf271622db",
+      "pointer": "/key_components/160",
+      "sha256": "2db721412c550aa51c2c4cce64c8d1bf8a63b635c304dca6a19da22e605c884f",
+      "start_byte": 48720
+    },
+    {
+      "end_byte": 49189,
+      "id": "lisa:maplib:contract:manifest-key-components-mbtilesinfo-50b3ac2f40",
+      "pointer": "/key_components/161",
+      "sha256": "20779ee587477ceb2cc3361ae174eb67b60684041ad9a0d918f0bb4d361c187a",
+      "start_byte": 48974
+    },
+    {
+      "end_byte": 49437,
+      "id": "lisa:maplib:contract:manifest-key-components-legacytilembtilesmath-d8c2f8d9b3",
+      "pointer": "/key_components/162",
+      "sha256": "0829e6fa80e3a5692b14b53e0e6175f8910f13de0bff6a0d504f213ce0167c0e",
+      "start_byte": 49191
+    },
+    {
+      "end_byte": 49627,
+      "id": "lisa:maplib:contract:manifest-key-components-lisacatalog-5247e60115",
+      "pointer": "/key_components/163",
+      "sha256": "5512b498249071cd18b142b91bc04c392c9c66df19617c4d2787bd73f49394bf",
+      "start_byte": 49439
+    },
+    {
+      "end_byte": 49820,
+      "id": "lisa:maplib:contract:manifest-key-components-lisacataloglookup-157f537a24",
+      "pointer": "/key_components/164",
+      "sha256": "c42f609bc37fc0f5f9b96e4cf46461f4fbdb0777965381bdc05c5f52776b7326",
+      "start_byte": 49629
+    },
+    {
+      "end_byte": 50170,
+      "id": "lisa:maplib:contract:manifest-key-components-resourcegroup-2c946894de",
+      "pointer": "/key_components/165",
+      "sha256": "43302ead517ccbdca1c0f8d3ca0949c407c2d1ba63a0b9987dbc444a267703de",
+      "start_byte": 49822
+    },
+    {
+      "end_byte": 50323,
+      "id": "lisa:maplib:contract:manifest-key-components-layerconfigutil-93dbbaa18a",
+      "pointer": "/key_components/166",
+      "sha256": "afe0d174d6c88a31a6684fdbe6b796c47efb8c6329fad6c254eef29fd08c1bf6",
+      "start_byte": 50172
+    },
+    {
+      "end_byte": 50666,
+      "id": "lisa:maplib:contract:manifest-key-components-multipolygongeometryrepair-666f218647",
+      "pointer": "/key_components/167",
+      "sha256": "25e339aa5d09aff7386c65c019d58546d491725eb6e1046d487de38bae25cd00",
+      "start_byte": 50325
+    },
+    {
+      "end_byte": 50957,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwfeaturegeometryvalidator-8c1287baf6",
+      "pointer": "/key_components/168",
+      "sha256": "0107bef79341a06762a297383d463c848d922d6fa2584d8a2cd233a7d7244e0b",
+      "start_byte": 50668
+    },
+    {
+      "end_byte": 51159,
+      "id": "lisa:maplib:contract:manifest-key-components-geogeometryfactory-784781a977",
+      "pointer": "/key_components/169",
+      "sha256": "bb07996fb5c2c01e955541cd0f5bdbad73c6f62fb9ce832adfd76778a9ca83e4",
+      "start_byte": 50959
+    },
+    {
+      "end_byte": 51393,
+      "id": "lisa:maplib:contract:manifest-key-components-geomultipolygon-532bdeaa42",
+      "pointer": "/key_components/170",
+      "sha256": "b7a2d161c72048958f408b493e25a5ca6927727bc4870b3b31aba4f26bced196",
+      "start_byte": 51161
+    },
+    {
+      "end_byte": 51676,
+      "id": "lisa:maplib:contract:manifest-key-components-polygoneditclass-6eab5e7f97",
+      "pointer": "/key_components/171",
+      "sha256": "ad63fc505ad8dda5c1232118b72c95cdfda80aa75230539a2abb9fedd3ee32d4",
+      "start_byte": 51395
+    },
+    {
+      "end_byte": 51999,
+      "id": "lisa:maplib:contract:manifest-key-components-multipolygoneditclass-4aeb6ddcc8",
+      "pointer": "/key_components/172",
+      "sha256": "98c23a764d62eb98cb5d753b7f4db84a898d84ec53a69f69d028c623b27ff2bd",
+      "start_byte": 51678
+    },
+    {
+      "end_byte": 52232,
+      "id": "lisa:maplib:contract:manifest-key-components-pointeditclass-b1f1c05318",
+      "pointer": "/key_components/173",
+      "sha256": "df65467a781d2a12cc72a9639dc601e682bb0e8e17b8f22d50fb37ee26a11322",
+      "start_byte": 52001
+    },
+    {
+      "end_byte": 52470,
+      "id": "lisa:maplib:contract:manifest-key-components-multipointeditclass-f27e41d734",
+      "pointer": "/key_components/174",
+      "sha256": "5288168b6f3bc8f37f6b7bc4a67a8db9f6a7f55ebb5ea724a95637de430c46d5",
+      "start_byte": 52234
+    },
+    {
+      "end_byte": 52708,
+      "id": "lisa:maplib:contract:manifest-key-components-lineeditclass-58a0051593",
+      "pointer": "/key_components/175",
+      "sha256": "082091959413c9ae067f0937f2b000ddadfed47e55109e9b4e4418531976612b",
+      "start_byte": 52472
+    },
+    {
+      "end_byte": 52945,
+      "id": "lisa:maplib:contract:manifest-key-components-multilineeditclass-17fe40312c",
+      "pointer": "/key_components/176",
+      "sha256": "1254c460bb66cca3150684751fc7f4db9df42e2900d160bb83ce3ce2c49fbc0e",
+      "start_byte": 52710
+    },
+    {
+      "end_byte": 53195,
+      "id": "lisa:maplib:contract:manifest-key-components-editdirectionpolicy-66a4ba2b31",
+      "pointer": "/key_components/177",
+      "sha256": "35e63d3d9ba607687f7336b31db8bb48e6c73c74972aaac4b5bc2acb1b7149a5",
+      "start_byte": 52947
+    },
+    {
+      "end_byte": 53537,
+      "id": "lisa:maplib:contract:manifest-key-components-locationtrackfilter-5c659b0b22",
+      "pointer": "/key_components/178",
+      "sha256": "ac411a9ffe8f66fe2fe23b651fb16057fbc015ef316dc276e063c9bd26b7ed1d",
+      "start_byte": 53197
+    },
+    {
+      "end_byte": 53732,
+      "id": "lisa:maplib:contract:manifest-key-components-locationutil-24ca218697",
+      "pointer": "/key_components/179",
+      "sha256": "7d26db06cd4bf47a9320a23d47ed3e2cc3686b73ec82bc9da7c34489745a01d2",
+      "start_byte": 53539
+    },
+    {
+      "end_byte": 54015,
+      "id": "lisa:maplib:contract:manifest-key-components-locationtrackfiltercore-3926220e04",
+      "pointer": "/key_components/180",
+      "sha256": "37355312648485a002530658bc5282f719ae73bc63fa2d1c440650b400751325",
+      "start_byte": 53734
+    },
+    {
+      "end_byte": 54238,
+      "id": "lisa:maplib:contract:manifest-key-components-locationproviderarbiter-5dab405ef3",
+      "pointer": "/key_components/181",
+      "sha256": "2d0ca8a279632bdd64f7419110d1c188cc41d2e23ba0133d569a4e7965f8eff2",
+      "start_byte": 54017
+    },
+    {
+      "end_byte": 54470,
+      "id": "lisa:maplib:contract:manifest-key-components-locationproviderarbitercore-9b5c8496ea",
+      "pointer": "/key_components/182",
+      "sha256": "de9254ba27b9837bbad4ad1c51ea94e374a5bc817e1f403de7c97f81ae88b858",
+      "start_byte": 54240
+    },
+    {
+      "end_byte": 54768,
+      "id": "lisa:maplib:contract:manifest-key-components-stakeoutgeometrytarget-801a811880",
+      "pointer": "/key_components/183",
+      "sha256": "36b5b71d11a31679ad32f641292d81954fb1641fa9c667b687671bb5de7645a9",
+      "start_byte": 54472
+    },
+    {
+      "end_byte": 55007,
+      "id": "lisa:maplib:contract:manifest-key-components-stakeoutguidancepolicy-d98e2b7fdd",
+      "pointer": "/key_components/184",
+      "sha256": "8564648b04a73438a732203c1ccf5b72fb3d5e76cc966d6d46ab1af8f076fb51",
+      "start_byte": 54770
+    },
+    {
+      "end_byte": 55649,
+      "id": "lisa:maplib:contract:manifest-key-components-gpseventsource-9027bd6b65",
+      "pointer": "/key_components/185",
+      "sha256": "8405278a94b9846e9a8a4454e6b8567f6d038d54e936d23a38a1849b3761b2f6",
+      "start_byte": 55009
+    },
+    {
+      "end_byte": 55834,
+      "id": "lisa:maplib:contract:manifest-key-components-layerdatabasetransaction-79749439e9",
+      "pointer": "/key_components/186",
+      "sha256": "12a6e1809d557fcc5282fddc94135cb03a5d7e3a76e07c14358f18216206973b",
+      "start_byte": 55651
+    },
+    {
+      "end_byte": 56008,
+      "id": "lisa:maplib:contract:manifest-key-components-featuresavejournal-0a6de20538",
+      "pointer": "/key_components/187",
+      "sha256": "1cc3e015088d8333d5eba7c3a7253bb0b5f2d0e06f7b0ae5998cd2b0d13c6c9f",
+      "start_byte": 55836
+    },
+    {
+      "end_byte": 56200,
+      "id": "lisa:maplib:contract:manifest-key-components-pendingtrackpoints-42493fcb67",
+      "pointer": "/key_components/188",
+      "sha256": "4c0aa25dd97dcac2243ce8f89d3c72abe147523881048a16ca130e8b9a09324f",
+      "start_byte": 56010
+    },
+    {
+      "end_byte": 56376,
+      "id": "lisa:maplib:contract:manifest-key-components-maptapgesture-88c35eaa75",
+      "pointer": "/key_components/189",
+      "sha256": "8542157458921fac2fa1dda13d43b4a5a15224b87dc499189406437bbae4e307",
+      "start_byte": 56202
+    },
+    {
+      "end_byte": 57118,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwlookuptable-bc356b8e64",
+      "pointer": "/key_components/190",
+      "sha256": "3ea2927a9f176e05b35dcc2e0ae851c3c6b0cf1ea50101c21b9fd3c2f66e9ddb",
+      "start_byte": 56378
+    },
+    {
+      "end_byte": 57511,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwvectorlayerfullsnapshothttpstatustest-7d047f383a",
+      "pointer": "/key_components/191",
+      "sha256": "bce7cadb87f29c9e6c0eb5eb8118843ff33819542c7b820ef3f32d49b5293ce9",
+      "start_byte": 57120
+    },
+    {
+      "end_byte": 57822,
+      "id": "lisa:maplib:contract:manifest-key-components-syncresultutil-c0de82c903",
+      "pointer": "/key_components/192",
+      "sha256": "70203db34a3c87d87d3510b467db32dcae410bf98c23db92afcde3e8d1fe45eb",
+      "start_byte": 57513
+    },
+    {
+      "end_byte": 58092,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwlayerschemacompat-b55fd85f5c",
+      "pointer": "/key_components/193",
+      "sha256": "03bf00005628b0d6b2561ebbf2e4fb8c8d91768ae831f8162644be26429c7c91",
+      "start_byte": 57824
+    },
+    {
+      "end_byte": 58317,
+      "id": "lisa:maplib:contract:manifest-key-components-connection-b01ac003e3",
+      "pointer": "/key_components/194",
+      "sha256": "1a50ec97534a45909e2505e0f8a574f1538e252cf3d91130e2280b5818cea068",
+      "start_byte": 58094
+    },
+    {
+      "end_byte": 58566,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwhttpexception-dfecfefa3d",
+      "pointer": "/key_components/195",
+      "sha256": "b21b7190c62ddcf374c35ff1077ae90edac90d2a3042417762de64fbb29192ce",
+      "start_byte": 58319
+    },
+    {
+      "end_byte": 58842,
+      "id": "lisa:maplib:contract:manifest-key-components-ngwhttpresponseexception-735ef742b9",
+      "pointer": "/key_components/196",
+      "sha256": "3b5292998ebb123c3a9e9d6f1bc00699cdd6da87e1ef1e1d7716bfb43451d886",
+      "start_byte": 58568
+    },
+    {
+      "end_byte": 59244,
+      "id": "lisa:maplib:contract:manifest-key-components-networkutil-857fd5c80f",
+      "pointer": "/key_components/197",
+      "sha256": "226e35815228e9419067360554eaa9c39e10593713b0ef800e25cb0968158442",
+      "start_byte": 58844
+    },
+    {
+      "end_byte": 59521,
+      "id": "lisa:maplib:contract:manifest-key-components-localvectorbulkcachereadinesstest-38a13c44b4",
+      "pointer": "/key_components/198",
+      "sha256": "855d7df640f49016a9dcea135f1b402123cf10b47351e2b5ffe79491caaef2f1",
+      "start_byte": 59246
+    },
+    {
+      "end_byte": 59823,
+      "id": "lisa:maplib:contract:manifest-key-components-geometryrtreerecoverytest-1f56a7161a",
+      "pointer": "/key_components/199",
+      "sha256": "8d8078d536f02b6b165489f079288ec9b42fb4b8765008f2f981900e4e678b98",
+      "start_byte": 59523
+    },
+    {
+      "end_byte": 60106,
+      "id": "lisa:maplib:contract:manifest-public-contracts-render-resource-economy-2c6382b96a",
+      "pointer": "/public_contracts/0",
+      "sha256": "90a1ce2ff719fb58c693c349617d1fe1fd4263a544adeb9acc22a502f8297cb1",
+      "start_byte": 59845
+    },
+    {
+      "end_byte": 60296,
+      "id": "lisa:maplib:contract:manifest-public-contracts-point-firefly-e94484c889",
+      "pointer": "/public_contracts/1",
+      "sha256": "a50a06c35b4835a71b11fee51bc2090b83396507bc3e577804bcdc7f656c5f5a",
+      "start_byte": 60108
+    },
+    {
+      "end_byte": 60478,
+      "id": "lisa:maplib:contract:manifest-public-contracts-compass-sector-visibility-074ae4a8f9",
+      "pointer": "/public_contracts/2",
+      "sha256": "299b79d092660677d52732a311da3940570cc63c961b28f4b0c298f30569081a",
+      "start_byte": 60298
+    },
+    {
+      "end_byte": 60674,
+      "id": "lisa:maplib:contract:manifest-public-contracts-track-send-settings-a20ac20056",
+      "pointer": "/public_contracts/3",
+      "sha256": "3e07def9e48add3e35907dbe20dbc18fbb8d4b19d151bd29f4a1cce41d661143",
+      "start_byte": 60480
+    },
+    {
+      "end_byte": 60917,
+      "id": "lisa:maplib:contract:manifest-public-contracts-sync-workspace-session-b6b7e0b5b6",
+      "pointer": "/public_contracts/4",
+      "sha256": "d2c9bbcadfb6341fa0a3d81c1e1079c046add3658883fd598e46e5c6d17aa575",
+      "start_byte": 60676
+    },
+    {
+      "end_byte": 61133,
+      "id": "lisa:maplib:contract:manifest-public-contracts-project-script-host-api-541dcc34d8",
+      "pointer": "/public_contracts/5",
+      "sha256": "cb6184373c8ba28e11d35ef9e3d4d9d2b44c11a3678628a656dee84d5c9be8ba",
+      "start_byte": 60919
+    },
+    {
+      "end_byte": 61288,
+      "id": "lisa:maplib:contract:manifest-public-contracts-ngw-required-fields-a84512e23b",
+      "pointer": "/public_contracts/6",
+      "sha256": "8a432e37aff3564fad7bbc758bc089fcb453758a2eadda31a5621566e8319a74",
+      "start_byte": 61135
+    },
+    {
+      "end_byte": 61491,
+      "id": "lisa:maplib:contract:manifest-public-contracts-local-write-commit-9cc626d90d",
+      "pointer": "/public_contracts/7",
+      "sha256": "62d52e8b667a58e5e7ead66e8de815292d9d0f34d185ad39b9a348d2f81493fe",
+      "start_byte": 61290
+    },
+    {
+      "end_byte": 61675,
+      "id": "lisa:maplib:contract:manifest-public-contracts-track-retry-37e9bbfc63",
+      "pointer": "/public_contracts/8",
+      "sha256": "d0849269580f34e8dfe9bd4985f116d492b1d31422cfb032ecd012ffc6f34e5a",
+      "start_byte": 61493
+    },
+    {
+      "end_byte": 61885,
+      "id": "lisa:maplib:contract:manifest-public-contracts-asynchronous-track-refresh-ce771aa3a8",
+      "pointer": "/public_contracts/9",
+      "sha256": "3fd48e4c7a2b87a1af1bfca650f6bcf346fcf0112ac2667b6da83422b7a36fcc",
+      "start_byte": 61677
+    },
+    {
+      "end_byte": 62046,
+      "id": "lisa:maplib:contract:manifest-public-contracts-passive-walk-preview-bbc57ac598",
+      "pointer": "/public_contracts/10",
+      "sha256": "2606456fdd59fda22a28a2f916fa4e6b192ce2a57a4237654eec53ee7c94b832",
+      "start_byte": 61887
+    },
+    {
+      "end_byte": 62375,
+      "id": "lisa:maplib:contract:manifest-public-contracts-current-location-recording-772d8b2753",
+      "pointer": "/public_contracts/11",
+      "sha256": "583999a38d6b5ed4b0f236832c46635202ca2acbe1f299829e4f9db4961075d2",
+      "start_byte": 62048
+    },
+    {
+      "end_byte": 62563,
+      "id": "lisa:maplib:contract:manifest-public-contracts-segmented-tracks-ce3d65fb67",
+      "pointer": "/public_contracts/12",
+      "sha256": "b8a23323ca1fdaaffe4787f6fd39d2c02e3b7aa3c44149d89527488e60412845",
+      "start_byte": 62377
+    },
+    {
+      "end_byte": 62812,
+      "id": "lisa:maplib:contract:manifest-public-contracts-map-host-34e0016f27",
+      "pointer": "/public_contracts/13",
+      "sha256": "15c7e61a83902de59bc5e1e6981cde2ca9263b663da3b2a63610e15804595ca4",
+      "start_byte": 62565
+    },
+    {
+      "end_byte": 62970,
+      "id": "lisa:maplib:contract:manifest-public-contracts-gis-application-b33dc451d3",
+      "pointer": "/public_contracts/14",
+      "sha256": "6dbb24c958fcca5bd6ea690a71dfd3eadf783d65910cd0fbae34645ef38b5087",
+      "start_byte": 62814
+    },
+    {
+      "end_byte": 63149,
+      "id": "lisa:maplib:contract:manifest-public-contracts-collector-metadata-5226114757",
+      "pointer": "/public_contracts/15",
+      "sha256": "1db43c88014b7b8b00a723ef778a1dcab508a4feeea1859023ce5eac9c5c8ae2",
+      "start_byte": 62972
+    },
+    {
+      "end_byte": 63344,
+      "id": "lisa:maplib:contract:manifest-public-contracts-ngw-resource-url-6480545fb1",
+      "pointer": "/public_contracts/16",
+      "sha256": "03207c8d4b208de03bd5838fb49b1c1ca8e9b060dd831f44eed78211c786393f",
+      "start_byte": 63151
+    },
+    {
+      "end_byte": 63536,
+      "id": "lisa:maplib:contract:manifest-public-contracts-stakeout-geometry-21d9cfd12b",
+      "pointer": "/public_contracts/17",
+      "sha256": "9fcdbd82dae9dfc150c6f04f1185398f98dc114100aea16e368b689fdfd9540e",
+      "start_byte": 63346
+    },
+    {
+      "end_byte": 63759,
+      "id": "lisa:maplib:contract:manifest-public-contracts-ngw-lookup-cache-content-b87bdf4ce7",
+      "pointer": "/public_contracts/18",
+      "sha256": "33d2322f8105fd14f9cc3815f2d0bd0610bbf825e746600685fc72b44c918b0f",
+      "start_byte": 63538
+    },
+    {
+      "end_byte": 64002,
+      "id": "lisa:maplib:contract:manifest-public-contracts-sync-failure-reasons-16941d5906",
+      "pointer": "/public_contracts/19",
+      "sha256": "fc65fa9c4119a0c835c159c4378924e0212759506f7c1a303bc187dfd501a8f2",
+      "start_byte": 63761
+    },
+    {
+      "end_byte": 64253,
+      "id": "lisa:maplib:contract:manifest-public-contracts-ngw-child-load-result-e9e76037fd",
+      "pointer": "/public_contracts/20",
+      "sha256": "ff8ec5f550160a7574722267898d039a32b6905ce6a4cf46130db5f65a354e7a",
+      "start_byte": 64004
+    },
+    {
+      "end_byte": 64522,
+      "id": "lisa:maplib:contract:manifest-public-contracts-ngw-http-failure-provenance-f2a33a61af",
+      "pointer": "/public_contracts/21",
+      "sha256": "1e10261e2c74f528afae134adfe5ed7432435ab96ed5c63c39d416a2739b1eaa",
+      "start_byte": 64255
+    },
+    {
+      "end_byte": 64800,
+      "id": "lisa:maplib:contract:manifest-public-contracts-ngw-temporary-server-classification-57b0050e09",
+      "pointer": "/public_contracts/22",
+      "sha256": "ccf6f3f88890c947cd712555ec012f02babc03cccff90d89cd4c144336acc6a9",
+      "start_byte": 64524
+    },
+    {
+      "end_byte": 65051,
+      "id": "lisa:maplib:contract:manifest-public-contracts-vector-spatial-cache-recovery-532cdaba6a",
+      "pointer": "/public_contracts/23",
+      "sha256": "43328a64e31ef6c32f4e42a6c6f12f236ada8479369e54707c09464216caecf2",
+      "start_byte": 64802
+    },
+    {
+      "end_byte": 65414,
+      "id": "lisa:maplib:resource:manifest-settings-refs",
+      "pointer": "/settings_refs",
+      "sha256": "3684c460a43494de48e12b981272dba32b18dabe6f5d44c264b43d2a883ba31a",
+      "start_byte": 65066
+    },
+    {
+      "end_byte": 65560,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-local-vector-tile-derived-cache-377000e4fd",
+      "pointer": "/storage_contracts/0",
+      "sha256": "65d82937e426b10c6652697f16351cc9d30c9114a24612ebb9a32dd905264dec",
+      "start_byte": 65438
+    },
+    {
+      "end_byte": 65672,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-project-scripts-cache-5f6e42ccb0",
+      "pointer": "/storage_contracts/1",
+      "sha256": "d70ff4b7b8eef46a83bd26fd99e83ddad4dec92c0823e272a44dd297e40d16fa",
+      "start_byte": 65562
+    },
+    {
+      "end_byte": 65780,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-feature-save-journal-e1dc0608ce",
+      "pointer": "/storage_contracts/2",
+      "sha256": "e7d4212bd755078c02012526c4ddca231be1eb094b516428c912edd0c2469b40",
+      "start_byte": 65674
+    },
+    {
+      "end_byte": 65888,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-pending-track-points-5f69fe91dd",
+      "pointer": "/storage_contracts/3",
+      "sha256": "4f9e985c380559839a31c588809fdfafd4e74603f075ded5a62363dc07b2a431",
+      "start_byte": 65782
+    },
+    {
+      "end_byte": 66008,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-ngw-snapshot-count-checkpoint-41610d91e9",
+      "pointer": "/storage_contracts/4",
+      "sha256": "5bb1074c33aaef6f465a674676c2acaae0c22ab8503bcbba8fbf7859c8ef2dde",
+      "start_byte": 65890
+    },
+    {
+      "end_byte": 66092,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-layer-json-c9f47d11a9",
+      "pointer": "/storage_contracts/5",
+      "sha256": "9b47f55a64bddc12d5c8feae2133867918f9f11b9ba2312de1acd02732f87606",
+      "start_byte": 66010
+    },
+    {
+      "end_byte": 66196,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-ngw-raster-layer-json-15b4f7c0b1",
+      "pointer": "/storage_contracts/6",
+      "sha256": "7739c6eb8920a91c7b2cde7697d1cd0a807e364a5209fae6b8b32393cc574983",
+      "start_byte": 66094
+    },
+    {
+      "end_byte": 66311,
+      "id": "lisa:maplib:contract:manifest-storage-contracts-ngw-vector-identity-backup-0e719d6c77",
+      "pointer": "/storage_contracts/7",
+      "sha256": "529cdc921ee9467cd2bc5230795e98c50e00dfc56de76d3fac194a1e711492c4",
+      "start_byte": 66198
+    },
+    {
+      "end_byte": 67687,
+      "id": "lisa:maplib:resource:manifest-invariant-refs",
+      "pointer": "/invariant_refs",
+      "sha256": "2c8023b6522be3463610771e51c162ffa1ffd1855cdc9745e013b47e737fba6d",
+      "start_byte": 66327
+    },
+    {
+      "end_byte": 68398,
+      "id": "lisa:maplib:resource:manifest-global-docs",
+      "pointer": "/global_docs",
+      "sha256": "f5756765a402a0373b59d3318e94cdbea1fba5afc9d80f578fc7ef821a8fdf8e",
+      "start_byte": 67703
+    },
+    {
+      "end_byte": 70036,
+      "id": "lisa:maplib:resource:manifest-smoke-tests",
+      "pointer": "/smoke_tests",
+      "sha256": "289ef67bafbf7e1e07ee162544c82511202158b57ac57757d0eb942cce6ab142",
+      "start_byte": 68411
+    },
+    {
+      "end_byte": 70173,
+      "id": "lisa:maplib:resource:manifest-upstream-hotspots",
+      "pointer": "/upstream_hotspots",
+      "sha256": "e7e1b61aa9d71ecd4fb7cd133f44b96f59ffe0d143be0b200872dfeb25de8d37",
+      "start_byte": 70056
+    }
+  ],
+  "owner": "android_projects/android_gisapp/maplib"
+}

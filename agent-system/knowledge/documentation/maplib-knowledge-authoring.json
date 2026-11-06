@@ -1,0 +1,61 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "reviewed",
+    "scope_refs": [
+      "lisa:maplib:resource:maplib-knowledge-home"
+    ],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "markdown_body_lines",
+      "value": [
+        "Edit readable logical records and explicitly re-review their source mappings",
+        "together. The shared LISA `py -3.13 -B -m tools.agent_system check-policy-migration`",
+        "replays complete originals, ownership, classifications and values. Standalone",
+        "opening can read ordinary JSON but must report the shared compiler unavailable",
+        "when LISA is absent; do not create a private scanner or claim an unchecked replay.",
+        "The default foreign-owner basis is committed HEAD; builds/checks over uncommitted",
+        "owner changes must explicitly declare this owner live in the shared protocol.",
+        "",
+        "The [working entrance](../AGENTS.md) and Cursor rule open the shared scoped reader.",
+        "Existing validators and hooks still apply. Library Merge Commit precedes a fetched merged app",
+        "gitlink; this open-PR source is not an adopted app dependency. Product code,",
+        "versions, data and app index pins are unchanged. Remaining contracts/resources/",
+        "scenarios, tasks and independent lifecycle states, defects, risks/questions,",
+        "decisions/notes/history/evidence, real clients and individual cleanup across ALL",
+        "six owners remain required. This source migration does not finish the goal.",
+        ""
+      ]
+    },
+    "view-path": {
+      "role": "published_markdown_path",
+      "value": "agent-system/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:maplib-knowledge-authoring",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Keep the established owner documentation address and exact original Git range.",
+    "runtime_verification": "NOT_APPLICABLE",
+    "source_verification": "NOT_APPLICABLE"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:maplib-knowledge-authoring"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

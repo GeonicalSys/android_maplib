@@ -1,0 +1,1253 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "manifest-field-order": {
+      "role": "module_manifest_manifest_field_order",
+      "value": [
+        "entrypoints",
+        "key_components",
+        "public_contracts",
+        "settings_refs",
+        "storage_contracts",
+        "invariant_refs",
+        "global_docs",
+        "smoke_tests",
+        "upstream_hotspots"
+      ]
+    },
+    "manifest-metadata": {
+      "role": "module_manifest_manifest_metadata",
+      "value": {
+        "last_verified": "2026-11-02",
+        "maturity": "maintained",
+        "module_id": "maplib",
+        "repository_id": "maplib",
+        "schema_version": 1
+      }
+    },
+    "view-path": {
+      "role": "module_manifest_view_path",
+      "value": "docs/manifest.yaml"
+    }
+  },
+  "id": "lisa:maplib:metadata:maplib-module-manifest",
+  "kind": "metadata",
+  "lifecycle": {
+    "goal": "unknown",
+    "implementation": "unknown",
+    "merge": "unknown",
+    "release": "unknown",
+    "retention": "Preserve this ordered module manifest value and its original Git source.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "UNKNOWN"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/maplib-module-manifest.json",
+    "scopes": [
+      "lisa:maplib:metadata:maplib-module-manifest"
+    ]
+  },
+  "relations": [
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:manifest-entrypoints",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layeridentifypolicytest-1315540af0",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-localvectortilediskcachetest-d6afc7203f",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectortileadmissiontest-05442f8d1d",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-renderresourceprofiler-fb2db21585",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-renderresourceprofilertest-2ff7c36e5f",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectorfeaturereader-5c3d9c84df",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectorfeaturereadertest-bd935b3f30",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridge-e54ae4e865",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectorsourcebridgetest-e7a56ff3be",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativevectortilebufferparitytest-3611b51b1c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectorlayercontroller-0935646f34",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectortilebackend-dead10fc7c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectortilerequest-36506e3249",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectortileprovider-ed199289ac",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-visiblelinelabelstreamingtest-5c2709d405",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativevectortileencoder-07280c85cc",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativevectortilepropertycodec-113a9405a6",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativevectortileclipper-e6e34f2513",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rendertileworklimiter-d342d15fa7",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectortilerequesttest-4c5d24a995",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectortileprovidertest-7ab6ee5d96",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativevectortilepropertycodectest-334adbc4a8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativevectortileencodertest-7075ef2283",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativevectortileclippertest-5b3353acf9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sqlitevectorspatialquerytest-ac4c3be704",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativefeaturepayload-a6b56d10c4",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nativefeaturepayloadtest-e49a587c7a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rendermemoryguard-f833d7a258",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rendermemorypolicy-efd7ee8fe2",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rendermemoryguardtest-ca979b5c1c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rendertileworkgate-4db837c96a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-localvectortilediskcache-249c52edfa",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-renderprocessmemory-59de825d72",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rendertileworkgatetest-a7f99e54a5",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layerdisplaypriority-c834b85493",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layerdisplayprioritytest-ddaf126e86",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-visiblelinelabellayout-0dcd0bd8cc",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-visiblelinelabelcontroller-b894c18912",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-visiblelinelabelquery-ce61fa8233",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-visiblelinelabelquerytest-133f61ea1e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-visiblelinelabellayouttest-420caabb8c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-legacytrackcolorstest-a7dce33a7a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-trackcolorpalette-12641dd12c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-trackmapstyle-eae6139c81",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-polygonpatternoptions-f456b5f2c7",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-polygonoutlineoptions-55002f28f9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-configurablepolygonpatternregistry-7d3033d657",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-patterntileperiod-850e1166ba",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-patterntileperiodtest-13fd9f9f44",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-polygonlayerfactory-6de3076b7f",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-polygonoutlinelayerfactory-63007e38ce",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-fireflymarkerregistry-7d6820a3bd",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-fireflylayerfactory-bf8e57460c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-simplemarkerstyle-1759ea254e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geometrytransformgesture-0546059c25",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geometrytransform-03b5026204",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-featurecopypolicy-88fad33287",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-markericonregistry-fa63ec7d27",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rulelabellayouts-167f84e02d",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rulegeometrylayouts-2578b2e0e3",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sharedtrackstore-54132a2007",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sharedtrackstoretest-a86108cdeb",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-projectsyncstate-ad3cb0d2a8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-projectsyncstatepublicationtest-504c527af6",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-featurechanges-7fced72b8b",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-localchangescommittest-e9589dfab7",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-gpsrecoverypolicy-44aeb5d127",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-gpsdisplayretentiontest-24da0a4ee8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-mapruntimediagnostics-b584bbe83e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-mapruntimediagnosticstest-b21e27e71f",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-localloginitializer-3343b59399",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layerformhashutil-334732c03c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-tracksendsettings-b658a5eea0",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-tracksendsettingstest-6bb22c2ba2",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-syncworkspacesession-58f33d7e0b",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-conditionalrequiredrules-7c07776b96",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-cascadinglists-aca3c26642",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-projectscriptservice-f6a546f564",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-projectscripthost-6a7596c638",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-projectscriptsync-3a85f5ba02",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-scriptpackage-9086d85818",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-field-df4bc62ff5",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-fieldmetadatatest-e3d1cf9f67",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationpowerpolicy-22003259c9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-gnssdevice-e15d15e28d",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-gnssdevicescanner-9b47655551",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-gnssdevicescanresults-d5380e3815",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-coalescingrefresh-e427d9a9cd",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-feature-2e5b5c5566",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsyncio-3329ebfbdc",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsyncprogress-96f81ac920",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsyncprogresstest-e2d5492baa",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsynctrace-1738662326",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsnapshotcheckpoint-17ef4f6b87",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sharedunderlaycatalog-0ac8bb27ef",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sharedunderlaystore-6a11b8e8e4",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sharedunderlaykind-c6a1ced6a8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngrcarchive-83596eb97e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-fileutil-3da0fd8ba0",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-fileutildisplaynametest-75aabe8820",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-rastermbtileswriter-098b697e3a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-camerazoom-f265356636",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-underlayworkspaceindex-611452ed96",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-walkpreviewgeometry-898b133bf3",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-userlocationgeometry-a628c349bf",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ic-user-location-dot-20e67979dc",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ic-user-location-orbit-5285a7cae0",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-userlocationgeometrytest-27afba6274",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationmotionfilter-658d49a6ac",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationdeparturetest-5b3d0b6416",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationsubscriptioncontroller-026ba8382e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-sensormotionmonitor-ae4cdd0012",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-devicemotionevidence-d058a17f0c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationrecordingsamplercore-2ef4104dcb",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-tracklayer-a3e2195fdd",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationfixpolicy-c1c58c9746",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-diagnosticlog-7bb185a795",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationdiagnosticformat-9e08c96a8e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-externalgnsskeepalivehost-8dccbef0e5",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationrecordingsampler-dc23468ac5",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-externalgnssfixpolicy-238461c3bf",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-gnsstransport-e35795ac1a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nmeaparser-e3f7a06512",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-nmealinebuffer-0bcdadd142",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-cnbframebuffer-dcda8b938b",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-cnbbestpos-6b4658564c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-comnavasciicommands-56239442d6",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-bluetoothletransport-41ae28a2f0",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-externalgnsssession-0c581d9bba",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-adaptivelocationfiltercore-8e5526fb4e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-build-a47ff6d32a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layercontentprovider-e27073dc28",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-mapdrawable-8a756a9bf1",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geometryeditfillpolicy-1c63e87344",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-mplfeaturesutils-3ec8ad13df",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-fieldstylerule-bee6fcf164",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layergroup-0eb29b1eac",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwrasterlayer-a64043756e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwvectorlayer-66f4602770",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsyncnonereloaddecision-bf1976e326",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwfeaturecountparser-650a446564",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-districtfilterutil-acb3a5709b",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-remoteattachmentsyncpolicy-229e87c238",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-syncadapter-c362e19f10",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsyncservice-69142af855",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-vectorlayer-7cab7c403f",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-table-7d2b584a25",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geometryrtree-4a061321b0",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geoenvelope-c8405b123b",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-mapcontentproviderhelper-c7ae7492f8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geojsonutil-caa8763a09",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-databasecontext-1586929db9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-coordinatepointparser-a95f9aaf46",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-coordinatepointlayerimporter-4d74883ec5",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwlayeridentitybackup-33f8bfe0ec",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-vectorlayerrendercache-a6279d4f1e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layeridentifypolicy-cc391da9df",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-collectorprojectcompositionsync-5b3d967ffc",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-collectorprojectitem-9e478c227a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-collectorresource-bb0b5c041e",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-tmslayer-bf271622db",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-mbtilesinfo-50b3ac2f40",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-legacytilembtilesmath-d8c2f8d9b3",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-lisacatalog-5247e60115",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-lisacataloglookup-157f537a24",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-resourcegroup-2c946894de",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layerconfigutil-93dbbaa18a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-multipolygongeometryrepair-666f218647",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwfeaturegeometryvalidator-8c1287baf6",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geogeometryfactory-784781a977",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geomultipolygon-532bdeaa42",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-polygoneditclass-6eab5e7f97",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-multipolygoneditclass-4aeb6ddcc8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-pointeditclass-b1f1c05318",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-multipointeditclass-f27e41d734",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-lineeditclass-58a0051593",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-multilineeditclass-17fe40312c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-editdirectionpolicy-66a4ba2b31",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationtrackfilter-5c659b0b22",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationutil-24ca218697",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationtrackfiltercore-3926220e04",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationproviderarbiter-5dab405ef3",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-locationproviderarbitercore-9b5c8496ea",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-stakeoutgeometrytarget-801a811880",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-stakeoutguidancepolicy-d98e2b7fdd",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-gpseventsource-9027bd6b65",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-layerdatabasetransaction-79749439e9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-featuresavejournal-0a6de20538",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-pendingtrackpoints-42493fcb67",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-maptapgesture-88c35eaa75",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwlookuptable-bc356b8e64",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwvectorlayerfullsnapshothttpstatustest-7d047f383a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-syncresultutil-c0de82c903",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwlayerschemacompat-b55fd85f5c",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-connection-b01ac003e3",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwhttpexception-dfecfefa3d",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwhttpresponseexception-735ef742b9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-networkutil-857fd5c80f",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-localvectorbulkcachereadinesstest-38a13c44b4",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-key-components-geometryrtreerecoverytest-1f56a7161a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-render-resource-economy-2c6382b96a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-point-firefly-e94484c889",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-compass-sector-visibility-074ae4a8f9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-track-send-settings-a20ac20056",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-sync-workspace-session-b6b7e0b5b6",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-project-script-host-api-541dcc34d8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-ngw-required-fields-a84512e23b",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-local-write-commit-9cc626d90d",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-track-retry-37e9bbfc63",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-asynchronous-track-refresh-ce771aa3a8",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-passive-walk-preview-bbc57ac598",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-current-location-recording-772d8b2753",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-segmented-tracks-ce3d65fb67",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-map-host-34e0016f27",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-gis-application-b33dc451d3",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-collector-metadata-5226114757",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-ngw-resource-url-6480545fb1",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-stakeout-geometry-21d9cfd12b",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-ngw-lookup-cache-content-b87bdf4ce7",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-sync-failure-reasons-16941d5906",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-ngw-child-load-result-e9e76037fd",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-ngw-http-failure-provenance-f2a33a61af",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-ngw-temporary-server-classification-57b0050e09",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-public-contracts-vector-spatial-cache-recovery-532cdaba6a",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:manifest-settings-refs",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-local-vector-tile-derived-cache-377000e4fd",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-project-scripts-cache-5f6e42ccb0",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-feature-save-journal-e1dc0608ce",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-pending-track-points-5f69fe91dd",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-ngw-snapshot-count-checkpoint-41610d91e9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-layer-json-c9f47d11a9",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-ngw-raster-layer-json-15b4f7c0b1",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:contract:manifest-storage-contracts-ngw-vector-identity-backup-0e719d6c77",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:manifest-invariant-refs",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:manifest-global-docs",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:manifest-smoke-tests",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:manifest-upstream-hotspots",
+      "type": "contains"
+    }
+  ],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "maplib-module-manifest"
+}

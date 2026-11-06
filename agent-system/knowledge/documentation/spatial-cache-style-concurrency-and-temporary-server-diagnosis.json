@@ -1,0 +1,70 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "- NGW config/data issue: отделить config parsing от feature sync decision.",
+        "- Crash `notify_insert → GeometryRTree.chooseLeaf → GeoEnvelope.width`: проверить,",
+        "  что incremental pull вошёл в bulk-режим, в журнале нет построчных notify, а",
+        "  после pull есть ровно одна строка `spatial cache rebuilt` с числом строк SQLite.",
+        "- `LinkedTreeMap` из `reloadVectorLayerStyleProps`: style worker не должен брать",
+        "  live `sourceFeaturesHashMap`; допустим только независимый render-cache snapshot",
+        "  либо полный data reload при cache miss.",
+        "- `ExternalDatabaseError`/HTTP 5xx на feature pull: проверить журнал",
+        "  `deferred transient retry`; один успешный второй проход является ожидаемым",
+        "  восстановлением, а исчерпание очереди даёт сообщение о временной",
+        "  недоступности сервера или внешней БД."
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Spatial cache, style concurrency and temporary server diagnosis"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:spatial-cache-style-concurrency-and-temporary-server-diagnosis",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:spatial-cache-style-concurrency-and-temporary-server-diagnosis"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

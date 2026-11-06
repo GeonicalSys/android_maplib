@@ -1,0 +1,70 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "unknown",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "## Назначение",
+        "",
+        "MapRuntimeDiagnostics отслеживает длительные touch queries и local tile work",
+        "без вызовов SDK/SQLite из watchdog: trace stages, heap/queue/workers, cached",
+        "frame/lifecycle/scene state, bounded caller Java stack. Observer работает отдельно",
+        "от bounded writer, быстрые успехи не логируются, повторы считают suppression.",
+        "Private journal до 16 KiB связывается с событием по времени и сохраняет identity",
+        "прежнего процесса. Local 503 содержит точную причину queue_full/heap_headroom",
+        "и request id; ограничения ресурсов и содержимое тайлов не меняются.",
+        "Контракт: consuming root docs/architecture/error-reporting.md.",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Exact source text and historical evidence retained. Review version-sensitive claims before treating this mixed note as current."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Watchdog boundaries and historical HTTP diagnostic field"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:note:watchdog-boundaries-and-historical-http-diagnostic-field",
+  "kind": "note",
+  "lifecycle": {
+    "goal": "open",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:note:watchdog-boundaries-and-historical-http-diagnostic-field"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "unknown",
+  "topic": "documentation"
+}

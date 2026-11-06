@@ -1,0 +1,79 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "."
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "markdown_body_lines",
+      "value": [
+        "# maplib knowledge sources",
+        "",
+        "This physical owner participates in the WHOLE six-owner LISA restructuring.",
+        "The original AGENTS.md is authored as logical policy,",
+        "contracts and individually separated historical evidence in [knowledge/policy](knowledge/policy).",
+        "The [inverse map](policy-migration.json) pins the original Git object and covers",
+        "every normalized character. Equal-looking text in another owner is not merged",
+        "without a separate same-fact and ownership review.",
+        "",
+        "Stable identities use `lisa:maplib`; the physical owner remains",
+        "`android_projects/android_gisapp/maplib`. Full conditions preserve lower-layer",
+        "boundaries, debug/release coupling, Collector identity, typed forms/scripts,",
+        "project/session/clock ownership, lookup/snapshot limits, safe failure reasons and",
+        "spatial-cache acceptance. Historical shared19 evidence is separate from the",
+        "lasting compile/native guard, including their within-line source boundary.",
+        "Stored rules and old receipts cannot authorize current execution or certify a product.",
+        ""
+      ]
+    },
+    "view-path": {
+      "role": "published_markdown_path",
+      "value": "agent-system/README.md"
+    }
+  },
+  "id": "lisa:maplib:resource:maplib-knowledge-home",
+  "kind": "resource",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Keep the established owner documentation address and exact original Git range.",
+    "runtime_verification": "NOT_APPLICABLE",
+    "source_verification": "NOT_APPLICABLE"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:resource:maplib-knowledge-home"
+    ]
+  },
+  "relations": [
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:maplib-knowledge-authoring",
+      "type": "contains"
+    },
+    {
+      "status": "source_backed",
+      "target": "lisa:maplib:resource:maplib-knowledge-layout",
+      "type": "contains"
+    }
+  ],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

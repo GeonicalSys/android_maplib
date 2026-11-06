@@ -1,0 +1,689 @@
+{
+  "format": "lisa.agent-system.policy-migration.v1",
+  "owner": "android_projects/android_gisapp/maplib",
+  "review": "Individually authored source boundaries and dispositions. Complete original text/metadata/conditions retained; semantic duplicates and product/task acceptance require their own evidence. No date, heading, status or size classifier; no client cutover.",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "revision": "7152e3cd403f9020cebcf752b8299538a85136c1",
+      "blob": "4ee71124991751b329c9c2e5d0e5c9ef15a0837a",
+      "sha256_utf8_lf": "12bb8690e988d94091d91f279a3d76d4dfb9cbeeefe6c9ca42d847fb232a495b",
+      "layout": [
+        {
+          "lines": [
+            1,
+            1
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            2,
+            2
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            6,
+            6
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            10,
+            10
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            14,
+            14
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            19,
+            19
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            23,
+            23
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            29,
+            29
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            30,
+            30
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            31,
+            31
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            38,
+            38
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            39,
+            39
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            40,
+            40
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            45,
+            45
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            46,
+            46
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            47,
+            47
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            55,
+            55
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            59,
+            59
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            61,
+            61
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            67,
+            67
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            68,
+            68
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            69,
+            69
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            82,
+            82
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            83,
+            83
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            84,
+            84
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            95,
+            95
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            96,
+            96
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            97,
+            97
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            98,
+            98
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            114,
+            114
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            115,
+            115
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            116,
+            116
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            117,
+            117
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            127,
+            127
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            128,
+            128
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            129,
+            129
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            140,
+            140
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            146,
+            146
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            152,
+            152
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            153,
+            153
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            154,
+            154
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            155,
+            155
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            163,
+            163
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            173,
+            173
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            177,
+            177
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            178,
+            178
+          ],
+          "reason": "blank_separator"
+        },
+        {
+          "lines": [
+            179,
+            179
+          ],
+          "reason": "heading"
+        },
+        {
+          "lines": [
+            180,
+            180
+          ],
+          "reason": "blank_separator"
+        }
+      ],
+      "units": [
+        {
+          "id": "lisa:maplib:instruction:workspace.prerequisites",
+          "spans": [
+            [
+              38,
+              274
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Complete local pack and conditional consuming-workspace routing, including related invariant/upstream entry.",
+          "record_sha256": "55bd7b66fbc09ac4ea1242b6350a51cec6ad1a63ae6acb9c550192cac6d7e2fa"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.standalone-docs",
+          "spans": [
+            [
+              275,
+              499
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Missing parent docs never waive local reading or cross-owner limitations; retain the separate central source obligation.",
+          "record_sha256": "40a09e5a27ac91d2567adf73271e7ab5eb7575844bbc00c63097a19174bf21f9"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.lower-layer-and-consumers",
+          "spans": [
+            [
+              500,
+              719
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Complete lower-layer prohibition and named public/storage/protocol consumer surfaces; no dependency on app or maplibui.",
+          "record_sha256": "93309b09c0f36217f6433b05965c129aeeee1f166780a6e3ee9601565f590b1b"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.version-coupling",
+          "spans": [
+            [
+              720,
+              1030
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Preserve distinct debug/release app coupling, AGP9 library DSL prohibition, explicit BuildConfig field and actual APK matrix route.",
+          "record_sha256": "1c8a552e048d9fa376d56850d8a4c6a89a9eb66455f86b9c154a9309f064921d"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.protected-behavior-and-dod",
+          "spans": [
+            [
+              1031,
+              1262
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Layer/order/hot-add/track/resource/backup protections travel with relevant unit/consumer compile and local/central documentation obligations.",
+          "record_sha256": "91662d3b87c48ff8b3fa2f4dc165eb5589dd5927115549f4fdee0f794a538e5c"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.collector-supported-types",
+          "spans": [
+            [
+              1263,
+              1633
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Keep exact supported vector/PostGIS/style classes, separate style identity and parent extent, no editing or speculative Connection classes.",
+          "record_sha256": "e96e1905d652946489dc631b31100bb2ee38449be84999950060ecd373124d84"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.git-delivery",
+          "spans": [
+            [
+              1651,
+              2112
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Complete change versus read-only authorization, restricted operations, library Merge Commit and post-merge consumer pointer; stored wording grants no present action.",
+          "record_sha256": "17be0329015edc5bb1b78fce9752d3709973805488ab88ceb76bc23b9af82e5b"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.report-owner-and-boundary",
+          "spans": [
+            [
+              2146,
+              2429
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Same-PR customer/internal report card, maplib prefix, central slices and ID-based boundary remain together.",
+          "record_sha256": "6498efd2863ac1f14d6e4ef595eaa2258742b05ea557124b47163de0fac9333c"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.conditional-form-rules",
+          "spans": [
+            [
+              2450,
+              3029
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Pure typed v1/v2 parser, missing/checkbox semantics, visible required, unchanged hidden data/schema, shared budgets, strict types/keys and letter-only element IDs.",
+          "record_sha256": "291113ffb4139501649791e6410324e5426382665752c8b57ee74b0716fa4705"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.cascading-list-ownership",
+          "spans": [
+            [
+              3030,
+              3264
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Pure parser/state ownership, architecture entry, no UI/JS/Access-specific logic and native graph/variant validation.",
+          "record_sha256": "9203c3b09629fd03b8522c207909cdfa182afb74af2dcb3f09283334081e5f7f"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.project-script-responsibility",
+          "spans": [
+            [
+              3265,
+              3466
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Preserve package/cache/isolated runtime/read-only host ownership and the exact implemented versus planned API distinction as a source-qualified contract, not proof of runtime availability.",
+          "record_sha256": "017c88996b70ed8729925f86bba29ff99df5bb2a8de5ee14c3dc20e8fc662e45"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.project-script-api-admission",
+          "spans": [
+            [
+              3467,
+              3855
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Read architecture/guide, implement typed granted budgeted/tested host APIs in APK first, prohibit arbitrary external privileges, retain pinned draft packages and coordinate desktop/schema owners.",
+          "record_sha256": "24434cd178cf61f2de607edd9b0c03be8d205c47eb1142bcc845fd1ac794e120"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.project-sync",
+          "spans": [
+            [
+              3889,
+              4658
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Complete default and manual/scheduled queue ownership, no global-map/prefs switching, async/service/provider session propagation, no expired fallback, lease/drain/pending-plan/journal and isolated verification boundaries.",
+          "record_sha256": "f77a4971a6206be889353efcbc954ecb5f61685750327d18b12f92025fbdd035"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.split-list-label-source",
+          "spans": [
+            [
+              4658,
+              4808
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Complete metadata keyname/display_name then layer alias then field-key-only fallback, retaining the split-list condition.",
+          "record_sha256": "10a52a362b304ed5229d6a7c93eabe5aa5f4eafd68ab24118c724fd897c9b326"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.confirmed-project-clock",
+          "spans": [
+            [
+              4811,
+              5619
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Exact weak preferences-owner/project identity, successful commit publication, GC/lock/reentry order, unchanged API/persistence, no compensation and explicit process-only failed-cache/disk uncertainty.",
+          "record_sha256": "afde2108bb21e0b55c0036599113a9c4ebc819f158cdb8668abd8ac27f09b8c6"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.independent-change-card",
+          "spans": [
+            [
+              5666,
+              5940
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "New independent ID and exact changed source/test/script covers, with a separately reasoned exact exemption route.",
+          "record_sha256": "f9a4d60a8ea7b8c6497695bea29ec43b406e0282550be3f58d21558c0bb0a74e"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.report-hook-admission",
+          "spans": [
+            [
+              5940,
+              6556
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Before commit/push check, per-clone hook setup, PyYAML recovery and preservation of foreign hook configuration; agent owns setup.",
+          "record_sha256": "6508d3dcd3e7c874f7aec50c4ab6de23aa9ee0a69c1134339f6064e79f6c1ab2"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.report-hook-enforcement",
+          "spans": [
+            [
+              6556,
+              6782
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Normal push fails on missing/broken admission; no bypass, policy weakening or fictitious exemption; semantic review stays separate.",
+          "record_sha256": "978ec456fd89c25478b9f65279e7120dfc60f253ed425181b35c36bd4435b39b"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.requested-report-persistence",
+          "spans": [
+            [
+              6821,
+              7276
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Every requested draft/audit/reconciliation goes to owner Git/PR, central ecosystem location and direct final links; no chat-only report.",
+          "record_sha256": "6c893e728ced497a77897e9d662aa499ecd0e9d5ad21cdac7e5ad6ba0046dfb1"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.report-acceptance",
+          "spans": [
+            [
+              7276,
+              7464
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Saving a draft never closes IDs; separate explicitly instructed reported/letters and source/secrecy limits include attachments.",
+          "record_sha256": "7b0513ad785a47fbe1e6fb45304b56014bc442e3e76fc6e8b07dd4abbcb46210"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.lookup-cache-persistence-boundary",
+          "spans": [
+            [
+              7502,
+              8237
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Read precise sync contracts/invariants; preserve full-key comparison, map identity, equal-no-write/SYNC_NONE/handled exceptions, one save/error increment and explicit no rollback/disk-ACK/retry guarantee with owning UNKNOWN.",
+          "record_sha256": "134029eb840e00d45c401ae17c4620c6f0d2dc2ace8c9b85b7a5e9b64ef80bd2"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.full-snapshot-admission",
+          "spans": [
+            [
+              8238,
+              8625
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Only full streamed downloader rejects explicit206 before listed new-stage reads; retain earlier prefix cleanup/push and other routes, no whole-SQL or successful200 completeness claim and unresolved alternatives.",
+          "record_sha256": "9baac507b182f00a188c5720e134de5f7d8f90e46cbb15186a688e60c4ae4bd1"
+        },
+        {
+          "id": "lisa:maplib:evidence:workspace.shared19-source-receipt",
+          "spans": [
+            [
+              8626,
+              8824
+            ]
+          ],
+          "classification": "historical_receipt",
+          "review": "Individually separated former App9/8ca and shared19 App15/Core4 receipt and technical seams; no current test execution, merge, native or release acceptance.",
+          "record_sha256": "5d3960716c729c8e18d29803ab4b2b1cfb6f034838afdf354ed47a90121ef330"
+        },
+        {
+          "id": "lisa:maplib:instruction:workspace.source-native-acceptance",
+          "spans": [
+            [
+              8824,
+              9010
+            ]
+          ],
+          "classification": "permanent_rule",
+          "review": "Complete compile-consumer obligation and source/JVM versus device/NGW/restart boundary retain the exact owning Core recipe; extracted from the same historical receipt line.",
+          "record_sha256": "d23f195dcaf03c05ac03c9edaa355196994b638f824a1b10519a1bb103828ef8"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.sync-failure-ownership",
+          "spans": [
+            [
+              9058,
+              9608
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Read owning UI/storage contracts, known typed HTTP reason bound to exact invocation/account/result, local token not IPC/persistence, generic stale/foreign/mixed outcomes and complete safe scope cleanup.",
+          "record_sha256": "5e875948f9e9aa23664a6116807156c817eddea775eca61395541db0dc6281cb"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.sync-failure-counters-and-ui",
+          "spans": [
+            [
+              9609,
+              10322
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Preserve existing PUSH/lookup increments, exact SYNC_NONE failure count, UNKNOWN/zero KEEP, optional wrappers, successful-empty distinction, legacy types/retry/diagnostics, Core text ownership and separate source/device/server acceptance.",
+          "record_sha256": "f94e2bab0c1589436f79ec74786ac934e3a41cb1d41d9929563c7ba0098a50f2"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.temporary-server-classification",
+          "spans": [
+            [
+              10323,
+              10557
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Text eligible only422, numeric429/5xx separate;408 remains retry transient without maintenance inference or weakened UI oracle.",
+          "record_sha256": "a75da5d0b45f79d991ae2d5119f5760276b3749d42b5c5275aae420580eece7d"
+        },
+        {
+          "id": "lisa:maplib:contract:workspace.spatial-cache-recovery",
+          "spans": [
+            [
+              10610,
+              11679
+            ]
+          ],
+          "classification": "standing_contract",
+          "review": "Preserve exact architecture/invariant ownership, verified empty identity/generation readiness, bulk/failure gates, dirty-clear versus clean-load, legacy/no-write bytes, independent ID/envelope originals, separate import/restart/device boundaries, private GPX protection and all neighboring identity/order/cancel/config contracts.",
+          "record_sha256": "728177cb71366ade43614b229e8a927edcc7229dbad02f2c4363f989164360be"
+        }
+      ]
+    }
+  ]
+}

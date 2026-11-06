@@ -1,0 +1,77 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "Actual89 source checks PASS/0fail/errors/skips: Core46 (37 Robolectric API28 +",
+        "9 plain JUnit) и App43 API28,11 XML10.995с, Gradle0/BUILD50с. Same literal4/6eb9",
+        "GREEN0.434с включены в эти89; прежний pre-fix baseline3comparisonFAIL/1control",
+        "3.180с/native1 сохранён отдельно. Первый общий85 остаётся NOT_PASS81/4assertFAIL/",
+        "0errors/skips:3 failures выявили HTTP408+externalDB false-server classification,",
+        "один stale Producer oracle8 противоречил исходному knownSERVER|OTHER12. Root",
+        "вручную исправил только этот assert8→12; API7ec/Core16/App13 и остальные тесты",
+        "не менялись. NetworkUtil теперь разрешает text recognition только422 после",
+        "numeric429/5xx; retry predicates byte-exact. Добавлены4 неизменённых plain tests.",
+        "BelkaRelease source compile0/BUILD59с (61.275с observed):100taskSET exact при ином",
+        "порядке, CoreJava/UIJava/AppJava+Kotlin executed;4 Java JAR28/535/670/45 classes",
+        "без native/product archives. Во время проверок68 inputs exact, все15 unit и13",
+        "compile процессов завершились естественно. Это не native/mobile acceptance.",
+        "Не классифицированы cookie/capability/TUS, malformed HTTP200 и все неоднозначные",
+        "remote outcomes; сохранность исходных данных, реальные requests/device/native",
+        "и large-font fitting не заявлены проверенными. Источник recipe и итоговые receipts:",
+        "[карточка](../update-reports/entries/maplib-20261030-sync-error-provenance.md).",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Dated source error cohorts, oracle correction and compile scope"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:evidence:dated-source-error-cohorts-oracle-correction-and-compile-scope",
+  "kind": "evidence",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:evidence:dated-source-error-cohorts-oracle-correction-and-compile-scope"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "historical",
+  "topic": "documentation"
+}

@@ -1,0 +1,71 @@
+{
+  "applicability": {
+    "conditions": [],
+    "paths": [
+      {
+        "exclude": [],
+        "include": [
+          "docs/README.md"
+        ],
+        "repository": "android_projects/android_gisapp/maplib"
+      }
+    ],
+    "review_status": "reviewed",
+    "scope_refs": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "execution_permission": false,
+  "facets": {
+    "body": {
+      "role": "original_owner_markdown_lines",
+      "value": [
+        "MapRuntime хранит bounded source-stage before/after и периодические RSS/native/",
+        "system-free counters в прежнем журнале16KiB, включая доступную RAM, Java headroom,",
+        "системный порог/low-memory, резерв свободной памяти и текущий tile work limit.",
+        "Они показывают наблюдаемые изменения,",
+        "а не доказанное владение асинхронными native allocation. Настоящие координаты,",
+        "геометрии и атрибуты в эти наблюдения не попадают. Native приёмка памяти,",
+        "полноты карты и предупреждения остаётся отдельным обязательным gate.",
+        "Компактный native payload дополняет эту защиту: полный rich Java снимок",
+        "остаётся у редактора, guard не подменяет его частичной выборкой.",
+        "Карточки: [экономия и диагностика](../update-reports/entries/maplib-20261027-render-memory-budget.md),",
+        "[native payload](../update-reports/entries/maplib-20261028-native-geojson-payload.md).",
+        ""
+      ]
+    },
+    "source-review": {
+      "role": "verification_boundary",
+      "value": "Source-text review covers this exact original span. Runtime acceptance remains separate."
+    },
+    "title": {
+      "role": "reviewed_subject",
+      "value": "Diagnostics measure process counters without per-layer allocation proof"
+    },
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    }
+  },
+  "id": "lisa:maplib:contract:diagnostics-measure-process-counters-without-per-layer-allocation-proof",
+  "kind": "contract",
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "merge": "not_applicable",
+    "release": "not_applicable",
+    "retention": "Retain the reviewed original span and its source-applicability boundary with the owning library.",
+    "runtime_verification": "NOT_RUN",
+    "source_verification": "PASS"
+  },
+  "owner": "android_projects/android_gisapp/maplib",
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:contract:diagnostics-measure-process-counters-without-per-layer-allocation-proof"
+    ]
+  },
+  "relations": [],
+  "schema_version": 2,
+  "status": "active",
+  "topic": "documentation"
+}

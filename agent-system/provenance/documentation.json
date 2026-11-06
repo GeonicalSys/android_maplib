@@ -1,0 +1,1005 @@
+{
+  "owner": "android_projects/android_gisapp/maplib",
+  "schema_version": 1,
+  "sources": [
+    {
+      "blob": "964aae4b260111e11b34e20c46a644819f7d5608",
+      "bytes": 501,
+      "id": "lisa:maplib:resource:library-introduction-license-and-upstream-support-references",
+      "ordered_records_sha256": "8d7d553b86067bcbc3e1be017dbeabc490ab0042b6ea3872bae4459a62382f0b",
+      "ordered_spans": [
+        {
+          "end_byte": 501,
+          "id": "lisa:maplib:resource:library-introduction-license-and-upstream-support-references",
+          "sha256": "64d8e6fa66b12f2ec274c958e9b8159dae3e87100a49585f680afc9097ec56ae",
+          "start_byte": 0
+        }
+      ],
+      "path": "README.md",
+      "record": "library-introduction-license-and-upstream-support-references.json",
+      "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
+      "sha256": "64d8e6fa66b12f2ec274c958e9b8159dae3e87100a49585f680afc9097ec56ae"
+    },
+    {
+      "blob": "1b9e458b3fc563398fb657d85000f8b9c2c4e152",
+      "bytes": 122595,
+      "id": "lisa:maplib:resource:module-readme-frontmatter-and-title",
+      "ordered_records_sha256": "49e953efa5156ff7e2ed1e25ceef5ce2fd9a4b2f3a987931a33d28e663b9a3ee",
+      "ordered_spans": [
+        {
+          "end_byte": 157,
+          "id": "lisa:maplib:resource:module-readme-frontmatter-and-title",
+          "sha256": "916e68a79e9d7d535c75bdc5304b49a3e7fb4444d9bf56f976f8bb9511b2803c",
+          "start_byte": 0
+        },
+        {
+          "end_byte": 1507,
+          "id": "lisa:maplib:contract:known-ngw-class-drift-takes-the-verified-metadata-repair-route",
+          "sha256": "6e92482692b3b74022b7619043986ceddfd0ba97e97f20bd55a585b1b5c09fef",
+          "start_byte": 157
+        },
+        {
+          "end_byte": 1980,
+          "id": "lisa:maplib:contract:two-save-metadata-order-and-retry-after-partial-persistence",
+          "sha256": "a94111cebe55c8e12fd81901fb88f3a2d5dee4dd7f0e500290f04f534b6c0bf9",
+          "start_byte": 1507
+        },
+        {
+          "end_byte": 3372,
+          "id": "lisa:maplib:evidence:dated-jvm-red-green-assertion-subtype-and-consumer-compile",
+          "sha256": "429b871c1b14762761d37165e84b50b0812e81635fbef722031abbef079838b8",
+          "start_byte": 1980
+        },
+        {
+          "end_byte": 5644,
+          "id": "lisa:maplib:note:dated-pbf-disk-cache-changes-with-historical-http-compatibility-wording",
+          "sha256": "f658d60aa906c8ee7daff7afc89eddea519ea5ea5258438edb3acb7d904aa32d",
+          "start_byte": 3372
+        },
+        {
+          "end_byte": 6478,
+          "id": "lisa:maplib:contract:cancellable-bounded-sqlite-session-admission",
+          "sha256": "4d4e9f6e8eabe392f42fec4c8a94ed92c5225de810741ba8cfa973a079a11f1d",
+          "start_byte": 5644
+        },
+        {
+          "end_byte": 7016,
+          "id": "lisa:maplib:evidence:dated-technical-tests-and-historical-apk-request",
+          "sha256": "098ae16995e7221c785ef4e930a49a92c2e718ba39002f919d7ce5b63d1bcb40",
+          "start_byte": 6478
+        },
+        {
+          "end_byte": 7926,
+          "id": "lisa:maplib:contract:opt-in-render-profiler-with-bounded-safe-fields",
+          "sha256": "5af27445786094583c676a8923c869b418d17dacf8d60cfc5fb6f5a18d49aa69",
+          "start_byte": 7016
+        },
+        {
+          "end_byte": 8890,
+          "id": "lisa:maplib:contract:bounded-per-request-and-aggregate-diagnostic-accounting",
+          "sha256": "562df0340080c3cbd12690680e7a967e3243554048f1973f81614b131984d548",
+          "start_byte": 7926
+        },
+        {
+          "end_byte": 9685,
+          "id": "lisa:maplib:contract:clock-domains-and-limits-of-interpreting-samples",
+          "sha256": "d992367304640143f0756233b04b3d145f6cd042dc23e3d59b0b9eb64dd0d70f",
+          "start_byte": 8890
+        },
+        {
+          "end_byte": 10755,
+          "id": "lisa:maplib:contract:stop-snapshot-active-scopes-and-summary-denominators",
+          "sha256": "73fc07a441d22057caa1149e4f21d12fa80d33ceb03fb4ce4f53b2a5967e1dea",
+          "start_byte": 9685
+        },
+        {
+          "end_byte": 11342,
+          "id": "lisa:maplib:evidence:dated-all-maplib-gate-independent-dense-run-and-limits",
+          "sha256": "a97fe45b55e64d0cd521390ac524dde4980e689f25512c8828abb2b70c487689",
+          "start_byte": 10755
+        },
+        {
+          "end_byte": 12716,
+          "id": "lisa:maplib:contract:sqlite-typed-attributes-and-bounded-full-original-reads",
+          "sha256": "c5477806501b2374d12524343a2763e0320f19e46f9f8b8adc704e8aef56657f",
+          "start_byte": 11342
+        },
+        {
+          "end_byte": 14441,
+          "id": "lisa:maplib:note:small-blob-window-algorithm-and-dated-tablet-observations",
+          "sha256": "38e82a55c3766f67306161af1812b574b0b4555810f0e0e5a3d502ae2b5235e6",
+          "start_byte": 12716
+        },
+        {
+          "end_byte": 16099,
+          "id": "lisa:maplib:contract:local-phase-diagnostics-bounded-scopes-and-safe-payload",
+          "sha256": "055aa013564d58cccc56f2bd2a75ca6c649605149003675adf60ee8fefdfbe3c",
+          "start_byte": 14441
+        },
+        {
+          "end_byte": 17047,
+          "id": "lisa:maplib:note:callback-observation-boundary-and-historical-phase-measurements",
+          "sha256": "98f51b0d33b09bb9531dab6850abb1cf94149b3564e236c2037e537423a94eff",
+          "start_byte": 16099
+        },
+        {
+          "end_byte": 17789,
+          "id": "lisa:maplib:contract:classic-equivalent-tile-query-buffer-and-native-limits",
+          "sha256": "df7bb5be2cd251ab9b798680ebd533d3cea31b2a3d23c89346e96cb8af308b21",
+          "start_byte": 17047
+        },
+        {
+          "end_byte": 19056,
+          "id": "lisa:maplib:contract:viewport-label-streaming-with-full-originals",
+          "sha256": "bc13f36746cffa7638ac100a8d8738bacd7e7f2498ce4d31e326ef0ddd165a6b",
+          "start_byte": 17789
+        },
+        {
+          "end_byte": 20478,
+          "id": "lisa:maplib:note:direct-sqlite-source-ownership-and-version-limited-http-reference",
+          "sha256": "f748b529f44eedd7a56c840121f471ade8b9bd6df5975e8df3316091868c7932",
+          "start_byte": 19056
+        },
+        {
+          "end_byte": 21129,
+          "id": "lisa:maplib:contract:mvt-property-codec-supported-renderers-and-explicit-refusal",
+          "sha256": "44c986bba0d7dcfced9cd59bfb6de25fb8b9f52278cec72acf044ca02f7c3ebd",
+          "start_byte": 20478
+        },
+        {
+          "end_byte": 21775,
+          "id": "lisa:maplib:contract:full-geometry-anchors-line-labels-and-host-edit-ownership",
+          "sha256": "7afdad2f72a0b89e7927eb5eabfb62ac2461121ea8576bb46c8afd80e2efec6a",
+          "start_byte": 21129
+        },
+        {
+          "end_byte": 22476,
+          "id": "lisa:maplib:evidence:dated-http-removal-and-targeted-tests-with-native-gates-open",
+          "sha256": "362cba40fe76c4f588bad7996648798589955b9a7fadd0011ea197544dd64e97",
+          "start_byte": 21775
+        },
+        {
+          "end_byte": 23901,
+          "id": "lisa:maplib:note:historical-payload-profile-and-compatibility-projection-contract",
+          "sha256": "06bf0cc6dc1daa7842fab403011a98e2c6bc337e28ea41dd104f6aca39ddf7ae",
+          "start_byte": 22476
+        },
+        {
+          "end_byte": 25385,
+          "id": "lisa:maplib:contract:default-sparsity-limits-and-full-edit-payload",
+          "sha256": "4c96523766d65c4759f23af6a201645ebb3ea709fed5fd28b4c9714bcceb82ea",
+          "start_byte": 23901
+        },
+        {
+          "end_byte": 26080,
+          "id": "lisa:maplib:risk:map-memory-and-native-renderer-acceptance-boundaries",
+          "sha256": "9c13d18980a7328f3056cfc6b439d4c03be88c2b9e6e8b93d222589407276890",
+          "start_byte": 25385
+        },
+        {
+          "end_byte": 27818,
+          "id": "lisa:maplib:contract:live-memory-guard-policy-and-meaning-of-counters",
+          "sha256": "3847525a4a47358bbfb591ff7472e596fa995634b8ea5e620d333bcdbe195c56",
+          "start_byte": 26080
+        },
+        {
+          "end_byte": 29186,
+          "id": "lisa:maplib:note:full-source-policy-and-historical-http-retry-transport",
+          "sha256": "1b373aeb93bf02acf1ced1f269a4ddc626aa9b07bcfe7f9ff5b8cb7ede1e7084",
+          "start_byte": 27818
+        },
+        {
+          "end_byte": 29777,
+          "id": "lisa:maplib:contract:bounded-derived-disk-cache-and-ownership",
+          "sha256": "f13433d0e1494ac0d521769fc8475d5eb061396b80ff46b70c41ca901392219b",
+          "start_byte": 29186
+        },
+        {
+          "end_byte": 30264,
+          "id": "lisa:maplib:contract:map-lifecycle-and-memory-notification-ownership",
+          "sha256": "fb720517920ff645787561508839edb0e66e35122c374825fabf358e2f2bc5e3",
+          "start_byte": 29777
+        },
+        {
+          "end_byte": 31501,
+          "id": "lisa:maplib:contract:diagnostics-measure-process-counters-without-per-layer-allocation-proof",
+          "sha256": "93052d7b1de8ec9d55cbe472ba60226d9e5612fdf0eb87e4266a172a6927b779",
+          "start_byte": 30264
+        },
+        {
+          "end_byte": 32514,
+          "id": "lisa:maplib:note:empty-renderer-handles-and-legacy-index-contract-with-dated-crash-scope",
+          "sha256": "10d21af78a86dbdc91f49f1611d05d5bd3cb2b682ab18dc1dcb356d2db85959e",
+          "start_byte": 31501
+        },
+        {
+          "end_byte": 33467,
+          "id": "lisa:maplib:contract:track-color-ownership-and-exact-core-and-glow-settings",
+          "sha256": "e44ade44381f4df1313651d1dd3fdca3fb68ed2a9b28f50f052b59c42212531e",
+          "start_byte": 32514
+        },
+        {
+          "end_byte": 34076,
+          "id": "lisa:maplib:contract:independent-pattern-and-outline-settings-and-native-image-ownership",
+          "sha256": "87f3db4d050422b802f9b06b671e67b09fd8def90ba880efdd7020fba6efd2e3",
+          "start_byte": 33467
+        },
+        {
+          "end_byte": 34684,
+          "id": "lisa:maplib:contract:pixel-exact-repeated-motif-reduction-and-full-fallback",
+          "sha256": "6a7b48fed15d37e528b5708a9f9e0f8db062e34fe69f2ce49c3beb2031c544d9",
+          "start_byte": 34076
+        },
+        {
+          "end_byte": 35388,
+          "id": "lisa:maplib:contract:firefly-marker-compatibility-and-native-source-children",
+          "sha256": "4ec18fb9e098b3f4563f361d23809af0ccc056892af15ec268bc881d83e3c7c6",
+          "start_byte": 34684
+        },
+        {
+          "end_byte": 35695,
+          "id": "lisa:maplib:evidence:historical-debug-and-release-version-mapping",
+          "sha256": "64d4293691052c25bae37eee83756aac561b4110116d5f1a787022b6bb1fbcdd",
+          "start_byte": 35388
+        },
+        {
+          "end_byte": 36386,
+          "id": "lisa:maplib:contract:geometry-copy-transform-and-gesture-boundaries",
+          "sha256": "a6fe880e61381d6f34eb15b3dbe371689726b802a0df8559f89ccfe53fa4adc5",
+          "start_byte": 35695
+        },
+        {
+          "end_byte": 37525,
+          "id": "lisa:maplib:contract:compass-sector-preference-and-preserved-cursor-properties",
+          "sha256": "fb1091c2337f9417cea9a1b46d66dccb41e07cc30e47c496760e32df8c56723b",
+          "start_byte": 36386
+        },
+        {
+          "end_byte": 38708,
+          "id": "lisa:maplib:note:gps-snapshot-v3-reason-timers-and-rate-limited-diagnostics",
+          "sha256": "8917eaf906fd123be8b40061c5dc7d988e3092b15cb43104abc29234f9285416",
+          "start_byte": 37525
+        },
+        {
+          "end_byte": 39546,
+          "id": "lisa:maplib:contract:shared-track-store-and-lossless-legacy-migration",
+          "sha256": "60a0b621082613938c1fa2fd5c256ce002a841fe593c6ceda4145f29e7586c28",
+          "start_byte": 38708
+        },
+        {
+          "end_byte": 40662,
+          "id": "lisa:maplib:contract:after-commit-ready-change-selection-and-full-clock-ownership",
+          "sha256": "3a82281e31cca57a3e0ef44525fad6f6eb13f6cd729a467d1760cc0f0fc1ce07",
+          "start_byte": 39546
+        },
+        {
+          "end_byte": 41710,
+          "id": "lisa:maplib:contract:confirmed-project-clock-and-independent-reads-during-write",
+          "sha256": "0c42734f33f16459440386bfb94be55549860f9ce72725ce2f3c9a54a4678b3f",
+          "start_byte": 40662
+        },
+        {
+          "end_byte": 42621,
+          "id": "lisa:maplib:contract:persistent-format-compatibility-and-limited-failed-write-guarantee",
+          "sha256": "ad43da854181f5f85912def951eed824aa7aae1d12f9851825f7525b3fd73ad3",
+          "start_byte": 41710
+        },
+        {
+          "end_byte": 44223,
+          "id": "lisa:maplib:evidence:dated-19-test-clock-result-and-variant-specific-compile",
+          "sha256": "7b947ad3a140c426be516534b6730019c80525c49fcb3a6c59f3f86b3fc799f2",
+          "start_byte": 42621
+        },
+        {
+          "end_byte": 45433,
+          "id": "lisa:maplib:contract:background-acquisition-and-display-only-network-ownership",
+          "sha256": "99a7295d1546404502c48f49ee78ccd710318753b80f380f39d434a138ec53b9",
+          "start_byte": 44223
+        },
+        {
+          "end_byte": 46946,
+          "id": "lisa:maplib:note:gps-snapshot-v4-passive-probe-and-unconfirmed-causal-diagnosis",
+          "sha256": "6e78e350574e5d44b1cb6ad91a92b80b1d971ef94a8dee10872aa31aa7919ea3",
+          "start_byte": 45433
+        },
+        {
+          "end_byte": 47801,
+          "id": "lisa:maplib:note:watchdog-boundaries-and-historical-http-diagnostic-field",
+          "sha256": "d3c2fd568a1987761daa9d8cc7cdff541faa06051b6d9652a44bd6f3d4dcdc70",
+          "start_byte": 46946
+        },
+        {
+          "end_byte": 48549,
+          "id": "lisa:maplib:contract:local-only-logging-and-canonical-form-pair-hashing",
+          "sha256": "5a9703325bb13a778c2c79b8263ea87044cc738d019795b22f6665aab0d01b46",
+          "start_byte": 47801
+        },
+        {
+          "end_byte": 49146,
+          "id": "lisa:maplib:contract:track-intent-and-independent-server-registration",
+          "sha256": "e5ee65328e929587b2d06afeb57d6cbca55aa5bd593b356b380941cfb3886041",
+          "start_byte": 48549
+        },
+        {
+          "end_byte": 49724,
+          "id": "lisa:maplib:contract:cascade-initial-selections-and-exact-style-preview-reuse",
+          "sha256": "9a0e1834effbfad16ac429bdbad075e84b8c35fcd78707bab69e82fdfbb1e9fb",
+          "start_byte": 49146
+        },
+        {
+          "end_byte": 50380,
+          "id": "lisa:maplib:contract:bounded-conditional-rules-parser-and-unsupported-input-refusal",
+          "sha256": "d5fb1f9bf2999bcf21a5359a029d8e443542488ff1ebd0fbf3ac53a5c56ffdca",
+          "start_byte": 49724
+        },
+        {
+          "end_byte": 50988,
+          "id": "lisa:maplib:contract:cascading-lookup-keys-and-supported-historical-values",
+          "sha256": "fee41948aeabbd4d9b072aa3684458b8d35d751d3d609c6c3fbcc6b1f14aa601",
+          "start_byte": 50380
+        },
+        {
+          "end_byte": 51179,
+          "id": "lisa:maplib:resource:lower-library-domain-ownership",
+          "sha256": "769006236a519719789eddf0a45d95b400b87e1aba49ded24298c2f430a9d2ab",
+          "start_byte": 50988
+        },
+        {
+          "end_byte": 51509,
+          "id": "lisa:maplib:evidence:dated-consumer-diagnostic-version-mapping",
+          "sha256": "02ecdc11abac544515729dee65ca2df4e418b4ba58b84eb3990f511251fbbef4",
+          "start_byte": 51179
+        },
+        {
+          "end_byte": 52263,
+          "id": "lisa:maplib:contract:ngw-required-field-metadata-persistence-and-ui-ownership",
+          "sha256": "3cdcea1c2547a7a2e5d3e4cca857f88121360b147c37ac6b259a28fe1c1025ba",
+          "start_byte": 51509
+        },
+        {
+          "end_byte": 52681,
+          "id": "lisa:maplib:contract:gps-power-policy-separate-from-app-exemption",
+          "sha256": "3fe59f013153a3ac118811e3d68062dc54e3db0b3fda70e6f867b29e24631719",
+          "start_byte": 52263
+        },
+        {
+          "end_byte": 53228,
+          "id": "lisa:maplib:contract:nullable-rssi-and-isolated-device-scan-identities",
+          "sha256": "d4867a3359908fc9b8c6f7d992be80c4b1e9e6a0fb011c8c1b4d8002eb079775",
+          "start_byte": 52681
+        },
+        {
+          "end_byte": 54419,
+          "id": "lisa:maplib:contract:track-only-mode-scope-and-captured-map-history-refresh",
+          "sha256": "a5b80849c7f6d44f65cf24bd8c067239bcdb28d7beba1f036dd425bd182963cf",
+          "start_byte": 53228
+        },
+        {
+          "end_byte": 54867,
+          "id": "lisa:maplib:contract:feature-equality-and-name-key-indexing",
+          "sha256": "564621b05dba4053f13682c6b633b05f14627a615a6cc0538b2d39e977e95e5d",
+          "start_byte": 54419
+        },
+        {
+          "end_byte": 55887,
+          "id": "lisa:maplib:contract:snapshot-timeouts-read-only-cancellation-and-mutation-completion",
+          "sha256": "e5c10b94413d33ad3c0e3a9394984d0cd786aabf90323290adc040c7d6115781",
+          "start_byte": 54867
+        },
+        {
+          "end_byte": 56658,
+          "id": "lisa:maplib:contract:full-snapshot-checkpoint-eligibility-and-sync-owner",
+          "sha256": "8936d5872bd7563f0f7d544b184f9375c14df471236d053d18b8b25f3c39c337",
+          "start_byte": 55887
+        },
+        {
+          "end_byte": 57446,
+          "id": "lisa:maplib:contract:rendering-module-background-modes-and-opengl-compatibility",
+          "sha256": "deabab07022b950228cf1731dd16420a667464e2bd840b8bddf3ae44a6139353",
+          "start_byte": 56658
+        },
+        {
+          "end_byte": 58395,
+          "id": "lisa:maplib:contract:independent-style-data-and-hot-add-apply-barrier",
+          "sha256": "a3e3f8fb690d29f2965f74ed64f9c032ff9c57d22c917be6438ee5a89481d190",
+          "start_byte": 57446
+        },
+        {
+          "end_byte": 58826,
+          "id": "lisa:maplib:contract:style-replacement-releases-detached-source-generations",
+          "sha256": "9ce4ad8b35c87dab37fa4a012d7119c16490d131371672571860d7c0e4081651",
+          "start_byte": 58395
+        },
+        {
+          "end_byte": 59663,
+          "id": "lisa:maplib:contract:direct-sqlite-originals-legacy-metadata-and-visible-only-identify",
+          "sha256": "eb5febe30dda79fd687006b5def0e43bb9f7d1acd007544e50dc65a949e0ab86",
+          "start_byte": 58826
+        },
+        {
+          "end_byte": 60282,
+          "id": "lisa:maplib:contract:cold-form-recovery-and-live-touch-host-ownership",
+          "sha256": "9f87dafe08c06bff4fe9dce7662cad708d2433594c7a924544547f1be51d7b1f",
+          "start_byte": 59663
+        },
+        {
+          "end_byte": 60997,
+          "id": "lisa:maplib:contract:rule-styles-label-zoom-and-interior-geometry-anchors",
+          "sha256": "c8bfdf4850f0145de9d5907939d1ec4e699f8a298e3035ac2fc5adee5ca2044e",
+          "start_byte": 60282
+        },
+        {
+          "end_byte": 61896,
+          "id": "lisa:maplib:contract:cursor-overlay-order-and-derived-azimuth-layers",
+          "sha256": "240f202ededbe4e06e3d05b1718683375381e610a858fcd942c51b1f20ff2437",
+          "start_byte": 60997
+        },
+        {
+          "end_byte": 63023,
+          "id": "lisa:maplib:contract:owning-map-resolution-account-retry-and-sync-progress-scope",
+          "sha256": "8cb79f4bb3dbf9df47cb7d2c3c1818285ccaf25419ab443ea002a49961504a04",
+          "start_byte": 61896
+        },
+        {
+          "end_byte": 63833,
+          "id": "lisa:maplib:contract:schema-metadata-repair-and-full-streamed-ngw-pull",
+          "sha256": "1b9683607d65c82d95ca81b4f62a33ee25a48fc1d60128e862c2228192730826",
+          "start_byte": 63023
+        },
+        {
+          "end_byte": 64769,
+          "id": "lisa:maplib:contract:attachment-metadata-and-atomic-incremental-pull",
+          "sha256": "bb74f6591759c9d9862a991643068ce102664b028be47cd5263f04ef8c6d0540",
+          "start_byte": 63833
+        },
+        {
+          "end_byte": 65321,
+          "id": "lisa:maplib:contract:hidden-vector-reload-resource-url-and-catalogue-traversal",
+          "sha256": "1cf747f8d440107a77a65373783966b7d6cd8e4cd7a510df968c9e543f2631c4",
+          "start_byte": 64769
+        },
+        {
+          "end_byte": 65603,
+          "id": "lisa:maplib:contract:collector-composition-and-separate-server-style-identity",
+          "sha256": "b1afa8227a5ced618ec0faedd8b3d0dd602d2f10105c4a0d78280b00689c94b1",
+          "start_byte": 65321
+        },
+        {
+          "end_byte": 67263,
+          "id": "lisa:maplib:contract:editable-flag-sync-direction-and-bounded-full-fill-diagnostics",
+          "sha256": "3267e3affb68cd267a06b77c465e2a6a745ca1fd1613effe7ee6142b9e7fd350",
+          "start_byte": 65603
+        },
+        {
+          "end_byte": 68160,
+          "id": "lisa:maplib:contract:fingerprint-aware-schema-rebuild-and-local-geojson-policy",
+          "sha256": "0e5d350784710a65b43a726b5f39617e7aaf5b33e0ccd5270fd1e95f76b4764c",
+          "start_byte": 67263
+        },
+        {
+          "end_byte": 68725,
+          "id": "lisa:maplib:contract:bounded-kml-gpx-point-import-and-independent-index-recovery",
+          "sha256": "9c40e152a2c68dc59ff4671487367635d7769d1009b8371739d3e9b7bad1c111",
+          "start_byte": 68160
+        },
+        {
+          "end_byte": 69272,
+          "id": "lisa:maplib:contract:atomic-layer-configuration-and-spatial-reader-writer-ownership",
+          "sha256": "532651c72ee7470f0da5479f1ca7a2442a1785167ece965944862e8713530030",
+          "start_byte": 68725
+        },
+        {
+          "end_byte": 69998,
+          "id": "lisa:maplib:contract:feature-display-name-and-precise-topology-repair-scope",
+          "sha256": "9d2a1fa52aa2d77f2f1d7fb286e7510c6d9153ed3c2c5fa701ce854998142dc6",
+          "start_byte": 69272
+        },
+        {
+          "end_byte": 71960,
+          "id": "lisa:maplib:contract:tap-sketch-vertices-wkt-geometry-and-cold-recovery",
+          "sha256": "ea9cd3e9ae17096d155e2ba957234016c6d609f2d9aa2fdcdef05f537dd19217",
+          "start_byte": 69998
+        },
+        {
+          "end_byte": 72756,
+          "id": "lisa:maplib:contract:metric-area-and-current-maplibre-measurement-ownership",
+          "sha256": "256c0fc39a3cdd53b47611d053dbf069d34e0826ead2962e326e297460ba4be1",
+          "start_byte": 71960
+        },
+        {
+          "end_byte": 74981,
+          "id": "lisa:maplib:contract:gps-display-cursor-geometry-and-independent-recording-stream",
+          "sha256": "e581970b6a25c91d1c95cc1baf96055c3821a01a7334b2888ac41e6cdf69c9b1",
+          "start_byte": 72756
+        },
+        {
+          "end_byte": 77471,
+          "id": "lisa:maplib:contract:external-gnss-origin-transport-framing-and-lifecycle",
+          "sha256": "7a85f517ce82a2f3222c6dc8cc52922f3fa1f232738291310281c9783c8fea8b",
+          "start_byte": 74981
+        },
+        {
+          "end_byte": 78300,
+          "id": "lisa:maplib:contract:nearest-facet-projection-and-independent-foreground-precision-lease",
+          "sha256": "6b606936cea5c32f5f2829348bcb5b1e94697a4e4be070b5e7e84124da7c3394",
+          "start_byte": 77471
+        },
+        {
+          "end_byte": 79093,
+          "id": "lisa:maplib:contract:unique-layer-storage-and-owning-workspace-database",
+          "sha256": "aa415c7174dd5c91a3372675fddc6315e62042690482d2fc0e22e4b01240f505",
+          "start_byte": 78300
+        },
+        {
+          "end_byte": 79726,
+          "id": "lisa:maplib:contract:server-geometry-validation-and-preserved-layer-order",
+          "sha256": "4aded383656614a43b9055dc752f0cfb32767c41919b66ce3cb91f91140b8f69",
+          "start_byte": 79093
+        },
+        {
+          "end_byte": 80435,
+          "id": "lisa:maplib:contract:raster-mbtiles-validation-and-legacy-tile-coordinate-conversion",
+          "sha256": "2f5ffd19e929b8ff68ab76c63f3696d9f95d78814797db86798365f563f84924",
+          "start_byte": 79726
+        },
+        {
+          "end_byte": 81142,
+          "id": "lisa:maplib:contract:dependency-direction-opengl-and-supported-raster-formats",
+          "sha256": "bb82edb06104668da3dd48faca79f6a3b6f0af1124091818f2e908441edde2c5",
+          "start_byte": 80435
+        },
+        {
+          "end_byte": 82153,
+          "id": "lisa:maplib:contract:topology-repair-and-recording-geometry-guardrails",
+          "sha256": "aade3cf1fdf664a974136950115b0faf7142e66435cffdc4045a7c40833a7418",
+          "start_byte": 81142
+        },
+        {
+          "end_byte": 83095,
+          "id": "lisa:maplib:contract:stakeout-crs-collector-support-and-resource-url-restrictions",
+          "sha256": "7edb5da76fac1c4bbcd1835cf555c01605835d5053d109ecd85eae422ba92e2d",
+          "start_byte": 82153
+        },
+        {
+          "end_byte": 84082,
+          "id": "lisa:maplib:contract:import-format-constraints-and-consumer-version-matrix",
+          "sha256": "972f3752ebd7cfabadbbe145f7b5c484909a18ba6f2628af4b345ccb9fccfdeb",
+          "start_byte": 83095
+        },
+        {
+          "end_byte": 84513,
+          "id": "lisa:maplib:resource:rendering-order-and-opengl-dependency-diagnosis",
+          "sha256": "0f04b3ac6df6de443463f0d87c4b9979a4a25d785d8c5026e4c3289fd47b4276",
+          "start_byte": 84082
+        },
+        {
+          "end_byte": 85532,
+          "id": "lisa:maplib:resource:style-inheritance-zoom-gates-and-cursor-stacking-diagnosis",
+          "sha256": "528b6ab9321203ff23d19e47785d8c27df9c1b5d2c453bcc865f015e2eca222c",
+          "start_byte": 84513
+        },
+        {
+          "end_byte": 86823,
+          "id": "lisa:maplib:resource:cold-save-destroyed-renderer-and-topology-error-diagnosis",
+          "sha256": "2f01f62cfa3145d35d8409bf0db89a402ea536de8f0d96f18fe50c8106997dbe",
+          "start_byte": 85532
+        },
+        {
+          "end_byte": 87919,
+          "id": "lisa:maplib:resource:ngw-fill-deferred-style-reload-and-local-visibility-diagnosis",
+          "sha256": "1cf7444f559fff0f8992994956d888109494217845f8db016838c60ad0154b10",
+          "start_byte": 86823
+        },
+        {
+          "end_byte": 88430,
+          "id": "lisa:maplib:resource:visible-only-identify-and-direct-sqlite-diagnostics",
+          "sha256": "b705c69897e22e7a498b24d72f595c7b070502827672cb51a4347dc5e6bac01e",
+          "start_byte": 87919
+        },
+        {
+          "end_byte": 89640,
+          "id": "lisa:maplib:resource:track-ownership-provider-filtering-and-distance-diagnosis",
+          "sha256": "2c7b457c6eed11a6d7679ffae5b8769209536eadf67384be85250ffe94ae26a6",
+          "start_byte": 88430
+        },
+        {
+          "end_byte": 90711,
+          "id": "lisa:maplib:resource:spatial-cache-style-concurrency-and-temporary-server-diagnosis",
+          "sha256": "925aaf491accda3c834a0b48524c4d4fdcbf954c93ac0691910ece59a930d5e6",
+          "start_byte": 89640
+        },
+        {
+          "end_byte": 91924,
+          "id": "lisa:maplib:resource:url-crs-sqlite-transaction-and-geometry-diagnosis",
+          "sha256": "76d04af2c6d92875f7cf950028b4a77221c444c2718bef359cf9d3abd68a12cd",
+          "start_byte": 90711
+        },
+        {
+          "end_byte": 93117,
+          "id": "lisa:maplib:resource:editable-flags-collector-composition-and-style-identity-diagnosis",
+          "sha256": "5cef9fc2d3ac910631a4c7ed46c73ae19820f5326354697edc0d131ee2b13391",
+          "start_byte": 91924
+        },
+        {
+          "end_byte": 93258,
+          "id": "lisa:maplib:resource:owned-source-tests-and-native-smoke-entry-references",
+          "sha256": "8da54311d62d8b566d248ff50ae1a328972fbff09bdc30e213af7bee37e69067",
+          "start_byte": 93117
+        },
+        {
+          "end_byte": 94447,
+          "id": "lisa:maplib:contract:gps-background-ownership-and-stationary-correction",
+          "sha256": "701498cd6fb574b785bbce157dd2f4db2906e40a6e960af8c52f28f8c0981145",
+          "start_byte": 93258
+        },
+        {
+          "end_byte": 95139,
+          "id": "lisa:maplib:contract:confirmed-movement-and-bounded-original-sample-buffer",
+          "sha256": "014482c1a8138f38614e54f05486e1527ac9f2653601f2880bc82d9e2525d5ef",
+          "start_byte": 94447
+        },
+        {
+          "end_byte": 95844,
+          "id": "lisa:maplib:contract:independent-walk-preview-and-reserved-layer-ownership",
+          "sha256": "b81ca472db4f36fcec136c8203deff4af9ac6e71687f3001f03d793fcdafdece",
+          "start_byte": 95139
+        },
+        {
+          "end_byte": 96451,
+          "id": "lisa:maplib:contract:display-candidate-versus-confirmed-movement",
+          "sha256": "4191463bdf1e7ffc3f7cc20aeedcdbdc5f83c59188bcbc1ef101298a5811b647",
+          "start_byte": 95844
+        },
+        {
+          "end_byte": 97255,
+          "id": "lisa:maplib:contract:shared-underlay-storage-stream-import-and-project-references",
+          "sha256": "f41df3011601a34054eb7e69c1998d3cac03e2dfb98b86f671285b3839b7ccb4",
+          "start_byte": 96451
+        },
+        {
+          "end_byte": 98103,
+          "id": "lisa:maplib:contract:reference-repair-and-preserved-project-properties",
+          "sha256": "e5c692a19812104ce487d90afbbc226dcf12b54baa7df1c7783e3d6b44891690",
+          "start_byte": 97255
+        },
+        {
+          "end_byte": 98931,
+          "id": "lisa:maplib:contract:legacy-ngrc-paths-and-main-thread-cleanup",
+          "sha256": "bd1cf4a88607d1cddf11a7abe2ba7752b970ee89212383742d7bee089c630976",
+          "start_byte": 98103
+        },
+        {
+          "end_byte": 99748,
+          "id": "lisa:maplib:contract:owned-local-transaction-outbox-and-retry-identity",
+          "sha256": "943690a8828cb25770ab2069988fcc651c5c96fe028cb37b10e1160c9f33ab88",
+          "start_byte": 98931
+        },
+        {
+          "end_byte": 100333,
+          "id": "lisa:maplib:contract:map-gesture-admission-authentication-scope-and-wkt-iteration",
+          "sha256": "68310d63d58c4aad9f39b68b2425d3e1b9d1d8c1dc98ed1d0de54ac5e980a1ae",
+          "start_byte": 99748
+        },
+        {
+          "end_byte": 100816,
+          "id": "lisa:maplib:resource:storage-verification-routes-and-git-adoption-order",
+          "sha256": "e4eafef25456b60bf46dfb24f9a40afab6c774df63e2356395b2954ffde60966",
+          "start_byte": 100333
+        },
+        {
+          "end_byte": 101247,
+          "id": "lisa:maplib:contract:project-script-package-isolated-runtime-and-limited-broker",
+          "sha256": "7d2599b324d6e82c7e9633d3162a5e0254cb2e93bb4e14c28a49b7e6d11ed691",
+          "start_byte": 100816
+        },
+        {
+          "end_byte": 102243,
+          "id": "lisa:maplib:contract:all-project-sync-map-callback-and-service-ownership",
+          "sha256": "3fdfd2fc12c66a4bbf361286a4ae6f560d66c1f2013aa8888ed6894c2bd98eb9",
+          "start_byte": 101247
+        },
+        {
+          "end_byte": 102726,
+          "id": "lisa:maplib:resource:opt-in-verification-identities-and-full-consumer-test-scope",
+          "sha256": "611ba24b0a804a9d5956df76ab2520c66dbf0ec5fac85f82bb5244aa76632e4c",
+          "start_byte": 102243
+        },
+        {
+          "end_byte": 103534,
+          "id": "lisa:maplib:contract:startup-diagnostic-observer-and-bounded-original-journal",
+          "sha256": "0c81644a4acc444233ec389440112c725a5ed0851d93cb2e867282ddebe66a6b",
+          "start_byte": 102726
+        },
+        {
+          "end_byte": 103863,
+          "id": "lisa:maplib:resource:update-cards-and-pre-push-registration",
+          "sha256": "c36eca36b2d5e8812269c0fdf96c34d6aefbf58c73f403919217be8318b66903",
+          "start_byte": 103534
+        },
+        {
+          "end_byte": 104550,
+          "id": "lisa:maplib:contract:shared-track-color-migration-and-effective-line-labels",
+          "sha256": "eb8e7ba463cad0c44618da5cdc681436decdddc01fd1f0789d9f64328eb188b6",
+          "start_byte": 103863
+        },
+        {
+          "end_byte": 105613,
+          "id": "lisa:maplib:note:mixed-hit-candidates-and-dated-classic-route-verification",
+          "sha256": "f9ebecb042c1f06b77288db1c2fad66eb0dd0030f14d041df8e596b84a640f22",
+          "start_byte": 104550
+        },
+        {
+          "end_byte": 106942,
+          "id": "lisa:maplib:contract:exact-sqlite-source-aliases-and-canonical-layer-priority",
+          "sha256": "107a5fae059e98de66a4992093fd6a5ede66b490f40d1c21cf719447e7471282",
+          "start_byte": 105613
+        },
+        {
+          "end_byte": 108229,
+          "id": "lisa:maplib:evidence:dated-tablet-priority-jvm-and-normal-install-observations",
+          "sha256": "713a076cbfa79124fcc2d8b36a688c993bb540aa6478d299c25955cf9dd7fa53",
+          "start_byte": 106942
+        },
+        {
+          "end_byte": 110022,
+          "id": "lisa:maplib:note:historical-lookup-key-repair-and-open-full-snapshot-limits",
+          "sha256": "0af62e4f70ca32daf53005573aff5f0e240e5aa22f7d1820d7f05a89eeea5636",
+          "start_byte": 108229
+        },
+        {
+          "end_byte": 111154,
+          "id": "lisa:maplib:contract:full-snapshot-http-206-and-lookup-save-failure-boundaries",
+          "sha256": "5453fcdff730df479d15eddb9a296c1a04437b3f8fff7a6900d91ce884345a2e",
+          "start_byte": 110022
+        },
+        {
+          "end_byte": 112356,
+          "id": "lisa:maplib:evidence:dated-combined-source-tests-and-prior-incomplete-observer",
+          "sha256": "495c422dd477eda6013392eaa6426e3583088711d03e5a6eb30929d5c9180e3b",
+          "start_byte": 111154
+        },
+        {
+          "end_byte": 113118,
+          "id": "lisa:maplib:contract:typed-ngw-provenance-and-exact-result-owner",
+          "sha256": "4da745629fd39bb075821d86b456257d17c7d495d6749adabe9ca0ddbd365251",
+          "start_byte": 112356
+        },
+        {
+          "end_byte": 114287,
+          "id": "lisa:maplib:contract:optional-typed-reasons-and-resource-child-transport",
+          "sha256": "1d3105d6be97a1e7d1bfd175eba47a8634ea732a6797163b4c4165e207b760fe",
+          "start_byte": 113118
+        },
+        {
+          "end_byte": 116024,
+          "id": "lisa:maplib:evidence:dated-source-error-cohorts-oracle-correction-and-compile-scope",
+          "sha256": "8bf9439803db9dc519e036ee048a4f09d9b75cdd277c5299a827152698df3379",
+          "start_byte": 114287
+        },
+        {
+          "end_byte": 116354,
+          "id": "lisa:maplib:contract:cached-child-success-and-open-partial-parse-semantics",
+          "sha256": "bbcf4ea61fff0ec82b5ab68f7cb2b5d6609b20288a5b956a085ae6a84f994308",
+          "start_byte": 116024
+        },
+        {
+          "end_byte": 117310,
+          "id": "lisa:maplib:contract:empty-index-readiness-and-exact-live-cache-owner",
+          "sha256": "8fe982380157c1e6ac4d993042caafd7ff531bd9bf7730c8c6e270cbec596f08",
+          "start_byte": 116354
+        },
+        {
+          "end_byte": 118277,
+          "id": "lisa:maplib:contract:rtree-clean-reset-load-validation-and-original-bytes",
+          "sha256": "a2bd2be8b32bcf02493e3756f57d021b1117fa0982518d6bb0db1ef37e723cef",
+          "start_byte": 117310
+        },
+        {
+          "end_byte": 119078,
+          "id": "lisa:maplib:contract:affected-import-entries-and-separate-readiness-gates",
+          "sha256": "9f206e879b16719dbe95616d24ed1bef2eddf6f9d355f85cafb9ab854e5c8b79",
+          "start_byte": 118277
+        },
+        {
+          "end_byte": 120142,
+          "id": "lisa:maplib:risk:reported-invisible-layers-and-unverified-device-recovery",
+          "sha256": "ad249b5fd5ab0325f5ddc5a13c7bc9958ebab347d2e4981dd86c83d4ced6af72",
+          "start_byte": 119078
+        },
+        {
+          "end_byte": 122042,
+          "id": "lisa:maplib:evidence:dated-spatial-cache-source-tests-and-separate-failed-cohort",
+          "sha256": "64f353745039e302cbf703ccdc398b27a13846a0bf7f2fa33f0f9fabeed65308",
+          "start_byte": 120142
+        },
+        {
+          "end_byte": 122595,
+          "id": "lisa:maplib:evidence:dated-underlay-transfer-preparation-and-pending-native-proof",
+          "sha256": "9026824f7e02aa8216389cd0893de28b380d927a49cd930af2fc19005e371112",
+          "start_byte": 122042
+        }
+      ],
+      "path": "docs/README.md",
+      "record": "module-readme-frontmatter-and-title.json",
+      "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
+      "sha256": "41aad4ba7842237628b56fdd8c98fb529729e99b320d5084905c46fe5f08c5c2"
+    },
+    {
+      "blob": "275fbefd29df79d4b33584ccaf22d5aa35bd7e4d",
+      "bytes": 11671,
+      "id": "lisa:maplib:resource:sqlite-source-bridge",
+      "ordered_records_sha256": "513ee1899e956434c637bdfc196ad2c23a2dcce624edd9f3a9cd74239dc9683f",
+      "ordered_spans": [
+        {
+          "end_byte": 1355,
+          "id": "lisa:maplib:resource:sqlite-source-bridge",
+          "sha256": "419768fb38c9ea97571f3befd3a75b8391b08dbc35ef69756c32d80ce7920198",
+          "start_byte": 0
+        },
+        {
+          "end_byte": 2826,
+          "id": "lisa:maplib:contract:sqlite-source-provider-diagnostics",
+          "sha256": "4f527fc636b040cf66d9f301083b1f0ca95dfca552f7de4ca92c2133f1734bab",
+          "start_byte": 1355
+        },
+        {
+          "end_byte": 3379,
+          "id": "lisa:maplib:evidence:sqlite-source-same-id-history",
+          "sha256": "2939fad4ba7193e8a435e388f0cb915cf8a84f457c8e74333ddb3464a252942b",
+          "start_byte": 2826
+        },
+        {
+          "end_byte": 4074,
+          "id": "lisa:maplib:contract:sqlite-source-logical-and-native-identities",
+          "sha256": "122aacbec9bc2adb424c43b78ca129fbc34f9f6c5dcb4c80b68b718c7af42a88",
+          "start_byte": 3379
+        },
+        {
+          "end_byte": 4858,
+          "id": "lisa:maplib:contract:sqlite-source-initial-layer-binding",
+          "sha256": "313d41a2cbaf832638227b811d9a2690b729ca1ccdfc5eea349c5a132808a9aa",
+          "start_byte": 4074
+        },
+        {
+          "end_byte": 5392,
+          "id": "lisa:maplib:contract:sqlite-source-classic-detach",
+          "sha256": "cc89d453638d401aadcdb4a6fec1b23f2ce65f24a643a836aeaf659c2501349a",
+          "start_byte": 4858
+        },
+        {
+          "end_byte": 5907,
+          "id": "lisa:maplib:contract:sqlite-source-construction-snapshot",
+          "sha256": "e8b3fe27ffeb693d81edd41adb0fa27816cad46ac8f242f441c56a388e4eff1e",
+          "start_byte": 5392
+        },
+        {
+          "end_byte": 6465,
+          "id": "lisa:maplib:contract:sqlite-source-ui-detach",
+          "sha256": "bcae9fbc2c3166b57b4626d1749accf000205258a45ea589722610708cbe8c21",
+          "start_byte": 5907
+        },
+        {
+          "end_byte": 7857,
+          "id": "lisa:maplib:contract:sqlite-source-project-retirement",
+          "sha256": "1dae535375b8f9593d55e92b16c79282c566b5d4d63a64a1745f7c3ef32a46e0",
+          "start_byte": 6465
+        },
+        {
+          "end_byte": 9006,
+          "id": "lisa:maplib:contract:sqlite-source-edit-mask",
+          "sha256": "136f0a9be91c88b98f5c2805251d5625fef04ecb230f91596d8970ab4f42c06a",
+          "start_byte": 7857
+        },
+        {
+          "end_byte": 9589,
+          "id": "lisa:maplib:contract:sqlite-source-worker-ownership",
+          "sha256": "8bf227acbf0091173a09cc25cecd1faa3ee1ff130c915fa270acd6db83f12aa9",
+          "start_byte": 9006
+        },
+        {
+          "end_byte": 10174,
+          "id": "lisa:maplib:contract:sqlite-source-retry-cancellation",
+          "sha256": "660f405edca0b8e2e85e2823797c5bfddedd5ab372ae6e894a08b373ce7662e6",
+          "start_byte": 9589
+        },
+        {
+          "end_byte": 10660,
+          "id": "lisa:maplib:risk:sqlite-source-native-acceptance-limits",
+          "sha256": "7b5fc6125f1971f161880eaf5ab776ac64b276d9006d6fc7ac7ca8f7ab7dec40",
+          "start_byte": 10174
+        },
+        {
+          "end_byte": 11366,
+          "id": "lisa:maplib:resource:sqlite-source-upstream-witnesses",
+          "sha256": "ff3980cae781076f082afbeb55e60e8cfdce1f2ba1e19377409f22a4ed7c7011",
+          "start_byte": 10660
+        },
+        {
+          "end_byte": 11671,
+          "id": "lisa:maplib:contract:sqlite-source-build-profile",
+          "sha256": "af5827797fa1691fce19e4fd070be23dbc3c17875805e6c430c735d290bd2a80",
+          "start_byte": 11366
+        }
+      ],
+      "path": "docs/sqlite-vector-source-bridge.md",
+      "record": "sqlite-source-bridge.json",
+      "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
+      "sha256": "201a6f44e863c1b205c486984424391e3766f46accf9dcb73da6a480f1ee8b57"
+    },
+    {
+      "blob": "3755f84cd2d196c9e572a7b92df17740cea577d9",
+      "bytes": 4527,
+      "id": "lisa:maplib:resource:sqlite-tile-buffer",
+      "ordered_records_sha256": "b720a94db558f56f977b2d42541718ac55464a6cf457d9ba38a94ecd1b11d599",
+      "ordered_spans": [
+        {
+          "end_byte": 1461,
+          "id": "lisa:maplib:resource:sqlite-tile-buffer",
+          "sha256": "319274c417be67c47564ebe63c0357e348baf7e3d7b179c64934bfa6bdbba2a3",
+          "start_byte": 0
+        },
+        {
+          "end_byte": 2010,
+          "id": "lisa:maplib:evidence:sqlite-tile-64px-history",
+          "sha256": "d76de16ad423a3923cf1b6414e7ba368088e4c796a51d1e75dac5b466dca040a",
+          "start_byte": 1461
+        },
+        {
+          "end_byte": 2567,
+          "id": "lisa:maplib:contract:sqlite-tile-shared-128px-envelope",
+          "sha256": "2aba79be99a2857118fd9cbd44b38a3574f357022912e1ee68ea5a2b49bab8b7",
+          "start_byte": 2010
+        },
+        {
+          "end_byte": 3660,
+          "id": "lisa:maplib:contract:sqlite-tile-buffer-technical-oracles",
+          "sha256": "187caa5cb861869f4af6b51e4dda5fd65f5a3ddb3291cfd57cc71c80ffe13996",
+          "start_byte": 2567
+        },
+        {
+          "end_byte": 4527,
+          "id": "lisa:maplib:risk:sqlite-tile-style-reach-acceptance",
+          "sha256": "50ae3d5b02c329810d2b4073eb0c64c804d2d1aeefda2f63d5431775dc72dd92",
+          "start_byte": 3660
+        }
+      ],
+      "path": "docs/sqlite-vector-tile-buffer.md",
+      "record": "sqlite-tile-buffer.json",
+      "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
+      "sha256": "8189d59de7c826bd92127b78cd6c003632a19269906dad271ec08f0ba1d7e595"
+    },
+    {
+      "applies_to": [
+        "."
+      ],
+      "blob": "eae7e7ad5f50ef32b410fd12c31b91fbc907807e",
+      "bytes": 3798,
+      "id": "lisa:maplib:resource:maplib-knowledge-home",
+      "ordered_records_sha256": "3aaeb2a3cb2587470fa9521413ad09a644587c6d57f3f04577ceedf2c893d5a1",
+      "ordered_spans": [
+        {
+          "end_byte": 1031,
+          "id": "lisa:maplib:resource:maplib-knowledge-home",
+          "sha256": "e61e6d4d5ec667ff4bd7af3c8e6cf3638374bc8c86c361029a632f79451b7d41",
+          "start_byte": 0
+        },
+        {
+          "end_byte": 2144,
+          "id": "lisa:maplib:resource:maplib-knowledge-authoring",
+          "sha256": "5f25e65e36a64a7bad7f9b9c6f1ad1188a7c47b80400f573368a5512708eb1a5",
+          "start_byte": 1031
+        },
+        {
+          "end_byte": 3798,
+          "id": "lisa:maplib:resource:maplib-knowledge-layout",
+          "sha256": "6e8139b7f04d9f0910bbb5663f05123eaa8252a406e9db7828831e047a8d2359",
+          "start_byte": 2144
+        }
+      ],
+      "path": "agent-system/README.md",
+      "record": "maplib-knowledge-home.json",
+      "revision": "ab4b41b9ab7dfb8dbccacab52a626cf11151f1f5",
+      "sha256": "696ea40cfd6e73ce8b8102b047e0dbe8bcf88fb2dfffbe4f4446b21ece5fe38b"
+    }
+  ]
+}

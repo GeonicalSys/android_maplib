@@ -1,0 +1,96 @@
+{
+  "schema_version": 2,
+  "id": "lisa:maplib:question:migration.layer-identify-pack-wording",
+  "kind": "question",
+  "owner": "android_projects/android_gisapp/maplib",
+  "topic": "knowledge-pack-review",
+  "status": "historical",
+  "execution_permission": false,
+  "applicability": {
+    "review_status": "reviewed",
+    "paths": [
+      {
+        "repository": "android_projects/android_gisapp/maplib",
+        "include": [
+          "."
+        ],
+        "exclude": []
+      }
+    ],
+    "scope_refs": [],
+    "conditions": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "lifecycle": {
+    "goal": "complete",
+    "implementation": "not_applicable",
+    "source_verification": "PASS",
+    "merge": "not_applicable",
+    "runtime_verification": "NOT_RUN",
+    "release": "not_applicable",
+    "retention": "Retain both original documentary assertions and the exact source-version resolution. Device behavior is outside this source review."
+  },
+  "facets": {
+    "title": {
+      "role": "question",
+      "value": "Conflicting hidden-layer identify descriptions in one mandatory local pack"
+    },
+    "observation": {
+      "role": "source_migration_question_not_product_defect",
+      "value": "The complete mandatory maplib README says hidden layers are excluded regardless of former render mode. The exact LayerIdentifyPolicy manifest responsibility says hidden local-vector-tile layers are included while hidden classic layers are excluded. These two source descriptions conflict. No product source or runtime behavior was audited or changed to resolve them in this instruction migration."
+    },
+    "next_step": {
+      "role": "bounded_migration_question",
+      "value": "During substantive migration of this local pack, preserve both exact source claims and reconcile their source/version applicability using the already owning UI/source contract and actual code. Keep the question UNKNOWN until that review; do not regenerate expectations, silently select a claim or resume product/native testing."
+    },
+    "protected": {
+      "role": "protected_behavior",
+      "value": "Preserve original sources, product identities and current client instructions; source text is not proof of runtime behavior. No dependency-gap audit, product fix, native/GUI/device, merge, publication or unmerged app adoption authorized."
+    },
+    "source_witnesses": {
+      "role": "exact_individually_reviewed_sources",
+      "value": [
+        {
+          "path": "docs/README.md",
+          "revision": "7152e3cd403f9020cebcf752b8299538a85136c1",
+          "blob": "1b9e458b3fc563398fb657d85000f8b9c2c4e152",
+          "sha256_utf8_lf": "41aad4ba7842237628b56fdd8c98fb529729e99b320d5084905c46fe5f08c5c2",
+          "address": {
+            "span": [
+              60849,
+              61001
+            ]
+          },
+          "value": "- Выключенный слой отсутствует в identify: это текущая visible-only policy,\n  независимо от старого render mode; список атрибутов не включается скрыто.\n"
+        },
+        {
+          "path": "docs/manifest.yaml",
+          "revision": "7152e3cd403f9020cebcf752b8299538a85136c1",
+          "blob": "b713fa79c5fdd0e20649015f03fe34b29df43728",
+          "sha256_utf8_lf": "6c52f116009ad4e8753c79e3661ef1073ba538e42e94c2e7a14fde97c1a14b9b",
+          "address": {
+            "pointer": "/key_components/156/responsibility"
+          },
+          "value": "Include hidden local-vector-tile layers in local attribute identification while continuing to exclude hidden classic layers."
+        }
+      ]
+    },
+    "resolution": {
+      "role": "source_version_review",
+      "value": {
+        "review": "agent-system/migration/identify-source-version-review.json",
+        "historical_policy_commit": "8b39e8b583bffe25c1c1ce06390d2ea255ea8610",
+        "replacement_commit": "803decb97348659bbc5dcf194b008fbbf976a058",
+        "summary": "Manifest responsibility describes a previous source rule. The README agrees with the current implementation and the App's exact pinned library source.",
+        "runtime_verification": "NOT_RUN"
+      }
+    }
+  },
+  "relations": [],
+  "provenance": {
+    "manifest": "agent-system/migration/pack-review.json",
+    "scopes": [
+      "layer-identify-pack-wording"
+    ]
+  }
+}
