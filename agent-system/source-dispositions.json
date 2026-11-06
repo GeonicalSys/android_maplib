@@ -55,6 +55,44 @@
         "docs/manifest.yaml"
       ],
       "reason": "Individually verified historical and current source witnesses for identify visibility. Runtime acceptance remains open."
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "046f49325a61f67f6dedfbd5070c74024097e6412c8f695d584abf686ab534c4",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "reason": "Keep the maplib repository's LGPL version 3 license text at its published Git address.",
+      "applies_to": [
+        "LICENSE",
+        "README.md"
+      ]
+    },
+    {
+      "path": "src/main/cpp/README.md",
+      "sha256": "b0aa4c253b01a73ad2629cb765685f2cbca597071f080ce571e31da21f54141e",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "reason": "Retain the recorded QuickJS archive version and checksum, interpreter linkage boundary, JNI UTF-8 contract and native update checks with the vendored source.",
+      "applies_to": [
+        "src/main/cpp/README.md",
+        "src/main/cpp/CMakeLists.txt",
+        "src/main/cpp/script_engine.c",
+        "src/main/cpp/quickjs",
+        "docs/README.md"
+      ]
+    },
+    {
+      "path": "src/main/cpp/quickjs/LICENSE",
+      "sha256": "598fd7fc928e4350abce36e337ba5a1346923c5c692f5be92c3d8e29ddd7c18d",
+      "sha256_scope": "utf8_lf",
+      "category": "retained_evidence",
+      "reason": "Retain the vendored QuickJS license text and copyright notices beside the interpreter sources linked by maplib.",
+      "applies_to": [
+        "src/main/cpp/quickjs/LICENSE",
+        "src/main/cpp/quickjs",
+        "src/main/cpp/CMakeLists.txt",
+        "src/main/cpp/README.md"
+      ]
     }
   ]
 }
