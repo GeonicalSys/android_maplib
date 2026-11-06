@@ -12,16 +12,6 @@
       "reason": "Individually authored complete original AGENTS Git/source/character and logical-unit inverse map, including the within-line historical/lasting boundary; retain provenance without active-prose or deletion authority."
     },
     {
-      "path": "agent-system/README.md",
-      "sha256": "696ea40cfd6e73ce8b8102b047e0dbe8bcf88fb2dfffbe4f4446b21ece5fe38b",
-      "sha256_scope": "utf8_lf",
-      "category": "working_bridge",
-      "applies_to": [
-        "."
-      ],
-      "reason": "Reviewed physical owner, stable identity, complete source projection, shared compiler/live-basis limits, existing client authority, dependency delivery and entire remaining six-owner scope; no product permission or acceptance."
-    },
-    {
       "path": "agent-system/migration/pack-review.json",
       "sha256": "04e0b808874cf1c1d0d3668ded513b45d9da90e773cca6e6e37e60f63733a18f",
       "sha256_scope": "utf8_lf",
@@ -43,14 +33,15 @@
     },
     {
       "path": "agent-system/provenance/documentation.json",
-      "sha256": "5ce79c307e900163d179661e0f7e439f6fd85cc977ff4ee7de18f12a8bd2fd41",
+      "sha256": "7c93cf171d3fa3e55faf0faf82f3d123cff810ee68d5db15ae8057741322f3f0",
       "sha256_scope": "utf8_lf",
       "category": "retained_evidence",
       "applies_to": [
         "docs/sqlite-vector-source-bridge.md",
         "docs/sqlite-vector-tile-buffer.md",
         "README.md",
-        "docs/README.md"
+        "docs/README.md",
+        "agent-system/README.md"
       ],
       "reason": "Exact original Git objects, reviewed Markdown byte spans and ordered record fingerprints."
     },

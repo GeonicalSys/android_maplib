@@ -967,6 +967,39 @@
       "record": "sqlite-tile-buffer.json",
       "revision": "f2ec1fc3491fc56f22abba6f6fd8f219059f384c",
       "sha256": "8189d59de7c826bd92127b78cd6c003632a19269906dad271ec08f0ba1d7e595"
+    },
+    {
+      "applies_to": [
+        "."
+      ],
+      "blob": "eae7e7ad5f50ef32b410fd12c31b91fbc907807e",
+      "bytes": 3798,
+      "id": "lisa:maplib:resource:maplib-knowledge-home",
+      "ordered_records_sha256": "3aaeb2a3cb2587470fa9521413ad09a644587c6d57f3f04577ceedf2c893d5a1",
+      "ordered_spans": [
+        {
+          "end_byte": 1031,
+          "id": "lisa:maplib:resource:maplib-knowledge-home",
+          "sha256": "e61e6d4d5ec667ff4bd7af3c8e6cf3638374bc8c86c361029a632f79451b7d41",
+          "start_byte": 0
+        },
+        {
+          "end_byte": 2144,
+          "id": "lisa:maplib:resource:maplib-knowledge-authoring",
+          "sha256": "5f25e65e36a64a7bad7f9b9c6f1ad1188a7c47b80400f573368a5512708eb1a5",
+          "start_byte": 1031
+        },
+        {
+          "end_byte": 3798,
+          "id": "lisa:maplib:resource:maplib-knowledge-layout",
+          "sha256": "6e8139b7f04d9f0910bbb5663f05123eaa8252a406e9db7828831e047a8d2359",
+          "start_byte": 2144
+        }
+      ],
+      "path": "agent-system/README.md",
+      "record": "maplib-knowledge-home.json",
+      "revision": "ab4b41b9ab7dfb8dbccacab52a626cf11151f1f5",
+      "sha256": "696ea40cfd6e73ce8b8102b047e0dbe8bcf88fb2dfffbe4f4446b21ece5fe38b"
     }
   ]
 }
