@@ -10,6 +10,35 @@ import java.util.Map;
 import static org.junit.Assert.*;
 
 public class MapRuntimeDiagnosticsTest {
+    @Test public void startupWatcherRecordsNestedPhaseAndRestoresEnclosingOperation() {
+        Fake fake = new Fake();
+        MapRuntimeDiagnostics.Engine engine = new MapRuntimeDiagnostics.Engine(fake);
+        MapRuntimeDiagnostics.Trace startup = engine.beginStartup();
+        startup.phase("gis_application_load");
+        try (MapRuntimeDiagnostics.StartupStep parse =
+                     engine.startupStep(MapRuntimeDiagnostics.StartupPhase.LAYER_CONFIG_PARSE)) {
+            fake.advance(20);
+            try (MapRuntimeDiagnostics.StartupStep rows =
+                         engine.startupStep(MapRuntimeDiagnostics.StartupPhase.SQLITE_ROW_COUNT)) {
+                fake.advance(1200);
+                fake.checks.get(0).run();
+                Map<?, ?> observed = (Map<?, ?>) fake.saved.get("startup");
+                assertEquals("sqlite_row_count", observed.get("phase"));
+                Map<?, ?> phases = (Map<?, ?>) observed.get("stage_ms");
+                assertEquals(20L, phases.get("layer_config_parse"));
+                assertEquals(1200L, phases.get("sqlite_row_count"));
+            }
+            assertEquals("layer_config_parse", startup.snapshot().get("phase"));
+        }
+        assertEquals("gis_application_load", startup.snapshot().get("phase"));
+        startup.finish(0, null);
+        try (MapRuntimeDiagnostics.StartupStep ignored =
+                     engine.startupStep(MapRuntimeDiagnostics.StartupPhase.MAPLIBRE_INITIALIZATION)) {
+            assertEquals("finished", startup.snapshot().get("phase"));
+        }
+        assertEquals(1, fake.checks.size());
+    }
+
     @Test public void sqliteInlineAndPfdCountsStayBoundedNumericWithoutMemoryReads() {
         Fake fake=new Fake();MapRuntimeDiagnostics.Engine engine=new MapRuntimeDiagnostics.Engine(fake);
         MapRuntimeDiagnostics.SqliteScope scope=engine.beginSqlite(8,12,"sqlite_native");

@@ -481,9 +481,9 @@ public class LayerGroup
         }
     }
 
-    public List<ILayer> getLayers(){
+    /** Returns an ordered snapshot of the group's direct children. */
+    public synchronized List<ILayer> getLayers() {
         return new ArrayList<>(mLayers.values());
-        //return mLayers.values().;
     }
 
 
@@ -496,8 +496,10 @@ public class LayerGroup
     public void addLayer(ILayer layer)
     {
         if (layer != null) {
-            mLayers.put(layer.getId(), layer);
-            layer.setParent(this);
+            synchronized (this) {
+                mLayers.put(layer.getId(), layer);
+                layer.setParent(this);
+            }
             onLayerAdded(layer);
         }
     }
@@ -506,11 +508,24 @@ public class LayerGroup
             int index,
             ILayer layer) {
         if (layer != null) {
-            putAtIndex(mLayers, index, layer.getId(), layer);
-            //mLayers.add(index, layer);
-            layer.setParent(this);
+            synchronized (this) {
+                putAtIndex(mLayers, index, layer.getId(), layer);
+                layer.setParent(this);
+            }
             onLayerAdded(layer);
         }
+    }
+
+    /** Moves a child to the current position of another child in this group. */
+    public void moveLayer(ILayer layer, ILayer target) {
+        synchronized (this) {
+            int targetIndex = indexOfLayer(mLayers, target);
+            if (targetIndex < 0 || layer == target || indexOfLayer(mLayers, layer) < 0) {
+                return;
+            }
+            moveLayer(mLayers, layer, targetIndex);
+        }
+        onLayersReordered();
     }
 
     public void moveLayer(
@@ -778,12 +793,14 @@ public class LayerGroup
 
     public void clearLayers()
     {
-        for (ILayer layer : mLayers.values()) {
+        for (ILayer layer : getLayers()) {
             if (layer instanceof LayerGroup) {
                 ((LayerGroup) layer).clearLayers();
             }
         }
-        mLayers.clear();
+        synchronized (this) {
+            mLayers.clear();
+        }
     }
 
 
@@ -891,16 +908,16 @@ public class LayerGroup
 
     protected void onLayerDeleted(int id)
     {
-        if (mLayers.get(id) != null) {
-            mLayers.remove(id);
-            return;
-        }
+        synchronized (this) {
+            if (mLayers.remove(id) != null) {
+                return;
+            }
 
-        for (ILayer layer : mLayers.values()) {
-
-            if (layer.getId() == id) {
-                mLayers.remove(layer);
-                break;
+            for (ILayer layer : mLayers.values()) {
+                if (layer.getId() == id) {
+                    mLayers.remove(layer);
+                    break;
+                }
             }
         }
 

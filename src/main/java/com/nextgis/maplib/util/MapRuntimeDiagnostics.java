@@ -33,7 +33,28 @@ public final class MapRuntimeDiagnostics {
         ENGINE.configure(version, build, revision);
     }
     /** Observe startup on the existing independent watcher, without moving GIS work or reading it. */
-    public static Trace beginStartup() { return ENGINE.begin("startup", now()); }
+    public static Trace beginStartup() { return ENGINE.beginStartup(); }
+
+    public enum StartupPhase {
+        MAPLIBRE_INITIALIZATION("maplibre_initialization"),
+        LAYER_CONFIG_READ("layer_config_read"),
+        LAYER_CONFIG_PARSE("layer_config_parse"),
+        SQLITE_ROW_COUNT("sqlite_row_count");
+
+        private final String label;
+        StartupPhase(String label) { this.label = label; }
+    }
+
+    public interface StartupStep extends AutoCloseable {
+        @Override void close();
+    }
+
+    private static final StartupStep NO_STARTUP_STEP = () -> {};
+
+    /** Refines the active startup trace on its owner thread, without starting another watcher. */
+    public static StartupStep startupStep(StartupPhase phase) {
+        return ENGINE.startupStep(phase);
+    }
     public static long now() { return ENGINE.adapter.now(); }
     public static long nextRequestId() { return ENGINE.nextId.incrementAndGet(); }
     public static Trace beginQuery(String target, Integer mode) {
@@ -263,6 +284,16 @@ public final class MapRuntimeDiagnostics {
             timings.put(phase, timings.getOrDefault(phase, 0L) + Math.max(0, now - phaseStart));
             phase = next; phaseStart = now;
         }
+        synchronized StartupStep startupStep(StartupPhase next) {
+            if (finished) return NO_STARTUP_STEP;
+            String enclosing = phase;
+            phase(next.label);
+            return () -> {
+                synchronized (this) {
+                    if (!finished) phase(enclosing);
+                }
+            };
+        }
         public synchronized void featureRead() { readCount++; }
         public void finish(int count, String error) {
             synchronized (this) {
@@ -274,6 +305,7 @@ public final class MapRuntimeDiagnostics {
             }
             if (watch != null) watch.cancel();
             engine.active.remove(id);
+            if ("startup".equals(kind) && engine.startup.get() == this) engine.startup.remove();
             if (engine.adapter.now() - start >= SLOW_MS || error != null)
                 engine.adapter.execute(() -> engine.record(this, error == null ? "slow_finished" : "failed"));
         }
@@ -299,6 +331,7 @@ public final class MapRuntimeDiagnostics {
         final Adapter adapter;
         final AtomicLong nextId = new AtomicLong();
         final Map<Long, Trace> active = new ConcurrentHashMap<>();
+        private final ThreadLocal<Trace> startup = new ThreadLocal<>();
         private final Map<String, Counter> limits = new LinkedHashMap<>();
         private final Map<String, Object> identity = new LinkedHashMap<>();
         private volatile Map<String, Object> lastQuery, lastTile, lastStartup, previousProcess;
@@ -436,6 +469,17 @@ public final class MapRuntimeDiagnostics {
             Map<String, Object> last;
             SqliteLayerState(int layerId) { this.layerId = layerId; }
         }
+        Trace beginStartup() {
+            Trace trace = begin("startup", adapter.now());
+            startup.set(trace);
+            return trace;
+        }
+
+        StartupStep startupStep(StartupPhase next) {
+            Trace trace = startup.get();
+            return trace == null ? NO_STARTUP_STEP : trace.startupStep(next);
+        }
+
         Trace begin(String kind, long start) { return begin(kind, start, nextId.incrementAndGet()); }
         synchronized void recordSource(long id, Map<String, Object> data) {
             sourceObservations.put(id, new LinkedHashMap<>(data));

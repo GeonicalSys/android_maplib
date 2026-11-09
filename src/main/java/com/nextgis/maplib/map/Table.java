@@ -32,6 +32,7 @@ import com.nextgis.maplib.api.IJSONStore;
 import com.nextgis.maplib.api.ILayer;
 import com.nextgis.maplib.datasource.GeoEnvelope;
 import com.nextgis.maplib.util.FileUtil;
+import com.nextgis.maplib.util.MapRuntimeDiagnostics;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -177,10 +178,16 @@ public class Table implements ILayer, IJSONStore {
     public boolean load()
     {
         try {
-            byte[] serialized = new AtomicFile(getFileName()).readFully();
-            JSONObject jsonObject = new JSONObject(
-                    new String(serialized, StandardCharsets.UTF_8));
-            fromJSON(jsonObject);
+            byte[] serialized;
+            try (MapRuntimeDiagnostics.StartupStep ignored =
+                         MapRuntimeDiagnostics.startupStep(MapRuntimeDiagnostics.StartupPhase.LAYER_CONFIG_READ)) {
+                serialized = new AtomicFile(getFileName()).readFully();
+            }
+            try (MapRuntimeDiagnostics.StartupStep ignored =
+                         MapRuntimeDiagnostics.startupStep(MapRuntimeDiagnostics.StartupPhase.LAYER_CONFIG_PARSE)) {
+                JSONObject jsonObject = new JSONObject(new String(serialized, StandardCharsets.UTF_8));
+                fromJSON(jsonObject);
+            }
         } catch (JSONException | IOException | SQLiteException e) {
             e.printStackTrace();
             return false;

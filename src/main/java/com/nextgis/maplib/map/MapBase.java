@@ -108,7 +108,7 @@ public class MapBase
     public boolean delete(boolean keepTrack)
     {
         ILayer trackLayer = null;
-        for (ILayer layer : mLayers.values()) {
+        for (ILayer layer : getLayers()) {
             if (!(layer instanceof TrackLayer)) {
                 layer.setParent(null);
                 layer.delete(true);
@@ -118,9 +118,12 @@ public class MapBase
         }
 
 
-        mLayers.clear();
-        if (keepTrack && mLayers != null)
-            mLayers.put(trackLayer.getId(), trackLayer);
+        synchronized (this) {
+            mLayers.clear();
+            if (keepTrack && trackLayer != null) {
+                mLayers.put(trackLayer.getId(), trackLayer);
+            }
+        }
 
         return FileUtil.deleteRecursive(getFileName());
     }

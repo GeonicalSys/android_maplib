@@ -2819,6 +2819,7 @@ public class MapDrawable
     public void setGeometryTransformEnabled(boolean enabled) {
         geometryTransformEnabled = enabled;
         geometryTransformGesture.reset();
+        if ((enabled || editingObject != null) && !areEditSourcesReadyForCurrentStyle()) return;
         if (enabled) { hideVertex(); hideMarker(); }
         else if (editingObject != null) { showVertex(); showMarker(); }
     }
@@ -3703,17 +3704,21 @@ public class MapDrawable
         }
     }
 
-    public void  cancelFeatureEdit(boolean backToOriginal){
+    public void cancelFeatureEdit(boolean backToOriginal) {
         unselectFeatureFromEdit(backToOriginal, false);
+        if (!areEditSourcesReadyForCurrentStyle()) {
+            markerFeatureCollection = FeatureCollection.fromFeatures(emptyList());
+            return;
+        }
+
         hideMarker();
+        Style style = maplibreMap.get().getStyle();
+        if (style.getLayer("selected-polygon-fill") != null)
+            style.removeLayer(fillPolyEditLayer);
 
-        Layer layer = maplibreMap.get().getStyle().getLayer("selected-polygon-fill");
-        if (layer != null)
-            maplibreMap.get().getStyle().removeLayer(fillPolyEditLayer);
-
-
-        if (originalSelectedFeature!= null && originalSelectedFeature.getId() != -1)
-            startFeatureSelectionForView(mapContext.get().getSelectedLayer(), originalSelectedFeature );
+        MaplibreMapInteraction host = mapContext.get();
+        if (host != null && originalSelectedFeature != null && originalSelectedFeature.getId() != -1)
+            startFeatureSelectionForView(host.getSelectedLayer(), originalSelectedFeature);
     }
 
     public void unselectFeatureFromView(){
@@ -3750,6 +3755,18 @@ public class MapDrawable
 
     public void unselectFeatureFromEdit(boolean backToOriginal, boolean keepEditObj) {
         setGeometryTransformEnabled(false);
+        if (!keepEditObj && !areEditSourcesReadyForCurrentStyle()) {
+            if (sqliteEditingLayerId != null) {
+                restoreSqliteEditingModelVisibility(sqliteEditingLayerId);
+                sqliteEditingLayerId = null;
+                polygonFeatures.clear();
+            }
+            hasEditeometry = false;
+            editingObject = null;
+            editingFeatureOriginal = null;
+            editingFeature = null;
+            return;
+        }
         if (editingObject != null && editingObject.editingFeature != null) {
             if (backToOriginal) {
                 copyProperties(editingFeatureOriginal, editingObject.editingFeature);
@@ -5424,25 +5441,27 @@ public class MapDrawable
 
     }
 
-    public void stoptMeasuring(){
-        hideMarker();
-        hideVertex();
-        //selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
-        selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
+    public void stoptMeasuring() {
+        if (areEditSourcesReadyForCurrentStyle()) {
+            hideMarker();
+            hideVertex();
+            selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(emptyList()));
+        } else {
+            markerFeatureCollection = FeatureCollection.fromFeatures(emptyList());
+        }
         editingObject = null;
         editingFeature = null;
-
     }
 
-    public void startMeasuring(){
-        if (editingObject != null)
-            editingObject = null;
+    public void startMeasuring() {
+        MapLibreMap map = maplibreMap.get();
+        if (map == null || !areEditSourcesReadyForCurrentStyle()) return;
+        org.maplibre.android.camera.CameraPosition camera = map.getCameraPosition();
+        LatLng center = camera == null ? null : camera.target;
+        if (center == null) return;
 
-        if (originalSelectedFeature != null)
-            originalSelectedFeature = null;
-
-
-        LatLng center = maplibreMap.get().getCameraPosition().target;
+        editingObject = null;
+        originalSelectedFeature = null;
         List<org.maplibre.geojson.Point> lineList = new ArrayList<>();
         lineList.add(Point.fromLngLat(center.getLongitude(), center.getLatitude()));
         setMeasurementPoints(lineList);
