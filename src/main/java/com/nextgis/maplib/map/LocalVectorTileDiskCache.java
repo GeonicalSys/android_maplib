@@ -124,11 +124,11 @@ final class LocalVectorTileDiskCache {
                     }
                     index.clear();
                     index.initialized = true;
-                    index.directoryStamp = root.lastModified();
+                    index.directoryStamp = files.directoryStamp(root);
                 }
                 // The private namespace has only same-process writers. OS cache deletion can
                 // overestimate a ledger until dirty/pressure reconciliation, never add bytes.
-                if (!index.initialized || index.directoryStamp != root.lastModified()) {
+                if (!index.initialized || index.directoryStamp != files.directoryStamp(root)) {
                     if (!inventory(index, maxBytes, current)) return;
                 }
                 if (!trim(index, maxBytes, MAX_FILES, current)) return;
@@ -145,7 +145,7 @@ final class LocalVectorTileDiskCache {
                             return;
                         }
                         index.remove(target.getName());
-                        index.directoryStamp = root.lastModified();
+                        index.directoryStamp = files.directoryStamp(root);
                     } else {
                         // Reconcile this one duplicate before enforcing a reduced byte budget.
                         index.add(new Entry(target, existing.size(),
@@ -171,7 +171,7 @@ final class LocalVectorTileDiskCache {
                         else index.initialized = false;
                     }
                 }
-                index.directoryStamp = root.lastModified();
+                index.directoryStamp = files.directoryStamp(root);
             } catch (IOException | SecurityException | DirectoryIteratorException unavailable) {
                 index.initialized = false;
                 // Cache failure never removes authoritative data or rejects the built tile.
@@ -181,7 +181,7 @@ final class LocalVectorTileDiskCache {
                         if (temporary.exists() && !files.delete(temporary))
                             android.util.Log.w("LocalVectorTiles", "Could not finalize an owned cache intermediate");
                         // Only our excluded .part file changed the directory after reconciliation.
-                        if (index.initialized) index.directoryStamp = root.lastModified();
+                        if (index.initialized) index.directoryStamp = files.directoryStamp(root);
                     } catch (SecurityException unavailable) { index.initialized = false; }
                 }
             }
@@ -221,7 +221,7 @@ final class LocalVectorTileDiskCache {
                 if (!trim(index, maxBytes, MAX_FILES, current)) return false;
             }
         }
-        index.directoryStamp = root.lastModified();
+        index.directoryStamp = files.directoryStamp(root);
         index.initialized = true;
         return true;
     }
@@ -239,7 +239,7 @@ final class LocalVectorTileDiskCache {
                 return false;
             }
             index.remove(entry.file.getName());
-            index.directoryStamp = root.lastModified();
+            index.directoryStamp = files.directoryStamp(root);
         }
         return true;
     }
@@ -321,6 +321,7 @@ final class LocalVectorTileDiskCache {
         }
         boolean publish(File temporary, File target) { return temporary.renameTo(target); }
         boolean delete(File file) { return file.delete(); }
+        long directoryStamp(File directory) { return directory.lastModified(); }
         long nowMillis() { return System.currentTimeMillis(); }
     }
 }

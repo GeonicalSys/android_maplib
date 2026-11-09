@@ -240,7 +240,9 @@ exact Simple/Field Rule renderers и standard effective styles, без data scan
 
 Clipper сохраняет multipart/holes/disconnected pieces, не добавляя simplification
 или чтения geom_zoom. Polygon label использует прежний classic anchor до clip
-и один half-open owner tile. Main geometry/inline polygon anchors имеют
+и один half-open owner tile. Соседние тайлы вычисляют общую границу по одному
+индексу ребра. Проверка на zoom 1, 12 и 13 декодирует четыре тайла и требует
+ровно один anchor с исходным FID. Main geometry/inline polygon anchors имеют
 `features` source layer, `_label_anchor` выделяет label points. Line labels
 читают viewport originals; `loadOriginalFeature`/`readOriginalFeature` дают
 полную DB/styled geometry редактору. ORDER=FID стабилен между tiles. Host

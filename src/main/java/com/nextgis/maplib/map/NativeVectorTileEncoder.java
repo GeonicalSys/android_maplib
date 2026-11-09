@@ -70,7 +70,10 @@ public final class NativeVectorTileEncoder {
             double span = MERCATOR_MAX * 2 / (1L << request.getZ());
             double left = -MERCATOR_MAX + request.getX() * span;
             double top = MERCATOR_MAX - request.getY() * span;
-            return new Bounds(left, top - span, left + span, top);
+            // Compute both sides of a shared edge from the same index to avoid gaps or overlaps.
+            double right = -MERCATOR_MAX + (request.getX() + 1) * span;
+            double bottom = MERCATOR_MAX - (request.getY() + 1) * span;
+            return new Bounds(left, bottom, right, top);
         }
         double queryMinX() { return minX - (maxX - minX) * CLASSIC_BUFFER_RATIO; }
         double queryMaxX() { return maxX + (maxX - minX) * CLASSIC_BUFFER_RATIO; }
