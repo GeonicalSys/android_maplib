@@ -240,7 +240,9 @@ exact Simple/Field Rule renderers и standard effective styles, без data scan
 
 Clipper сохраняет multipart/holes/disconnected pieces, не добавляя simplification
 или чтения geom_zoom. Polygon label использует прежний classic anchor до clip
-и один half-open owner tile. Main geometry/inline polygon anchors имеют
+и один half-open owner tile. Соседние тайлы вычисляют общую границу по одному
+индексу ребра. Проверка на zoom 1, 12 и 13 декодирует четыре тайла и требует
+ровно один anchor с исходным FID. Main geometry/inline polygon anchors имеют
 `features` source layer, `_label_anchor` выделяет label points. Line labels
 читают viewport originals; `loadOriginalFeature`/`readOriginalFeature` дают
 полную DB/styled geometry редактору. ORDER=FID стабилен между tiles. Host
@@ -366,6 +368,9 @@ TrackColorPalette назначает насыщенный цвет один ра
 ## Штриховки, контуры и живой образец
 
 PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые обычные стили остаются на прямом SQLite source. Контракт — consuming docs/architecture/polygon-style-controls.md.
+
+Переключение видимости находит заливку, контур, штриховку, значок и подписи
+по их ID в текущем стиле. Группы вариантов контура переключаются вместе.
 
 `PatternTilePeriod` уменьшает исходную512×512ARGB решётку только при точном
 совпадении повторяемого прямоугольного мотива во всех пикселях. Сохраняются
@@ -875,6 +880,12 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
 - Crash `No Vulkan compatible GPU found` означает возврат generic
   `org.maplibre.gl:android-sdk` либо Vulkan-артефакта; production использует
   `android-sdk-opengl` и не должен инициализировать Vulkan surface.
+- Список слоёв читает упорядоченный снимок прямых детей через `LayerGroup.getLayers()`.
+  Снимок создаётся под тем же монитором, что и изменение состава группы.
+  Перетаскивание разрешает позицию по целевому слою под этим монитором,
+  поэтому фоновая вставка не сдвигает цель на соседний слой.
+- Отмена редактирования при пересоздании карты очищает модель и восстанавливает
+  видимость объекта SQLite. К слою выделения обращается готовый стиль.
 - Rule-based подписи игнорируют зум/opacity/scale: проверить, что слойные
   дефолты взяты из «прочих», props после merge, и SymbolLayer min/max сброшены;
   только отсутствующие ключи наследуются из other; явно заданные false/255/default сохраняются.
@@ -1074,6 +1085,9 @@ startup/query/tile записи вместе ограничены 16 KiB с уд
 Новых зависимостей на app/maplibui, чтения GIS из watchdog и изменений тайлов нет.
 Unit checks покрывают blocked startup, late ANR после перезаписи файла и размер
 общего journal; native consuming-app check использует настоящий SDK AnrV2Hint.
+Во время старта журнал различает инициализацию MapLibre, чтение и разбор
+конфигурации слоя, а также запрос количества строк SQLite. Вложенная операция
+возвращает прежнюю стадию. Текущую стадию и длительность читает существующий наблюдатель.
 
 
 ## Учёт доработок

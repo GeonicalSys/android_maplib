@@ -127,18 +127,33 @@ public class SqliteVectorTileProviderTest {
         GeoPolygon polygon=NativeVectorTileClipperTest.polygon(-1000000,-1000000,1000000,-1000000,
                 1000000,1000000,-1000000,1000000,-1000000,-1000000);
         String before=polygon.toWKT(true);source.add(42,polygon);
-        SqliteVectorTileProvider provider=new SqliteVectorTileProvider(source,1,()->1,null);int labels=0;
-        for(int x=0;x<2;x++)for(int y=0;y<2;y++){
-            for(NativeVectorTileEncoderTest.Record record:NativeVectorTileEncoderTest.decode(provider.load(provider.snapshot(1,x,y),()->true)).records){
-                assertEquals(42,record.id);
-                if(record.type==1){labels++;assertEquals(1,x);assertEquals(1,y);
-                    assertEquals(true,record.properties.get("_label_anchor"));assertEquals("label",record.properties.get(MplFeatureStyleProps.SIGNATURE));
-                    assertFalse(record.properties.containsKey(MplFeatureStyleProps.COLOR_FILL_RULE));
-                }else{assertEquals(3,record.type);assertFalse(record.properties.containsKey(MplFeatureStyleProps.SIGNATURE));
-                    assertEquals("#112233",record.properties.get(MplFeatureStyleProps.COLOR_FILL_RULE));}
+        SqliteVectorTileProvider provider = new SqliteVectorTileProvider(source, 1, () -> 1, null);
+        for (int zoom : new int[]{1, 12, 13}) {
+            int seam = 1 << (zoom - 1);
+            int labels = 0;
+            for (int x = seam - 1; x <= seam; x++) {
+                for (int y = seam - 1; y <= seam; y++) {
+                    byte[] bytes = provider.load(provider.snapshot(zoom, x, y), () -> true);
+                    for (NativeVectorTileEncoderTest.Record record : NativeVectorTileEncoderTest.decode(bytes).records) {
+                        assertEquals(42, record.id);
+                        if (record.type == 1) {
+                            labels++;
+                            assertEquals("Owner column at zoom " + zoom, seam, x);
+                            assertEquals("Owner row at zoom " + zoom, seam, y);
+                            assertEquals(true, record.properties.get("_label_anchor"));
+                            assertEquals("label", record.properties.get(MplFeatureStyleProps.SIGNATURE));
+                            assertFalse(record.properties.containsKey(MplFeatureStyleProps.COLOR_FILL_RULE));
+                        } else {
+                            assertEquals(3, record.type);
+                            assertFalse(record.properties.containsKey(MplFeatureStyleProps.SIGNATURE));
+                            assertEquals("#112233", record.properties.get(MplFeatureStyleProps.COLOR_FILL_RULE));
+                        }
+                    }
+                }
             }
+            assertEquals("Exactly one label at zoom " + zoom, 1, labels);
         }
-        assertEquals(1,labels);assertEquals(before,polygon.toWKT(true));
+        assertEquals(before, polygon.toWKT(true));
     }
 
     static final class Fake implements SqliteVectorTileProvider.Access {

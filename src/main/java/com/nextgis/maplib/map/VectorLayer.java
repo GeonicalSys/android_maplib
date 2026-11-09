@@ -76,6 +76,7 @@ import com.nextgis.maplib.display.Style;
 import com.nextgis.maplib.util.AttachItem;
 import com.hypertrack.hyperlog.HyperLog;
 import com.nextgis.maplib.util.Constants;
+import com.nextgis.maplib.util.MapRuntimeDiagnostics;
 import com.nextgis.maplib.util.DatabaseContext;
 import com.nextgis.maplib.util.FeatureAttachments;
 import com.nextgis.maplib.util.FeatureChanges;
@@ -2973,10 +2974,11 @@ public class VectorLayer
      * Number of rows in the layer data table, or -1 if the table is missing or the query fails.
      */
     public int getSqliteTableRowCount() {
-        if (!hasLocalDataTable()) {
-            return -1;
-        }
-        try {
+        try (MapRuntimeDiagnostics.StartupStep ignored =
+                     MapRuntimeDiagnostics.startupStep(MapRuntimeDiagnostics.StartupPhase.SQLITE_ROW_COUNT)) {
+            if (!hasLocalDataTable()) {
+                return -1;
+            }
             SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, true);
             try (Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + mPath.getName(), null)) {
                 return c.moveToFirst() ? c.getInt(0) : 0;

@@ -63,7 +63,10 @@ public class LocalVectorTileDiskCacheTest {
     @Test public void hotWritesAndNewProvidersDoNotRepeatTheInventoryOrStatOldEntries() throws Exception {
         File app = folder.newFolder(); File root = root(app); assertTrue(root.mkdir());
         for (int i = 0; i < 128; i++) Files.write(tile(root, i).toPath(), new byte[4]);
-        CountingFiles io = new CountingFiles();
+        CountingFiles io = new CountingFiles() {
+            // Keep the same-process write counter independent of deferred NTFS directory timestamps.
+            @Override long directoryStamp(File directory) { return 0L; }
+        };
         new LocalVectorTileDiskCache(app, io).put(rawKey(1000), new byte[4], 65536);
         assertEquals(1, io.inventories);
         int metadataAfterInventory = io.metadata;

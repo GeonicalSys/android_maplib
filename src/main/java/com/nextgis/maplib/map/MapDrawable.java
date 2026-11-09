@@ -2819,6 +2819,7 @@ public class MapDrawable
     public void setGeometryTransformEnabled(boolean enabled) {
         geometryTransformEnabled = enabled;
         geometryTransformGesture.reset();
+        if ((enabled || editingObject != null) && !areEditSourcesReadyForCurrentStyle()) return;
         if (enabled) { hideVertex(); hideMarker(); }
         else if (editingObject != null) { showVertex(); showMarker(); }
     }
@@ -3703,17 +3704,21 @@ public class MapDrawable
         }
     }
 
-    public void  cancelFeatureEdit(boolean backToOriginal){
+    public void cancelFeatureEdit(boolean backToOriginal) {
         unselectFeatureFromEdit(backToOriginal, false);
+        if (!areEditSourcesReadyForCurrentStyle()) {
+            markerFeatureCollection = FeatureCollection.fromFeatures(emptyList());
+            return;
+        }
+
         hideMarker();
+        Style style = maplibreMap.get().getStyle();
+        if (style.getLayer("selected-polygon-fill") != null)
+            style.removeLayer(fillPolyEditLayer);
 
-        Layer layer = maplibreMap.get().getStyle().getLayer("selected-polygon-fill");
-        if (layer != null)
-            maplibreMap.get().getStyle().removeLayer(fillPolyEditLayer);
-
-
-        if (originalSelectedFeature!= null && originalSelectedFeature.getId() != -1)
-            startFeatureSelectionForView(mapContext.get().getSelectedLayer(), originalSelectedFeature );
+        MaplibreMapInteraction host = mapContext.get();
+        if (host != null && originalSelectedFeature != null && originalSelectedFeature.getId() != -1)
+            startFeatureSelectionForView(host.getSelectedLayer(), originalSelectedFeature);
     }
 
     public void unselectFeatureFromView(){
@@ -3750,6 +3755,18 @@ public class MapDrawable
 
     public void unselectFeatureFromEdit(boolean backToOriginal, boolean keepEditObj) {
         setGeometryTransformEnabled(false);
+        if (!keepEditObj && !areEditSourcesReadyForCurrentStyle()) {
+            if (sqliteEditingLayerId != null) {
+                restoreSqliteEditingModelVisibility(sqliteEditingLayerId);
+                sqliteEditingLayerId = null;
+                polygonFeatures.clear();
+            }
+            hasEditeometry = false;
+            editingObject = null;
+            editingFeatureOriginal = null;
+            editingFeature = null;
+            return;
+        }
         if (editingObject != null && editingObject.editingFeature != null) {
             if (backToOriginal) {
                 copyProperties(editingFeatureOriginal, editingObject.editingFeature);
@@ -4618,8 +4635,10 @@ public class MapDrawable
 
 
 
-        public void checkLayerVisibility(int id){
-        if (maplibreMap.get() == null || maplibreMap.get().getStyle() == null)
+    public void checkLayerVisibility(int id) {
+        MapLibreMap map = maplibreMap.get();
+        Style liveStyle = map == null ? null : map.getStyle();
+        if (liveStyle == null)
             return;
 
         ILayer targetlayer = getVectorLayersById(this,  id);
@@ -4632,27 +4651,14 @@ public class MapDrawable
             if(geometry==GTLineString || geometry==GTMultiLineString)mVisibleLineLabels.requestRefresh();
         }
         String geometryId = namePrefix + layer_namepart + id;
+        String nativeVisibility = isVisible ? VISIBLE : NONE;
+        // The current style owns these layers even when it was rebound outside the handle caches.
         for (String baseId : new String[]{geometryId, geometryId + outline_namepart, geometryId + pattern_namepart,
-                geometryId + MARKER_ICON_LAYER_SUFFIX, "symbol-" + geometryId})
-            RuleLabelLayouts.visibility(maplibreMap.get().getStyle(), baseId, isVisible ? VISIBLE : NONE);
-
-        Layer layer = layersHashMap.get(id);
-        if (layer != null)
-            layer.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
-        Layer layer2 = layersHashMap2.get(id);
-        if (layer2 != null)
-            layer2.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
-        Layer layerPattern = maplibreMap.get().getStyle().getLayer(
-                namePrefix + layer_namepart + id + pattern_namepart);
-        if (layerPattern != null)
-            layerPattern.setProperties(visibility(isVisible ? VISIBLE : NONE));
-
-        Layer layerMarkerIcon = maplibreMap.get().getStyle().getLayer(
-                namePrefix + layer_namepart + id + MARKER_ICON_LAYER_SUFFIX);
-        if (layerMarkerIcon != null)
-            layerMarkerIcon.setProperties(visibility(isVisible ? VISIBLE : NONE));
+                geometryId + MARKER_ICON_LAYER_SUFFIX, "symbol-" + geometryId}) {
+            Layer liveLayer = liveStyle.getLayer(baseId);
+            if (liveLayer != null) liveLayer.setProperties(visibility(nativeVisibility));
+            RuleLabelLayouts.visibility(liveStyle, baseId, nativeVisibility);
+        }
 
         List<Layer> layerLineDashList = layersHashMapLineDash.get(id);
         if (layerLineDashList != null) {
@@ -4661,13 +4667,7 @@ public class MapDrawable
             }
         }
 
-        Layer layerSymbol = symbolsLayerHashMap.get(id);
-        if (layerSymbol != null)
-            layerSymbol.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
-
         if (targetlayer instanceof VectorLayer) {
-            Style liveStyle = maplibreMap.get().getStyle();
             String mainLayerId = namePrefix + layer_namepart + id;
             boolean sourcePresent = liveStyle.getSource(getVectorRenderSourceId(targetlayer.getId())) != null;
             boolean renderLayerPresent = liveStyle.getLayer(mainLayerId) != null
@@ -4697,13 +4697,13 @@ public class MapDrawable
 
         if (targetlayer instanceof NGWRasterLayer || targetlayer instanceof  RemoteTMSLayer ||
                 targetlayer instanceof  LocalTMSLayer){
-            Layer layerRaster = getRasterLayer(id,  maplibreMap.get().getStyle());
+            Layer layerRaster = getRasterLayer(id, liveStyle);
             if (layerRaster != null){
                 layerRaster.setProperties(visibility(isVisible ? VISIBLE:NONE));
             }
         }
         if (targetlayer instanceof TrackLayer ){
-            TrackMapStyle.visibility(maplibreMap.get().getStyle(), isVisible);
+            TrackMapStyle.visibility(liveStyle, isVisible);
         }
     }
 
@@ -5424,25 +5424,27 @@ public class MapDrawable
 
     }
 
-    public void stoptMeasuring(){
-        hideMarker();
-        hideVertex();
-        //selectedEditedSource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
-        selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(new ArrayList<>()));
+    public void stoptMeasuring() {
+        if (areEditSourcesReadyForCurrentStyle()) {
+            hideMarker();
+            hideVertex();
+            selectedPolySource.setGeoJson(FeatureCollection.fromFeatures(emptyList()));
+        } else {
+            markerFeatureCollection = FeatureCollection.fromFeatures(emptyList());
+        }
         editingObject = null;
         editingFeature = null;
-
     }
 
-    public void startMeasuring(){
-        if (editingObject != null)
-            editingObject = null;
+    public void startMeasuring() {
+        MapLibreMap map = maplibreMap.get();
+        if (map == null || !areEditSourcesReadyForCurrentStyle()) return;
+        org.maplibre.android.camera.CameraPosition camera = map.getCameraPosition();
+        LatLng center = camera == null ? null : camera.target;
+        if (center == null) return;
 
-        if (originalSelectedFeature != null)
-            originalSelectedFeature = null;
-
-
-        LatLng center = maplibreMap.get().getCameraPosition().target;
+        editingObject = null;
+        originalSelectedFeature = null;
         List<org.maplibre.geojson.Point> lineList = new ArrayList<>();
         lineList.add(Point.fromLngLat(center.getLongitude(), center.getLatitude()));
         setMeasurementPoints(lineList);
