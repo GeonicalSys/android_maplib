@@ -4635,8 +4635,10 @@ public class MapDrawable
 
 
 
-        public void checkLayerVisibility(int id){
-        if (maplibreMap.get() == null || maplibreMap.get().getStyle() == null)
+    public void checkLayerVisibility(int id) {
+        MapLibreMap map = maplibreMap.get();
+        Style liveStyle = map == null ? null : map.getStyle();
+        if (liveStyle == null)
             return;
 
         ILayer targetlayer = getVectorLayersById(this,  id);
@@ -4649,27 +4651,14 @@ public class MapDrawable
             if(geometry==GTLineString || geometry==GTMultiLineString)mVisibleLineLabels.requestRefresh();
         }
         String geometryId = namePrefix + layer_namepart + id;
+        String nativeVisibility = isVisible ? VISIBLE : NONE;
+        // The current style owns these layers even when it was rebound outside the handle caches.
         for (String baseId : new String[]{geometryId, geometryId + outline_namepart, geometryId + pattern_namepart,
-                geometryId + MARKER_ICON_LAYER_SUFFIX, "symbol-" + geometryId})
-            RuleLabelLayouts.visibility(maplibreMap.get().getStyle(), baseId, isVisible ? VISIBLE : NONE);
-
-        Layer layer = layersHashMap.get(id);
-        if (layer != null)
-            layer.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
-        Layer layer2 = layersHashMap2.get(id);
-        if (layer2 != null)
-            layer2.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
-        Layer layerPattern = maplibreMap.get().getStyle().getLayer(
-                namePrefix + layer_namepart + id + pattern_namepart);
-        if (layerPattern != null)
-            layerPattern.setProperties(visibility(isVisible ? VISIBLE : NONE));
-
-        Layer layerMarkerIcon = maplibreMap.get().getStyle().getLayer(
-                namePrefix + layer_namepart + id + MARKER_ICON_LAYER_SUFFIX);
-        if (layerMarkerIcon != null)
-            layerMarkerIcon.setProperties(visibility(isVisible ? VISIBLE : NONE));
+                geometryId + MARKER_ICON_LAYER_SUFFIX, "symbol-" + geometryId}) {
+            Layer liveLayer = liveStyle.getLayer(baseId);
+            if (liveLayer != null) liveLayer.setProperties(visibility(nativeVisibility));
+            RuleLabelLayouts.visibility(liveStyle, baseId, nativeVisibility);
+        }
 
         List<Layer> layerLineDashList = layersHashMapLineDash.get(id);
         if (layerLineDashList != null) {
@@ -4678,13 +4667,7 @@ public class MapDrawable
             }
         }
 
-        Layer layerSymbol = symbolsLayerHashMap.get(id);
-        if (layerSymbol != null)
-            layerSymbol.setProperties(visibility(isVisible ? VISIBLE:NONE));
-
-
         if (targetlayer instanceof VectorLayer) {
-            Style liveStyle = maplibreMap.get().getStyle();
             String mainLayerId = namePrefix + layer_namepart + id;
             boolean sourcePresent = liveStyle.getSource(getVectorRenderSourceId(targetlayer.getId())) != null;
             boolean renderLayerPresent = liveStyle.getLayer(mainLayerId) != null
@@ -4714,13 +4697,13 @@ public class MapDrawable
 
         if (targetlayer instanceof NGWRasterLayer || targetlayer instanceof  RemoteTMSLayer ||
                 targetlayer instanceof  LocalTMSLayer){
-            Layer layerRaster = getRasterLayer(id,  maplibreMap.get().getStyle());
+            Layer layerRaster = getRasterLayer(id, liveStyle);
             if (layerRaster != null){
                 layerRaster.setProperties(visibility(isVisible ? VISIBLE:NONE));
             }
         }
         if (targetlayer instanceof TrackLayer ){
-            TrackMapStyle.visibility(maplibreMap.get().getStyle(), isVisible);
+            TrackMapStyle.visibility(liveStyle, isVisible);
         }
     }
 

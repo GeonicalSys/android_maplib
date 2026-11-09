@@ -367,6 +367,9 @@ TrackColorPalette назначает насыщенный цвет один ра
 
 PolygonPatternOptions/PolygonOutlineOptions сохраняют необязательные параметры и explicit off. ConfigurablePolygonPatternRegistry строит бесшовные цветные текстуры с независимой alpha, LRU 4 MiB и native ownership. PolygonOutlineLayerFactory группирует константные dash/cap/join; новые обычные стили остаются на прямом SQLite source. Контракт — consuming docs/architecture/polygon-style-controls.md.
 
+Переключение видимости находит заливку, контур, штриховку, значок и подписи
+по их ID в текущем стиле. Группы вариантов контура переключаются вместе.
+
 `PatternTilePeriod` уменьшает исходную512×512ARGB решётку только при точном
 совпадении повторяемого прямоугольного мотива во всех пикселях. Сохраняются
 округление, плотность160, цвет/alpha, идентификаторы и владение изображениями;
