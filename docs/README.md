@@ -1,10 +1,13 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-11-02
+last_verified: 2026-11-10
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
+
+Текущая диагностическая версия Maplib: Release `3.1.2.32`, Debug `3.1.2.23`.
+Обе версии связаны с соответствующими вариантами потребляющего приложения.
 
 ## Класс NGW исправляется как metadata без refill — 1 ноября 2026
 

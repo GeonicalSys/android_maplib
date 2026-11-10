@@ -12,7 +12,7 @@
       "role": "module_manifest_definition",
       "value": {
         "path": "maplib/build.gradle",
-        "responsibility": "Keep release diagnostic VERSION_NAME 3.1.2.31 and debug VERSION_NAME 3.1.2.23 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.7.1 through the explicit OpenGL artifact without unsupported library build-type version DSL."
+        "responsibility": "Keep release diagnostic VERSION_NAME 3.1.2.32 and debug VERSION_NAME 3.1.2.23 coupled to their consuming application variants, provide the shared JTS topology runtime, and select MapLibre 13.7.1 through the explicit OpenGL artifact without unsupported library build-type version DSL."
       }
     },
     "manifest-field": {

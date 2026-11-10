@@ -21,6 +21,9 @@
       "value": [
         "",
         "# maplib — GIS model, storage, NGW и MapLibre",
+        "",
+        "Текущая диагностическая версия Maplib: Release `3.1.2.32`, Debug `3.1.2.23`.",
+        "Обе версии связаны с соответствующими вариантами потребляющего приложения.",
         ""
       ]
     },
@@ -29,7 +32,7 @@
       "value": [
         "title: maplib — GIS model, storage, NGW и MapLibre",
         "module_id: maplib",
-        "last_verified: 2026-11-02"
+        "last_verified: 2026-11-10"
       ]
     },
     "source-review": {
@@ -43,7 +46,7 @@
     "typed-frontmatter": {
       "role": "reviewed_frontmatter_values",
       "value": {
-        "last_verified": "2026-11-02",
+        "last_verified": "2026-11-10",
         "module_id": "maplib",
         "title": "maplib — GIS model, storage, NGW и MapLibre"
       }
