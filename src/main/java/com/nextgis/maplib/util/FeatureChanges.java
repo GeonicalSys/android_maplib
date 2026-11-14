@@ -40,6 +40,92 @@ import static com.nextgis.maplib.util.Constants.*;
 
 public class FeatureChanges
 {
+    /** Immutable identity of one queued mutation; numeric row IDs can be reused after a rebuild. */
+    public static final String OPERATION_UUID = "_operation_uuid";
+
+    private static String quotedTable(String table) { return "\"" + table.replace("\"", "\"\"") + "\""; }
+
+    public static boolean hasOperationIdentity(SQLiteDatabase db, String table) {
+        try (Cursor cursor = db.rawQuery("PRAGMA table_info(" + quotedTable(table) + ")", null)) {
+            while (cursor.moveToNext()) if (OPERATION_UUID.equals(cursor.getString(1))) return true;
+        }
+        return false;
+    }
+
+    public static void ensureOperationIdentity(SQLiteDatabase db, String table) {
+        if (!hasOperationIdentity(db, table))
+            db.execSQL("ALTER TABLE " + quotedTable(table) + " ADD COLUMN " + OPERATION_UUID + " TEXT");
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS " + quotedTable(table + "_operation_uuid_idx") + " ON "
+                + quotedTable(table) + "(" + OPERATION_UUID + ") WHERE " + OPERATION_UUID + " IS NOT NULL AND " + OPERATION_UUID + "<>''");
+    }
+
+    public static String operationId(SQLiteDatabase db, String table, long recordId) {
+        if (!hasOperationIdentity(db, table)) return null;
+        try (Cursor cursor = db.query(table, new String[]{OPERATION_UUID}, FIELD_ID + "=?",
+                new String[]{Long.toString(recordId)}, null, null, null)) {
+            return cursor.moveToFirst() && !cursor.isNull(0) ? cursor.getString(0) : null;
+        }
+    }
+
+    /** Used only inside the reservation transaction. A legacy creation remains uncertain. */
+    public static String bindOperationId(SQLiteDatabase db, String table, long recordId) {
+        if (!db.inTransaction()) throw new SQLiteException("Operation identity needs a transaction");
+        ensureOperationIdentity(db, table);
+        String existing = operationId(db, table, recordId);
+        if (existing != null && !existing.isEmpty()) return existing;
+        String identity = java.util.UUID.randomUUID().toString();
+        ContentValues values = new ContentValues(); values.put(OPERATION_UUID, identity);
+        if (db.update(table, values, FIELD_ID + "=? AND (" + OPERATION_UUID + " IS NULL OR " + OPERATION_UUID + "='')",
+                new String[]{Long.toString(recordId)}) != 1) throw new SQLiteException("Queued operation is missing");
+        return identity;
+    }
+
+    public static boolean matchesOperation(SQLiteDatabase db, String table, long recordId, String identity) {
+        return identity != null && identity.equals(operationId(db, table, recordId));
+    }
+
+    public static java.util.List<String> changedOperationIds(SQLiteDatabase db, String table, long featureId) {
+        java.util.List<Long> records = new java.util.ArrayList<>();
+        try (Cursor cursor = db.query(table, new String[]{FIELD_ID}, FIELD_FEATURE_ID + "=? AND ("
+                + FIELD_OPERATION + " & " + CHANGE_OPERATION_CHANGED + ")!=0 AND (" + FIELD_OPERATION
+                + " & " + CHANGE_OPERATION_ATTACH + ")=0", new String[]{Long.toString(featureId)}, null, null, null)) {
+            while (cursor.moveToNext()) records.add(cursor.getLong(0));
+        }
+        java.util.List<String> result = new java.util.ArrayList<>();
+        for (long record : records) result.add(bindOperationId(db, table, record));
+        return result;
+    }
+
+    public static void acknowledgeChangedOperations(SQLiteDatabase db, String table, long featureId,
+            java.util.List<String> identities) {
+        for (String identity : identities) db.delete(table, FIELD_FEATURE_ID + "=? AND " + OPERATION_UUID
+                + "=? AND (" + FIELD_OPERATION + " & " + CHANGE_OPERATION_CHANGED + ")!=0 AND ("
+                + FIELD_OPERATION + " & " + CHANGE_OPERATION_ATTACH + ")=0",
+                new String[]{Long.toString(featureId), identity});
+    }
+
+    public static java.util.List<String> changedAttachmentOperationIds(SQLiteDatabase db,String table,long featureId,long attachmentId) {
+        java.util.List<Long> records=new java.util.ArrayList<>();
+        try(Cursor cursor=db.query(table,new String[]{FIELD_ID},FIELD_FEATURE_ID+"=? AND "+FIELD_ATTACH_ID+"=? AND ("
+                +FIELD_OPERATION+" & "+CHANGE_OPERATION_ATTACH+")!=0 AND ("+FIELD_ATTACH_OPERATION+" & "+CHANGE_OPERATION_CHANGED+")!=0",
+                new String[]{Long.toString(featureId),Long.toString(attachmentId)},null,null,null)) {
+            while(cursor.moveToNext())records.add(cursor.getLong(0));
+        }
+        java.util.List<String> result=new java.util.ArrayList<>();
+        for(long record:records)result.add(bindOperationId(db,table,record));return result;
+    }
+
+    public static void acknowledgeChangedAttachments(SQLiteDatabase db,String table,long featureId,long attachmentId,
+            java.util.List<String> identities) {
+        for(String identity:identities)db.delete(table,FIELD_FEATURE_ID+"=? AND "+FIELD_ATTACH_ID+"=? AND "+OPERATION_UUID
+                +"=? AND ("+FIELD_OPERATION+" & "+CHANGE_OPERATION_ATTACH+")!=0 AND ("+FIELD_ATTACH_OPERATION+" & "+CHANGE_OPERATION_CHANGED+")!=0",
+                new String[]{Long.toString(featureId),Long.toString(attachmentId),identity});
+    }
+
+    public static int acknowledgeRecord(SQLiteDatabase db,String table,long record,String identity) {
+        if(identity==null)throw new SQLiteException("An acknowledgement needs an immutable operation identity");
+        return db.delete(table,FIELD_ID+"=? AND "+OPERATION_UUID+"=?",new String[]{Long.toString(record),identity});
+    }
     public static void initialize(String tableName)
     {
         initialize(((MapContentProviderHelper) MapBase.getInstance()).getDatabase(false), tableName);
@@ -55,13 +141,15 @@ public class FeatureChanges
         sqlCreateTable += FIELD_FEATURE_ID + " INTEGER, ";
         sqlCreateTable += FIELD_OPERATION + " INTEGER, ";
         sqlCreateTable += FIELD_ATTACH_ID + " INTEGER, ";
-        sqlCreateTable += FIELD_ATTACH_OPERATION + " INTEGER";
+        sqlCreateTable += FIELD_ATTACH_OPERATION + " INTEGER, ";
+        sqlCreateTable += OPERATION_UUID + " TEXT";
         sqlCreateTable += " );";
 
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "create the layer change table: " + sqlCreateTable);
 
         db.execSQL(sqlCreateTable);
+        ensureOperationIdentity(db, tableName);
     }
 
 
@@ -117,7 +205,11 @@ public class FeatureChanges
     public static long insert(SQLiteDatabase db, String tableName,
             ContentValues values)
     {
-        return db.insertOrThrow(tableName, null, values);
+        ensureOperationIdentity(db, tableName);
+        ContentValues queued = new ContentValues(values);
+        // An explicit null is retained when importing legacy queue data: it has no proven attempt identity.
+        if (!queued.containsKey(OPERATION_UUID)) queued.put(OPERATION_UUID, java.util.UUID.randomUUID().toString());
+        return db.insertOrThrow(tableName, null, queued);
     }
 
 
@@ -150,6 +242,15 @@ public class FeatureChanges
         }
 
         if (res > 0) {
+            // A later edit may reuse the same coalesced CHANGED row while its previous snapshot is
+            // in flight. Rotate its identity so that the previous ACK cannot consume the new edit.
+            if (((featureOperation & CHANGE_OPERATION_CHANGED) != 0 && (featureOperation & CHANGE_OPERATION_NEW) == 0)
+                    || ((featureOperation & CHANGE_OPERATION_ATTACH) != 0
+                    && (attachOperation & CHANGE_OPERATION_CHANGED) != 0 && (attachOperation & CHANGE_OPERATION_NEW) == 0)) {
+                ensureOperationIdentity(db, tableName);
+                ContentValues next = new ContentValues(); next.put(OPERATION_UUID, java.util.UUID.randomUUID().toString());
+                db.update(tableName, next, selection, null);
+            }
             return res;
         }
 

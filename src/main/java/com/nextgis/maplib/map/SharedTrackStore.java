@@ -166,6 +166,7 @@ public final class SharedTrackStore {
 
     /** One transaction includes history, lost acknowledgements, durable tail and the completion marker. */
     public synchronized void migrateWorkspace(File workspace) throws IOException {
+        if (com.nextgis.maplib.util.ProjectRecoveryGuard.isRecoveryCopy(workspace)) return;
         String source = sourceKey(workspace);
         if (source.equals(sourceKey(directory))) return;
         SQLiteDatabase target = getDatabase(false);

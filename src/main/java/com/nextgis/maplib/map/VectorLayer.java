@@ -1794,7 +1794,8 @@ public class VectorLayer
 
     public Uri insert(Uri uri, ContentValues contentValues) {
         int type = mUriMatcher.match(uri);
-        if (type != TYPE_TABLE && uri.getQueryParameter(
+        boolean syncAttachment = this instanceof NGWVectorLayer && (type == TYPE_ATTACH || type == TYPE_ATTACH_ID);
+        if (type != TYPE_TABLE && !syncAttachment && uri.getQueryParameter(
                 com.nextgis.maplib.util.FeatureSaveJournal.URI_PARAMETER) == null)
             return insertInTransaction(uri, contentValues);
         return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
@@ -2327,7 +2328,8 @@ public class VectorLayer
 
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
         int type = mUriMatcher.match(uri);
-        if (type != TYPE_TABLE && type != TYPE_FEATURE)
+        boolean syncAttachment = this instanceof NGWVectorLayer && (type == TYPE_ATTACH || type == TYPE_ATTACH_ID);
+        if (type != TYPE_TABLE && type != TYPE_FEATURE && !syncAttachment)
             return updateInTransaction(uri, values, selection, selectionArgs);
         return com.nextgis.maplib.util.LayerDatabaseTransaction.run(
                 DatabaseContext.getDatabaseForLayer(this, false),

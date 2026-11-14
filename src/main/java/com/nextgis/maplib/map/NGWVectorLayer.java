@@ -174,6 +174,13 @@ public class NGWVectorLayer
     private static final int NGW_SYNC_INVALID_FEATURE_LOG_LIMIT = 20;
     private transient boolean mDeferTransientPullFailureAccounting;
     private transient boolean mLastSyncHadTransientPullFailure;
+    private static final class QueuedMutation {
+        final com.nextgis.maplib.util.UploadOperationJournal.Entry receipt;
+        int httpStatus = -1;
+        boolean finalRequestStarted, attachmentImplementationEntered;
+        QueuedMutation(com.nextgis.maplib.util.UploadOperationJournal.Entry receipt) { this.receipt = receipt; }
+    }
+    private final ThreadLocal<QueuedMutation> mQueuedMutation = new ThreadLocal<>();
 
     private static final class FeaturePushResult {
         final boolean success;
@@ -186,10 +193,6 @@ public class NGWVectorLayer
 
         static FeaturePushResult failed() {
             return new FeaturePushResult(false, Constants.NOT_FOUND);
-        }
-
-        static FeaturePushResult handledWithoutRemoteId() {
-            return new FeaturePushResult(true, Constants.NOT_FOUND);
         }
 
         static FeaturePushResult success(long remoteFeatureId) {
@@ -542,6 +545,23 @@ public class NGWVectorLayer
         // do nothing
     }
 
+
+    @Override
+    public long getUniqId() {
+        long candidate = super.getUniqId();
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        long reserved = com.nextgis.maplib.util.UploadOperationJournal.lastLocalFeatureId(db, mPath.getName());
+        // A missing feature still owns its queued ID. Reusing it would give its receipt a different row.
+        try (Cursor table = db.rawQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                new String[]{getChangeTableName()})) {
+            if (table.moveToFirst()) try (Cursor cursor = db.rawQuery("SELECT max(" + FIELD_FEATURE_ID + ") FROM \""
+                    + getChangeTableName().replace("\"", "\"\"") + "\"", null)) {
+                if (cursor.moveToFirst() && !cursor.isNull(0)) reserved = Math.max(reserved, cursor.getLong(0));
+            }
+        }
+        if (reserved == Long.MAX_VALUE) throw new SQLiteException("Local feature identifiers are exhausted");
+        return Math.max(candidate, reserved + 1);
+    }
 
     @Override
     protected long insertInternal(ContentValues contentValues)
@@ -969,6 +989,8 @@ public class NGWVectorLayer
             List<Field> fields)
             throws SQLiteException
     {
+        if (com.nextgis.maplib.util.ProjectRecoveryGuard.isSyncBlocked(this))
+            throw new SQLiteException("Restored project requires reconciliation before replacing NGW data");
         if (mNgwVersionMajor < Constants.NGW_v3 && geometryType < 4
                 && mNGWLayerType == Connection.NGWResourceTypeVectorLayer) {
             // to multi
@@ -1123,6 +1145,10 @@ public class NGWVectorLayer
             Pair<Integer, Integer> ver,
             SyncResult syncResult)
     {
+        if (com.nextgis.maplib.util.ProjectRecoveryGuard.isSyncBlocked(this)) {
+            syncResult.stats.numConflictDetectedExceptions++;
+            return;
+        }
         mLastSyncHadTransientPullFailure = false;
 
         Log.d("SSYNC", "sync of " + getName());
@@ -1267,6 +1293,10 @@ public class NGWVectorLayer
 
     public boolean sendLocalChanges(SyncResult syncResult)
     {
+        if (com.nextgis.maplib.util.ProjectRecoveryGuard.isSyncBlocked(this)) {
+            syncResult.stats.numConflictDetectedExceptions++;
+            return false;
+        }
         try (NgwSyncIo.OutboundWrite ignored = NgwSyncIo.beginOutboundWrite()) {
             return sendLocalChangesInternal(syncResult);
         }
@@ -1277,6 +1307,10 @@ public class NGWVectorLayer
         HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " sendLocalChanges START" );
 
         String changeTableName = getChangeTableName();
+        if (DatabaseContext.getDatabaseForLayer(this, false).inTransaction()) {
+            syncResult.databaseError = true;
+            return false;
+        }
         long changesCount = FeatureChanges.getChangeCount(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
         if (Constants.DEBUG_MODE) {
             Log.d(Constants.TAG, "sendLocalChanges: " + changesCount);
@@ -1295,6 +1329,7 @@ public class NGWVectorLayer
 
         try {
             NgwSyncIo.checkInterrupted();
+            FeatureChanges.ensureOperationIdentity(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
             // get column's IDs, there is at least one entry
             Cursor changeCursor = FeatureChanges.getFirstChangeFromRecordId(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, 0);
             changeCursor.moveToFirst();
@@ -1341,111 +1376,34 @@ public class NGWVectorLayer
 
                 long lastChangeRecordId = FeatureChanges.getLastChangeRecordId(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
 
-                if (0 == (changeOperation & Constants.CHANGE_OPERATION_ATTACH)) {
-
-                    if (0 != (changeOperation & Constants.CHANGE_OPERATION_DELETE)) {
-                        if (deleteFeatureOnServer(changeFeatureId, syncResult)) {
-                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
-                        } else {
-                            isError = true;
-                            if (Constants.DEBUG_MODE) {
-                                Log.d(Constants.TAG, "proceed deleteFeatureOnServer() failed");
-                            }
-                        }
-
-                    } else if (0 != (changeOperation & Constants.CHANGE_OPERATION_NEW)) {
-                        HyperLog.v(Constants.TAG, "NGWVectorLayer: feature add start featureID = "  + changeFeatureId );
-
-                        FeaturePushResult pushResult =
-                                addFeatureOnServer(changeFeatureId, syncResult, accountData);
-                        if (pushResult.success) {
-                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
-                            FeatureChanges.removeChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeFeatureId,
-                                    Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
-                            if (!NgwSyncIo.isCancellationRequested()) {
-                                refreshFeatureFromServerAfterPush(
-                                        pushResult.remoteFeatureId, accountData, "addFeature");
-                            }
-                        } else {
-                            HyperLog.v(Constants.TAG, "NGWVectorLayer: feature add FAILED featureID = "  + changeFeatureId );
-
-                            isError = true;
-                            if (Constants.DEBUG_MODE) {
-                                Log.d(Constants.TAG, "proceed addFeatureOnServer() failed");
-                            }
-                        }
-
-                    } else if (0 != (changeOperation & Constants.CHANGE_OPERATION_CHANGED)) {
-                        HyperLog.v(Constants.TAG, "NGWVectorLayer: feature change start featureID = "  + changeFeatureId );
-
-                        if (changeFeatureOnServer(changeFeatureId, syncResult, accountData)) {
-                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
-                            FeatureChanges.removeChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeFeatureId,
-                                    Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
-                            if (!NgwSyncIo.isCancellationRequested()) {
-                                refreshFeatureFromServerAfterPush(
-                                        changeFeatureId, accountData, "changeFeature");
-                            }
-                        } else {
-                            HyperLog.v(Constants.TAG, "NGWVectorLayer: feature change FAILED featureID = "  + changeFeatureId );
-
-                            isError = true;
-                            if (Constants.DEBUG_MODE) {
-                                Log.d(Constants.TAG, "proceed changeFeatureOnServer() failed");
-                            }
-                        }
-                    }
+                SQLiteDatabase uploadDb = DatabaseContext.getDatabaseForLayer(this, false);
+                boolean creating = (changeOperation & Constants.CHANGE_OPERATION_ATTACH) == 0
+                        && (changeOperation & Constants.CHANGE_OPERATION_NEW) != 0
+                        && (changeOperation & Constants.CHANGE_OPERATION_DELETE) == 0;
+                if (com.nextgis.maplib.util.FeatureSaveJournal.isUploadHeld(uploadDb, mPath.getName(), changeFeatureId)
+                        || !creating && (com.nextgis.maplib.util.UploadOperationJournal.blocksFeature(
+                                uploadDb, mPath.getName(), changeTableName, changeFeatureId)
+                        || FeatureChanges.isChanges(uploadDb, changeTableName, changeFeatureId, Constants.CHANGE_OPERATION_NEW))) {
+                    isError = true;
+                    continue;
                 }
 
-                //process attachments
-                else { // 0 != (changeOperation & CHANGE_OPERATION_ATTACH)
-
-                    if (changeAttachOperation == Constants.CHANGE_OPERATION_DELETE) {
-                        HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttacheDelete start");
-
-                        if (deleteAttachOnServer(changeFeatureId, changeAttachId, syncResult)) {
-                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
-                        } else {
-                            HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttacheDelete FAILED");
-                            isError = true;
-                            if (Constants.DEBUG_MODE) {
-                                Log.d(Constants.TAG, "proceed deleteAttachOnServer() failed");
-                            }
-                        }
-
-                    } else if (changeAttachOperation == Constants.CHANGE_OPERATION_NEW) {
-                        HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachNew start with Fid =" + changeFeatureId + " attachId= "+ changeAttachId);
-
-                        if (sendAttachOnServer(changeFeatureId, changeAttachId, true, syncResult)) {
-
-                            FeatureChanges.removeChangeRecord(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, changeRecordId);
-                            FeatureChanges.removeAttachChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
-                                    changeFeatureId, changeAttachId,
-                                    Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
-                        } else {
-                            HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachNew FAILED");
-
-                            isError = true;
-                            if (Constants.DEBUG_MODE) {
-                                Log.d(Constants.TAG, "proceed sendAttachOnServer() failed");
-                            }
-                        }
-
-                    } else if (changeAttachOperation == Constants.CHANGE_OPERATION_CHANGED) {
-                        HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachChange start with Fid =" + changeFeatureId + " attachId= "+ changeAttachId);
-
-                        if (changeAttachOnServer(changeFeatureId, changeAttachId, syncResult)) {
-                            FeatureChanges.removeAttachChangesToLast(DatabaseContext.getDatabaseForLayer(this, false), changeTableName,
-                                    changeFeatureId, changeAttachId,
-                                    Constants.CHANGE_OPERATION_CHANGED, lastChangeRecordId);
-                        } else {
-                            HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachChange FAILED");
-                            isError = true;
-                            if (Constants.DEBUG_MODE) {
-                                Log.d(Constants.TAG, "proceed changeAttachOnServer() failed");
-                            }
-                        }
-                    }
+                if (creating) {
+                    FeaturePushResult pushed = addFeatureOnServer(changeFeatureId, syncResult, accountData,
+                            changeRecordId, lastChangeRecordId);
+                    if (pushed.success && !NgwSyncIo.isCancellationRequested())
+                        refreshFeatureFromServerAfterPush(pushed.remoteFeatureId, accountData, "addFeature");
+                    if (!pushed.success) isError = true;
+                } else {
+                    boolean attachment = (changeOperation & Constants.CHANGE_OPERATION_ATTACH) != 0;
+                    String operation = attachment
+                            ? changeAttachOperation == Constants.CHANGE_OPERATION_NEW ? "attachment_create"
+                            : changeAttachOperation == Constants.CHANGE_OPERATION_CHANGED ? "attachment_update"
+                            : changeAttachOperation == Constants.CHANGE_OPERATION_DELETE ? "attachment_delete" : null
+                            : (changeOperation & Constants.CHANGE_OPERATION_DELETE) != 0 ? "delete"
+                            : (changeOperation & Constants.CHANGE_OPERATION_CHANGED) != 0 ? "update" : null;
+                    if (operation == null || !sendQueuedMutation(operation, changeFeatureId, changeAttachId,
+                            changeRecordId, lastChangeRecordId, accountData, syncResult)) isError = true;
                 }
                 sent++;
                 NgwSyncProgress.reportPush(sent, pushTotal);
@@ -1470,6 +1428,7 @@ public class NGWVectorLayer
         } catch (SQLiteException e) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " SQLiteException " + e.getMessage());
             isError = true;
+            syncResult.databaseError = true;
             syncResult.stats.numConflictDetectedExceptions++;
             if (Constants.DEBUG_MODE) {
                 Log.d(Constants.TAG, "proceed sendLocalChanges() failed");
@@ -1483,58 +1442,25 @@ public class NGWVectorLayer
                     + " pendingChanges=" + FeatureChanges.getChangeCount(DatabaseContext.getDatabaseForLayer(this, false), changeTableName));
         }
 
-        return !isError;
+        return !isError && FeatureChanges.getChangeCount(DatabaseContext.getDatabaseForLayer(this, false), changeTableName) == 0;
     }
 
 
-    private boolean changeAttachOnServer(
-            long featureId,
-            long attachId,
-            SyncResult syncResult)
-    {
-        if (!mNet.isNetworkAvailable()) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: changeAttachOnServer !mNet.isNetworkAvailable()");
-            SyncResultUtil.markNetworkUnavailable(syncResult);
-            return false;
-        }
-
-        AttachItem attach = getAttach("" + featureId, "" + attachId);
-        if (null == attach) {   // just remove buggy item
-            return true;
-        }
-
+    private boolean changeAttachOnServer(long featureId,long attachId,SyncResult syncResult) {
+        if(!mNet.isNetworkAvailable()) {SyncResultUtil.markNetworkUnavailable(syncResult);return false;}
         try {
-            JSONObject putData = new JSONObject();
-            //putData.put(JSON_ID_KEY, attach.getAttachId());
-            putData.put(Constants.JSON_NAME_KEY, attach.getDisplayName());
-            //putData.put("mime_type", attach.getMimetype());
-            putData.put("description", attach.getDescription());
-
-            HttpResponse response = changeAttachOnServer(featureId, attachId, putData.toString());
-
-            if (!response.isOk()) {
-                reportSyncHttpFailure("changeAttach", featureId, attachId, syncResult, response);
-                return false;
-            }
-
+            QueuedMutation mutation=mQueuedMutation.get();
+            AttachItem attach=mutation==null?getAttach(Long.toString(featureId),Long.toString(attachId))
+                    :com.nextgis.maplib.util.UploadAttachmentRemap.submitted(mutation.receipt);
+            if(attach==null) {syncResult.databaseError=true;return false;}
+            JSONObject body=new JSONObject().put(Constants.JSON_NAME_KEY,attach.getDisplayName()).put("description",attach.getDescription());
+            HttpResponse response=changeAttachOnServer(featureId,attachId,body.toString());
+            if(!response.isOk()) {reportSyncHttpFailure("changeAttach",featureId,attachId,syncResult,response);return false;}
             return true;
-        } catch (JSONException e) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: JSONException " + e.getMessage());
-            log(e, "changeAttachOnServer JSONException");
-            syncResult.stats.numParseExceptions++;
-            return false;
-        } catch (IOException e) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: IOException " + e.getMessage());
-            log(e, "changeAttachOnServer IOException");
-            SyncResultUtil.markConnectFailed(syncResult);
-            syncResult.stats.numUpdates++;
-            return false;
-        } catch (IllegalStateException e) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: IllegalStateException " + e.getMessage());
-            log(e, "changeAttachOnServer IllegalStateException");
-            syncResult.stats.numAuthExceptions++;
-            return false;
-        }
+        }catch(IOException error) {
+            SyncResultUtil.markConnectFailed(syncResult);syncResult.stats.numUpdates++;return false;
+        }catch(JSONException error) {syncResult.stats.numParseExceptions++;return false;}
+        catch(IllegalStateException error) {syncResult.stats.numAuthExceptions++;return false;}
     }
 
 
@@ -1586,124 +1512,53 @@ public class NGWVectorLayer
     }
 
 
-    protected boolean sendAttachOnServer(
-            long featureId,
-            long attachId,
-            boolean useTus,
-            SyncResult syncResult)
-    {
-        if (!mNet.isNetworkAvailable()) {
-            SyncResultUtil.markNetworkUnavailable(syncResult);
-            return false;
+    protected boolean sendAttachOnServer(long featureId,long attachId,boolean useTus,SyncResult syncResult) {
+        QueuedMutation mutation=mQueuedMutation.get();
+        if(mutation==null) {
+            // A non-idempotent transfer must have a durable queued identity.
+            syncResult.databaseError=true;return false;
         }
-
-        AttachItem attach = getAttach("" + featureId, "" + attachId);
-        if (null == attach) {   //just remove buggy item
-            return true;
-        }
-        boolean fisrtSendPhase = true;
-
+        mutation.attachmentImplementationEntered=true;
+        if(!mNet.isNetworkAvailable()) {SyncResultUtil.markNetworkUnavailable(syncResult);return false;}
+        SQLiteDatabase db=DatabaseContext.getDatabaseForLayer(this,false);
+        boolean firstPhase=true;
         try {
+            AttachItem attach=com.nextgis.maplib.util.UploadAttachmentRemap.submitted(mutation.receipt);
+            com.nextgis.maplib.util.UploadAttachmentRemap.payloadFile(mPath,mutation.receipt);
             NgwSyncIo.checkInterrupted();
-            HttpResponse response;
-            JSONObject result;
-            if (useTus) {
-
-                response = sendAttachOnServerViaTus(featureId, attach);
-                if (!response.isOk()) {
-                    reportSyncHttpFailure("sendAttachTus", featureId, attachId, syncResult, response);
-                    return false;
-                }
-                fisrtSendPhase = false;
-                NgwSyncIo.checkInterrupted();
-
-                result = new JSONObject(response.getResponseBody());
-                if (!proceedAttachFromTus(result, syncResult)) {
-                    return false;
-                }
+            HttpResponse response;JSONObject upload;
+            if(useTus) {
+                response=sendAttachOnServerViaTus(featureId,attach);
+                if(!response.isOk()) {reportSyncHttpFailure("sendAttachTus",featureId,attachId,syncResult,response);return false;}
+                firstPhase=false;upload=new JSONObject(response.getResponseBody());
+                if(!proceedAttachFromTus(upload,syncResult))return false;
             } else {
-                fisrtSendPhase = false;
-                response = sendAttachOnServerOldStyle(featureId, attach);
-
-                if (!response.isOk()) {
-                    reportSyncHttpFailure("sendAttachOld", featureId, attachId, syncResult, response);
-                    return false;
-                }
-                result = new JSONObject(response.getResponseBody());
-
-                if (!proceedAttachOldStyle(result, syncResult)) {
-                    return false;
-                }
-                result = (JSONObject) result.getJSONArray("upload_meta").get(0);
-
+                firstPhase=false;response=sendAttachOnServerOldStyle(featureId,attach);
+                if(!response.isOk()) {reportSyncHttpFailure("sendAttachOld",featureId,attachId,syncResult,response);return false;}
+                upload=new JSONObject(response.getResponseBody());
+                if(!proceedAttachOldStyle(upload,syncResult))return false;
+                upload=upload.getJSONArray("upload_meta").getJSONObject(0);
             }
-
             NgwSyncIo.checkInterrupted();
-            response = sendFeatureAttachOnServer(result, featureId, attach);
-            if (!response.isOk()) {
-                reportSyncHttpFailure("sendFeatureAttach", featureId, attachId, syncResult, response);
-                return false;
-            }
-
-            // set new local id for attach
-            result = new JSONObject(response.getResponseBody());
-                if (!result.has(Constants.JSON_ID_KEY)) {
-                    HyperLog.w(Constants.TAG, "sendAttach missing id in response layer=\""
-                            + ProdLogUtil.truncateForLog(getName(), 100) + "\" res=" + mRemoteId
-                            + " json=\"" + ProdLogUtil.truncateForLog(result.toString(), 500) + "\"");
-
-                    if (Constants.DEBUG_MODE) {
-                        Log.d(Constants.TAG, "Problem sendAttachOnServer(), result has not ID key, result: " + result.toString());
-                    }
-                syncResult.stats.numParseExceptions++;
-                return false;
-            }
-
-            // Keep local file under server attach id and register online metadata so
-            // identification works without waiting for a second pull.
-            FeatureChanges.removeAttachChanges(DatabaseContext.getDatabaseForLayer(this, false), getChangeTableName(), featureId, attachId);
-            long newAttachId = result.getLong(Constants.JSON_ID_KEY);
-            setNewAttachId(String.valueOf(featureId), attach, String.valueOf(newAttachId));
-            try {
-                FeatureAttachments.checkTable(getAttachmentsTableName());
-                FeatureAttachments.add(
-                        getAttachmentsTableName(),
-                        featureId,
-                        newAttachId,
-                        attach.getDescription(),
-                        attach.getDisplayName(),
-                        attach.getMimetype());
-            } catch (RuntimeException e) {
-                HyperLog.w(Constants.TAG, "sendAttachOnServer: FeatureAttachments.add failed"
-                        + " featureId=" + featureId + " attachId=" + newAttachId
-                        + ": " + e.getMessage(), e);
-            }
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: attach kept locally as server id="
-                    + newAttachId + " featureId=" + featureId + " layer=\"" + getName() + "\"");
-
-            return true;
-        } catch (IOException e) {
-            if (fisrtSendPhase && e instanceof SocketException ){ // try usual way to send attaach
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer IOException : SocketException " + e.getMessage());
-                HyperLog.v(Constants.TAG, "NGWVectorLayer: try to send not using TUS ");
-                return sendAttachOnServer(featureId,attachId, false,syncResult);
-            }
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer IOException " + e.getMessage());
-            log(e, "sendAttachOnServer IOException");
-            SyncResultUtil.markConnectFailed(syncResult);
-            syncResult.stats.numInserts++;
-            return false;
-        }  catch (JSONException e) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer JSONException " + e.getMessage());
-            log(e, "sendAttachOnServer JSONException");
-            syncResult.stats.numParseExceptions++;
-            return false;
-        } catch (IllegalStateException e) {
-            HyperLog.v(Constants.TAG, "NGWVectorLayer: sendAttachOnServer IllegalStateException " + e.getMessage());
-
-            log(e, "sendAttachOnServer IllegalStateException");
-            syncResult.stats.numAuthExceptions++;
-            return false;
+            // Persist the association boundary before the only non-idempotent object POST.
+            com.nextgis.maplib.util.UploadOperationJournal.state(db,mutation.receipt,
+                    com.nextgis.maplib.util.UploadOperationJournal.SENDING,-1,"awaiting_attachment_association");
+            mutation.finalRequestStarted=true;mutation.httpStatus=-1;
+            response=sendFeatureAttachOnServer(upload,featureId,attach);
+            if(!response.isOk()) {reportSyncHttpFailure("sendFeatureAttach",featureId,attachId,syncResult,response);return false;}
+            long id=com.nextgis.maplib.util.UploadOperationJournal.serverId(new JSONObject(response.getResponseBody()));
+            com.nextgis.maplib.util.UploadOperationJournal.state(db,mutation.receipt,
+                    com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED,id,"server_attachment_id_received");
+            return finishCreatedAttachment(com.nextgis.maplib.util.UploadOperationJournal.find(db,mPath.getName(),mutation.receipt.id),syncResult);
+        }catch(IOException error) {
+            if(firstPhase&&error instanceof SocketException)return sendAttachOnServer(featureId,attachId,false,syncResult);
+            SyncResultUtil.markConnectFailed(syncResult);syncResult.stats.numInserts++;return false;
+        }catch(JSONException error) {
+            if(mutation.finalRequestStarted)com.nextgis.maplib.util.UploadOperationJournal.state(db,mutation.receipt,
+                    com.nextgis.maplib.util.UploadOperationJournal.UNCERTAIN,-1,"invalid_server_attachment_id");
+            syncResult.stats.numParseExceptions++;return false;
+        }catch(IllegalStateException error) {
+            syncResult.stats.numAuthExceptions++;return false;
         }
     }
 
@@ -1792,7 +1647,7 @@ public class NGWVectorLayer
     protected HttpResponse sendAttachOnServerViaTus(long featureId, AttachItem attach) throws IOException {
         // fill attach info
         String fileName = attach.getDisplayName();
-        File filePath = new File(mPath, featureId + File.separator + attach.getAttachId());
+        File filePath = attachmentTransferFile(featureId, attach);
         long length = 0;
         if (filePath.exists())
             length = filePath.length();
@@ -1814,7 +1669,7 @@ public class NGWVectorLayer
     protected HttpResponse sendAttachOnServerOldStyle(long featureId, AttachItem attach) throws IOException {
         // fill attach info
         String fileName = attach.getDisplayName();
-        File filePath = new File(mPath, featureId + File.separator + attach.getAttachId());
+        File filePath = attachmentTransferFile(featureId, attach);
         long length = 0;
         if (filePath.exists())
             length = filePath.length();
@@ -1834,6 +1689,13 @@ public class NGWVectorLayer
         return NetworkUtil.postFileOld(url, fileName, filePath, fileMime, accountData.login, accountData.password, false);
     }
 
+    private File attachmentTransferFile(long featureId, AttachItem attach) throws IOException {
+        QueuedMutation mutation=mQueuedMutation.get();
+        if(mutation==null)return new File(mPath,featureId+File.separator+attach.getAttachId());
+        try {return com.nextgis.maplib.util.UploadAttachmentRemap.payloadFile(mPath,mutation.receipt);}
+        catch(JSONException error) {throw new IOException("Invalid immutable attachment snapshot",error);}
+    }
+
     /**
      * Classifies HTTP failure into {@link SyncResult} counters and writes one bounded diagnostic line.
      */
@@ -1844,6 +1706,8 @@ public class NGWVectorLayer
             SyncResult syncResult,
             HttpResponse response) {
         if (response != null) {
+            QueuedMutation mutation = mQueuedMutation.get();
+            if (mutation != null) mutation.httpStatus = response.getResponseCode();
             long ioBefore = syncResult.stats.numIoExceptions;
             log(syncResult, String.valueOf(response.getResponseCode()));
             if (ioBefore >= 0 && ioBefore < Long.MAX_VALUE
@@ -2186,6 +2050,10 @@ public class NGWVectorLayer
 
     public void syncNgwResourceConfigOnly(String authority, SyncResult syncResult,
                                          boolean forceRecheck) {
+        if (com.nextgis.maplib.util.ProjectRecoveryGuard.isSyncBlocked(this)) {
+            syncResult.stats.numConflictDetectedExceptions++;
+            return;
+        }
         ConfigRefreshOutcome refreshOutcome = tryRefreshServerResourceMetaAndConfig(syncResult);
         if (refreshOutcome == ConfigRefreshOutcome.NETWORK_UNAVAILABLE) {
             SyncResultUtil.markNetworkUnavailable(syncResult);
@@ -3860,41 +3728,68 @@ public class NGWVectorLayer
     protected FeaturePushResult addFeatureOnServer(
             long featureId,
             SyncResult syncResult,
-            AccountUtil.AccountData accountData )
+            AccountUtil.AccountData accountData,
+            long changeId,
+            long boundary)
             throws SQLiteException
     {
-
-//        Log.e("FEA", "addFeatureOnServer " + featureId );
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt =
+                com.nextgis.maplib.util.UploadOperationJournal.queued(db, mPath.getName(), getChangeTableName(), changeId);
+        boolean postStarted = false;
+        com.nextgis.maplib.util.UploadOperationJournal.Flight flight = null;
+        if (receipt != null && receipt.needsReconciliation()) {
+            if (!uploadTarget(accountData).equals(receipt.target)) {
+                syncResult.stats.numConflictDetectedExceptions++;
+                return FeaturePushResult.failed();
+            }
+            if (com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(receipt.state))
+                return finishCreatedFeature(receipt, syncResult);
+            syncResult.stats.numConflictDetectedExceptions++;
+            return FeaturePushResult.failed();
+        }
 
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "addFeatureOnServer !mNet.isNetworkAvailable() no network!!! ");
             SyncResultUtil.markNetworkUnavailable(syncResult);
             return FeaturePushResult.failed();
         }
-        Uri uri = ContentUris.withAppendedId(getContentUri(), featureId);
-        uri = uri.buildUpon().fragment(NO_SYNC).build();
-
-        Cursor cursor = query(uri, null, null, null, "_id", null);
-        if (null == cursor) {
-            Log.e(Constants.TAG, "Cannot read feature for upload: " + featureId);
-            syncResult.databaseError = true;
-            return FeaturePushResult.failed();
-        }
+        final Uri uri = ContentUris.withAppendedId(getContentUri(), featureId).buildUpon().fragment(NO_SYNC).build();
 
         try {
-            if (cursor.moveToFirst()) {
-                // feature to string
-                String payload = cursorToJson(cursor);
+                // Capture data, coalesced edit identities and the durable reservation in one
+                // transaction. A concurrent edit cannot slip between payload and ACK boundary.
+                receipt = com.nextgis.maplib.util.UploadOperationJournal.begin(db, mPath.getName(),
+                        getChangeTableName(), changeId, featureId, -1, "create", uploadTarget(accountData), () -> {
+                            if (com.nextgis.maplib.util.FeatureSaveJournal.isUploadHeld(db,mPath.getName(),featureId)
+                                    || FeatureChanges.hasFeatureTempFlag(db,getChangeTableName(),featureId)
+                                    || FeatureChanges.hasFeatureNotSyncFlag(db,getChangeTableName(),featureId))
+                                throw new SQLiteException("The form still owns this feature");
+                            try (Cursor snapshot=query(uri,null,null,null,"_id",null)) {
+                                if(snapshot==null)throw new IOException("Cannot read feature for upload");
+                                return snapshot.moveToFirst()?cursorToJson(snapshot):null;
+                            }
+                        }, boundary);
+                if (!receipt.wasStarted()) {
+                    if(com.nextgis.maplib.util.UploadOperationJournal.LOCAL_MISSING.equals(receipt.state)
+                            ||com.nextgis.maplib.util.UploadOperationJournal.READ_FAILED.equals(receipt.state))syncResult.databaseError=true;
+                    else syncResult.stats.numConflictDetectedExceptions++;
+                    return FeaturePushResult.failed();
+                }
+                String payload = receipt.payload;
                 if (Constants.DEBUG_MODE) {
                     Log.d(Constants.TAG, "payload: " + payload);
                 }
 
-                // post to NGW
+                // A process death after this durable boundary is an uncertain POST, never a blind replay.
+                flight = com.nextgis.maplib.util.UploadOperationJournal.sending(db, receipt);
+                postStarted = true;
                 HttpResponse response = addFeatureOnServer(payload, accountData);
 
 
                 // add 403 processinge
                 if (!response.isOk()) {
+                    com.nextgis.maplib.util.UploadOperationJournal.httpFailure(db, receipt, response.getResponseCode());
 //                    Log.e("FEA", "addFeatureOnServer 403" );
                     if (response.getResponseCode() == 403){
                         // no access right
@@ -3907,27 +3802,23 @@ public class NGWVectorLayer
                     return FeaturePushResult.failed();
                 }
 
-                //set new id from server // like: {"id": 24}
                 JSONObject result = new JSONObject(response.getResponseBody());
-                long id = Constants.NOT_FOUND;
-                if (result.has(Constants.JSON_ID_KEY)) {
-                    id = result.getLong(Constants.JSON_ID_KEY);
-//                    Log.e("FEA", "addFeatureOnServer start changeFeatureId from " + featureId + " to " + id  );
-                    changeFeatureId(featureId, id);
-                }
-
-                return FeaturePushResult.success(id);
-            } else {
-                logBuggyChangeDrop("addFeatureOnServer (empty cursor)", featureId);
-                return FeaturePushResult.handledWithoutRemoteId(); //just remove buggy data
-            }
+                long id = com.nextgis.maplib.util.UploadOperationJournal.serverId(result);
+                com.nextgis.maplib.util.UploadOperationJournal.state(db, receipt,
+                        com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED, id, "server_id_received");
+                return finishCreatedFeature(com.nextgis.maplib.util.UploadOperationJournal.find(
+                        db, mPath.getName(), receipt.id), syncResult);
 
         } catch (JSONException e) {
+            if (postStarted) com.nextgis.maplib.util.UploadOperationJournal.state(db, receipt,
+                    com.nextgis.maplib.util.UploadOperationJournal.UNCERTAIN, -1, "invalid_server_id");
             HyperLog.v(Constants.TAG, "addFeatureOnServer JSONException: " + e.getMessage());
             log(e, "addFeatureOnServer JSONException");
             syncResult.stats.numParseExceptions++;
             return FeaturePushResult.failed();
         } catch (IOException e) {
+            if (postStarted) com.nextgis.maplib.util.UploadOperationJournal.state(db, receipt,
+                    com.nextgis.maplib.util.UploadOperationJournal.UNCERTAIN, -1, "response_lost");
             HyperLog.v(Constants.TAG, "addFeatureOnServer IOException: " + e.getMessage());
             log(e, "addFeatureOnServer IOException");
             SyncResultUtil.markConnectFailed(syncResult);
@@ -3944,7 +3835,7 @@ public class NGWVectorLayer
             syncResult.stats.numAuthExceptions++;
             return FeaturePushResult.failed();
         } finally {
-            cursor.close();
+            if (flight != null) flight.close();
         }
     }
 
@@ -3953,6 +3844,431 @@ public class NGWVectorLayer
 
         return NetworkUtil.post(NGWUtil.getFeaturesUrl(accountData.url, mRemoteId) + appendix(),
                 payload, accountData.login, accountData.password, false);
+    }
+
+    private String mutationSnapshot(String operation,long featureId,long attachmentId,SQLiteDatabase db)
+            throws IOException,JSONException {
+        if (com.nextgis.maplib.util.FeatureSaveJournal.isUploadHeld(db,mPath.getName(),featureId)
+                || FeatureChanges.hasFeatureTempFlag(db,getChangeTableName(),featureId)
+                || FeatureChanges.hasFeatureNotSyncFlag(db,getChangeTableName(),featureId))
+            throw new SQLiteException("The form still owns this feature");
+        if (operation.startsWith("attachment_") && !"attachment_delete".equals(operation)) {
+            if (FeatureChanges.hasAttachTempFlag(db,getChangeTableName(),featureId,attachmentId)
+                    || FeatureChanges.hasAttachNotSyncFlag(db,getChangeTableName(),featureId,attachmentId))
+                throw new SQLiteException("The form still owns this attachment");
+            return com.nextgis.maplib.util.UploadAttachmentRemap.snapshot(mPath,featureId,attachmentId,
+                    "attachment_create".equals(operation));
+        }
+        if (!"update".equals(operation)&&!"create".equals(operation)) return "{}";
+        Uri uri=ContentUris.withAppendedId(getContentUri(),featureId).buildUpon().fragment(NO_SYNC).build();
+        try(Cursor cursor=query(uri,null,null,null,"_id",null)) {
+            if(cursor==null)throw new IOException("Cannot read feature for update");
+            return cursor.moveToFirst()?cursorToJson(cursor):null;
+        }
+    }
+
+    private boolean sendQueuedMutation(String operation,long featureId,long attachmentId,long changeId,long boundary,
+            AccountUtil.AccountData account,SyncResult result) {
+        SQLiteDatabase db=DatabaseContext.getDatabaseForLayer(this,false);
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt=
+                com.nextgis.maplib.util.UploadOperationJournal.queued(db,mPath.getName(),getChangeTableName(),changeId);
+        if(receipt!=null&&!uploadTarget(account).equals(receipt.target)) {result.stats.numConflictDetectedExceptions++;return false;}
+        if(receipt!=null&&receipt.needsReconciliation()) {
+            if("attachment_create".equals(operation)&&com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(receipt.state))
+                return finishCreatedAttachment(receipt,result);
+            result.stats.numConflictDetectedExceptions++;return false;
+        }
+        if(!mNet.isNetworkAvailable()) {SyncResultUtil.markNetworkUnavailable(result);return false;}
+        try {
+            receipt=com.nextgis.maplib.util.UploadOperationJournal.begin(db,mPath.getName(),getChangeTableName(),changeId,
+                    featureId,attachmentId,operation,uploadTarget(account),()->mutationSnapshot(operation,featureId,attachmentId,db),boundary);
+            if(!receipt.wasStarted()) {
+                if(com.nextgis.maplib.util.UploadOperationJournal.LOCAL_MISSING.equals(receipt.state)
+                        ||com.nextgis.maplib.util.UploadOperationJournal.READ_FAILED.equals(receipt.state))result.databaseError=true;
+                else result.stats.numConflictDetectedExceptions++;
+                return false;
+            }
+            QueuedMutation mutation=new QueuedMutation(receipt);mQueuedMutation.set(mutation);
+            mutation.finalRequestStarted=!"attachment_create".equals(operation);
+            try(com.nextgis.maplib.util.UploadOperationJournal.Flight ignored=com.nextgis.maplib.util.UploadOperationJournal.sending(db,receipt)) {
+                boolean success;
+                switch(operation) {
+                    case "delete":success=deleteFeatureOnServer(featureId,result);break;
+                    case "update":success=changeFeatureOnServer(featureId,result,account);break;
+                    case "attachment_delete":success=deleteAttachOnServer(featureId,attachmentId,result);break;
+                    case "attachment_update":success=changeAttachOnServer(featureId,attachmentId,result);break;
+                    case "attachment_create":success=sendAttachOnServer(featureId,attachmentId,true,result);break;
+                    default:throw new SQLiteException("Unsupported queued mutation");
+                }
+                if("attachment_create".equals(operation)) {
+                    com.nextgis.maplib.util.UploadOperationJournal.Entry current=com.nextgis.maplib.util.UploadOperationJournal.find(db,mPath.getName(),receipt.id);
+                    if(com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(current.state))return success;
+                    if(com.nextgis.maplib.util.UploadOperationJournal.PREPARING.equals(current.state)
+                            ||com.nextgis.maplib.util.UploadOperationJournal.SENDING.equals(current.state)) {
+                        if(mutation.attachmentImplementationEntered&&!mutation.finalRequestStarted)
+                            com.nextgis.maplib.util.UploadOperationJournal.state(db,current,com.nextgis.maplib.util.UploadOperationJournal.RETRY_PENDING,-1,
+                                    mutation.httpStatus>=0?"http_"+mutation.httpStatus:"upload_preparation_failed");
+                        else if(mutation.httpStatus>=0)com.nextgis.maplib.util.UploadOperationJournal.httpFailure(db,current,mutation.httpStatus);
+                        else com.nextgis.maplib.util.UploadOperationJournal.transportFailure(db,current,true);
+                    }
+                    return false;
+                }
+                if(!success) {
+                    if(mutation.httpStatus>=0)com.nextgis.maplib.util.UploadOperationJournal.httpFailure(db,receipt,mutation.httpStatus);
+                    else com.nextgis.maplib.util.UploadOperationJournal.transportFailure(db,receipt,mutation.finalRequestStarted);
+                    return false;
+                }
+                com.nextgis.maplib.util.UploadOperationJournal.acknowledge(db,getChangeTableName(),receipt,featureId,
+                        operation.startsWith("attachment_")?attachmentId:-1);
+                if("update".equals(operation)&&!NgwSyncIo.isCancellationRequested())
+                    refreshFeatureFromServerAfterPush(featureId,account,"changeFeature");
+                return true;
+            } finally {mQueuedMutation.remove();}
+        } catch(IOException|JSONException error) {
+            result.databaseError=true;return false;
+        }
+    }
+
+    private boolean finishCreatedAttachment(com.nextgis.maplib.util.UploadOperationJournal.Entry receipt,SyncResult result) {
+        SQLiteDatabase db=DatabaseContext.getDatabaseForLayer(this,false);
+        try {
+            com.nextgis.maplib.util.LayerDatabaseTransaction.run(db,()->{
+                if(!FeatureChanges.matchesOperation(db,getChangeTableName(),receipt.changeId,receipt.id)
+                        ||com.nextgis.maplib.util.FeatureSaveJournal.isUploadHeld(db,mPath.getName(),receipt.featureId)
+                        ||FeatureChanges.hasFeatureTempFlag(db,getChangeTableName(),receipt.featureId)
+                        ||FeatureChanges.hasFeatureNotSyncFlag(db,getChangeTableName(),receipt.featureId))
+                    throw new SQLiteException("The attachment operation changed or its form still owns it");
+                try(Cursor feature=db.rawQuery("SELECT 1 FROM \""+mPath.getName().replace("\"","\"\"")+"\" WHERE _id=?",
+                        new String[]{Long.toString(receipt.featureId)})) {
+                    if(!feature.moveToFirst())throw new SQLiteException("The attachment's feature is missing");
+                }
+                try {
+                    com.nextgis.maplib.util.UploadAttachmentRemap.finish(db,mPath,getChangeTableName(),getAttachmentsTableName(),receipt);
+                }catch(IOException|JSONException error) {throw new SQLiteException("Cannot finish attachment acknowledgement",error);}
+                return null;
+            });
+            com.nextgis.maplib.util.UploadAttachmentRemap.complete(db,mPath,receipt);
+            return true;
+        }catch(RuntimeException|IOException error) {result.databaseError=true;return false;}
+    }
+
+    /** Finalize only known acknowledged, operation-owned transfer files after an interrupted cleanup. */
+    public void cleanupAcknowledgedUploads() {
+        File[] stages=mPath.listFiles(file->file.getName().matches("\\.upload-attachment-[a-f0-9-]{36}"));
+        if(stages==null)return;
+        int checked=0;
+        for(File stage:stages) {
+            if(checked++>=16)break;
+            try {
+                SQLiteDatabase db=DatabaseContext.getDatabaseForLayer(this,false);
+                String id=stage.getName().substring(".upload-attachment-".length());
+                com.nextgis.maplib.util.UploadOperationJournal.Entry receipt=com.nextgis.maplib.util.UploadOperationJournal.find(db,mPath.getName(),id);
+                if(receipt!=null&&"attachment_create".equals(receipt.operation)
+                        &&com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(receipt.state))
+                    com.nextgis.maplib.util.UploadAttachmentRemap.complete(db,mPath,receipt);
+            }catch(IOException|RuntimeException error) {Log.w(Constants.TAG,"Acknowledged upload cleanup deferred");}
+        }
+    }
+
+    private String uploadTarget(AccountUtil.AccountData account) {
+        try {
+            return com.nextgis.maplib.util.UploadOperationJournal.target(DatabaseContext.getMapForLayer(this).getPath(),
+                    mPath.getName(),mAccountName,account.url,account.login,mRemoteId);
+        } catch (IOException error) {
+            throw new SQLiteException("Cannot bind upload to its workspace");
+        }
+    }
+
+    private FeaturePushResult finishCreatedFeature(com.nextgis.maplib.util.UploadOperationJournal.Entry receipt,
+            SyncResult result) {
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        if(receipt==null) {result.databaseError=true;return FeaturePushResult.failed();}
+        final boolean[] filesAttempted={false};
+        try {
+            com.nextgis.maplib.util.LayerDatabaseTransaction.run(db, () -> {
+                if(!FeatureChanges.matchesOperation(db,getChangeTableName(),receipt.changeId,receipt.id))
+                    throw new SQLiteException("The original queued operation is no longer present");
+                if (com.nextgis.maplib.util.FeatureSaveJournal.isUploadHeld(db, mPath.getName(), receipt.featureId)
+                        || FeatureChanges.hasFeatureTempFlag(db, getChangeTableName(), receipt.featureId)
+                        || FeatureChanges.hasFeatureNotSyncFlag(db, getChangeTableName(), receipt.featureId))
+                    throw new SQLiteException("The form still owns this feature");
+                com.nextgis.maplib.util.UploadIdRemap.rows(db, mPath.getName(), getChangeTableName(),
+                        getAttachmentsTableName(), receipt.featureId, receipt.remoteId);
+                try {
+                    filesAttempted[0]=true;
+                    com.nextgis.maplib.util.UploadIdRemap.files(mPath, receipt.featureId, receipt.remoteId, receipt.id);
+                } catch (IOException error) { throw new SQLiteException("Cannot remap attachments", error); }
+                if (db.delete(getChangeTableName(), Constants.FIELD_ID + "=? AND " + Constants.FIELD_FEATURE_ID + "=? AND "+FeatureChanges.OPERATION_UUID+"=?",
+                        new String[]{Long.toString(receipt.changeId), Long.toString(receipt.remoteId),receipt.id}) != 1)
+                    throw new SQLiteException("Creation outbox record changed during acknowledgement");
+                FeatureChanges.acknowledgeChangedOperations(db,getChangeTableName(),receipt.remoteId,receipt.acknowledgedChanges);
+                com.nextgis.maplib.util.UploadOperationJournal.state(db, receipt,
+                        com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED, receipt.remoteId, "server_confirmed");
+                com.nextgis.maplib.util.LayerDatabaseTransaction.afterCommit(db, () -> {
+                    Intent notify = new Intent(Constants.NOTIFY_UPDATE);
+                    notify.putExtra(Constants.FIELD_OLD_ID, receipt.featureId);
+                    notify.putExtra(Constants.FIELD_ID, receipt.remoteId);
+                    notify.putExtra(Constants.ATTRIBUTES_ONLY, true);
+                    notify.putExtra(Constants.NOTIFY_LAYER_NAME, mPath.getName());
+                    notify.setPackage(getContext().getPackageName());
+                    sendWorkspaceNotification(notify);
+                    VectorLayerRenderCache.invalidateOnDataChange(this);
+                });
+                return null;
+            });
+            com.nextgis.maplib.util.UploadIdRemap.completeFiles(mPath, receipt.remoteId, receipt.id);
+            return FeaturePushResult.success(receipt.remoteId);
+        } catch (RuntimeException error) {
+            if(filesAttempted[0])com.nextgis.maplib.util.UploadIdRemap.rollbackFiles(mPath, receipt.featureId, receipt.remoteId, receipt.id);
+            result.databaseError = true;
+            return FeaturePushResult.failed();
+        }
+    }
+
+    private String queuedOperation(int flags,int attachmentFlags) {
+        boolean attachment=(flags&CHANGE_OPERATION_ATTACH)!=0;int value=attachment?attachmentFlags:flags;
+        String operation=(value&Constants.CHANGE_OPERATION_DELETE)!=0?"delete":(value&Constants.CHANGE_OPERATION_NEW)!=0?"create"
+                :(value&Constants.CHANGE_OPERATION_CHANGED)!=0?"update":"unknown";
+        return attachment?"attachment_"+operation:operation;
+    }
+
+    private boolean reviewable(SQLiteDatabase db,long change,String identity,long feature,long attachment,String operation) {
+        if(com.nextgis.maplib.util.FeatureSaveJournal.isUploadHeld(db,mPath.getName(),feature)
+                ||FeatureChanges.hasFeatureTempFlag(db,getChangeTableName(),feature)
+                ||FeatureChanges.hasFeatureNotSyncFlag(db,getChangeTableName(),feature)
+                ||attachment>=0&&(FeatureChanges.hasAttachTempFlag(db,getChangeTableName(),feature,attachment)
+                ||FeatureChanges.hasAttachNotSyncFlag(db,getChangeTableName(),feature,attachment)))return false;
+        try(Cursor c=db.query(getChangeTableName(),null,FIELD_ID+"=?",new String[]{Long.toString(change)},null,null,null)) {
+            if(!c.moveToFirst())return false;
+            String current=FeatureChanges.operationId(db,getChangeTableName(),change);
+            return java.util.Objects.equals(identity,current)&&c.getLong(c.getColumnIndexOrThrow(FIELD_FEATURE_ID))==feature
+                    &&c.getLong(c.getColumnIndexOrThrow(FIELD_ATTACH_ID))==attachment
+                    &&operation.equals(queuedOperation(c.getInt(c.getColumnIndexOrThrow(FIELD_OPERATION)),
+                    c.getInt(c.getColumnIndexOrThrow(FIELD_ATTACH_OPERATION))))
+                    &&!com.nextgis.maplib.util.UploadOperationJournal.isInFlight(db,mPath.getName(),identity);
+        }
+    }
+
+    private boolean reviewTarget(com.nextgis.maplib.util.UploadOperationJournal.Entry receipt,AccountUtil.AccountData account) {
+        File workspace=DatabaseContext.getMapForLayer(this).getPath();
+        try {
+            if(com.nextgis.maplib.util.ProjectRecoveryGuard.isHeld(workspace)) {
+                String original=com.nextgis.maplib.util.ProjectRecoveryGuard.originalTarget(workspace,mPath,mAccountName,
+                        account.url,account.login,mRemoteId,mNGWLayerType);
+                return receipt.target.equals(original)||receipt.target.equals(uploadTarget(account));
+            }
+            return receipt.target.equals(uploadTarget(account));
+        }catch(IOException error) {return false;}
+    }
+
+    /** Resolves an exact current queue identity; viewing the list alone never reserves anything. */
+    public String prepareChangeReview(long changeId,String expectedIdentity,long featureId,long attachmentId,String operation) {
+        SQLiteDatabase db=DatabaseContext.getDatabaseForLayer(this,false);
+        AccountUtil.AccountData account=AccountUtil.getAccountData(mContext,mAccountName);
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(db,()->{
+            try {com.nextgis.maplib.util.ProjectRecoveryGuard.releaseCompletedFormHolds(
+                    DatabaseContext.getMapForLayer(this).getPath(),db,mPath.getName(),featureId);}
+            catch(IOException error) {throw new SQLiteException("Cannot review recovered form",error);}
+            if(isRemoteReadOnly()||!reviewable(db,changeId,expectedIdentity,featureId,attachmentId,operation))
+                throw new SQLiteException("Queued operation changed or is still owned by a form");
+            // A recovered project must still name the archived server, login and resource.
+            if(com.nextgis.maplib.util.ProjectRecoveryGuard.isHeld(DatabaseContext.getMapForLayer(this).getPath())) {
+                try {com.nextgis.maplib.util.ProjectRecoveryGuard.originalTarget(DatabaseContext.getMapForLayer(this).getPath(),
+                        mPath,mAccountName,account.url,account.login,mRemoteId,mNGWLayerType);}
+                catch(IOException error) {throw new SQLiteException("Recovered target changed",error);}
+            }
+            com.nextgis.maplib.util.UploadOperationJournal.Entry prior=expectedIdentity==null?null:
+                    com.nextgis.maplib.util.UploadOperationJournal.find(db,mPath.getName(),expectedIdentity);
+            if(prior!=null&&!reviewTarget(prior,account))throw new SQLiteException("Review destination changed");
+            com.nextgis.maplib.util.UploadOperationJournal.Entry receipt=com.nextgis.maplib.util.UploadOperationJournal.prepareReview(
+                    db,mPath.getName(),getChangeTableName(),changeId,featureId,attachmentId,operation,prior==null?uploadTarget(account):prior.target,
+                    ()->mutationSnapshot(operation,featureId,attachmentId,db),FeatureChanges.getLastChangeRecordId(db,getChangeTableName()));
+            if(!reviewTarget(receipt,account)||com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(receipt.state)
+                    ||receipt.payload.isEmpty())throw new SQLiteException("Cannot resolve queued operation");
+            return receipt.id;
+        });
+    }
+
+    /** Explicit reconciliation never sends a POST, PUT or DELETE. */
+    public boolean reconcileUpload(String operationId,long serverId) throws Exception {
+        if (serverId < 0) return false;
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt =
+                com.nextgis.maplib.util.UploadOperationJournal.find(db, mPath.getName(), operationId);
+        AccountUtil.AccountData account = AccountUtil.getAccountData(mContext, mAccountName);
+        if(receipt==null||!reviewTarget(receipt,account)||!reviewable(db,receipt.changeId,receipt.id,
+                receipt.featureId,receipt.attachId,receipt.operation)||receipt.payload.isEmpty()
+                ||com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(receipt.state))return false;
+        boolean held=com.nextgis.maplib.util.ProjectRecoveryGuard.isHeld(DatabaseContext.getMapForLayer(this).getPath());
+        boolean accepted=com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(receipt.state);
+        if(accepted&&receipt.remoteId!=serverId)return false;
+        if(!accepted||held) {
+            switch(receipt.operation) {
+                case "create":case "update":
+                    if("update".equals(receipt.operation)&&serverId!=receipt.featureId)return false;
+                    Feature remote=getFeatureFromServer(serverId,account);
+                    if(remote==null||remote.getId()!=serverId)return false;
+                    ContentValues values=remote.getContentValues(false);String[] columns=values.keySet().toArray(new String[0]);
+                    try(android.database.MatrixCursor cursor=new android.database.MatrixCursor(columns)) {
+                        Object[] row=new Object[columns.length];for(int i=0;i<columns.length;i++)row[i]=values.get(columns[i]);
+                        cursor.addRow(row);cursor.moveToFirst();
+                        if(!sameSubmittedData(new JSONObject(receipt.payload),new JSONObject(cursorToJson(cursor))))return false;
+                    }
+                    break;
+                case "attachment_create":case "attachment_update":case "attachment_delete":
+                    if(!"attachment_create".equals(receipt.operation)&&serverId!=receipt.attachId)return false;
+                    HttpResponse feature=readFeatureForReview(receipt.featureId,account);
+                    if(!feature.isOk())return false;
+                    JSONObject data=new JSONObject(feature.getResponseBody());
+                    if(com.nextgis.maplib.util.UploadOperationJournal.serverId(data)!=receipt.featureId)return false;
+                    JSONObject extensions=data.getJSONObject("extensions");
+                    if(!extensions.has("attachment"))return false;
+                    JSONArray attachments=extensions.isNull("attachment")?new JSONArray():extensions.getJSONArray("attachment");
+                    JSONObject found=null;
+                    for(int i=0;i<attachments.length();i++) {
+                        JSONObject candidate=attachments.getJSONObject(i);
+                        if(com.nextgis.maplib.util.UploadOperationJournal.serverId(candidate)==serverId) {
+                            if(found!=null)return false;found=candidate;
+                        }
+                    }
+                    if("attachment_delete".equals(receipt.operation)) {if(found!=null)return false;break;}
+                    if(found==null)return false;
+                    AttachItem submitted=com.nextgis.maplib.util.UploadAttachmentRemap.submitted(receipt);
+                    if(!submitted.getDisplayName().equals(found.getString("name"))
+                            ||!java.util.Objects.equals(submitted.getDescription()==null?"":submitted.getDescription(),
+                            found.isNull("description")?"":found.getString("description")))return false;
+                    if("attachment_create".equals(receipt.operation)) {
+                        if(!attachmentBytesMatch(receipt,serverId,account))return false;
+                        com.nextgis.maplib.util.UploadAttachmentRemap.payloadFile(mPath,receipt);
+                    }
+                    break;
+                case "delete":
+                    if(serverId!=receipt.featureId)return false;
+                    // A missing resource or hidden account is not proof that this feature was deleted.
+                    if(!NetworkUtil.get(NGWUtil.getResourceUrl(account.url,mRemoteId),account.login,account.password,false).isOk()
+                            ||readFeatureForReview(serverId,account).getResponseCode()!=404)return false;
+                    break;
+                default:return false;
+            }
+        }
+        final com.nextgis.maplib.util.UploadOperationJournal.Entry checked=receipt;
+        receipt=com.nextgis.maplib.util.LayerDatabaseTransaction.run(db,()->{
+            if(!reviewable(db,checked.changeId,checked.id,checked.featureId,checked.attachId,checked.operation)
+                    ||!reviewTarget(checked,AccountUtil.getAccountData(mContext,mAccountName)))throw new SQLiteException("Review changed");
+            com.nextgis.maplib.util.UploadOperationJournal.Entry current=com.nextgis.maplib.util.UploadOperationJournal.rebindReviewed(db,checked,uploadTarget(account));
+            if(com.nextgis.maplib.util.UploadOperationJournal.nonIdempotent(current.operation))
+                com.nextgis.maplib.util.UploadOperationJournal.state(db,current,com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED,serverId,"server_read_confirmed");
+            else com.nextgis.maplib.util.UploadOperationJournal.acknowledge(db,getChangeTableName(),current,current.featureId,current.attachId);
+            return com.nextgis.maplib.util.UploadOperationJournal.find(db,mPath.getName(),current.id);
+        });
+        if("create".equals(receipt.operation))return finishCreatedFeature(receipt,new SyncResult()).success;
+        if("attachment_create".equals(receipt.operation))return finishCreatedAttachment(receipt,new SyncResult());
+        return true;
+    }
+
+    protected HttpResponse readFeatureForReview(long feature,AccountUtil.AccountData account) throws IOException {
+        return NetworkUtil.get(NGWUtil.getFeatureUrl(account.url,mRemoteId,feature),account.login,account.password,false);
+    }
+    protected boolean attachmentBytesMatch(com.nextgis.maplib.util.UploadOperationJournal.Entry receipt,long serverId,
+            AccountUtil.AccountData account) throws Exception {
+        JSONObject payload=new JSONObject(receipt.payload);long expected=payload.getLong("bytes");
+        java.net.HttpURLConnection connection=NetworkUtil.getHttpConnection("GET",NGWUtil.getFeatureAttachmentUrl(account.url,
+                mRemoteId,receipt.featureId)+serverId+"/download",account.login,account.password);
+        if(connection==null)return false;connection.setInstanceFollowRedirects(false);NgwSyncIo.registerReadConnection(connection);
+        try {
+            if(connection.getResponseCode()!=200)return false;
+            java.security.MessageDigest digest=com.nextgis.maplib.util.UnderlayFiles.digest();long size=0;byte[] bytes=new byte[65536];
+            try(java.io.InputStream input=connection.getInputStream()) {
+                int count;while((count=input.read(bytes))!=-1) {
+                    if(Thread.currentThread().isInterrupted()||NgwSyncIo.isCancellationRequested())throw new java.io.InterruptedIOException("Review cancelled");
+                    size=Math.addExact(size,count);if(size>expected)return false;digest.update(bytes,0,count);
+                }
+            }
+            return size==expected&&payload.getString("sha256").equals(com.nextgis.maplib.util.UnderlayFiles.hex(digest.digest()));
+        } finally {NgwSyncIo.unregisterReadConnection(connection);connection.disconnect();}
+    }
+
+    public boolean reconcileCreatedFeature(String operationId,long serverId) throws Exception {
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt=com.nextgis.maplib.util.UploadOperationJournal.metadata(
+                DatabaseContext.getDatabaseForLayer(this,false),mPath.getName(),operationId);
+        if(receipt==null||!"create".equals(receipt.operation))return false;
+        return reconcileUpload(operationId,serverId);
+    }
+
+    static boolean sameSubmittedData(JSONObject submitted, JSONObject actual) throws Exception {
+        java.util.Iterator<String> keys = submitted.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            if (!actual.has(key)) return false;
+            Object a = submitted.get(key), b = actual.get(key);
+            if (a instanceof JSONObject && b instanceof JSONObject) {
+                if (!sameSubmittedData((JSONObject) a, (JSONObject) b)) return false;
+            } else if ("geom".equals(key) && a instanceof String && b instanceof String) {
+                if (!GeoGeometryFactory.fromWKT((String) a, GeoConstants.CRS_WEB_MERCATOR)
+                        .equals(GeoGeometryFactory.fromWKT((String) b, GeoConstants.CRS_WEB_MERCATOR))) return false;
+            } else if (a instanceof Number && b instanceof Number) {
+                if (new java.math.BigDecimal(a.toString()).compareTo(new java.math.BigDecimal(b.toString())) != 0) return false;
+            } else if (!a.equals(b)) return false;
+        }
+        return true;
+    }
+
+    /** The caller must obtain explicit confirmation after checking the server for a duplicate. */
+    public boolean authorizeUploadRetry(String operationId) {
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt =
+                com.nextgis.maplib.util.UploadOperationJournal.find(db, mPath.getName(), operationId);
+        AccountUtil.AccountData account=AccountUtil.getAccountData(mContext,mAccountName);
+        if(receipt==null||receipt.payload.isEmpty()||com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(receipt.state)
+                ||com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(receipt.state))return false;
+        return com.nextgis.maplib.util.LayerDatabaseTransaction.run(db,()->{
+            if(!reviewTarget(receipt,account)||!reviewable(db,receipt.changeId,receipt.id,receipt.featureId,receipt.attachId,receipt.operation))return false;
+            com.nextgis.maplib.util.UploadOperationJournal.Entry current=com.nextgis.maplib.util.UploadOperationJournal.rebindReviewed(db,receipt,uploadTarget(account));
+            com.nextgis.maplib.util.UploadOperationJournal.state(db,current,
+                    com.nextgis.maplib.util.UploadOperationJournal.RETRY_ALLOWED,-1,"explicit_retry_authorized");return true;
+        });
+    }
+    public boolean authorizeCreationRetry(String operationId) {
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt=com.nextgis.maplib.util.UploadOperationJournal.metadata(
+                DatabaseContext.getDatabaseForLayer(this,false),mPath.getName(),operationId);
+        if(receipt==null||!"create".equals(receipt.operation))return false;
+        return authorizeUploadRetry(operationId);
+    }
+
+    /** Called while the recovery workspace's database transaction and project lease are held. */
+    public boolean isRecoveryQueueReviewed() {
+        SQLiteDatabase db=DatabaseContext.getDatabaseForLayer(this,false);
+        if(!db.inTransaction())throw new SQLiteException("Recovery review requires a transaction");
+        AccountUtil.AccountData account=AccountUtil.getAccountData(mContext,mAccountName);
+        try {com.nextgis.maplib.util.ProjectRecoveryGuard.originalTarget(DatabaseContext.getMapForLayer(this).getPath(),
+                mPath,mAccountName,account.url,account.login,mRemoteId,mNGWLayerType);}
+        catch(IOException error) {return false;}
+        try(Cursor rows=db.query(getChangeTableName(),null,null,null,null,null,null)) {
+            while(rows.moveToNext()) {
+                int flags=rows.getInt(rows.getColumnIndexOrThrow(FIELD_OPERATION));
+                int attachFlags=rows.getInt(rows.getColumnIndexOrThrow(FIELD_ATTACH_OPERATION));
+                if((flags&CHANGE_OPERATION_TEMP)!=0||(attachFlags&CHANGE_OPERATION_TEMP)!=0)return false;
+                String operation=queuedOperation(flags,attachFlags);
+                if(operation.endsWith("unknown"))continue;
+                long feature=rows.getLong(rows.getColumnIndexOrThrow(FIELD_FEATURE_ID));
+                long attachment=rows.getLong(rows.getColumnIndexOrThrow(FIELD_ATTACH_ID));
+                if(FeatureChanges.hasFeatureNotSyncFlag(db,getChangeTableName(),feature)
+                        ||attachment>=0&&FeatureChanges.hasAttachNotSyncFlag(db,getChangeTableName(),feature,attachment))continue;
+                long change=rows.getLong(rows.getColumnIndexOrThrow(FIELD_ID));
+                String identity=FeatureChanges.operationId(db,getChangeTableName(),change);
+                com.nextgis.maplib.util.UploadOperationJournal.Entry receipt=identity==null?null:
+                        com.nextgis.maplib.util.UploadOperationJournal.metadata(db,mPath.getName(),identity);
+                if(receipt==null||!com.nextgis.maplib.util.UploadOperationJournal.RETRY_ALLOWED.equals(receipt.state)
+                        ||!uploadTarget(account).equals(receipt.target)||!reviewable(db,change,identity,feature,attachment,operation))return false;
+            }
+        }
+        long count=com.nextgis.maplib.util.UploadOperationJournal.historyCount(db,mPath.getName(),getChangeTableName());
+        for(long offset=0;offset<count;offset+=200)
+            for(com.nextgis.maplib.util.UploadOperationJournal.Entry receipt:
+                    com.nextgis.maplib.util.UploadOperationJournal.historyPage(db,mPath.getName(),getChangeTableName(),200,offset))
+                if(receipt.needsReconciliation()||com.nextgis.maplib.util.UploadOperationJournal.LOCAL_MISSING.equals(receipt.state)
+                        ||com.nextgis.maplib.util.UploadOperationJournal.READ_FAILED.equals(receipt.state))return false;
+        return true;
     }
 
     protected boolean deleteFeatureOnServer(
@@ -3993,69 +4309,28 @@ public class NGWVectorLayer
                 accountData.login, accountData.password, false);
     }
 
-    protected boolean changeFeatureOnServer(
-            long featureId,
-            SyncResult syncResult,
-            AccountUtil.AccountData accountData)
-            throws SQLiteException
-    {
-        if (!mNet.isNetworkAvailable()) {
-            HyperLog.v(Constants.TAG, "changeFeatureOnServer !mNet.isNetworkAvailable()");
-            SyncResultUtil.markNetworkUnavailable(syncResult);
-            return false;
-        }
-
-        // get uri for feature
-        Uri uri = ContentUris.withAppendedId(getContentUri(), featureId);
-        uri = uri.buildUpon().fragment(NO_SYNC).build();
-
-        // get it's cursor
-        Cursor cursor = query(uri, null, null, null, null, null);
-        if (null == cursor) {
-            Log.e(Constants.TAG, "Cannot read feature for update: " + featureId);
-            syncResult.databaseError = true;
-            return false;
-        }
-
+    protected boolean changeFeatureOnServer(long featureId,SyncResult syncResult,AccountUtil.AccountData accountData) {
+        if(!mNet.isNetworkAvailable()) {SyncResultUtil.markNetworkUnavailable(syncResult);return false;}
         try {
-            if (cursor.moveToFirst()) {
-                // get payload from cursor
-                String payload = cursorToJson(cursor);
-                if (Constants.DEBUG_MODE) {
-                    Log.d(Constants.TAG, "payload: " + payload);
+            String payload;
+            QueuedMutation mutation=mQueuedMutation.get();
+            if(mutation!=null&&"update".equals(mutation.receipt.operation))payload=mutation.receipt.payload;
+            else {
+                Uri uri=ContentUris.withAppendedId(getContentUri(),featureId).buildUpon().fragment(NO_SYNC).build();
+                try(Cursor cursor=query(uri,null,null,null,null,null)) {
+                    if(cursor==null||!cursor.moveToFirst()) {syncResult.databaseError=true;return false;}
+                    payload=cursorToJson(cursor);
                 }
-
-                // change on server ERRROR
-                HttpResponse response = changeFeatureOnServer(featureId, payload, accountData);
-
-                if (!response.isOk()) {
-                    reportSyncHttpFailure("changeFeature", featureId, -1, syncResult, response);
-                    return false;
-                }
-
-                return true;
-            } else {
-                logBuggyChangeDrop("changeFeatureOnServer (empty cursor)", featureId);
-                return true; //just remove buggy data
             }
-        } catch (IllegalStateException e) {
-            HyperLog.v(Constants.TAG, "changeFeatureOnServer IllegalStateException: " + e.getMessage());
-            log(e, "changeFeatureOnServer IllegalStateException");
-            syncResult.stats.numAuthExceptions++;
-            return false;
-        } catch (IOException e) {
-            HyperLog.v(Constants.TAG, "changeFeatureOnServer IOException: " + e.getMessage());
-            log(e, "changeFeatureOnServer IOException");
-            SyncResultUtil.markConnectFailed(syncResult);
-            syncResult.stats.numUpdates++;
-            return false;
-        } catch (JSONException e) {
-            HyperLog.v(Constants.TAG, "changeFeatureOnServer JSONException: " + e.getMessage());
-            log(e, "changeFeatureOnServer JSONException");
-            syncResult.stats.numParseExceptions++;
-            return false;
-        } finally {
-            cursor.close();
+            HttpResponse response=changeFeatureOnServer(featureId,payload,accountData);
+            if(!response.isOk()) {reportSyncHttpFailure("changeFeature",featureId,-1,syncResult,response);return false;}
+            return true;
+        }catch(IOException error) {
+            SyncResultUtil.markConnectFailed(syncResult);syncResult.stats.numUpdates++;return false;
+        }catch(JSONException error) {
+            syncResult.stats.numParseExceptions++;return false;
+        }catch(IllegalStateException error) {
+            syncResult.stats.numAuthExceptions++;return false;
         }
     }
 
