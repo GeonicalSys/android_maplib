@@ -24,7 +24,7 @@
 apply plugin: 'com.android.library'
 apply plugin: 'org.jetbrains.kotlin.android'
 
-def productionVersionName = '3.1.2.32'
+def productionVersionName = '3.1.2.33'
 def debugVersionName = '3.1.2.23'
 
 android {

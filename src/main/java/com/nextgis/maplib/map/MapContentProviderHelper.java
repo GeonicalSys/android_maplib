@@ -55,6 +55,9 @@ public class MapContentProviderHelper
     protected static final String DBNAME           = "layers";
     protected static final int    DATABASE_VERSION = 6;
 
+    /** Admission of an offline archive must not depend on opening a damaged source database. */
+    public static int getCurrentDatabaseVersion() { return DATABASE_VERSION; }
+
 
     public MapContentProviderHelper(
             Context context,
