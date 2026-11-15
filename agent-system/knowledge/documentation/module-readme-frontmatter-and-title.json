@@ -729,6 +729,11 @@
       "status": "source_backed",
       "target": "lisa:maplib:evidence:dated-underlay-transfer-preparation-and-pending-native-proof",
       "type": "contains"
+    },
+    {
+      "type": "contains",
+      "target": "lisa:maplib:resource:rel03-resource-bounded-full-snapshot",
+      "status": "source_backed"
     }
   ],
   "schema_version": 2,
