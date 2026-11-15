@@ -1062,6 +1062,21 @@
       "type": "contains"
     },
     {
+      "type": "contains",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwfullsnapshotindex-rel03",
+      "status": "source_backed"
+    },
+    {
+      "type": "contains",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwsyncresourcebudget-rel03",
+      "status": "source_backed"
+    },
+    {
+      "type": "contains",
+      "target": "lisa:maplib:contract:manifest-key-components-ngwfeaturebudgetreader-rel03",
+      "status": "source_backed"
+    },
+    {
       "status": "source_backed",
       "target": "lisa:maplib:contract:manifest-public-contracts-render-resource-economy-2c6382b96a",
       "type": "contains"

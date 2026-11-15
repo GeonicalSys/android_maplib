@@ -60,6 +60,8 @@ import com.nextgis.maplib.util.NgwPullDecision;
 import com.nextgis.maplib.util.NgwSyncNoneReloadDecision;
 import com.nextgis.maplib.util.NgwSnapshotCheckpoint;
 import com.nextgis.maplib.util.NgwSyncIo;
+import com.nextgis.maplib.util.NgwSyncResourceBudget;
+import com.nextgis.maplib.util.NgwFeatureBudgetReader;
 import com.nextgis.maplib.util.NgwSyncProgress;
 import com.nextgis.maplib.util.NgwSyncTrace;
 import com.nextgis.maplib.util.DistrictFilterUtil;
@@ -2607,13 +2609,13 @@ public class NGWVectorLayer
         String changeTableName = getChangeTableName();
         boolean bulkPullStarted = false;
         boolean committed = false;
-        try {
+        try (FullSnapshotScan scan = new FullSnapshotScan(mPath)) {
             trace.stage("scan");
-            FullSnapshotScan scan = scanFullSnapshot(snapshot, changeTableName, trace);
+            scanFullSnapshot(snapshot, changeTableName, trace, scan);
             NgwSyncIo.checkInterrupted();
             NgwSyncProgress.reportApply(0, Math.max(1, scan.remoteIds.size()));
             trace.stage("backup");
-            if (!backupBeforeRemoteDestructiveApply(scan.destructiveIds)) {
+            if (!backupBeforeFullSnapshotApply(scan.destructiveIds)) {
                 HyperLog.w(Constants.TAG, "NGWVectorLayer: " + getName()
                         + " streamed snapshot apply blocked by backup gate ids="
                         + scan.destructiveIds.size());
@@ -2642,7 +2644,7 @@ public class NGWVectorLayer
                 }
             }
             committed = true;
-            deleteCommittedAttachmentFolders(apply.attachmentCleanupIds);
+            deleteCommittedAttachmentFolders(scan.index.ids(NgwFullSnapshotIndex.CLEANUP));
             // Publish evidence only after commit. A failed attempt must not suppress a later retry.
             try {
                 String scope = snapshotCheckpointScope();
@@ -2713,28 +2715,31 @@ public class NGWVectorLayer
         }
     }
 
-    private FullSnapshotScan scanFullSnapshot(
+    private void scanFullSnapshot(
             File snapshot,
-            String changeTableName, NgwSyncTrace trace) throws IOException, NGException {
-        FullSnapshotScan scan = new FullSnapshotScan();
-        try (JsonReader reader = new JsonReader(new InputStreamReader(
-                new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"))) {
+            String changeTableName, NgwSyncTrace trace, FullSnapshotScan scan) throws IOException, NGException {
+        String localRowBudgetSql = fullSnapshotRowBudgetSql();
+        try (NgwFeatureBudgetReader input = new NgwFeatureBudgetReader(new InputStreamReader(
+                new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"));
+             JsonReader reader = new JsonReader(input)) {
             reader.beginArray();
             int featureIndex = 0;
             while (reader.hasNext()) {
                 NgwSyncIo.checkInterrupted();
                 int currentFeatureIndex = featureIndex++;
                 trace.progress(featureIndex, "features");
+                input.beginFeature();
+                NgwSyncResourceBudget.requireSpace(mPath, 64 * 1024);
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
-                if (!trackFullSnapshotFeatureAndCheckGeometry(
-                        remoteFeature, scan.remoteIds)) {
+                if (remoteFeature != null) scan.index.mark(remoteFeature.getId(), NgwFullSnapshotIndex.REMOTE);
+                if (!isFullSnapshotFeatureGeometryUsable(remoteFeature)) {
                     scan.skippedInvalid++;
                     if (remoteFeature != null) {
                         Cursor existing = query(new String[]{Constants.FIELD_ID},
                                 Constants.FIELD_ID + " = " + remoteFeature.getId(), null, null, null);
                         try {
                             if (existing != null && !existing.moveToFirst()) {
-                                scan.missingInvalidIds.add(remoteFeature.getId());
+                                scan.index.mark(remoteFeature.getId(), NgwFullSnapshotIndex.MISSING_INVALID);
                             }
                         } finally {
                             if (existing != null) existing.close();
@@ -2744,25 +2749,27 @@ public class NGWVectorLayer
                             remoteFeature, currentFeatureIndex, scan.skippedInvalid);
                     continue;
                 }
+                requireFullSnapshotLocalRowBudget(localRowBudgetSql, remoteFeature.getId());
                 if (willRemoteOverwriteLocalFeature(remoteFeature, changeTableName)) {
-                    scan.destructiveIds.add(remoteFeature.getId());
+                    scan.index.mark(remoteFeature.getId(), NgwFullSnapshotIndex.DESTRUCTIVE);
                 }
             }
             reader.endArray();
         }
 
-        for (Long featureId : queryAllFeatureIdsFromDb()) {
-            NgwSyncIo.checkInterrupted();
-            boolean deleteFeature = !scan.remoteIds.contains(featureId)
-                    && !FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false),
-                            changeTableName, featureId, Constants.CHANGE_OPERATION_NEW)
-                    && !FeatureChanges.hasFeatureFlags(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId);
-            if (deleteFeature) {
-                scan.deleteIds.add(featureId);
-                scan.destructiveIds.add(featureId);
+        try (Cursor local = query(new String[]{Constants.FIELD_ID}, null, null, null, null)) {
+            if (local == null) throw new SQLiteException("Cannot enumerate local snapshot identifiers");
+            while (local.moveToNext()) {
+                NgwSyncIo.checkInterrupted();
+                long featureId = local.getLong(0);
+                boolean deleteFeature = !scan.remoteIds.contains(featureId)
+                        && !FeatureChanges.isChanges(DatabaseContext.getDatabaseForLayer(this, false),
+                                changeTableName, featureId, Constants.CHANGE_OPERATION_NEW)
+                        && !FeatureChanges.hasFeatureFlags(DatabaseContext.getDatabaseForLayer(this, false), changeTableName, featureId);
+                if (deleteFeature) scan.index.mark(featureId,
+                        NgwFullSnapshotIndex.DELETE | NgwFullSnapshotIndex.DESTRUCTIVE);
             }
         }
-        return scan;
     }
 
     private void applyFullSnapshot(
@@ -2771,18 +2778,23 @@ public class NGWVectorLayer
             String changeTableName,
             FullSnapshotScan scan,
             FullSnapshotApply apply, NgwSyncTrace trace) throws IOException, NGException {
-        try (JsonReader reader = new JsonReader(new InputStreamReader(
-                new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"))) {
+        String localRowBudgetSql = fullSnapshotRowBudgetSql();
+        try (NgwFeatureBudgetReader input = new NgwFeatureBudgetReader(new InputStreamReader(
+                new BufferedInputStream(new FileInputStream(snapshot)), "UTF-8"));
+             JsonReader reader = new JsonReader(input)) {
             reader.beginArray();
             int processed = 0;
             while (reader.hasNext()) {
                 NgwSyncIo.checkInterrupted();
                 trace.progress(++processed, "features");
                 NgwSyncProgress.reportApply(processed, Math.max(processed, scan.remoteIds.size()));
+                input.beginFeature();
+                NgwSyncResourceBudget.requireSpace(mPath, 64 * 1024);
                 Feature remoteFeature = NGWUtil.readNGWFeature(reader, getFields(), mCRS);
                 if (!isFullSnapshotFeatureGeometryUsable(remoteFeature)) {
                     continue;
                 }
+                requireFullSnapshotLocalRowBudget(localRowBudgetSql, remoteFeature.getId());
                 Cursor cursor = query(
                         null,
                         Constants.FIELD_ID + " = " + remoteFeature.getId(),
@@ -2815,9 +2827,28 @@ public class NGWVectorLayer
             NgwSyncIo.checkInterrupted();
             SQLiteDatabase database = DatabaseContext.getDatabaseForLayer(this, false);
             if (deleteDatabaseRowWithoutAttachmentCleanup(database, featureId) > 0) {
-                apply.attachmentCleanupIds.add(featureId);
+                scan.index.mark(featureId, NgwFullSnapshotIndex.CLEANUP);
             }
         }
+    }
+
+    private static String snapshotSqlName(String value) {
+        return "\"" + value.replace("\"", "\"\"") + "\"";
+    }
+
+    /** Inspect SQLite lengths before materializing an old geometry/attribute row into Java. */
+    private String fullSnapshotRowBudgetSql() {
+        StringBuilder size = new StringBuilder("coalesce(length(")
+                .append(snapshotSqlName(Constants.FIELD_GEOM)).append("),0)");
+        for (com.nextgis.maplib.datasource.Field field : getFields())
+            size.append("+coalesce(length(").append(snapshotSqlName(field.getName())).append("),0)");
+        return "SELECT coalesce((SELECT " + size + " FROM " + snapshotSqlName(mPath.getName())
+                + " WHERE " + snapshotSqlName(Constants.FIELD_ID) + "=? LIMIT 1),0)";
+    }
+
+    private void requireFullSnapshotLocalRowBudget(String sql, long id) throws IOException {
+        NgwSyncResourceBudget.requireFeatureBytes(android.database.DatabaseUtils.longForQuery(
+                DatabaseContext.getDatabaseForLayer(this, false), sql, new String[]{Long.toString(id)}));
     }
 
     static boolean trackFullSnapshotFeatureAndCheckGeometry(
@@ -2856,7 +2887,7 @@ public class NGWVectorLayer
 
     private void reconcileFullSnapshotChangeRecords(
             String changeTableName,
-            Set<Long> remoteIds) throws IOException {
+            Collection<Long> remoteIds) throws IOException {
         Cursor changeCursor = FeatureChanges.getChanges(DatabaseContext.getDatabaseForLayer(this, false), changeTableName);
         if (changeCursor == null) {
             return;
@@ -2915,6 +2946,7 @@ public class NGWVectorLayer
         for (int attempt = 1; attempt <= NGW_SYNC_PULL_MAX_ATTEMPTS; attempt++) {
             HttpURLConnection connection = null;
             File snapshot = null;
+            boolean retained = false;
             try {
                 NgwSyncIo.checkInterrupted();
                 trace.stage("connect-" + attempt);
@@ -2928,7 +2960,7 @@ public class NGWVectorLayer
                     String responseMessage = connection.getResponseMessage();
                     String errorBody = null;
                     try {
-                        errorBody = NetworkUtil.responseToString(connection.getErrorStream());
+                        errorBody = NgwSyncResourceBudget.readErrorText(connection.getErrorStream());
                     } catch (IOException ignored) {
                     }
                     if (code == 404) {
@@ -2952,15 +2984,7 @@ public class NGWVectorLayer
                 }
 
                 int contentLength = connection.getContentLength();
-                long usable = mPath != null ? mPath.getUsableSpace() : 0L;
-                if (contentLength > 0 && usable > 0
-                        && usable < contentLength + 32L * 1024L * 1024L) {
-                    HyperLog.w(Constants.TAG, "NGWVectorLayer: insufficient disk for staged snapshot"
-                            + " layer=\"" + ProdLogUtil.truncateForLog(getName(), 100) + "\""
-                            + " contentLength=" + contentLength + " usable=" + usable);
-                    syncResult.stats.numIoExceptions++;
-                    return FullSnapshotDownload.failed(code);
-                }
+                NgwSyncResourceBudget.requireSpace(mPath, Math.max(0L, contentLength));
 
                 snapshot = File.createTempFile(
                         NGW_SYNC_SNAPSHOT_FILE_PREFIX,
@@ -2969,7 +2993,7 @@ public class NGWVectorLayer
                 trace.stage("download-" + attempt);
                 try (InputStream input = new BufferedInputStream(connection.getInputStream());
                      BufferedOutputStream output = new BufferedOutputStream(
-                             new FileOutputStream(snapshot, false))) {
+                             NgwSyncResourceBudget.reserving(new FileOutputStream(snapshot, false), mPath))) {
                     byte[] buffer = new byte[64 * 1024];
                     int read;
                     long received = 0;
@@ -2984,6 +3008,7 @@ public class NGWVectorLayer
                     }
                 }
                 NgwSyncProgress.reportDownloadComplete();
+                retained = true;
                 return FullSnapshotDownload.success(snapshot, code);
             } catch (MalformedURLException e) {
                 log(e, "downloadFullSnapshot: malformed URL");
@@ -2998,6 +3023,7 @@ public class NGWVectorLayer
                     snapshot.delete();
                 }
                 boolean transientFailure = !NgwSyncIo.isCancellationRequested()
+                        && !(e instanceof NgwSyncResourceBudget.LimitException)
                         && NetworkUtil.isTransientNetworkFailure(e);
                 if (transientFailure && attempt < NGW_SYNC_PULL_MAX_ATTEMPTS) {
                     sleepBeforeNgwSyncPullRetry(attempt, e.getMessage());
@@ -3015,6 +3041,8 @@ public class NGWVectorLayer
                     NgwSyncIo.unregisterReadConnection(connection);
                     connection.disconnect();
                 }
+                if (!retained && snapshot != null && snapshot.exists() && !snapshot.delete())
+                    HyperLog.w(Constants.TAG, "Failed download staging cleanup is pending");
             }
         }
         return FullSnapshotDownload.failed(0);
@@ -3026,7 +3054,9 @@ public class NGWVectorLayer
         }
         File[] files = mPath.listFiles((dir, name) -> name != null
                 && name.startsWith(NGW_SYNC_SNAPSHOT_FILE_PREFIX)
-                && name.endsWith(".json"));
+                && (name.endsWith(".json") || name.endsWith(".sqlite")
+                || name.endsWith(".sqlite-journal") || name.endsWith(".sqlite-wal")
+                || name.endsWith(".sqlite-shm")));
         if (files == null) {
             return;
         }
@@ -3056,18 +3086,23 @@ public class NGWVectorLayer
         }
     }
 
-    private static final class FullSnapshotScan {
-        final Set<Long> remoteIds = new HashSet<>();
-        final Set<Long> destructiveIds = new LinkedHashSet<>();
-        final List<Long> deleteIds = new ArrayList<>();
+    private static final class FullSnapshotScan implements AutoCloseable {
+        final NgwFullSnapshotIndex index;
+        final Collection<Long> remoteIds, destructiveIds, deleteIds, missingInvalidIds;
         int skippedInvalid;
-        final Set<Long> missingInvalidIds = new HashSet<>();
+        FullSnapshotScan(File directory) throws IOException {
+            index = new NgwFullSnapshotIndex(directory);
+            remoteIds = index.ids(NgwFullSnapshotIndex.REMOTE);
+            destructiveIds = index.ids(NgwFullSnapshotIndex.DESTRUCTIVE);
+            deleteIds = index.ids(NgwFullSnapshotIndex.DELETE);
+            missingInvalidIds = index.ids(NgwFullSnapshotIndex.MISSING_INVALID);
+        }
+        @Override public void close() { index.close(); }
     }
 
     private static final class FullSnapshotApply {
         int updated;
         int created;
-        final List<Long> attachmentCleanupIds = new ArrayList<>();
     }
 
 
@@ -3154,7 +3189,7 @@ public class NGWVectorLayer
                 null);
     }
 
-    private void deleteCommittedAttachmentFolders(List<Long> featureIds) {
+    private void deleteCommittedAttachmentFolders(Collection<Long> featureIds) {
         for (long featureId : featureIds) {
             FileUtil.deleteRecursive(new File(mPath, String.valueOf(featureId)));
         }
@@ -3218,6 +3253,19 @@ public class NGWVectorLayer
      * Reason string must match {@code LayerBackupManager.REASON_MANUAL_FEATURE_DELETE}.
      */
     private static final String BACKUP_REASON_MANUAL_FEATURE_DELETE = "manual_feature_delete";
+
+    /** Bound selective backup metadata/SQL parameters; larger plans retain the whole layer. */
+    protected boolean backupBeforeFullSnapshotApply(Collection<Long> featureIds) {
+        if (featureIds.size() <= 512) return backupBeforeRemoteDestructiveApply(featureIds);
+        try {
+            Context app = mContext.getApplicationContext();
+            return app instanceof IGISApplication && ((IGISApplication) app)
+                    .backupEditableLayerData(this, BACKUP_REASON_SYNC_REMOTE_APPLY);
+        } catch (RuntimeException failure) {
+            HyperLog.w(Constants.TAG, "Full snapshot backup gate failed", failure);
+            return false;
+        }
+    }
 
     protected boolean backupBeforeRemoteDestructiveApply(Collection<Long> featureIds) {
         if (featureIds == null || featureIds.isEmpty()) {

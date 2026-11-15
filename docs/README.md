@@ -1280,3 +1280,9 @@ RasterMbtilesWriter, shared catalog, y-flip и lease API здесь не мен�
 Main consumers LisaDebug/LisaRelease/BelkaRelease и изменённые unit/native test
 sources скомпилированы. Новые tests execution отложены пользователем; снятие
 HTTP маршрута не является доказательством исправления прежних pixel/ID FAIL.
+
+### REL-03: bounded full snapshot resources
+
+NgwFullSnapshotIndex stores full-pull identity/backup/delete/cleanup sets in a disposable disk SQLite index (512KiB cache, FILE temporary storage, constant-time counters). NgwFeatureBudgetReader bounds each feature before WKT materialization; NgwSyncResourceBudget checks heap headroom, actual streaming disk writes and a 32MiB free-space reserve. Single-feature budget heap/64 capped8MiB; error text capped64KiB. Local row lengths are checked in SQL before Java hydration. Up to512 destructive IDs use selective backup; larger plans use the existing whole-layer fail-closed backup API. No new IGISApplication API or remote payload/schema.
+
+Cancellation, staged-write failure and SQLite apply errors preserve prior DB/outbox and clean owned staging/index sidecars. HTTP206 admission and postcommit cache publication retain their existing boundaries. Direct tests cover actual technical SQLite rollback, outbox/photo retention, retry, huge feature refusal and large-plan backup routing on API26/36. Injected resource failures are not physical-device ENOSPC or publication acceptance.

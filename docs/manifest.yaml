@@ -459,6 +459,8 @@ key_components:
     stage; prior push/prefix cleanup and other response routes stay unchanged. Preserve known temporary-server reason after
     existing PUSH IO and report known SYNC_NONE metadata/count HTTP failures without changing UNKNOWN/zero→KEEP; initial feature
     IOException and metadata NGException retain typed HTTP provenance and their original diagnostic/catch/retry boundaries.
+    REL-03 replaces full-pull heap ID sets with a disk index, bounds remote/local feature hydration and stages, and uses existing
+    whole-layer backup for plans above512 IDs.
 - path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncNoneReloadDecision.java
   responsibility: Pure KEEP/RELOAD policy for SYNC_NONE count comparison; server count <= 0 keeps local data.
 - path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureCountParser.java
@@ -649,6 +651,14 @@ key_components:
 - path: maplib/src/test/java/com/nextgis/maplib/datasource/GeometryRTreeRecoveryTest.java
   responsibility: Independent11 actual RTree/legacy binary file oracles for clear persistence, missing/invalid/truncated load,
     wrong child kinds, clean no-write and fresh-object readback; plain JVM only.
+- path: maplib/src/main/java/com/nextgis/maplib/map/NgwFullSnapshotIndex.java
+  responsibility: Disposable disk-backed full-pull identity/backup/delete sets, constant-time counters and cursor-backed bounded
+    traversal; close/delete index and sidecars on every terminal path.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwSyncResourceBudget.java
+  responsibility: Bound feature/error allocation, check actual disk/heap headroom and stream with a free-space reserve; non-transient
+    LimitException.
+- path: maplib/src/main/java/com/nextgis/maplib/util/NgwFeatureBudgetReader.java
+  responsibility: Bound per-feature JSON/WKT read before JsonReader materializes a huge geometry string.
 public_contracts:
 - id: render-resource-economy
   symbol: MapDrawable.getRenderMemoryGuard, retryMemoryLimitedLayers and RenderMemoryGuard snapshot/hasResourceNotice/restrictions
