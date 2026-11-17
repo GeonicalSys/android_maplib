@@ -1,0 +1,67 @@
+{
+  "schema_version": 2,
+  "id": "lisa:maplib:evidence:night-committed-freshness-20261117",
+  "kind": "evidence",
+  "owner": "android_projects/android_gisapp/maplib",
+  "topic": "documentation",
+  "status": "active",
+  "execution_permission": false,
+  "applicability": {
+    "review_status": "reviewed",
+    "paths": [],
+    "scope_refs": [
+      "lisa:maplib:resource:module-readme-frontmatter-and-title"
+    ],
+    "conditions": [],
+    "unknown_behavior": "include_with_unknown_reason"
+  },
+  "lifecycle": {
+    "goal": "not_applicable",
+    "implementation": "not_applicable",
+    "source_verification": "NOT_APPLICABLE",
+    "merge": "not_applicable",
+    "runtime_verification": "NOT_APPLICABLE",
+    "release": "not_applicable",
+    "retention": "Retain scoped tested-input receipts and negative findings; this dated note does not accept the whole library or publication."
+  },
+  "facets": {
+    "view-path": {
+      "role": "ordinary_markdown_address",
+      "value": "docs/README.md"
+    },
+    "body": {
+      "role": "owner_dated_markdown_lines",
+      "value": [
+        "## Committed freshness — 17.11.2026",
+        "",
+        "`MapDrawable` replaces a former full compatibility list with an empty streaming",
+        "list and rechecks current SQLite admission before/after classic reads and before",
+        "Main publication. `VectorLayer.notifyDelete` invalidates rendering after committed",
+        "delete even if the separate spatial cache lacked that FID; metadata-save conditions",
+        "are preserved. Source lifecycle/admission, edit, full originals and persistent IDs",
+        "remain unchanged.",
+        "",
+        "The consuming App's MvtCommittedFreshnessTest uses real SQLite insert/update/delete,",
+        "original geometry/FID/labels/identify/pixels, no pan/restart, and real colliding",
+        "project layer IDs/FIDs across A→B→A→B. Phone/API37, tablet/API30 and CPU/API36 targeted",
+        "receipts pass. All10 old SQLite native cases pass in the last CPU candidate;",
+        "intermediate content/style30s timeouts remain unexplained, and the phone heavy-map",
+        "120s fully-rendered failure is still open PERF-01. These are not a General Full,",
+        "field, merge or publication acceptance. See the App mobile roadmap and update card",
+        "`maplib-20261117-mvt-committed-freshness`.",
+        ""
+      ]
+    },
+    "scope": {
+      "role": "verification_boundary",
+      "value": "Executed targeted receipts on exact source snapshots; current delivery only rebinds unchanged code, no new device execution."
+    }
+  },
+  "relations": [],
+  "provenance": {
+    "manifest": "agent-system/provenance/documentation.json",
+    "scopes": [
+      "lisa:maplib:evidence:night-committed-freshness-20261117"
+    ]
+  }
+}

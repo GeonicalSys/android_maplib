@@ -76,6 +76,11 @@
   },
   "relations": [
     {
+      "type": "contains",
+      "target": "lisa:maplib:evidence:night-committed-freshness-20261117",
+      "status": "source_backed"
+    },
+    {
       "status": "source_backed",
       "target": "lisa:maplib:contract:known-ngw-class-drift-takes-the-verified-metadata-repair-route",
       "type": "contains"

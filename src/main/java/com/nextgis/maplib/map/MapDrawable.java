@@ -486,7 +486,9 @@ public class MapDrawable
                 layersHashMap.remove(layer.getId()); layersHashMap2.remove(layer.getId());
                 layersHashMapLineDash.remove(layer.getId()); symbolsLayerHashMap.remove(layer.getId());
             }
-            sourceFeaturesHashMap.putIfAbsent(layer.getId(), new ArrayList<>());
+            // A legacy reload may have prepared this layer before its SQLite source was ready.
+            // The compatibility entry must not retain that complete geometry collection.
+            sourceFeaturesHashMap.put(layer.getId(), new ArrayList<>());
             sourcesOrder.putIfAbsent(layer.getId(), new ArrayList<>());
             sourceNativeUriMap.remove(layer.getId());
             createFillLayerForLayer(layer.getId(), layer.getGeometryType(), style,
@@ -1570,6 +1572,12 @@ public class MapDrawable
                     return;
                 VectorLayer layer = (VectorLayer) ilayer;
 
+                // Admission can change while this legacy job waits in the executor queue.
+                if (SqliteVectorTileProvider.canServe(layer)) {
+                    mainHandler.post(() -> reloadVectorLayerDataToMaplibre(layer));
+                    return;
+                }
+
                 if (!layer.isVisible()) {
                     // A data-change callback for a hidden layer must not allocate a complete Java
                     // feature list and a second native GeoJSON copy. Visibility enable already has
@@ -1632,14 +1640,24 @@ public class MapDrawable
                             + ProdLogUtil.truncateForLog(layer.getName(), 100)
                             + "\" id=" + layer.getId()
                             + " features=" + vectorPolygonFeatures.size());
+                    if (SqliteVectorTileProvider.canServe(layer)) {
+                        mainHandler.post(() -> reloadVectorLayerDataToMaplibre(layer));
+                        return;
+                    }
                     VectorLayerRenderCache.save(layer, vectorPolygonFeatures);
-                    sourceFeaturesHashMap.put(layer.getId(), vectorPolygonFeatures);
-                    sourcesOrder.put(layer.getId(), new ArrayList<>());
                     long reloadToken = System.nanoTime();
-                    mVectorLayerReloadTokens.put(layer.getId(), reloadToken);
 
                     postMainGuarded("reloadVectorLayerDataToMaplibre update layer=" + layer.getName(), () -> {
                         if (!TextUtils.equals(preparedStyle, VectorLayerRenderCache.styleFingerprint(layer))) return;
+                        // Serialize publication with SQLite attachment on Main. A late classic
+                        // result must never repopulate the streaming compatibility collection.
+                        if (SqliteVectorTileProvider.canServe(layer)) {
+                            reloadVectorLayerDataToMaplibre(layer);
+                            return;
+                        }
+                        sourceFeaturesHashMap.put(layer.getId(), vectorPolygonFeatures);
+                        sourcesOrder.put(layer.getId(), new ArrayList<>());
+                        mVectorLayerReloadTokens.put(layer.getId(), reloadToken);
                         updateVectorLayerGeoJsonSources(layer, vectorPolygonFeatures);
                         applyMaplibreStyleLayersForVector(layer);
                         logVectorLayerMaplibreState("apply", layer, vectorPolygonFeatures.size());

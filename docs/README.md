@@ -9,6 +9,24 @@ last_verified: 2026-11-10
 Текущая диагностическая версия Maplib: Release `3.1.2.32`, Debug `3.1.2.23`.
 Обе версии связаны с соответствующими вариантами потребляющего приложения.
 
+## Committed freshness — 17.11.2026
+
+`MapDrawable` replaces a former full compatibility list with an empty streaming
+list and rechecks current SQLite admission before/after classic reads and before
+Main publication. `VectorLayer.notifyDelete` invalidates rendering after committed
+delete even if the separate spatial cache lacked that FID; metadata-save conditions
+are preserved. Source lifecycle/admission, edit, full originals and persistent IDs
+remain unchanged.
+
+The consuming App's MvtCommittedFreshnessTest uses real SQLite insert/update/delete,
+original geometry/FID/labels/identify/pixels, no pan/restart, and real colliding
+project layer IDs/FIDs across A→B→A→B. Phone/API37, tablet/API30 and CPU/API36 targeted
+receipts pass. All10 old SQLite native cases pass in the last CPU candidate;
+intermediate content/style30s timeouts remain unexplained, and the phone heavy-map
+120s fully-rendered failure is still open PERF-01. These are not a General Full,
+field, merge or publication acceptance. See the App mobile roadmap and update card
+`maplib-20261117-mvt-committed-freshness`.
+
 ## Класс NGW исправляется как metadata без refill — 1 ноября 2026
 
 При известном несовпадении vector_layer ↔ postgis_layer и совпадающих geometry
