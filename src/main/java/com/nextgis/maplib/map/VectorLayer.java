@@ -3167,9 +3167,11 @@ public class VectorLayer
             if (mCache.removeItem(rowId) != null) {
 //            Log.e("CCACHH","mCache.removeItem");
                 save();
-                invalidateLocalRenderCache();
-                notifyLayerChanged();
             }
+            // The committed SQLite deletion is authoritative. A missing legacy spatial-cache
+            // item must not suppress retirement of the already visible native source/tiles.
+            invalidateLocalRenderCache();
+            notifyLayerChanged();
 //        Log.e("CCACHH","mCache.save");
             mCache.save(new File(mPath, RTREE));
         }
