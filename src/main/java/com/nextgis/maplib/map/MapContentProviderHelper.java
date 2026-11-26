@@ -230,12 +230,15 @@ public class MapContentProviderHelper
             String account,
             List<INGWLayer> layerList)
     {
+        if (account == null || account.isEmpty()) {
+            return;
+        }
         for (int i = 0; i < layerGroup.getLayerCount(); i++) {
             ILayer layer = layerGroup.getLayer(i);
 
             if (layer instanceof INGWLayer) {
                 INGWLayer ngwLayer = (INGWLayer) layer;
-                if (ngwLayer.getAccountName().equals(account)) {
+                if (account.equals(ngwLayer.getAccountName())) {
                     layerList.add(ngwLayer);
                 }
             }
