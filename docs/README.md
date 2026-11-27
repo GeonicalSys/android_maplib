@@ -1,12 +1,12 @@
 ---
 title: maplib — GIS model, storage, NGW и MapLibre
 module_id: maplib
-last_verified: 2026-11-10
+last_verified: 2026-11-26
 ---
 
 # maplib — GIS model, storage, NGW и MapLibre
 
-Текущая диагностическая версия Maplib: Release `3.1.2.32`, Debug `3.1.2.23`.
+Текущая диагностическая версия Maplib: Release `3.1.2.35`, Debug `3.1.2.23`.
 Обе версии связаны с соответствующими вариантами потребляющего приложения.
 
 ## Committed freshness — 17.11.2026
@@ -472,6 +472,46 @@ canonical workspace; библиотечный account adapter не пишет о
 Tracked URL читает часы своего проекта, с since=0 для неизвестного подтверждения.
 Регрессии: LocalChangesCommitTest и ProjectSyncStateTest, native consumer tests.
 
+## История сервера и сохранённая очередь — 26 ноября 2026
+
+Для известных dynamic-слоёв ЛИСы клиент исключает только семь служебных полей
+истории из нового upload payload после свежего подтверждения postgis_layer,
+resource/account/server и типов полей. Старая локальная структура с четырьмя
+audit-полями допускается до обновления конфигурации; отсутствие остальных
+полей не требует удаления или перезагрузки накопленных объектов. Обычная
+числовая сериализация SQLite NULL как0 сохранена; бизнес-поля не фильтруются.
+
+Legacy226 не сохраняла UUID или исход сетевой попытки. Такая новая точка
+автоматически не отправляется повторно: пользователь явно сверяет объект
+с исходным сервером. Список совпадений помогает выбору, но не доказывает
+identity или отсутствие прежней отправки. Явная привязка существующего ID
+сохраняет текущие локальные атрибуты и геометрию отдельным CHANGED UUID до
+ACCEPTED/remap; frozen ACK исходной create не поглощает эту правку.
+Коллизии локальных строк, вложений и файлов не разрешаются слиянием.
+
+Только явно подтверждённая новая reviewed creation получает отдельный durable
+NGW transaction journal в той же SQLite transaction, что исходный snapshot.
+Payload/source hash, target, resource SRS, типы и WKB остаются неизменными;
+геометрия готовится в SRS ресурса, который может отличаться от SRID PostGIS.
+HTTP подготовки выполняется вне SQLite transaction. Недоступные metadata или
+неподтверждённая поддержка reviewed transport блокируют push без plainPOST fallback.
+Обычные новые создания сохраняют прежний upload route.
+
+После durable commit_started автоматическое восстановление читает только
+результаты прежнего tid: повтор commit или новый tid не разрешается. Во внешнем
+PostGIS возможен разрыв между commit данных и NGW receipt; NotCommitted после
+неоднозначного ответа не доказывает отсутствие вставки. Положительный commit
+с валидным timestamp сохраняется до получения fid и запрещает NeverSent/reset
+даже при временно недоступном GET результата. Явный разрешённый reset архивирует
+прежние Tx/receipt доказательства; известное подтверждение не удаляется.
+
+Form/TEMP/NOT_SYNC guards, workspace ownership, frozen ACK identities и отдельные
+full completion clocks сохранены. Первичный combined JVM receipt до последних
+review-правок: Core90 + App8 =98 PASS. Итоговые JVM/native/release проверки
+для229/3.1.2.35 ещё не подтверждены этим документом; fixture не является
+проверкой реальной БД, устройства или принятия NGW. Карточки:
+`maplib-20261126-history-uploads` и `maplib-20261126-legacy-recovery-229`.
+
 
 ## Подтверждённое время полного завершения проекта — 29 октября2026
 
@@ -717,6 +757,10 @@ protocol/sync decisions, MapLibre style/rendering и shared application APIs.
   получение NGW-ресурса без загрузки всего дерева;
 - `LisaCatalog` / `LisaCatalogLookup` — поиск группы `keyname=lisa` и список
   `collector_project` внутри неё;
+- Слой с отсутствующим или пустым именем учётной записи остаётся в составе
+  карты. Выбор слоёв для обмена требует указанной учётной записи, включая
+  обход вложенных групп. Векторный слой без неё пропускает чтение и отправку.
+  Локальные права редактирования и накопленные записи сохраняются.
 - `CollectorProjectItem`, `CollectorProjectMetadata`,
   `CollectorProjectCompositionSync` — normalized Collector composition;
 - `NGWRasterLayer` хранит style identity, отдельный parent extent id и

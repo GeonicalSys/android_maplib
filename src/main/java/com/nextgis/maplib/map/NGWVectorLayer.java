@@ -74,6 +74,7 @@ import com.nextgis.maplib.util.NGException;
 import com.nextgis.maplib.util.NGWUtil;
 import com.nextgis.maplib.util.LayerConfigDiff;
 import com.nextgis.maplib.util.LayerConfigUtil;
+import com.nextgis.maplib.util.LisaHistoryFields;
 import com.nextgis.maplib.util.NGWLayerSchemaCompat;
 import com.nextgis.maplib.util.NetworkUtil;
 import com.nextgis.maplib.util.ProdLogUtil;
@@ -222,6 +223,9 @@ public class NGWVectorLayer
     protected boolean mTracked;
     protected int mSyncDirection = DIRECTION_BOTH; //1 - to server only, 2 - from server only, 3 - both directions
     protected LayerOriginMetadata mLayerOriginMetadata;
+    // Runtime proof from authoritative resource metadata; never trust a mobile config for this.
+    private volatile LisaHistoryFields mVerifiedLisaHistory;
+    private volatile boolean mLisaHistoryMetadataAvailable;
     //check where to sync on GSM/WI-FI for data/attachments
 
     /** Log SQLite error text once per getChangesFromServer when createNewFeature insert fails. */
@@ -281,6 +285,9 @@ public class NGWVectorLayer
     @Override
     public void setAccountName(String accountName)
     {
+        if (!java.util.Objects.equals(mAccountName, accountName)) {
+            mVerifiedLisaHistory = null;
+        }
         mAccountName = accountName;
         setAccountCacheData();
     }
@@ -307,6 +314,9 @@ public class NGWVectorLayer
     @Override
     public void setRemoteId(long remoteId)
     {
+        if (mRemoteId != remoteId) {
+            mVerifiedLisaHistory = null;
+        }
         mRemoteId = remoteId;
     }
 
@@ -423,6 +433,7 @@ public class NGWVectorLayer
     public void fromJSON(JSONObject jsonObject)
             throws JSONException, SQLiteException
     {
+        mVerifiedLisaHistory = null;
         super.fromJSON(jsonObject);
 
         mTracked = jsonObject.optBoolean(JSON_TRACKED_KEY);
@@ -631,6 +642,7 @@ public class NGWVectorLayer
      */
     public void applyMobileConfigPreservingAuthoritativeSchema(JSONObject config)
             throws JSONException, SQLiteException {
+        LisaHistoryFields authoritativeHistory = mVerifiedLisaHistory;
         int authoritativeGeometryType = mGeometryType;
         LinkedHashMap<String, Field> authoritativeFields = mFields;
         int authoritativeCrs = mCRS;
@@ -650,6 +662,7 @@ public class NGWVectorLayer
             mNgwVersionMinor = authoritativeNgwVersionMinor;
             setAccountName(authoritativeAccount);
             mRemoteId = authoritativeRemoteId;
+            mVerifiedLisaHistory = authoritativeHistory;
             persistNgwIdentityBackup();
         }
     }
@@ -661,6 +674,7 @@ public class NGWVectorLayer
     public void createFromNGW(IProgressor progressor)
             throws NGException, IOException, JSONException, SQLiteException
     {
+        mVerifiedLisaHistory = null;
         if (!mNet.isNetworkAvailable()) { //return tile from cache
             throw new NGException(getContext().getString(R.string.error_network_unavailable));
         }
@@ -704,6 +718,7 @@ public class NGWVectorLayer
             throw new com.nextgis.maplib.util.NgwHttpResponseException(mContext, response);
         }
         geoJSONObject = new JSONObject(response.getResponseBody());
+        verifyLisaHistoryMetadata(geoJSONObject, accountData.url);
 
         //fill field list
         JSONObject featureLayerJSONObject = geoJSONObject.getJSONObject("feature_layer");
@@ -1147,12 +1162,12 @@ public class NGWVectorLayer
             Pair<Integer, Integer> ver,
             SyncResult syncResult)
     {
+        mLastSyncHadTransientPullFailure = false;
+        if (TextUtils.isEmpty(mAccountName)) return;
         if (com.nextgis.maplib.util.ProjectRecoveryGuard.isSyncBlocked(this)) {
             syncResult.stats.numConflictDetectedExceptions++;
             return;
         }
-        mLastSyncHadTransientPullFailure = false;
-
         Log.d("SSYNC", "sync of " + getName());
         if (0 != (mSyncType & Constants.SYNC_NONE) || mFields == null) {
             if (0 != (mSyncType & Constants.SYNC_NONE) && mFields != null) {
@@ -1295,12 +1310,16 @@ public class NGWVectorLayer
 
     public boolean sendLocalChanges(SyncResult syncResult)
     {
+        if (TextUtils.isEmpty(mAccountName)) return true;
         if (com.nextgis.maplib.util.ProjectRecoveryGuard.isSyncBlocked(this)) {
             syncResult.stats.numConflictDetectedExceptions++;
             return false;
         }
         try (NgwSyncIo.OutboundWrite ignored = NgwSyncIo.beginOutboundWrite()) {
             return sendLocalChangesInternal(syncResult);
+        } finally {
+            // A later immediate-upload pass must verify the source again, including after restart.
+            mVerifiedLisaHistory = null;
         }
     }
 
@@ -1348,6 +1367,8 @@ public class NGWVectorLayer
             changeCursor.close();
 
             final AccountUtil.AccountData accountData = AccountUtil.getAccountData(mContext, mAccountName);
+            // Immediate upload can bypass full sync, and a resource can be rebound since import.
+            refreshLisaHistoryFromServer(accountData);
             while (true) {
                 // Do not start another remote mutation after cancellation. A mutation already
                 // sent is allowed to resolve so its local change record has an unambiguous state.
@@ -1883,6 +1904,7 @@ public class NGWVectorLayer
     }
 
     private ConfigRefreshOutcome tryRefreshServerResourceMetaAndConfig(SyncResult syncResult) {
+        mVerifiedLisaHistory = null;
         if (!mNet.isNetworkAvailable()) {
             HyperLog.v(Constants.TAG, "NGWVectorLayer: " + getName() + " network is unavailable -stop getChangesFromServer");
             return ConfigRefreshOutcome.NETWORK_UNAVAILABLE;
@@ -1911,6 +1933,7 @@ public class NGWVectorLayer
                         getResourceMetaUrl(accountDataForSchema),
                         accountDataForSchema.login,
                         accountDataForSchema.password, syncResult);
+                verifyLisaHistoryMetadata(resourceMeta, accountDataForSchema.url);
                 NGWLayerSchemaCompat.SchemaComparison schemaComparison = null;
                 if (resourceMeta != null) {
                     schemaComparison = NGWLayerSchemaCompat.compareLocalWithServerMeta(
@@ -2009,6 +2032,49 @@ public class NGWVectorLayer
         }
 
         return ConfigRefreshOutcome.CONTINUE_TO_FEATURES;
+    }
+
+    void verifyLisaHistoryMetadata(JSONObject resourceMeta, String serverUrl) {
+        mLisaHistoryMetadataAvailable = resourceMeta != null;
+        mVerifiedLisaHistory = LisaHistoryFields.fromResourceMetadata(
+                resourceMeta, mAccountName, serverUrl, mRemoteId);
+    }
+
+    private boolean hasVerifiedLisaHistorySource() {
+        LisaHistoryFields verified = mVerifiedLisaHistory;
+        if (verified == null) {
+            return false;
+        }
+        if (mFields == null || !LisaHistoryFields.hasCompatibleLocalSchema(mFields.values())) {
+            mVerifiedLisaHistory = null;
+            return false;
+        }
+        try {
+            AccountUtil.AccountData account = AccountUtil.getAccountData(mContext, mAccountName);
+            if (verified.matchesTarget(mAccountName, account.url, mRemoteId)) {
+                return true;
+            }
+        } catch (IllegalStateException missingAccount) {
+            // No account can prove ownership of this target.
+        }
+        mVerifiedLisaHistory = null;
+        return false;
+    }
+
+    /** Read-only proof for upload/review after restart; never taken from a saved description. */
+    protected JSONObject readResourceMetadataForHistory(AccountUtil.AccountData account) {
+        return NGWLayerSchemaCompat.fetchResourceMetaJson(
+                getResourceMetaUrl(account), account.login, account.password);
+    }
+
+    private void refreshLisaHistoryFromServer(AccountUtil.AccountData account) {
+        mVerifiedLisaHistory = null;
+        mLisaHistoryMetadataAvailable = false;
+        // Local names/types only decide whether to request proof, never whether to omit fields.
+        if (account.url != null && mFields != null
+                && LisaHistoryFields.hasCompatibleLocalSchema(mFields.values())) {
+            verifyLisaHistoryMetadata(readResourceMetadataForHistory(account), account.url);
+        }
     }
 
     private boolean repairVerifiedServerMetadata(
@@ -3786,6 +3852,10 @@ public class NGWVectorLayer
                 com.nextgis.maplib.util.UploadOperationJournal.queued(db, mPath.getName(), getChangeTableName(), changeId);
         boolean postStarted = false;
         com.nextgis.maplib.util.UploadOperationJournal.Flight flight = null;
+        if (receipt != null && com.nextgis.maplib.util.UploadTransactionJournal.find(
+                db, mPath.getName(), receipt.id) != null) {
+            return sendReviewedFeatureTransaction(receipt, syncResult);
+        }
         if (receipt != null && receipt.needsReconciliation()) {
             if (!uploadTarget(accountData).equals(receipt.target)) {
                 syncResult.stats.numConflictDetectedExceptions++;
@@ -3803,6 +3873,23 @@ public class NGWVectorLayer
             return FeaturePushResult.failed();
         }
         final Uri uri = ContentUris.withAppendedId(getContentUri(), featureId).buildUpon().fragment(NO_SYNC).build();
+        boolean reviewedCreation = receipt != null
+                && com.nextgis.maplib.util.UploadOperationJournal.RETRY_ALLOWED.equals(receipt.state);
+        if (reviewedCreation && mFields != null
+                && LisaHistoryFields.hasCompatibleLocalSchema(mFields.values())
+                && !mLisaHistoryMetadataAvailable) {
+            syncResult.stats.numIoExceptions++;
+            return FeaturePushResult.failed();
+        }
+        final LisaHistoryFields transactionProof;
+        if (reviewedCreation && hasVerifiedLisaHistorySource()) {
+            int serverMajor = reviewedServerMajor(accountData);
+            if (serverMajor < 0 || serverMajor >= 5 && mVerifiedLisaHistory.resourceSrs() <= 0) {
+                syncResult.stats.numConflictDetectedExceptions++;
+                return FeaturePushResult.failed();
+            }
+            transactionProof = serverMajor >= 5 ? mVerifiedLisaHistory : null;
+        } else transactionProof = null;
 
         try {
                 // Capture data, coalesced edit identities and the durable reservation in one
@@ -3815,7 +3902,16 @@ public class NGWVectorLayer
                                 throw new SQLiteException("The form still owns this feature");
                             try (Cursor snapshot=query(uri,null,null,null,"_id",null)) {
                                 if(snapshot==null)throw new IOException("Cannot read feature for upload");
-                                return snapshot.moveToFirst()?cursorToJson(snapshot):null;
+                                if (!snapshot.moveToFirst()) return null;
+                                String body = transactionProof == null ? cursorToJson(snapshot) : cursorToTransactionJson(snapshot);
+                                if (transactionProof != null) {
+                                    String operationId = FeatureChanges.operationId(db, getChangeTableName(), changeId);
+                                    com.nextgis.maplib.util.UploadTransactionJournal.reserve(db, operationId,
+                                            mPath.getName(), uploadTarget(accountData),
+                                            com.nextgis.maplib.util.UploadTransactionJournal.sha256(body),
+                                            transactionProof.resourceSrs(), transactionProof.fieldTypesJson());
+                                }
+                                return body;
                             }
                         }, boundary);
                 if (!receipt.wasStarted()) {
@@ -3824,6 +3920,8 @@ public class NGWVectorLayer
                     else syncResult.stats.numConflictDetectedExceptions++;
                     return FeaturePushResult.failed();
                 }
+                if (com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), receipt.id) != null)
+                    return sendReviewedFeatureTransaction(receipt, syncResult);
                 String payload = receipt.payload;
                 if (Constants.DEBUG_MODE) {
                     Log.d(Constants.TAG, "payload: " + payload);
@@ -4137,6 +4235,115 @@ public class NGWVectorLayer
         });
     }
 
+    public static final class CreationReviewCandidates {
+        public final java.util.List<Long> serverIds;
+        public final boolean truncated;
+        public final boolean creationConfirmed;
+        public final long knownServerId;
+        public final boolean lookupUnavailable;
+        private CreationReviewCandidates(java.util.List<Long> ids, boolean truncated, boolean confirmed, long knownId) {
+            this(ids, truncated, confirmed, knownId, false);
+        }
+        private CreationReviewCandidates(java.util.List<Long> ids, boolean truncated, boolean confirmed, long knownId, boolean unavailable) {
+            this.serverIds = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(ids));
+            this.truncated = truncated;
+            this.creationConfirmed = confirmed;
+            this.knownServerId = knownId;
+            this.lookupUnavailable = unavailable;
+        }
+    }
+
+    /** Candidates assist an explicit identity decision; neither a match nor absence authorizes a POST. */
+    public CreationReviewCandidates findCreationCandidates(String operationId) throws Exception {
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt =
+                com.nextgis.maplib.util.UploadOperationJournal.find(db, mPath.getName(), operationId);
+        AccountUtil.AccountData account = AccountUtil.getAccountData(mContext, mAccountName);
+        if (receipt == null || !"create".equals(receipt.operation) || receipt.payload.isEmpty()
+                || !reviewTarget(receipt, account) || !reviewable(db, receipt.changeId, receipt.id,
+                receipt.featureId, receipt.attachId, receipt.operation))
+            throw new SQLiteException("The queued creation is no longer available for review");
+        com.nextgis.maplib.util.UploadTransactionJournal.Entry transaction =
+                com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), operationId);
+        if (transaction != null && (!transaction.target.equals(receipt.target)
+                || !transaction.sourceSha.equals(com.nextgis.maplib.util.UploadTransactionJournal.sha256(receipt.payload))))
+            throw new SQLiteException("The transaction identity changed");
+        long knownId = receipt.remoteId >= 0 ? receipt.remoteId
+                : transaction != null && com.nextgis.maplib.util.UploadTransactionJournal.COMMITTED.equals(transaction.phase)
+                ? transaction.remoteId : -1;
+        boolean confirmed = com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(receipt.state)
+                || transaction != null && com.nextgis.maplib.util.UploadTransactionJournal.hasCommittedProof(transaction);
+        if (confirmed && knownId >= 0)
+            return new CreationReviewCandidates(java.util.Collections.singletonList(knownId), false, true, knownId);
+        try {
+            refreshLisaHistoryFromServer(account);
+            JSONObject submitted = new JSONObject(receipt.payload);
+            boolean managedHistory = hasVerifiedLisaHistorySource();
+            if (managedHistory) submitted = LisaHistoryFields.withoutServerManagedFields(submitted);
+            int sourceSrs = com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), operationId) != null
+                    ? GeoConstants.CRS_WEB_MERCATOR : mCRS;
+            if (sourceSrs != GeoConstants.CRS_WEB_MERCATOR && sourceSrs != GeoConstants.CRS_WGS84)
+                throw new IOException("The saved request CRS cannot be verified for candidate lookup");
+            JSONArray records;
+            try { records = readCreationCandidatesForReview(submitted, account, sourceSrs); }
+            catch (IOException | JSONException unavailable) {
+                if (confirmed) return new CreationReviewCandidates(java.util.Collections.emptyList(), false, true, knownId, true);
+                throw unavailable;
+            }
+            java.util.List<Long> matches = new java.util.ArrayList<>();
+            java.util.Set<Long> seen = new java.util.HashSet<>();
+            int limit = Math.min(records.length(), 51);
+            for (int i = 0; i < limit; i++) {
+                JSONObject remote = records.getJSONObject(i);
+                long id = com.nextgis.maplib.util.UploadOperationJournal.serverId(remote);
+                if (!seen.add(id)) throw new IOException("Duplicate server identifiers in review response");
+                JSONObject comparable = managedHistory ? LisaHistoryFields.withoutServerManagedFields(remote) : remote;
+                if (sameSubmittedData(submitted, comparable) && matches.size() < 50) matches.add(id);
+            }
+            if (!reviewTarget(receipt, AccountUtil.getAccountData(mContext, mAccountName))
+                    || !reviewable(db, receipt.changeId, receipt.id, receipt.featureId, receipt.attachId, receipt.operation))
+                throw new SQLiteException("The queued creation changed during review");
+            return new CreationReviewCandidates(matches, records.length() >= 51, confirmed, knownId);
+        } finally {
+            mVerifiedLisaHistory = null;
+        }
+    }
+
+    protected JSONArray readCreationCandidatesForReview(JSONObject submitted, AccountUtil.AccountData account, int sourceSrs)
+            throws IOException, JSONException {
+        String geometry = submitted.getString("geom");
+        String url = Uri.parse(NGWUtil.getFeaturesUrl(account.url, mRemoteId)).buildUpon()
+                .appendQueryParameter("srs", Integer.toString(sourceSrs))
+                .appendQueryParameter("intersects_srs", Integer.toString(sourceSrs))
+                .appendQueryParameter("intersects", geometry)
+                .appendQueryParameter("geom_format", "wkt")
+                .appendQueryParameter("dt_format", "iso")
+                .appendQueryParameter("limit", "51").build().toString();
+        java.net.HttpURLConnection connection = NetworkUtil.getHttpConnection("GET", url, account.login, account.password);
+        if (connection == null) throw new IOException("Cannot connect for creation review");
+        connection.setInstanceFollowRedirects(false);
+        NgwSyncIo.registerReadConnection(connection);
+        try {
+            int status = connection.getResponseCode();
+            if (status != 200) throw new IOException("Cannot read review candidates (HTTP " + status + ")");
+            java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+            byte[] bytes = new byte[16384];
+            try (java.io.InputStream input = connection.getInputStream()) {
+                int count;
+                while ((count = input.read(bytes)) != -1) {
+                    NgwSyncIo.checkInterrupted();
+                    if (body.size() + (long) count > 2L * 1024 * 1024)
+                        throw new IOException("Review response exceeds the bounded candidate budget");
+                    body.write(bytes, 0, count);
+                }
+            }
+            return new JSONArray(body.toString("UTF-8"));
+        } finally {
+            NgwSyncIo.unregisterReadConnection(connection);
+            connection.disconnect();
+        }
+    }
+
     /** Explicit reconciliation never sends a POST, PUT or DELETE. */
     public boolean reconcileUpload(String operationId,long serverId) throws Exception {
         if (serverId < 0) return false;
@@ -4150,17 +4357,32 @@ public class NGWVectorLayer
         boolean held=com.nextgis.maplib.util.ProjectRecoveryGuard.isHeld(DatabaseContext.getMapForLayer(this).getPath());
         boolean accepted=com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(receipt.state);
         if(accepted&&receipt.remoteId!=serverId)return false;
+        com.nextgis.maplib.util.UploadTransactionJournal.Entry transaction =
+                com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), operationId);
+        if (transaction != null && com.nextgis.maplib.util.UploadTransactionJournal.COMMITTED.equals(transaction.phase)) {
+            if (transaction.remoteId != serverId || !transaction.target.equals(receipt.target)
+                    || !transaction.sourceSha.equals(com.nextgis.maplib.util.UploadTransactionJournal.sha256(receipt.payload))) return false;
+            accepted = true;
+        }
         if(!accepted||held) {
             switch(receipt.operation) {
                 case "create":case "update":
                     if("update".equals(receipt.operation)&&serverId!=receipt.featureId)return false;
+                    refreshLisaHistoryFromServer(account);
                     Feature remote=getFeatureFromServer(serverId,account);
                     if(remote==null||remote.getId()!=serverId)return false;
                     ContentValues values=remote.getContentValues(false);String[] columns=values.keySet().toArray(new String[0]);
                     try(android.database.MatrixCursor cursor=new android.database.MatrixCursor(columns)) {
                         Object[] row=new Object[columns.length];for(int i=0;i<columns.length;i++)row[i]=values.get(columns[i]);
                         cursor.addRow(row);cursor.moveToFirst();
-                        if(!sameSubmittedData(new JSONObject(receipt.payload),new JSONObject(cursorToJson(cursor))))return false;
+                        JSONObject submitted = new JSONObject(receipt.payload);
+                        JSONObject actual = new JSONObject(transaction == null ? cursorToJson(cursor) : cursorToTransactionJson(cursor));
+                        if (hasVerifiedLisaHistorySource()) {
+                            // Compare copies: legacy frozen receipts retain their original bytes.
+                            submitted = LisaHistoryFields.withoutServerManagedFields(submitted);
+                            actual = LisaHistoryFields.withoutServerManagedFields(actual);
+                        }
+                        if (!sameSubmittedData(submitted, actual)) return false;
                     }
                     break;
                 case "attachment_create":case "attachment_update":case "attachment_delete":
@@ -4243,22 +4465,112 @@ public class NGWVectorLayer
         return reconcileUpload(operationId,serverId);
     }
 
+    /**
+     * Explicit operator identity decision after comparing the original server object.
+     * This method performs GET only. Current local data is preserved as a separate update.
+     */
+    public boolean linkReviewedCreation(String operationId, long serverId) throws Exception {
+        if (serverId < 0 || isRemoteReadOnly()) return false;
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        if (db.inTransaction()) throw new SQLiteException("Review HTTP requires a durable transaction boundary");
+        com.nextgis.maplib.util.UploadOperationJournal.Entry receipt =
+                com.nextgis.maplib.util.UploadOperationJournal.find(db, mPath.getName(), operationId);
+        AccountUtil.AccountData account = AccountUtil.getAccountData(mContext, mAccountName);
+        if (receipt == null || !"create".equals(receipt.operation) || receipt.payload.isEmpty()
+                || com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(receipt.state)
+                || !reviewTarget(receipt, account) || !reviewable(db, receipt.changeId, receipt.id,
+                receipt.featureId, receipt.attachId, receipt.operation)) return false;
+        if (receipt.remoteId >= 0 && receipt.remoteId != serverId) return false;
+        com.nextgis.maplib.util.UploadTransactionJournal.Entry transaction =
+                com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), receipt.id);
+        if (transaction != null && (!transaction.target.equals(receipt.target)
+                || !transaction.sourceSha.equals(com.nextgis.maplib.util.UploadTransactionJournal.sha256(receipt.payload))
+                || transaction.remoteId >= 0 && transaction.remoteId != serverId)) return false;
+        if (transaction != null && com.nextgis.maplib.util.UploadTransactionJournal.COMMITTED.equals(transaction.phase)
+                && transaction.remoteId < 0) return false;
+
+        Feature remote = getFeatureFromServer(serverId, account);
+        if (remote == null || remote.getId() != serverId || remote.getGeometry() == null
+                || remote.getGeometry().getType() != getGeometryType()) return false;
+        final com.nextgis.maplib.util.UploadOperationJournal.Entry reviewed = receipt;
+        receipt = com.nextgis.maplib.util.LayerDatabaseTransaction.run(db, () -> {
+            AccountUtil.AccountData currentAccount = AccountUtil.getAccountData(mContext, mAccountName);
+            if (isRemoteReadOnly() || !java.util.Objects.equals(account.url, currentAccount.url)
+                    || !java.util.Objects.equals(account.login, currentAccount.login)
+                    || !reviewTarget(reviewed, currentAccount) || !reviewable(db, reviewed.changeId,
+                    reviewed.id, reviewed.featureId, reviewed.attachId, reviewed.operation)) return null;
+            com.nextgis.maplib.util.UploadOperationJournal.Entry current =
+                    com.nextgis.maplib.util.UploadOperationJournal.find(db, mPath.getName(), reviewed.id);
+            if (current == null || !current.target.equals(reviewed.target) || !current.payload.equals(reviewed.payload)
+                    || !current.state.equals(reviewed.state) || current.boundary != reviewed.boundary
+                    || current.featureId != reviewed.featureId || current.attachId != reviewed.attachId
+                    || !current.operation.equals(reviewed.operation)
+                    || !current.acknowledgedChanges.equals(reviewed.acknowledgedChanges)
+                    || current.remoteId >= 0 && current.remoteId != serverId
+                    || com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(current.state)) return null;
+            com.nextgis.maplib.util.UploadTransactionJournal.Entry currentTransaction =
+                    com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), current.id);
+            if (currentTransaction != null && (!currentTransaction.target.equals(current.target)
+                    || !currentTransaction.sourceSha.equals(com.nextgis.maplib.util.UploadTransactionJournal.sha256(current.payload))
+                    || currentTransaction.remoteId >= 0 && currentTransaction.remoteId != serverId
+                    || com.nextgis.maplib.util.UploadTransactionJournal.COMMITTED.equals(currentTransaction.phase)
+                    && currentTransaction.remoteId < 0)) return null;
+
+            // Neither a local destination row nor its pending records/files may be merged implicitly.
+            if (current.featureId != serverId) {
+                try (Cursor destination = db.query(mPath.getName(), new String[]{Constants.FIELD_ID},
+                        Constants.FIELD_ID + "=?", new String[]{Long.toString(serverId)}, null, null, null)) {
+                    if (destination.moveToFirst()) return null;
+                }
+                try (Cursor queued = db.query(getChangeTableName(), new String[]{Constants.FIELD_FEATURE_ID},
+                        Constants.FIELD_FEATURE_ID + "=?", new String[]{Long.toString(serverId)}, null, null, null)) {
+                    if (queued.moveToFirst()) return null;
+                }
+                if (new File(mPath, Long.toString(serverId)).exists()) return null;
+                try (Cursor tables = db.rawQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                        new String[]{getAttachmentsTableName()})) {
+                    if (tables.moveToFirst()) {
+                        try (Cursor attachments = db.query(getAttachmentsTableName(), new String[]{Constants.FIELD_FEATURE_ID},
+                                Constants.FIELD_FEATURE_ID + "=?", new String[]{Long.toString(serverId)}, null, null, null)) {
+                            if (attachments.moveToFirst()) return null;
+                        }
+                    }
+                }
+            }
+            try (Cursor local = db.query(mPath.getName(), new String[]{Constants.FIELD_GEOM},
+                    Constants.FIELD_ID + "=?", new String[]{Long.toString(current.featureId)}, null, null, null)) {
+                if (!local.moveToFirst() || local.isNull(0)) return null;
+                GeoGeometry localGeometry;
+                try { localGeometry = GeoGeometryFactory.fromBlob(local.getBlob(0)); }
+                catch (IOException error) { throw new SQLiteException("Cannot read the local geometry", error); }
+                if (localGeometry == null || localGeometry.getType() != remote.getGeometry().getType()
+                        || localGeometry.getType() != getGeometryType()) return null;
+            }
+            boolean alreadyAccepted = com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(current.state);
+            if (alreadyAccepted && current.remoteId != serverId) return null;
+            if (!alreadyAccepted) {
+                // A fresh identity cannot belong to the creation receipt's frozen ACK tokens.
+                long updateId = FeatureChanges.add(db, getChangeTableName(), current.featureId,
+                        Constants.CHANGE_OPERATION_CHANGED);
+                String updateIdentity = FeatureChanges.operationId(db, getChangeTableName(), updateId);
+                if (updateId < 0 || updateIdentity == null || updateIdentity.equals(current.id)
+                        || current.acknowledgedChanges.contains(updateIdentity))
+                    throw new SQLiteException("Cannot preserve the local data as a separate update");
+            }
+            com.nextgis.maplib.util.UploadOperationJournal.Entry bound =
+                    com.nextgis.maplib.util.UploadOperationJournal.rebindReviewed(db, current, uploadTarget(currentAccount));
+            if (!alreadyAccepted)
+                com.nextgis.maplib.util.UploadOperationJournal.state(db, bound,
+                        com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED, serverId, "operator_linked_existing_creation");
+            return com.nextgis.maplib.util.UploadOperationJournal.find(db, mPath.getName(), current.id);
+        });
+        // ACCEPTED + the separate CHANGED row are durable before the recoverable ID/files remap.
+        // A process death here resumes the ordinary ACK; it cannot create another update or POST.
+        return receipt != null && finishCreatedFeature(receipt, new SyncResult()).success;
+    }
+
     static boolean sameSubmittedData(JSONObject submitted, JSONObject actual) throws Exception {
-        java.util.Iterator<String> keys = submitted.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            if (!actual.has(key)) return false;
-            Object a = submitted.get(key), b = actual.get(key);
-            if (a instanceof JSONObject && b instanceof JSONObject) {
-                if (!sameSubmittedData((JSONObject) a, (JSONObject) b)) return false;
-            } else if ("geom".equals(key) && a instanceof String && b instanceof String) {
-                if (!GeoGeometryFactory.fromWKT((String) a, GeoConstants.CRS_WEB_MERCATOR)
-                        .equals(GeoGeometryFactory.fromWKT((String) b, GeoConstants.CRS_WEB_MERCATOR))) return false;
-            } else if (a instanceof Number && b instanceof Number) {
-                if (new java.math.BigDecimal(a.toString()).compareTo(new java.math.BigDecimal(b.toString())) != 0) return false;
-            } else if (!a.equals(b)) return false;
-        }
-        return true;
+        return com.nextgis.maplib.util.NgwFeatureData.sameSubmittedData(submitted, actual);
     }
 
     /** The caller must obtain explicit confirmation after checking the server for a duplicate. */
@@ -4271,6 +4583,10 @@ public class NGWVectorLayer
                 ||com.nextgis.maplib.util.UploadOperationJournal.CONFIRMED.equals(receipt.state))return false;
         return com.nextgis.maplib.util.LayerDatabaseTransaction.run(db,()->{
             if(!reviewTarget(receipt,account)||!reviewable(db,receipt.changeId,receipt.id,receipt.featureId,receipt.attachId,receipt.operation))return false;
+            com.nextgis.maplib.util.UploadTransactionJournal.Entry transaction =
+                    com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), receipt.id);
+            if (transaction != null)
+                com.nextgis.maplib.util.UploadTransactionJournal.resetAfterExplicitReview(db, transaction, receipt);
             com.nextgis.maplib.util.UploadOperationJournal.Entry current=com.nextgis.maplib.util.UploadOperationJournal.rebindReviewed(db,receipt,uploadTarget(account));
             com.nextgis.maplib.util.UploadOperationJournal.state(db,current,
                     com.nextgis.maplib.util.UploadOperationJournal.RETRY_ALLOWED,-1,"explicit_retry_authorized");return true;
@@ -4317,6 +4633,128 @@ public class NGWVectorLayer
                 if(receipt.needsReconciliation()||com.nextgis.maplib.util.UploadOperationJournal.LOCAL_MISSING.equals(receipt.state)
                         ||com.nextgis.maplib.util.UploadOperationJournal.READ_FAILED.equals(receipt.state))return false;
         return true;
+    }
+
+    private FeaturePushResult sendReviewedFeatureTransaction(
+            com.nextgis.maplib.util.UploadOperationJournal.Entry receipt,
+            SyncResult result) {
+        SQLiteDatabase db = DatabaseContext.getDatabaseForLayer(this, false);
+        try {
+            AccountUtil.AccountData account = AccountUtil.getAccountData(mContext, mAccountName);
+            if (!uploadTarget(account).equals(receipt.target)) {
+                result.stats.numConflictDetectedExceptions++;
+                return FeaturePushResult.failed();
+            }
+            if (com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED.equals(receipt.state))
+                return finishCreatedFeature(receipt, result);
+            if (com.nextgis.maplib.util.FeatureSaveJournal.isUploadHeld(db, mPath.getName(), receipt.featureId)
+                    || FeatureChanges.hasFeatureTempFlag(db, getChangeTableName(), receipt.featureId)
+                    || FeatureChanges.hasFeatureNotSyncFlag(db, getChangeTableName(), receipt.featureId)) {
+                result.stats.numConflictDetectedExceptions++;
+                return FeaturePushResult.failed();
+            }
+            if (!mNet.isNetworkAvailable()) {
+                SyncResultUtil.markNetworkUnavailable(result);
+                return FeaturePushResult.failed();
+            }
+            com.nextgis.maplib.util.UploadTransactionJournal.Entry transaction =
+                    com.nextgis.maplib.util.UploadTransactionJournal.find(db, mPath.getName(), receipt.id);
+            if (transaction == null) throw new SQLiteException("Missing reviewed transaction");
+            if (!transaction.commitStarted) {
+                refreshLisaHistoryFromServer(account);
+                if (!hasVerifiedLisaHistorySource()
+                        || mVerifiedLisaHistory.resourceSrs() != transaction.resourceSrs) {
+                    result.stats.numConflictDetectedExceptions++;
+                    return FeaturePushResult.failed();
+                }
+                JSONObject frozenTypes = new JSONObject(transaction.fieldTypesJson);
+                JSONObject currentTypes = new JSONObject(mVerifiedLisaHistory.fieldTypesJson());
+                JSONObject fields = new JSONObject(receipt.payload).optJSONObject("fields");
+                if (fields != null) {
+                    java.util.Iterator<String> names = fields.keys();
+                    while (names.hasNext()) {
+                        String name = names.next();
+                        if (!frozenTypes.has(name) || !frozenTypes.get(name).equals(currentTypes.opt(name))) {
+                            result.stats.numConflictDetectedExceptions++;
+                            return FeaturePushResult.failed();
+                        }
+                    }
+                }
+            }
+            try (com.nextgis.maplib.util.UploadOperationJournal.Flight flight =
+                         com.nextgis.maplib.util.UploadOperationJournal.sending(db, receipt)) {
+                com.nextgis.maplib.util.NgwFeatureTransaction.Result uploaded =
+                        com.nextgis.maplib.util.NgwFeatureTransaction.execute(db, receipt, uploadTarget(account),
+                                mRemoteId, account, this::requestFeatureTransaction);
+                if (uploaded.accepted) {
+                    com.nextgis.maplib.util.UploadOperationJournal.state(db, receipt,
+                            com.nextgis.maplib.util.UploadOperationJournal.ACCEPTED,
+                            uploaded.remoteId, "server_transaction_confirmed");
+                    return finishCreatedFeature(com.nextgis.maplib.util.UploadOperationJournal.find(
+                            db, mPath.getName(), receipt.id), result);
+                }
+                String state = uploaded.retryable ? com.nextgis.maplib.util.UploadOperationJournal.RETRY_PENDING
+                        : uploaded.rejected ? com.nextgis.maplib.util.UploadOperationJournal.REJECTED
+                        : com.nextgis.maplib.util.UploadOperationJournal.UNCERTAIN;
+                com.nextgis.maplib.util.UploadOperationJournal.state(db, receipt, state, -1, uploaded.reason);
+                if (uploaded.response != null && !uploaded.response.isOk())
+                    reportSyncHttpFailure("addFeature", receipt.featureId, -1, result, uploaded.response);
+                else if (uploaded.retryable) result.stats.numIoExceptions++;
+                else result.stats.numConflictDetectedExceptions++;
+                return FeaturePushResult.failed();
+            }
+        } catch (JSONException | IllegalStateException error) {
+            result.stats.numConflictDetectedExceptions++;
+            return FeaturePushResult.failed();
+        }
+    }
+
+    protected int reviewedServerMajor(AccountUtil.AccountData account) {
+        if (mNgwVersionMajor >= 5) return mNgwVersionMajor;
+        try {
+            Pair<Integer, Integer> version = NGWUtil.getNgwVersion(account.url, account.login, account.password);
+            return version == null ? -1 : version.first;
+        } catch (IOException | JSONException | NumberFormatException error) {
+            return -1;
+        }
+    }
+
+    protected HttpResponse requestFeatureTransaction(String method, String url, String body,
+            AccountUtil.AccountData account) throws IOException {
+        if (!"GET".equals(method) && !"POST".equals(method) && !"PUT".equals(method))
+            throw new IOException("Unsupported transaction request");
+        java.net.HttpURLConnection connection = NetworkUtil.getHttpConnection(method, url, account.login, account.password);
+        if (connection == null) throw new IOException("Cannot connect for transaction");
+        connection.setInstanceFollowRedirects(false);
+        boolean read = "GET".equals(method);
+        if (read) NgwSyncIo.registerReadConnection(connection);
+        try {
+            if (!read) {
+                byte[] bytes = (body == null ? "{}" : body).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setDoOutput(true);
+                connection.setFixedLengthStreamingMode(bytes.length);
+                try (java.io.OutputStream output = connection.getOutputStream()) { output.write(bytes); }
+            }
+            int code = connection.getResponseCode();
+            java.io.InputStream stream = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
+            java.io.ByteArrayOutputStream response = new java.io.ByteArrayOutputStream();
+            if (stream != null) try (java.io.InputStream input = stream) {
+                byte[] bytes = new byte[16384]; int count;
+                while ((count = input.read(bytes)) != -1) {
+                    if (read) NgwSyncIo.checkInterrupted();
+                    if (response.size() + (long) count > 16L * 1024 * 1024)
+                        throw new IOException("Transaction response exceeds the bounded budget");
+                    response.write(bytes, 0, count);
+                }
+            }
+            HttpResponse result = new HttpResponse(code, connection.getResponseMessage(), response.toString("UTF-8"));
+            result.setOk(code >= 200 && code < 300);
+            return result;
+        } finally {
+            if (read) NgwSyncIo.unregisterReadConnection(connection);
+            connection.disconnect();
+        }
     }
 
     protected boolean deleteFeatureOnServer(
@@ -4560,12 +4998,24 @@ public class NGWVectorLayer
         return name;
     }
 
+    /** SQLite originals are Mercator; Tx payloads keep that explicit source CRS until server preparation. */
+    private String cursorToTransactionJson(Cursor cursor) throws JSONException, IOException {
+        JSONObject body = new JSONObject(cursorToJson(cursor));
+        if (body.has(NGWUtil.NGWKEY_GEOM)) {
+            GeoGeometry geometry = GeoGeometryFactory.fromBlob(cursor.getBlob(cursor.getColumnIndexOrThrow(Constants.FIELD_GEOM)));
+            geometry.setCRS(GeoConstants.CRS_WEB_MERCATOR);
+            body.put(NGWUtil.NGWKEY_GEOM, geometry.toWKT(true));
+        }
+        return body.toString();
+    }
+
     protected String cursorToJson(Cursor cursor)
             throws JSONException, IOException
     {
         JSONObject rootObject = new JSONObject();
         if (0 != (mSyncType & Constants.SYNC_ATTRIBUTES)) {
             JSONObject valueObject = new JSONObject();
+            boolean omitServerHistory = hasVerifiedLisaHistorySource();
 
             for (int i = 0; i < cursor.getColumnCount(); i++) {
                 String columnName = cursor.getColumnName(i);
@@ -4574,6 +5024,9 @@ public class NGWVectorLayer
                 }
 
                 String fieldName = unNormalizeName(columnName);
+                if (omitServerHistory && LisaHistoryFields.isServerManaged(fieldName)) {
+                    continue;
+                }
 
                 Field field = mFields.get(columnName);
                 if (null == field) {
@@ -4785,13 +5238,12 @@ public class NGWVectorLayer
 
 
     /**
-     * Indicate if layer can send changes to remote server
-     *
-     * @return true if layer can send changes to remote server or false
+     * Whether the layer has no writable remote destination. Local editing has its own policy.
      */
     public boolean isRemoteReadOnly()
     {
-        return !(mNGWLayerType == Connection.NGWResourceTypeVectorLayer || mNGWLayerType == NGWResourceTypePostgisLayer);
+        return TextUtils.isEmpty(mAccountName)
+                || !(mNGWLayerType == Connection.NGWResourceTypeVectorLayer || mNGWLayerType == NGWResourceTypePostgisLayer);
     }
 
 
